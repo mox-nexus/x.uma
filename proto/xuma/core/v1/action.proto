@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package xuma.core.v1;
+
+option java_package = "io.xuma.core.v1";
+option java_outer_classname = "ActionProto";
+option java_multiple_files = true;
+
+// Generic action that returns a named result.
+// Used as a base action type across domains.
+message NamedAction {
+  // Action identifier returned on match.
+  string name = 1;
+
+  // Optional metadata attached to the action.
+  map<string, string> metadata = 2;
+}

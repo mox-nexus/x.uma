@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package xuma.claude.v1;
+
+option java_package = "io.xuma.claude.v1";
+option java_outer_classname = "ContextProto";
+option java_multiple_files = true;
+
+// Context passed to matchers for Claude Code hook evaluation.
+message HookContext {
+  // Hook event type.
+  string event_type = 1;
+
+  // Tool being invoked (for tool-related hooks).
+  string tool_name = 2;
+
+  // Tool arguments as key-value pairs.
+  map<string, string> tool_args = 3;
+
+  // Current session ID.
+  string session_id = 4;
+
+  // Current working directory.
+  string cwd = 5;
+
+  // Git branch (if in a git repo).
+  string git_branch = 6;
+}
+
+// Action to allow the tool use to proceed.
+message AllowAction {
+  // Optional message to display.
+  string message = 1;
+}
+
+// Action to block the tool use.
+message BlockAction {
+  // Reason for blocking (displayed to user).
+  string reason = 1;
+}
+
+// Action to modify the tool use.
+message ModifyAction {
+  // Modified tool arguments.
+  map<string, string> modified_args = 1;
+
+  // Optional message explaining the modification.
+  string message = 2;
+}

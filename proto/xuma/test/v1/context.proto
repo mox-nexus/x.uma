@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package xuma.test.v1;
+
+option java_package = "io.xuma.test.v1";
+option java_outer_classname = "ContextProto";
+option java_multiple_files = true;
+
+// Test context passed to matchers during conformance testing.
+// Provides data that inputs extract from.
+message TestContext {
+  // Simple string value (for StringInput).
+  string string_value = 1;
+
+  // Map of string values (for MapInput).
+  map<string, string> map_values = 2;
+
+  // Optional bytes value for binary matching.
+  bytes bytes_value = 3;
+}

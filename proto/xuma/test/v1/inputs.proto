@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package xuma.test.v1;
+
+option java_package = "io.xuma.test.v1";
+option java_outer_classname = "InputsProto";
+option java_multiple_files = true;
+
+// Simple string input for conformance testing.
+// Extracts a single string value from test context.
+message StringInput {
+  // The string value to match against.
+  string value = 1;
+}
+
+// Map-based input for conformance testing.
+// Extracts a value from a string map by key (like headers).
+message MapInput {
+  // Key to extract from the map.
+  string key = 1;
+}
+
+// Input that always returns the specified value.
+// Useful for testing matcher logic in isolation.
+message ConstantInput {
+  // The constant value to return.
+  string value = 1;
+}

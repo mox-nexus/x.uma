@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package xuma.claude.v1;
+
+option java_package = "io.xuma.claude.v1";
+option java_outer_classname = "InputsProto";
+option java_multiple_files = true;
+
+// Extracts the hook event type.
+// Values: "PreToolUse", "PostToolUse", "Stop", "SessionStart", etc.
+message EventTypeInput {}
+
+// Extracts the tool name being invoked.
+// Values: "Bash", "Read", "Write", "Edit", etc.
+message ToolNameInput {}
+
+// Extracts a tool argument value by name.
+message ToolArgInput {
+  // Argument name to extract.
+  string name = 1;
+}
+
+// Extracts the session ID.
+message SessionIdInput {}
+
+// Extracts the current working directory.
+message CwdInput {}

@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package xuma.http.v1;
+
+option java_package = "io.xuma.http.v1";
+option java_outer_classname = "InputsProto";
+option java_multiple_files = true;
+
+// Extracts an HTTP header value by name.
+message HeaderInput {
+  // Header name to extract (case-insensitive).
+  string name = 1;
+}
+
+// Extracts the HTTP request path.
+message PathInput {}
+
+// Extracts the HTTP request method.
+message MethodInput {}
+
+// Extracts a query parameter value by name.
+message QueryParamInput {
+  // Query parameter name.
+  string name = 1;
+}
+
+// Extracts the HTTP host/authority.
+message HostInput {}
+
+// Extracts the HTTP scheme (http/https).
+message SchemeInput {}
