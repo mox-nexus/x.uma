@@ -1,0 +1,17 @@
+[package]
+name = "rumi-domains"
+description = "Domain adapters for r.umi (HTTP, Claude, etc.)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["test"]
+test = []    # xuma.test.v1 domain (always available for testing)
+http = []    # xuma.http.v1 domain
+claude = []  # xuma.claude.v1 domain
+full = ["test", "http", "claude"]
+
+[dependencies]
+rumi-core.workspace = true

@@ -1,0 +1,16 @@
+[package]
+name = "rumi-proto"
+description = "Proto types and registry for r.umi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+
+[dependencies]
+rumi-core.workspace = true
+prost.workspace = true
+prost-types.workspace = true
+thiserror.workspace = true
