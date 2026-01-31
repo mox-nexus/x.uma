@@ -27,23 +27,34 @@ fi
 # 2. Rust validation (if any Rust files staged)
 if git diff --cached --name-only | grep -q "\.rs$"; then
     echo ">>> Rust Validation"
-    
-    # Format check
-    echo "Checking formatting..."
-    cargo fmt --manifest-path rumi/Cargo.toml --all -- --check || { echo "Format check failed. Run: just fmt"; exit 1; }
-    
-    # Clippy
-    echo "Running clippy..."
-    cargo clippy --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic -D warnings || { echo "Clippy failed"; exit 1; }
-    
+
+    # Check if fixes needed (don't fail yet)
+    NEEDS_FMT=0
+    NEEDS_CLIPPY=0
+
+    cargo fmt --manifest-path rumi/Cargo.toml --all -- --check 2>/dev/null || NEEDS_FMT=1
+    cargo clippy --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic -D warnings 2>/dev/null || NEEDS_CLIPPY=1
+
+    # Auto-fix if needed, then fail so user re-stages
+    if [ "$NEEDS_CLIPPY" -eq 1 ] || [ "$NEEDS_FMT" -eq 1 ]; then
+        echo "Auto-fixing issues..."
+        cargo clippy --manifest-path rumi/Cargo.toml --workspace --fix --allow-dirty -- -W clippy::pedantic 2>/dev/null || true
+        cargo fmt --manifest-path rumi/Cargo.toml --all
+        echo ""
+        echo "Files fixed. Run 'git add -u && git commit' again."
+        exit 1
+    fi
+
+    echo "Format and clippy: OK"
+
     # Tests
     echo "Running tests..."
     cargo test --manifest-path rumi/Cargo.toml --workspace || { echo "Tests failed"; exit 1; }
-    
+
     # no_std check
     echo "Verifying no_std compatibility..."
     cargo build --manifest-path rumi/Cargo.toml -p rumi-core --no-default-features --features alloc || { echo "no_std build failed"; exit 1; }
-    
+
     echo ""
 fi
 

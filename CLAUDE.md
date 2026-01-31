@@ -206,3 +206,13 @@ On new session, read `scratch/next-session.md` and confirm understanding with us
 2. **Implement to pass fixture**
 3. **Benchmark** (catch regressions early)
 4. Use `just build`, `just test`, `just lint` for common tasks
+
+### Code Quality Principles
+
+1. **Always fix, never skip** — when lints/checks fail, fix immediately. Don't ask whether to skip.
+2. **clippy --fix then fmt** — always run both in sequence before committing:
+   ```bash
+   cargo clippy --fix --allow-dirty --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic
+   cargo fmt --manifest-path rumi/Cargo.toml --all
+   ```
+3. **Pre-commit auto-fixes** — if the hook fails, it auto-fixes and you re-stage + commit again.
