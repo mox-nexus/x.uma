@@ -22,51 +22,51 @@ breaking:
     buf breaking --against '.git#branch=main'
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Rust (r.umi)
+# Rust (rumi)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Build all Rust crates
 build:
-    cargo build --manifest-path r.umi/Cargo.toml --workspace
+    cargo build --manifest-path rumi/Cargo.toml --workspace
 
 # Build with all features
 build-full:
-    cargo build --manifest-path r.umi/Cargo.toml --workspace --all-features
+    cargo build --manifest-path rumi/Cargo.toml --workspace --all-features
 
 # Run tests
 test:
-    cargo test --manifest-path r.umi/Cargo.toml --workspace
+    cargo test --manifest-path rumi/Cargo.toml --workspace
 
 # Run tests with all features
 test-full:
-    cargo test --manifest-path r.umi/Cargo.toml --workspace --all-features
+    cargo test --manifest-path rumi/Cargo.toml --workspace --all-features
 
 # Run clippy lints
 lint:
-    cargo clippy --manifest-path r.umi/Cargo.toml --workspace -- -W clippy::pedantic
+    cargo clippy --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic
 
 # Format code
 fmt:
-    cargo fmt --manifest-path r.umi/Cargo.toml --all
+    cargo fmt --manifest-path rumi/Cargo.toml --all
 
 # Check formatting
 fmt-check:
-    cargo fmt --manifest-path r.umi/Cargo.toml --all -- --check
+    cargo fmt --manifest-path rumi/Cargo.toml --all -- --check
 
 # Run all checks (lint + fmt-check + test)
 check: lint fmt-check test
 
 # Build documentation
 doc:
-    cargo doc --manifest-path r.umi/Cargo.toml --workspace --no-deps --open
+    cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps --open
 
 # Run benchmarks
 bench:
-    cargo bench --manifest-path r.umi/Cargo.toml
+    cargo bench --manifest-path rumi/Cargo.toml
 
 # Verify no_std compatibility
 check-no-std:
-    cargo build --manifest-path r.umi/Cargo.toml -p rumi-core --no-default-features --features alloc
+    cargo build --manifest-path rumi/Cargo.toml -p rumi-core --no-default-features --features alloc
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Conformance Testing
@@ -82,11 +82,11 @@ test-fixtures:
 
 # Watch and rebuild on changes
 watch:
-    cargo watch --manifest-path r.umi/Cargo.toml -x build
+    cargo watch --manifest-path rumi/Cargo.toml -x build
 
 # Clean build artifacts
 clean:
-    cargo clean --manifest-path r.umi/Cargo.toml
+    cargo clean --manifest-path rumi/Cargo.toml
     rm -rf spike/target
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -95,10 +95,10 @@ clean:
 
 # Dry-run publish
 publish-dry:
-    cargo publish --manifest-path r.umi/rumi-core/Cargo.toml --dry-run
-    cargo publish --manifest-path r.umi/rumi-proto/Cargo.toml --dry-run
-    cargo publish --manifest-path r.umi/rumi-domains/Cargo.toml --dry-run
-    cargo publish --manifest-path r.umi/rumi/Cargo.toml --dry-run
+    cargo publish --manifest-path rumi/rumi-core/Cargo.toml --dry-run
+    cargo publish --manifest-path rumi/rumi-proto/Cargo.toml --dry-run
+    cargo publish --manifest-path rumi/rumi-domains/Cargo.toml --dry-run
+    cargo publish --manifest-path rumi/rumi/Cargo.toml --dry-run
 
 # Security audit
 audit:

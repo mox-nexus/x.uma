@@ -6,10 +6,10 @@ A matcher ecosystem implementing the xDS Unified Matcher API across multiple lan
 
 | Package | Language | Notes |
 |---------|----------|-------|
-| **r.umi** | Rust | Core engine (+ Rumi the poet) |
+| **rumi** | Rust | Core engine (+ Rumi the poet) |
 | **p.uma** | Python | PyO3/maturin bindings |
 
-WASM is a build target of r.umi (`wasm-pack`), not a separate package.
+WASM is a build target of rumi (`wasm-pack`), not a separate package.
 
 ## Design Philosophy: ACES
 
@@ -33,7 +33,7 @@ x.uma follows ACES principles using hexagonal architecture (ports & adapters) to
                                     │
                     ┌───────────────▼─────────────────┐
                     │            CORE                 │
-                    │         r.umi engine            │
+                    │         rumi engine            │
                     │   Matcher · Predicate · Tree    │
                     │      (pure, domain-agnostic)    │
                     └─────────────────────────────────┘
@@ -92,7 +92,7 @@ x.uma/
 │       └── .../                # more domains
 ├── spec/
 │   └── tests/                  # conformance test fixtures (YAML)
-├── r.umi/                      # Rust core (+ wasm-pack for WASM target)
+├── rumi/                      # Rust core (+ wasm-pack for WASM target)
 ├── p.uma/                      # Python bindings (PyO3/maturin)
 └── justfile                    # polyglot task orchestration
 ```
@@ -104,7 +104,7 @@ x.uma/
 | Proto codegen | buf.build |
 | Rust | Cargo workspace |
 | Python | uv + maturin |
-| WASM (optional) | wasm-pack (build target of r.umi) |
+| WASM (optional) | wasm-pack (build target of rumi) |
 | Task orchestration | just |
 | Conformance tests | YAML fixtures, native runners |
 
@@ -113,11 +113,11 @@ x.uma/
 | Implementation | Language | Role |
 |----------------|----------|------|
 | Envoy | C++ | Original, production-proven |
-| r.umi | Rust | Our reference |
+| rumi | Rust | Our reference |
 
 Envoy source: `~/oss/envoy/source/common/matcher/`
 
-## r.umi Type System (Envoy-Inspired)
+## rumi Type System (Envoy-Inspired)
 
 **Key insight from spike**: Type erasure at the **data level**, not the predicate level.
 
@@ -151,7 +151,7 @@ pub struct SinglePredicate<Ctx> {
 
 From official Envoy xDS proto research:
 
-| Concept | xDS Semantics | r.umi Implementation |
+| Concept | xDS Semantics | rumi Implementation |
 |---------|---------------|---------------------|
 | **OnMatch exclusivity** | `oneof { Matcher matcher = 1; Action action = 2; }` | `enum OnMatch<Ctx, A> { Action(A), Matcher(Box<Matcher>) }` |
 | **Nested matcher failure** | If nested matcher returns no-match, parent OnMatch fails | Continue to next field_matcher (no fallback) |
@@ -174,10 +174,10 @@ From 13-agent architecture review:
 | **DataInput None → false** | Dijkstra | `None` from `DataInput::get()` → predicate evaluates to `false`. |
 | **No unsafe impl** | Wolf | Let compiler derive Send/Sync — don't add restrictive bounds. |
 
-## r.umi Crate Structure
+## rumi Crate Structure
 
 ```
-r.umi/
+rumi/
 ├── rumi-core/      # Pure engine, no_std + alloc compatible
 ├── rumi-proto/     # Proto types + ExtensionRegistry
 ├── rumi-domains/   # Feature-gated adapters (test, http, claude)
@@ -195,6 +195,10 @@ Dependencies point inward: `rumi → rumi-domains → rumi-core`, `rumi → rumi
 ### Conformance Tests
 
 All implementations must pass all fixtures in `spec/tests/`. The fixture suite is the source of truth for correctness.
+
+### Session Start
+
+On new session, read `scratch/next-session.md` and confirm understanding with user before proceeding.
 
 ### Development Workflow
 

@@ -1,0 +1,20 @@
+[package]
+name = "rumi"
+description = "rumi - Rust implementation of xDS Unified Matcher API"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["std", "test"]
+std = ["rumi-core/std"]
+test = ["rumi-domains/test"]
+http = ["rumi-domains/http"]
+claude = ["rumi-domains/claude"]
+full = ["test", "http", "claude"]
+
+[dependencies]
+rumi-core.workspace = true
+rumi-proto.workspace = true
+rumi-domains.workspace = true

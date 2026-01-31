@@ -1,0 +1,55 @@
+#!/bin/bash
+# Git pre-commit hook for x.uma
+# Validates proto, Rust, and arch constraints before commit
+
+set -e
+
+XUMA_ROOT="$(git rev-parse --show-toplevel)"
+cd "$XUMA_ROOT"
+
+echo "=== x.uma Pre-commit Validation ==="
+echo ""
+
+# 1. Proto validation (if any proto files staged)
+if git diff --cached --name-only | grep -q "\.proto$"; then
+    echo ">>> Proto Validation"
+    buf lint proto/ || { echo "Proto lint failed"; exit 1; }
+    
+    # Check for breaking changes if on a branch
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    if [ "$BRANCH" != "main" ]; then
+        echo "Checking for breaking changes..."
+        buf breaking proto/ --against ".git#branch=main" || { echo "Breaking change detected"; exit 1; }
+    fi
+    echo ""
+fi
+
+# 2. Rust validation (if any Rust files staged)
+if git diff --cached --name-only | grep -q "\.rs$"; then
+    echo ">>> Rust Validation"
+    
+    # Format check
+    echo "Checking formatting..."
+    cargo fmt --manifest-path rumi/Cargo.toml --all -- --check || { echo "Format check failed. Run: just fmt"; exit 1; }
+    
+    # Clippy
+    echo "Running clippy..."
+    cargo clippy --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic -D warnings || { echo "Clippy failed"; exit 1; }
+    
+    # Tests
+    echo "Running tests..."
+    cargo test --manifest-path rumi/Cargo.toml --workspace || { echo "Tests failed"; exit 1; }
+    
+    # no_std check
+    echo "Verifying no_std compatibility..."
+    cargo build --manifest-path rumi/Cargo.toml -p rumi-core --no-default-features --features alloc || { echo "no_std build failed"; exit 1; }
+    
+    echo ""
+fi
+
+# 3. Arch constraint validation
+echo ">>> Arch Constraint Validation"
+"${XUMA_ROOT}/.claude/scripts/check-constraints.sh" "$XUMA_ROOT" || { echo "Constraint check failed"; exit 1; }
+
+echo ""
+echo "=== All checks passed ==="

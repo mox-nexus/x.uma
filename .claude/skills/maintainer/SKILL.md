@@ -21,7 +21,7 @@ The goal: sustainable excellence — no rewrites needed. Growth happens at edges
 
 | Package | Language | Role |
 |---------|----------|------|
-| **r.umi** | Rust | Core engine (the reference implementation) |
+| **rumi** | Rust | Core engine (the reference implementation) |
 | **p.uma** | Python | PyO3/maturin bindings |
 | **j.uma** | TypeScript | WASM bindings via wasm-pack |
 
@@ -35,7 +35,7 @@ x.uma/
 │       ├── http/v1/
 │       └── claude/v1/
 ├── spec/tests/                 # conformance fixtures (YAML)
-├── r.umi/                      # Rust workspace member
+├── rumi/                      # Rust workspace member
 ├── p.uma/                      # Python package (uv + maturin)
 ├── j.uma/                      # TypeScript/WASM
 └── justfile                    # task orchestration
@@ -73,9 +73,9 @@ Type URLs: `type.googleapis.com/xuma.http.v1.HeaderInput`
 
 | Adding... | Location | Why |
 |-----------|----------|-----|
-| Matcher evaluation logic | `r.umi/rumi-core/src/` | Core, domain-agnostic |
+| Matcher evaluation logic | `rumi/rumi-core/src/` | Core, domain-agnostic |
 | New input/action type | `proto/xuma/<domain>/v1/` | Extension, domain-specific |
-| DataInput impl | `r.umi/rumi-domains/src/<domain>.rs` | Adapter behind port |
+| DataInput impl | `rumi/rumi-domains/src/<domain>.rs` | Adapter behind port |
 | Python-specific wrapper | `p.uma/python/` | Binding ergonomics |
 | Conformance test case | `spec/tests/<matcher-type>/` | Source of truth |
 
@@ -85,9 +85,9 @@ Type URLs: `type.googleapis.com/xuma.http.v1.HeaderInput`
 
 ## Naming Convention (xDS Alignment)
 
-r.umi uses xDS naming throughout for ecosystem compatibility:
+rumi uses xDS naming throughout for ecosystem compatibility:
 
-| xDS Term | r.umi Type | Purpose |
+| xDS Term | rumi Type | Purpose |
 |----------|------------|---------|
 | DataInput | `trait DataInput<Ctx>` | Extracts data from context |
 | InputMatcher | `trait InputMatcher<V>` | Matches extracted values |
@@ -114,7 +114,7 @@ Methods follow Envoy's naming (`get()`, `matches()`, `evaluate()`).
 ### Build Order
 
 ```
-r.umi (no deps) → p.uma (depends on r.umi) → j.uma (depends on r.umi)
+rumi (no deps) → p.uma (depends on rumi) → j.uma (depends on rumi)
 ```
 
 ### Development Workflow
@@ -203,14 +203,14 @@ cases:
 1. Create proto: `proto/xuma/grpc/v1/inputs.proto`
 2. Define input types (e.g., `MethodInput`, `MetadataInput`)
 3. Run `just gen` to generate bindings
-4. Implement adapter in `r.umi/src/adapters/grpc.rs`
+4. Implement adapter in `rumi/src/adapters/grpc.rs`
 5. Register in extension registry
 6. Add conformance tests in `spec/tests/grpc/`
 
 ### Adding a New Matcher Type to Core
 
 1. Check if xDS already defines it (probably does)
-2. Implement evaluation logic in `r.umi/src/matchers/`
+2. Implement evaluation logic in `rumi/src/matchers/`
 3. Add conformance tests first (TDD)
 4. Ensure all three implementations pass
 
@@ -232,3 +232,23 @@ cases:
 | on_no_match recursion | Can trigger another matcher, not just an action |
 | keep_matching flag | Match succeeds but evaluation continues (audit patterns) |
 | TypedExtensionConfig resolution | Name lookup happens at runtime; typos fail late |
+
+---
+
+## References
+
+For detailed documentation, see:
+
+| Need | Load |
+|------|------|
+| Arch-guild constraints | [arch-constraints.md](references/arch-constraints.md) |
+| xDS specification details | [xds-semantics.md](references/xds-semantics.md) |
+| Build system workflows | [build-system.md](references/build-system.md) |
+
+## Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/validate` | Run full validation suite |
+| `/check-breaking` | Check for breaking changes |
+| `/audit` | Run constraint auditor agent |
