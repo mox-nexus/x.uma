@@ -56,9 +56,28 @@ fmt-check:
 # Run all checks (lint + fmt-check + test)
 check: lint fmt-check test
 
-# Build documentation
+# Build Rust documentation
 doc:
     cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps --open
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Documentation Site
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Build full docs site (mdbook + rustdoc + proto)
+docs-build:
+    mkdir -p docs/src/generated/rust docs/src/generated/proto
+    cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps
+    cp -r rumi/target/doc/* docs/src/generated/rust/
+    mdbook build docs
+
+# Serve docs locally with hot reload
+docs-serve:
+    mdbook serve docs --open
+
+# Clean generated docs
+docs-clean:
+    rm -rf docs/book docs/src/generated
 
 # Run benchmarks
 bench:
