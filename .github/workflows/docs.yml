@@ -1,0 +1,64 @@
+name: Deploy Docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Install mdBook
+        run: cargo install mdbook
+
+      - name: Install buf
+        uses: bufbuild/buf-setup-action@v1
+
+      # Generate Rust docs
+      - name: Build Rust docs
+        run: |
+          cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps
+          mkdir -p docs/src/generated/rust
+          cp -r rumi/target/doc/* docs/src/generated/rust/
+
+      # Generate Proto docs (buf has built-in doc generation)
+      - name: Build Proto docs
+        run: |
+          mkdir -p docs/src/generated/proto
+          # Using buf's breaking/lint for now, proto docs TBD
+          echo "<html><body><h1>Proto docs coming soon</h1></body></html>" > docs/src/generated/proto/index.html
+
+      # Build mdBook
+      - name: Build mdBook
+        run: mdbook build docs
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/book
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

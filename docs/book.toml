@@ -1,0 +1,26 @@
+[book]
+title = "x.uma"
+description = "Cross-Platform Unified Matcher API"
+authors = ["mox-labs"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+create-missing = true
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "coal"
+git-repository-url = "https://github.com/mox-labs/x.uma"
+edit-url-template = "https://github.com/mox-labs/x.uma/edit/main/docs/{path}"
+site-url = "/x.uma/"
+
+# Rust playground integration
+[output.html.playground]
+editable = true
+copyable = true
+runnable = true
+
+[output.html.code]
+hidelines = { rust = "#" }
