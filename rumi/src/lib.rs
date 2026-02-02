@@ -1,7 +1,7 @@
-//! rumi-core: Pure matcher engine for rumi
+//! rumi - Rust implementation of xDS Unified Matcher API
 //!
-//! This crate provides the core types and traits for the xDS Unified Matcher API.
-//! It is designed to be `no_std` compatible (with alloc) for embedded/WASM use cases.
+//! A matcher engine implementing the xDS Unified Matcher API specification.
+//! Designed for `no_std` compatibility (with alloc) for embedded/WASM use cases.
 //!
 //! # Architecture (Envoy-inspired)
 //!
@@ -28,11 +28,7 @@
 //! # Example
 //!
 //! ```
-//! use rumi_core::{
-//!     DataInput, InputMatcher, MatchingData,
-//!     ExactMatcher, SinglePredicate, Predicate,
-//!     FieldMatcher, Matcher, OnMatch,
-//! };
+//! use rumi::prelude::*;
 //!
 //! // Define a context
 //! #[derive(Debug)]
@@ -66,6 +62,15 @@
 //! let result = matcher.evaluate(&Request { path: "/api".to_string() });
 //! assert_eq!(result, Some("api_backend".to_string()));
 //! ```
+//!
+//! # Features
+//!
+//! - `std` (default) — Standard library support
+//! - `alloc` — `no_std` with alloc support
+//! - `test-domain` — Testing domain adapters
+//! - `http` — HTTP request matching adapters
+//! - `claude` — Claude Code hooks adapters
+//! - `proto` — Protobuf types and registry
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -83,6 +88,9 @@ mod matcher;
 mod matching_data;
 mod on_match;
 mod predicate;
+
+#[cfg(any(feature = "test-domain", feature = "http", feature = "claude"))]
+pub mod adapters;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Public API
@@ -107,20 +115,20 @@ pub use input_matcher::{BoolMatcher, ContainsMatcher, ExactMatcher, PrefixMatche
 /// Prelude module for convenient imports.
 ///
 /// ```
-/// use rumi_core::prelude::*;
+/// use rumi::prelude::*;
 /// ```
 pub mod prelude {
     pub use crate::{
+        // Concrete matchers
         BoolMatcher,
         ContainsMatcher,
         // Traits
         DataInput,
-        // Concrete matchers
         ExactMatcher,
+        // Core types
         FieldMatcher,
         InputMatcher,
         Matcher,
-        // Core types
         MatchingData,
         OnMatch,
         Predicate,

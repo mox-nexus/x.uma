@@ -25,40 +25,40 @@ breaking:
 # Rust (rumi)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Build all Rust crates
+# Build rumi
 build:
-    cargo build --manifest-path rumi/Cargo.toml --workspace
+    cargo build --manifest-path rumi/Cargo.toml
 
 # Build with all features
 build-full:
-    cargo build --manifest-path rumi/Cargo.toml --workspace --all-features
+    cargo build --manifest-path rumi/Cargo.toml --all-features
 
 # Run tests
 test:
-    cargo test --manifest-path rumi/Cargo.toml --workspace
+    cargo test --manifest-path rumi/Cargo.toml
 
 # Run tests with all features
 test-full:
-    cargo test --manifest-path rumi/Cargo.toml --workspace --all-features
+    cargo test --manifest-path rumi/Cargo.toml --all-features
 
 # Run clippy lints
 lint:
-    cargo clippy --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic
+    cargo clippy --manifest-path rumi/Cargo.toml -- -W clippy::pedantic
 
 # Format code
 fmt:
-    cargo fmt --manifest-path rumi/Cargo.toml --all
+    cargo fmt --manifest-path rumi/Cargo.toml
 
 # Check formatting
 fmt-check:
-    cargo fmt --manifest-path rumi/Cargo.toml --all -- --check
+    cargo fmt --manifest-path rumi/Cargo.toml -- --check
 
 # Run all checks (lint + fmt-check + test)
 check: lint fmt-check test
 
 # Build Rust documentation
 doc:
-    cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps --open
+    cargo doc --manifest-path rumi/Cargo.toml --no-deps --open
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Documentation Site
@@ -67,7 +67,7 @@ doc:
 # Build full docs site (mdbook + rustdoc + proto)
 docs-build:
     mkdir -p docs/src/generated/rust docs/src/generated/proto
-    cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps
+    cargo doc --manifest-path rumi/Cargo.toml --no-deps
     cp -r rumi/target/doc/* docs/src/generated/rust/
     mdbook build docs
 
@@ -85,7 +85,7 @@ bench:
 
 # Verify no_std compatibility
 check-no-std:
-    cargo build --manifest-path rumi/Cargo.toml -p rumi-core --no-default-features --features alloc
+    cargo build --manifest-path rumi/Cargo.toml --no-default-features --features alloc
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Conformance Testing
@@ -106,7 +106,6 @@ watch:
 # Clean build artifacts
 clean:
     cargo clean --manifest-path rumi/Cargo.toml
-    rm -rf spike/target
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Release
@@ -114,10 +113,7 @@ clean:
 
 # Dry-run publish
 publish-dry:
-    cargo publish --manifest-path rumi/rumi-core/Cargo.toml --dry-run
-    cargo publish --manifest-path rumi/rumi-proto/Cargo.toml --dry-run
-    cargo publish --manifest-path rumi/rumi-domains/Cargo.toml --dry-run
-    cargo publish --manifest-path rumi/rumi/Cargo.toml --dry-run
+    cargo publish --manifest-path rumi/Cargo.toml --dry-run
 
 # Security audit
 audit:

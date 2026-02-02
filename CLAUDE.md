@@ -194,15 +194,27 @@ From 13-agent architecture review:
 
 ## rumi Crate Structure
 
+Single crate with feature-gated modules:
+
 ```
 rumi/
-├── rumi-core/      # Pure engine, no_std + alloc compatible
-├── rumi-proto/     # Proto types + ExtensionRegistry
-├── rumi-domains/   # Feature-gated adapters (test, http, claude)
-└── rumi/           # Facade crate
+├── Cargo.toml
+└── src/
+    ├── lib.rs           # Public API + prelude
+    ├── matcher.rs       # Matcher<Ctx, A>
+    ├── predicate.rs     # Predicate, SinglePredicate
+    ├── data_input.rs    # DataInput trait
+    ├── input_matcher.rs # InputMatcher trait + ExactMatcher, etc.
+    ├── matching_data.rs # MatchingData enum
+    ├── field_matcher.rs # FieldMatcher
+    ├── on_match.rs      # OnMatch enum
+    └── adapters/        # Feature-gated domain adapters
+        ├── test.rs      # test-domain feature
+        ├── http.rs      # http feature
+        └── claude.rs    # claude feature
 ```
 
-Dependencies point inward: `rumi → rumi-domains → rumi-core`, `rumi → rumi-proto → rumi-core`.
+Features: `std` (default), `alloc`, `test-domain`, `http`, `claude`, `proto`.
 
 ## Working Conventions
 
@@ -230,7 +242,7 @@ On new session, read `scratch/next-session.md` and confirm understanding with us
 1. **Always fix, never skip** — when lints/checks fail, fix immediately. Don't ask whether to skip.
 2. **clippy --fix then fmt** — always run both in sequence before committing:
    ```bash
-   cargo clippy --fix --allow-dirty --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic
-   cargo fmt --manifest-path rumi/Cargo.toml --all
+   cargo clippy --fix --allow-dirty --manifest-path rumi/Cargo.toml -- -W clippy::pedantic
+   cargo fmt --manifest-path rumi/Cargo.toml
    ```
 3. **Pre-commit auto-fixes** — if the hook fails, it auto-fixes and you re-stage + commit again.

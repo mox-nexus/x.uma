@@ -27,7 +27,7 @@ use std::vec::Vec;
 /// # Example
 ///
 /// ```
-/// use rumi_core::MatchingData;
+/// use rumi::MatchingData;
 ///
 /// let data = MatchingData::String("hello".to_string());
 /// assert_eq!(data.as_str(), Some("hello"));
@@ -58,7 +58,7 @@ impl MatchingData {
     /// # Example
     ///
     /// ```
-    /// use rumi_core::MatchingData;
+    /// use rumi::MatchingData;
     ///
     /// assert!(MatchingData::None.is_none());
     /// assert!(!MatchingData::String("x".to_string()).is_none());
@@ -102,7 +102,7 @@ impl MatchingData {
     /// # Example
     ///
     /// ```
-    /// use rumi_core::MatchingData;
+    /// use rumi::MatchingData;
     ///
     /// let data = MatchingData::String("hello".to_string());
     /// assert_eq!(data.as_str(), Some("hello"));

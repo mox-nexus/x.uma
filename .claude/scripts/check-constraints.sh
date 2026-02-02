@@ -22,7 +22,7 @@ echo "OK"
 
 # 2. Max depth constant exists
 echo -n "2. Max Depth Constant... "
-if ! grep -rq "MAX.*DEPTH" "$XUMA_ROOT/rumi/rumi-core/src/" 2>/dev/null; then
+if ! grep -rq "MAX.*DEPTH" "$XUMA_ROOT/rumi/src/" 2>/dev/null; then
     echo "WARN: MAX_DEPTH constant not found (may be implemented differently)"
 else
     echo "OK"
@@ -31,7 +31,7 @@ fi
 # 3. Type registry immutable (no &mut self on registry)
 echo -n "3. Type Registry Immutable... "
 if grep -rqE "impl.*Registry.*\{" "$XUMA_ROOT/rumi/" 2>/dev/null; then
-    if grep -rqE "&mut\s+self" "$XUMA_ROOT/rumi/rumi-proto/src/" 2>/dev/null | grep -qi "registry"; then
+    if grep -rqE "&mut\s+self" "$XUMA_ROOT/rumi/src/" 2>/dev/null | grep -qi "registry"; then
         echo "WARN: Registry may have mutable methods"
     else
         echo "OK"
@@ -43,7 +43,7 @@ fi
 # 4. Send + Sync + Debug (check for marker tests)
 echo -n "4. Send + Sync + Debug... "
 if grep -rq "assert_send_sync" "$XUMA_ROOT/rumi/" 2>/dev/null || \
-   grep -rq "Send + Sync" "$XUMA_ROOT/rumi/rumi-core/src/" 2>/dev/null; then
+   grep -rq "Send + Sync" "$XUMA_ROOT/rumi/src/" 2>/dev/null; then
     echo "OK"
 else
     echo "WARN: No Send+Sync marker tests found"
@@ -51,7 +51,7 @@ fi
 
 # 5. No recursive evaluate calls (check for explicit stack)
 echo -n "5. Iterative Evaluation... "
-RECURSIVE_CALLS=$(grep -rn "\.evaluate(" "$XUMA_ROOT/rumi/rumi-core/src/" 2>/dev/null | wc -l)
+RECURSIVE_CALLS=$(grep -rn "\.evaluate(" "$XUMA_ROOT/rumi/src/" 2>/dev/null | wc -l)
 if [ "$RECURSIVE_CALLS" -gt 5 ]; then
     echo "WARN: Multiple evaluate() calls found - verify they're not recursive"
 else
@@ -60,9 +60,9 @@ fi
 
 # 6. OnMatch is enum (not struct with Option fields)
 echo -n "6. OnMatch Exclusivity... "
-if grep -rq "enum OnMatch" "$XUMA_ROOT/rumi/rumi-core/src/" 2>/dev/null; then
+if grep -rq "enum OnMatch" "$XUMA_ROOT/rumi/src/" 2>/dev/null; then
     echo "OK"
-elif grep -rq "struct OnMatch" "$XUMA_ROOT/rumi/rumi-core/src/" 2>/dev/null; then
+elif grep -rq "struct OnMatch" "$XUMA_ROOT/rumi/src/" 2>/dev/null; then
     echo "FAIL: OnMatch should be enum, not struct"
     exit 1
 else
@@ -71,8 +71,8 @@ fi
 
 # 7. Action bounds include 'static
 echo -n "7. Action 'static... "
-if grep -rqE "Output:\s*'static" "$XUMA_ROOT/rumi/rumi-core/src/" 2>/dev/null || \
-   grep -rqE "A:\s*.*'static" "$XUMA_ROOT/rumi/rumi-core/src/" 2>/dev/null; then
+if grep -rqE "Output:\s*'static" "$XUMA_ROOT/rumi/src/" 2>/dev/null || \
+   grep -rqE "A:\s*.*'static" "$XUMA_ROOT/rumi/src/" 2>/dev/null; then
     echo "OK"
 else
     echo "WARN: 'static bound not found on action types"
@@ -80,7 +80,7 @@ fi
 
 # 8-9. Clone + Send + Sync bounds
 echo -n "8-9. Action Clone+Send+Sync... "
-if grep -rqE "Clone\s*\+\s*Send\s*\+\s*Sync" "$XUMA_ROOT/rumi/rumi-core/src/" 2>/dev/null; then
+if grep -rqE "Clone\s*\+\s*Send\s*\+\s*Sync" "$XUMA_ROOT/rumi/src/" 2>/dev/null; then
     echo "OK"
 else
     echo "WARN: Clone+Send+Sync bounds not found"

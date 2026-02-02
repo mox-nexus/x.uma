@@ -1,27 +1,31 @@
-[workspace]
-resolver = "2"
-members = ["rumi-core", "rumi-proto", "rumi-domains", "rumi"]
-
-[workspace.package]
+[package]
+name = "rumi"
+description = "Rust implementation of xDS Unified Matcher API"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yzavyas/x.uma"
+repository = "https://github.com/mox-labs/x.uma"
 authors = ["Yashodeep Vyas"]
+keywords = ["xds", "matcher", "envoy", "config"]
+categories = ["config", "data-structures"]
 
-[workspace.dependencies]
-# Internal crates
-rumi-core = { path = "rumi-core" }
-rumi-proto = { path = "rumi-proto" }
-rumi-domains = { path = "rumi-domains" }
+[features]
+default = ["std"]
+std = []
+alloc = []
 
-# Proto & serialization
-prost = "0.13"
-prost-types = "0.13"
+# Domain adapters
+test-domain = []
+http = []
+claude = []
 
-# Testing
+# Proto support (future)
+proto = ["dep:prost", "dep:prost-types"]
+
+[dependencies]
+prost = { version = "0.13", optional = true }
+prost-types = { version = "0.13", optional = true }
+
+[dev-dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
-
-# Development
-thiserror = "2"

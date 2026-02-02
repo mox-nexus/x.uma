@@ -34,7 +34,7 @@ use core::fmt::Debug;
 /// # Example
 ///
 /// ```
-/// use rumi_core::{InputMatcher, MatchingData, ExactMatcher};
+/// use rumi::{InputMatcher, MatchingData, ExactMatcher};
 ///
 /// let matcher = ExactMatcher::new("hello");
 /// assert!(matcher.matches(&MatchingData::String("hello".to_string())));
@@ -76,7 +76,7 @@ impl InputMatcher for Box<dyn InputMatcher> {
 /// # Example
 ///
 /// ```
-/// use rumi_core::{InputMatcher, MatchingData, ExactMatcher};
+/// use rumi::{InputMatcher, MatchingData, ExactMatcher};
 ///
 /// let matcher = ExactMatcher::new("hello");
 /// assert!(matcher.matches(&"hello".into()));
@@ -116,7 +116,7 @@ impl InputMatcher for ExactMatcher {
 /// # Example
 ///
 /// ```
-/// use rumi_core::{InputMatcher, MatchingData, PrefixMatcher};
+/// use rumi::{InputMatcher, MatchingData, PrefixMatcher};
 ///
 /// let matcher = PrefixMatcher::new("/api/");
 /// assert!(matcher.matches(&"/api/users".into()));
@@ -156,7 +156,7 @@ impl InputMatcher for PrefixMatcher {
 /// # Example
 ///
 /// ```
-/// use rumi_core::{InputMatcher, MatchingData, SuffixMatcher};
+/// use rumi::{InputMatcher, MatchingData, SuffixMatcher};
 ///
 /// let matcher = SuffixMatcher::new(".json");
 /// assert!(matcher.matches(&"data.json".into()));
@@ -195,7 +195,7 @@ impl InputMatcher for SuffixMatcher {
 /// # Example
 ///
 /// ```
-/// use rumi_core::{InputMatcher, MatchingData, ContainsMatcher};
+/// use rumi::{InputMatcher, MatchingData, ContainsMatcher};
 ///
 /// let matcher = ContainsMatcher::new("error");
 /// assert!(matcher.matches(&"connection error".into()));
@@ -239,7 +239,7 @@ impl InputMatcher for ContainsMatcher {
 /// # Example
 ///
 /// ```
-/// use rumi_core::{InputMatcher, MatchingData, BoolMatcher};
+/// use rumi::{InputMatcher, MatchingData, BoolMatcher};
 ///
 /// let matcher = BoolMatcher::new(true);
 /// assert!(matcher.matches(&MatchingData::Bool(true)));

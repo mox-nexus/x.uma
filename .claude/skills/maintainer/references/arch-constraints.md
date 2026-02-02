@@ -37,8 +37,8 @@ grep -r "regex!" rumi/  # macro that might use fancy-regex
 **Check:** Validate `MAX_DEPTH` constant exists and is ≤ 32.
 
 ```rust
-// In rumi-core/src/lib.rs or similar
-pub const MAX_MATCHER_DEPTH: usize = 32;
+// In rumi/src/lib.rs
+pub const MAX_DEPTH: usize = 32;
 ```
 
 **Why:** Unbounded nesting causes stack overflow. Envoy uses similar limits.
@@ -66,7 +66,7 @@ impl Registry {
 **Check:** All public types have these trait bounds.
 
 ```rust
-// Marker test in rumi-core
+// Marker test in rumi/src/
 fn assert_send_sync_debug<T: Send + Sync + std::fmt::Debug>() {}
 
 #[test]
@@ -85,7 +85,7 @@ fn public_types_are_ffi_safe() {
 
 ```bash
 # Should find no recursion
-grep -r "\.evaluate(" rumi/rumi-core/src/
+grep -r "\.evaluate(" rumi/src/
 # Review each hit - should be iterative with explicit stack
 ```
 
@@ -171,13 +171,13 @@ if grep -rq "fancy.regex" rumi/; then
 fi
 
 # 2. Max depth constant
-if ! grep -q "MAX.*DEPTH.*=.*[0-9]" rumi/rumi-core/src/; then
+if ! grep -q "MAX.*DEPTH.*=.*[0-9]" rumi/src/; then
     echo "FAIL: MAX_DEPTH constant not found"
     exit 1
 fi
 
 # 3-9: Run marker tests
-cargo test --manifest-path rumi/Cargo.toml -p rumi-core ffi_safe
+cargo test --manifest-path rumi/Cargo.toml ffi_safe
 
 echo "All constraints validated!"
 ```
