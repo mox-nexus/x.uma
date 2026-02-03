@@ -1,0 +1,36 @@
+name: "exact_string_match"
+description: "Tests exact string equality matching"
+
+matcher:
+  matchers:
+    - predicate:
+        single:
+          input: { key: "value" }
+          value_match: { exact: "hello" }
+      on_match:
+        action: "matched"
+
+cases:
+  - name: "exact_match"
+    context: { value: "hello" }
+    expect: "matched"
+
+  - name: "different_value"
+    context: { value: "world" }
+    expect: null
+
+  - name: "case_sensitive"
+    context: { value: "Hello" }
+    expect: null
+
+  - name: "partial_no_match"
+    context: { value: "hello world" }
+    expect: null
+
+  - name: "empty_vs_nonempty"
+    context: { value: "" }
+    expect: null
+
+  - name: "missing_key_returns_none"
+    context: { other: "hello" }
+    expect: null

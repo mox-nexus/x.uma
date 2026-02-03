@@ -67,10 +67,14 @@
 //!
 //! - `std` (default) — Standard library support
 //! - `alloc` — `no_std` with alloc support
-//! - `test-domain` — Testing domain adapters
-//! - `http` — HTTP request matching adapters
-//! - `claude` — Claude Code hooks adapters
-//! - `proto` — Protobuf types and registry
+//!
+//! # Extensions
+//!
+//! Domain-specific functionality is provided by extension crates:
+//!
+//! - [`rumi-test`](https://docs.rs/rumi-test) — Test domain for conformance
+//! - [`rumi-http`](https://docs.rs/rumi-http) — HTTP request matching
+//! - [`rumi-claude`](https://docs.rs/rumi-claude) — Claude Code hooks
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -88,9 +92,6 @@ mod matcher;
 mod matching_data;
 mod on_match;
 mod predicate;
-
-#[cfg(any(feature = "test-domain", feature = "http", feature = "claude"))]
-pub mod adapters;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Public API

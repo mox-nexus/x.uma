@@ -25,40 +25,40 @@ breaking:
 # Rust (rumi)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Build rumi
+# Build all crates
 build:
-    cargo build --manifest-path rumi/Cargo.toml
+    cargo build --manifest-path rumi/Cargo.toml --workspace
 
 # Build with all features
 build-full:
-    cargo build --manifest-path rumi/Cargo.toml --all-features
+    cargo build --manifest-path rumi/Cargo.toml --workspace --all-features
 
 # Run tests
 test:
-    cargo test --manifest-path rumi/Cargo.toml
+    cargo test --manifest-path rumi/Cargo.toml --workspace
 
 # Run tests with all features
 test-full:
-    cargo test --manifest-path rumi/Cargo.toml --all-features
+    cargo test --manifest-path rumi/Cargo.toml --workspace --all-features
 
 # Run clippy lints
 lint:
-    cargo clippy --manifest-path rumi/Cargo.toml -- -W clippy::pedantic
+    cargo clippy --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic
 
 # Format code
 fmt:
-    cargo fmt --manifest-path rumi/Cargo.toml
+    cargo fmt --manifest-path rumi/Cargo.toml --all
 
 # Check formatting
 fmt-check:
-    cargo fmt --manifest-path rumi/Cargo.toml -- --check
+    cargo fmt --manifest-path rumi/Cargo.toml --all -- --check
 
 # Run all checks (lint + fmt-check + test)
 check: lint fmt-check test
 
 # Build Rust documentation
 doc:
-    cargo doc --manifest-path rumi/Cargo.toml --no-deps --open
+    cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps --open
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Documentation Site
@@ -67,7 +67,7 @@ doc:
 # Build full docs site (mdbook + rustdoc + proto)
 docs-build:
     mkdir -p docs/src/generated/rust docs/src/generated/proto
-    cargo doc --manifest-path rumi/Cargo.toml --no-deps
+    cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps
     cp -r rumi/target/doc/* docs/src/generated/rust/
     mdbook build docs
 
@@ -83,9 +83,9 @@ docs-clean:
 bench:
     cargo bench --manifest-path rumi/Cargo.toml
 
-# Verify no_std compatibility
+# Verify no_std compatibility (core only)
 check-no-std:
-    cargo build --manifest-path rumi/Cargo.toml --no-default-features --features alloc
+    cargo build --manifest-path rumi/Cargo.toml -p rumi --no-default-features --features alloc
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Conformance Testing
@@ -93,7 +93,7 @@ check-no-std:
 
 # Run conformance fixtures
 test-fixtures:
-    @echo "Conformance fixture runner not yet implemented"
+    cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test conformance --features rumi-test/fixtures
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Development
@@ -113,7 +113,10 @@ clean:
 
 # Dry-run publish
 publish-dry:
-    cargo publish --manifest-path rumi/Cargo.toml --dry-run
+    cargo publish --manifest-path rumi/core/Cargo.toml --dry-run
+    cargo publish --manifest-path rumi/ext/test/Cargo.toml --dry-run
+    cargo publish --manifest-path rumi/ext/http/Cargo.toml --dry-run
+    cargo publish --manifest-path rumi/ext/claude/Cargo.toml --dry-run
 
 # Security audit
 audit:

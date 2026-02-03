@@ -1,0 +1,53 @@
+name: "nested_predicates"
+description: "Tests deeply nested predicate composition"
+
+matcher:
+  matchers:
+    # (role=admin OR role=superuser) AND status=active
+    - predicate:
+        and:
+          - or:
+              - single:
+                  input: { key: "role" }
+                  value_match: { exact: "admin" }
+              - single:
+                  input: { key: "role" }
+                  value_match: { exact: "superuser" }
+          - single:
+              input: { key: "status" }
+              value_match: { exact: "active" }
+      on_match:
+        action: "elevated_active"
+  on_no_match:
+    action: "denied"
+
+cases:
+  - name: "admin_active"
+    context:
+      role: "admin"
+      status: "active"
+    expect: "elevated_active"
+
+  - name: "superuser_active"
+    context:
+      role: "superuser"
+      status: "active"
+    expect: "elevated_active"
+
+  - name: "admin_inactive"
+    context:
+      role: "admin"
+      status: "inactive"
+    expect: "denied"
+
+  - name: "user_active"
+    context:
+      role: "user"
+      status: "active"
+    expect: "denied"
+
+  - name: "user_inactive"
+    context:
+      role: "user"
+      status: "inactive"
+    expect: "denied"

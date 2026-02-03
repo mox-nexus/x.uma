@@ -1,0 +1,52 @@
+name: "and_predicate"
+description: "Tests AND predicate composition (all must match)"
+
+matcher:
+  matchers:
+    - predicate:
+        and:
+          - single:
+              input: { key: "role" }
+              value_match: { exact: "admin" }
+          - single:
+              input: { key: "status" }
+              value_match: { exact: "active" }
+      on_match:
+        action: "allowed"
+  on_no_match:
+    action: "denied"
+
+cases:
+  - name: "both_match"
+    context:
+      role: "admin"
+      status: "active"
+    expect: "allowed"
+
+  - name: "first_fails"
+    context:
+      role: "user"
+      status: "active"
+    expect: "denied"
+
+  - name: "second_fails"
+    context:
+      role: "admin"
+      status: "inactive"
+    expect: "denied"
+
+  - name: "both_fail"
+    context:
+      role: "user"
+      status: "inactive"
+    expect: "denied"
+
+  - name: "first_missing"
+    context:
+      status: "active"
+    expect: "denied"
+
+  - name: "second_missing"
+    context:
+      role: "admin"
+    expect: "denied"

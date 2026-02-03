@@ -1,25 +1,33 @@
 #!/bin/bash
 # Git pre-commit hook for x.uma
 # Validates proto, Rust, and arch constraints before commit
+# Sources project-paths.sh for canonical path definitions
 
 set -e
 
-XUMA_ROOT="$(git rev-parse --show-toplevel)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/project-paths.sh"
+
 cd "$XUMA_ROOT"
 
 echo "=== x.uma Pre-commit Validation ==="
 echo ""
 
+# 0. Path consistency check
+echo ">>> Path Consistency"
+"${SCRIPTS_DIR}/check-path-consistency.sh" || { echo "Path references broken - update project-paths.sh"; exit 1; }
+echo ""
+
 # 1. Proto validation (if any proto files staged)
 if git diff --cached --name-only | grep -q "\.proto$"; then
     echo ">>> Proto Validation"
-    buf lint proto/ || { echo "Proto lint failed"; exit 1; }
+    buf lint "$PROTO_DIR/" || { echo "Proto lint failed"; exit 1; }
 
     # Check for breaking changes if on a branch
     BRANCH=$(git rev-parse --abbrev-ref HEAD)
     if [ "$BRANCH" != "main" ]; then
         echo "Checking for breaking changes..."
-        buf breaking proto/ --against ".git#branch=main" || { echo "Breaking change detected"; exit 1; }
+        buf breaking "$PROTO_DIR/" --against ".git#branch=main" || { echo "Breaking change detected"; exit 1; }
     fi
     echo ""
 fi
@@ -32,14 +40,14 @@ if git diff --cached --name-only | grep -q "\.rs$"; then
     NEEDS_FMT=0
     NEEDS_CLIPPY=0
 
-    cargo fmt --manifest-path rumi/Cargo.toml -- --check 2>/dev/null || NEEDS_FMT=1
-    cargo clippy --manifest-path rumi/Cargo.toml -- -W clippy::pedantic -D warnings 2>/dev/null || NEEDS_CLIPPY=1
+    cargo fmt --manifest-path "$RUST_MANIFEST" --all -- --check 2>/dev/null || NEEDS_FMT=1
+    cargo clippy --manifest-path "$RUST_MANIFEST" --workspace -- -W clippy::pedantic -D warnings 2>/dev/null || NEEDS_CLIPPY=1
 
     # Auto-fix if needed, then fail so user re-stages
     if [ "$NEEDS_CLIPPY" -eq 1 ] || [ "$NEEDS_FMT" -eq 1 ]; then
         echo "Auto-fixing issues..."
-        cargo clippy --manifest-path rumi/Cargo.toml --fix --allow-dirty -- -W clippy::pedantic 2>/dev/null || true
-        cargo fmt --manifest-path rumi/Cargo.toml
+        cargo clippy --manifest-path "$RUST_MANIFEST" --workspace --fix --allow-dirty -- -W clippy::pedantic 2>/dev/null || true
+        cargo fmt --manifest-path "$RUST_MANIFEST" --all
         echo ""
         echo "Files fixed. Run 'git add -u && git commit' again."
         exit 1
@@ -49,18 +57,18 @@ if git diff --cached --name-only | grep -q "\.rs$"; then
 
     # Tests
     echo "Running tests..."
-    cargo test --manifest-path rumi/Cargo.toml || { echo "Tests failed"; exit 1; }
+    cargo test --manifest-path "$RUST_MANIFEST" --workspace || { echo "Tests failed"; exit 1; }
 
-    # no_std check
+    # no_std check (core only)
     echo "Verifying no_std compatibility..."
-    cargo build --manifest-path rumi/Cargo.toml --no-default-features --features alloc || { echo "no_std build failed"; exit 1; }
+    cargo build --manifest-path "$RUST_MANIFEST" -p "$CRATE_CORE_PACKAGE" --no-default-features --features alloc || { echo "no_std build failed"; exit 1; }
 
     echo ""
 fi
 
 # 3. Arch constraint validation
 echo ">>> Arch Constraint Validation"
-"${XUMA_ROOT}/.claude/scripts/check-constraints.sh" "$XUMA_ROOT" || { echo "Constraint check failed"; exit 1; }
+"${SCRIPTS_DIR}/check-constraints.sh" || { echo "Constraint check failed"; exit 1; }
 
 echo ""
 echo "=== All checks passed ==="

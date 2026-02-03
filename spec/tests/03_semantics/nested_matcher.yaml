@@ -1,0 +1,111 @@
+name: "nested_matcher_success"
+description: "Tests nested matcher that successfully matches"
+
+matcher:
+  matchers:
+    - predicate:
+        single:
+          input: { key: "tier" }
+          value_match: { exact: "premium" }
+      on_match:
+        # Nested matcher for premium tier
+        matcher:
+          matchers:
+            - predicate:
+                single:
+                  input: { key: "feature" }
+                  value_match: { exact: "analytics" }
+              on_match:
+                action: "premium_analytics"
+            - predicate:
+                single:
+                  input: { key: "feature" }
+                  value_match: { exact: "export" }
+              on_match:
+                action: "premium_export"
+          on_no_match:
+            action: "premium_default"
+
+    - predicate:
+        single:
+          input: { key: "tier" }
+          value_match: { exact: "free" }
+      on_match:
+        action: "free_tier"
+
+  on_no_match:
+    action: "unknown_tier"
+
+cases:
+  - name: "nested_analytics"
+    context:
+      tier: "premium"
+      feature: "analytics"
+    expect: "premium_analytics"
+
+  - name: "nested_export"
+    context:
+      tier: "premium"
+      feature: "export"
+    expect: "premium_export"
+
+  - name: "nested_fallback"
+    context:
+      tier: "premium"
+      feature: "other"
+    expect: "premium_default"
+
+  - name: "free_tier"
+    context:
+      tier: "free"
+      feature: "analytics"
+    expect: "free_tier"
+
+  - name: "unknown_tier"
+    context:
+      tier: "enterprise"
+    expect: "unknown_tier"
+
+---
+name: "nested_matcher_failure_propagates"
+description: "Tests that nested matcher failure propagates to next field_matcher"
+
+matcher:
+  matchers:
+    # First rule: predicate matches, but nested matcher has no fallback
+    - predicate:
+        single:
+          input: { key: "tier" }
+          value_match: { exact: "premium" }
+      on_match:
+        matcher:
+          matchers:
+            - predicate:
+                single:
+                  input: { key: "feature" }
+                  value_match: { exact: "analytics" }
+              on_match:
+                action: "premium_analytics"
+          # NO on_no_match - nested failure propagates
+
+    # Second rule: fallback for premium tier
+    - predicate:
+        single:
+          input: { key: "tier" }
+          value_match: { exact: "premium" }
+      on_match:
+        action: "premium_fallback"
+
+cases:
+  - name: "nested_matches"
+    context:
+      tier: "premium"
+      feature: "analytics"
+    expect: "premium_analytics"
+
+  - name: "nested_fails_continues_to_next"
+    # Nested matcher returns None, so we continue to next field_matcher
+    context:
+      tier: "premium"
+      feature: "export"
+    expect: "premium_fallback"

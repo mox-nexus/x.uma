@@ -1,0 +1,36 @@
+name: "prefix_string_match"
+description: "Tests string prefix matching"
+
+matcher:
+  matchers:
+    - predicate:
+        single:
+          input: { key: "path" }
+          value_match: { prefix: "/api/" }
+      on_match:
+        action: "api_route"
+
+cases:
+  - name: "prefix_matches"
+    context: { path: "/api/users" }
+    expect: "api_route"
+
+  - name: "exact_prefix_matches"
+    context: { path: "/api/" }
+    expect: "api_route"
+
+  - name: "no_prefix"
+    context: { path: "/users" }
+    expect: null
+
+  - name: "prefix_in_middle_no_match"
+    context: { path: "/v2/api/users" }
+    expect: null
+
+  - name: "case_sensitive"
+    context: { path: "/API/users" }
+    expect: null
+
+  - name: "empty_string"
+    context: { path: "" }
+    expect: null

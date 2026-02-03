@@ -1,0 +1,31 @@
+name: "not_predicate"
+description: "Tests NOT predicate (inverts result)"
+
+matcher:
+  matchers:
+    - predicate:
+        not:
+          single:
+            input: { key: "status" }
+            value_match: { exact: "blocked" }
+      on_match:
+        action: "allowed"
+  on_no_match:
+    action: "blocked"
+
+cases:
+  - name: "not_blocked_allowed"
+    context:
+      status: "active"
+    expect: "allowed"
+
+  - name: "blocked_denied"
+    context:
+      status: "blocked"
+    expect: "blocked"
+
+  - name: "missing_key_inverts_none"
+    # None from DataInput -> predicate is false -> NOT(false) = true
+    context:
+      other: "value"
+    expect: "allowed"

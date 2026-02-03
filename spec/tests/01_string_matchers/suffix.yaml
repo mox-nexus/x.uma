@@ -1,0 +1,32 @@
+name: "suffix_string_match"
+description: "Tests string suffix matching"
+
+matcher:
+  matchers:
+    - predicate:
+        single:
+          input: { key: "filename" }
+          value_match: { suffix: ".json" }
+      on_match:
+        action: "json_file"
+
+cases:
+  - name: "suffix_matches"
+    context: { filename: "data.json" }
+    expect: "json_file"
+
+  - name: "exact_suffix_matches"
+    context: { filename: ".json" }
+    expect: "json_file"
+
+  - name: "different_suffix"
+    context: { filename: "data.xml" }
+    expect: null
+
+  - name: "suffix_in_middle_no_match"
+    context: { filename: "data.json.bak" }
+    expect: null
+
+  - name: "case_sensitive"
+    context: { filename: "data.JSON" }
+    expect: null

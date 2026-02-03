@@ -1,0 +1,44 @@
+name: "first_match_wins"
+description: "Tests that first matching rule wins, even if later rules also match"
+
+matcher:
+  matchers:
+    # Rule 1: exact match for "hello"
+    - predicate:
+        single:
+          input: { key: "value" }
+          value_match: { exact: "hello" }
+      on_match:
+        action: "first_rule"
+
+    # Rule 2: also matches "hello" (but should never be reached)
+    - predicate:
+        single:
+          input: { key: "value" }
+          value_match: { exact: "hello" }
+      on_match:
+        action: "second_rule"
+
+    # Rule 3: matches "world"
+    - predicate:
+        single:
+          input: { key: "value" }
+          value_match: { exact: "world" }
+      on_match:
+        action: "third_rule"
+
+cases:
+  - name: "first_rule_matches"
+    context:
+      value: "hello"
+    expect: "first_rule"  # NOT second_rule
+
+  - name: "third_rule_matches"
+    context:
+      value: "world"
+    expect: "third_rule"
+
+  - name: "no_match"
+    context:
+      value: "other"
+    expect: null

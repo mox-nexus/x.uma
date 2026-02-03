@@ -1,27 +1,30 @@
 #!/bin/bash
 # Rust validation for x.uma
+# Sources project-paths.sh for canonical path definitions
 
 set -e
 
-XUMA_ROOT="${1:-$(pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/project-paths.sh"
+
 cd "$XUMA_ROOT"
 
 echo "Validating Rust workspace..."
 
 # Format check
 echo "Checking formatting..."
-cargo fmt --manifest-path rumi/Cargo.toml --all -- --check
+cargo fmt --manifest-path "$RUST_MANIFEST" --all -- --check
 
 # Clippy with pedantic
 echo "Running clippy..."
-cargo clippy --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic -D warnings
+cargo clippy --manifest-path "$RUST_MANIFEST" --workspace -- -W clippy::pedantic -D warnings
 
 # Tests
 echo "Running tests..."
-cargo test --manifest-path rumi/Cargo.toml --workspace
+cargo test --manifest-path "$RUST_MANIFEST" --workspace
 
 # no_std check
 echo "Verifying no_std compatibility..."
-cargo build --manifest-path rumi/Cargo.toml -p rumi-core --no-default-features --features alloc
+cargo build --manifest-path "$RUST_MANIFEST" -p "$CRATE_CORE_PACKAGE" --no-default-features --features alloc
 
 echo "Rust validation complete!"

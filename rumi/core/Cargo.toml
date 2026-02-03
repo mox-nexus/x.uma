@@ -1,0 +1,22 @@
+[package]
+name = "rumi"
+description = "Rust implementation of xDS Unified Matcher API"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["xds", "matcher", "envoy", "config"]
+categories = ["config", "data-structures"]
+
+[features]
+default = ["std"]
+std = []
+alloc = []
+
+[dependencies]
+# Core has zero dependencies
+
+[dev-dependencies]
+serde.workspace = true
+serde_yaml.workspace = true

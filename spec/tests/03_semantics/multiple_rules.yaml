@@ -1,0 +1,89 @@
+name: "multiple_rules_routing"
+description: "Tests realistic routing with multiple rules"
+
+matcher:
+  matchers:
+    # API routes
+    - predicate:
+        single:
+          input: { key: "path" }
+          value_match: { prefix: "/api/v2/" }
+      on_match:
+        action: "api_v2"
+
+    - predicate:
+        single:
+          input: { key: "path" }
+          value_match: { prefix: "/api/v1/" }
+      on_match:
+        action: "api_v1"
+
+    - predicate:
+        single:
+          input: { key: "path" }
+          value_match: { prefix: "/api/" }
+      on_match:
+        action: "api_legacy"
+
+    # Static assets
+    - predicate:
+        or:
+          - single:
+              input: { key: "path" }
+              value_match: { suffix: ".js" }
+          - single:
+              input: { key: "path" }
+              value_match: { suffix: ".css" }
+          - single:
+              input: { key: "path" }
+              value_match: { suffix: ".png" }
+      on_match:
+        action: "static"
+
+    # Health check
+    - predicate:
+        single:
+          input: { key: "path" }
+          value_match: { exact: "/health" }
+      on_match:
+        action: "health"
+
+  on_no_match:
+    action: "default"
+
+cases:
+  - name: "api_v2"
+    context: { path: "/api/v2/users" }
+    expect: "api_v2"
+
+  - name: "api_v1"
+    context: { path: "/api/v1/users" }
+    expect: "api_v1"
+
+  - name: "api_legacy"
+    context: { path: "/api/old/endpoint" }
+    expect: "api_legacy"
+
+  - name: "static_js"
+    context: { path: "/assets/app.js" }
+    expect: "static"
+
+  - name: "static_css"
+    context: { path: "/styles/main.css" }
+    expect: "static"
+
+  - name: "static_png"
+    context: { path: "/images/logo.png" }
+    expect: "static"
+
+  - name: "health"
+    context: { path: "/health" }
+    expect: "health"
+
+  - name: "default_html"
+    context: { path: "/index.html" }
+    expect: "default"
+
+  - name: "default_root"
+    context: { path: "/" }
+    expect: "default"

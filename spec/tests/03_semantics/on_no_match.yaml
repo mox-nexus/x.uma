@@ -1,0 +1,54 @@
+name: "on_no_match_fallback"
+description: "Tests on_no_match fallback behavior"
+
+matcher:
+  matchers:
+    - predicate:
+        single:
+          input: { key: "type" }
+          value_match: { exact: "special" }
+      on_match:
+        action: "special_handler"
+  on_no_match:
+    action: "default_handler"
+
+cases:
+  - name: "match_uses_action"
+    context:
+      type: "special"
+    expect: "special_handler"
+
+  - name: "no_match_uses_fallback"
+    context:
+      type: "regular"
+    expect: "default_handler"
+
+  - name: "missing_key_uses_fallback"
+    context:
+      other: "value"
+    expect: "default_handler"
+
+---
+# Second fixture: no on_no_match
+name: "no_fallback"
+description: "Tests behavior when no on_no_match is configured"
+
+matcher:
+  matchers:
+    - predicate:
+        single:
+          input: { key: "type" }
+          value_match: { exact: "special" }
+      on_match:
+        action: "special_handler"
+
+cases:
+  - name: "match_works"
+    context:
+      type: "special"
+    expect: "special_handler"
+
+  - name: "no_match_returns_null"
+    context:
+      type: "regular"
+    expect: null

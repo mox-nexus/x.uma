@@ -1,0 +1,21 @@
+[package]
+name = "rumi-test"
+description = "Test domain for rumi conformance testing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+default = []
+fixtures = ["serde", "serde_yaml"]
+
+[dependencies]
+rumi.workspace = true
+serde = { workspace = true, optional = true }
+serde_yaml = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde.workspace = true
+serde_yaml.workspace = true

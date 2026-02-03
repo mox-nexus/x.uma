@@ -1,0 +1,15 @@
+[package]
+name = "rumi-claude"
+description = "Claude Code hooks domain for rumi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rumi.workspace = true
+
+[dev-dependencies]
+serde.workspace = true
+serde_yaml.workspace = true

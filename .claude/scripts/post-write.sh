@@ -1,6 +1,10 @@
 #!/bin/bash
 # PostToolUse hook for Write/Edit operations
 # Suggests regeneration and testing after changes
+# Sources project-paths.sh for canonical path definitions
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/project-paths.sh"
 
 # Read tool input from stdin
 INPUT=$(cat)
@@ -18,14 +22,14 @@ if [[ "$FILE_PATH" == *.proto ]]; then
 fi
 
 # After Rust changes in core, suggest tests
-if [[ "$FILE_PATH" == */rumi-core/*.rs ]]; then
-    echo '{"additionalContext":"Core Rust file modified. Run `just test-rust` to verify, `just clippy` for lints, and `just build-no-std` to check no_std compat."}'
+if [[ "$FILE_PATH" == $CORE_PATH_PATTERN && "$FILE_PATH" == *.rs ]]; then
+    echo '{"additionalContext":"Core Rust file modified. Run `just test` to verify, `just lint` for lints, and `just check-no-std` for no_std compat."}'
     exit 0
 fi
 
 # After any Rust changes
 if [[ "$FILE_PATH" == *.rs ]]; then
-    echo '{"additionalContext":"Rust file modified. Consider running `just test-rust` and `just clippy`."}'
+    echo '{"additionalContext":"Rust file modified. Consider running `just test` and `just lint`."}'
     exit 0
 fi
 

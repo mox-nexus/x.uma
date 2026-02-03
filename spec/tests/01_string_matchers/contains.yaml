@@ -1,0 +1,40 @@
+name: "contains_string_match"
+description: "Tests string contains matching"
+
+matcher:
+  matchers:
+    - predicate:
+        single:
+          input: { key: "message" }
+          value_match: { contains: "error" }
+      on_match:
+        action: "has_error"
+
+cases:
+  - name: "contains_at_start"
+    context: { message: "error: something failed" }
+    expect: "has_error"
+
+  - name: "contains_at_end"
+    context: { message: "something failed with error" }
+    expect: "has_error"
+
+  - name: "contains_in_middle"
+    context: { message: "an error occurred" }
+    expect: "has_error"
+
+  - name: "exact_match_contains"
+    context: { message: "error" }
+    expect: "has_error"
+
+  - name: "not_contains"
+    context: { message: "success" }
+    expect: null
+
+  - name: "case_sensitive"
+    context: { message: "Error: failed" }
+    expect: null
+
+  - name: "partial_word_matches"
+    context: { message: "terrorize" }
+    expect: "has_error"

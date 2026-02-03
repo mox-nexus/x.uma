@@ -1,0 +1,25 @@
+name: "none_returns_false"
+description: "Tests critical invariant: DataInput returning None causes predicate to be false"
+
+matcher:
+  matchers:
+    - predicate:
+        single:
+          input: { key: "missing_key" }
+          value_match: { exact: "any_value" }
+      on_match:
+        action: "should_never_match"
+  on_no_match:
+    action: "correctly_no_match"
+
+cases:
+  - name: "missing_key_returns_none"
+    # When key doesn't exist, DataInput returns None
+    # None -> predicate false -> no match -> on_no_match
+    context:
+      other_key: "value"
+    expect: "correctly_no_match"
+
+  - name: "empty_context"
+    context: {}
+    expect: "correctly_no_match"

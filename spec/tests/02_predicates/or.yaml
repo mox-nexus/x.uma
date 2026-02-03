@@ -1,0 +1,38 @@
+name: "or_predicate"
+description: "Tests OR predicate composition (any must match)"
+
+matcher:
+  matchers:
+    - predicate:
+        or:
+          - single:
+              input: { key: "role" }
+              value_match: { exact: "admin" }
+          - single:
+              input: { key: "role" }
+              value_match: { exact: "superuser" }
+      on_match:
+        action: "elevated"
+  on_no_match:
+    action: "standard"
+
+cases:
+  - name: "first_matches"
+    context:
+      role: "admin"
+    expect: "elevated"
+
+  - name: "second_matches"
+    context:
+      role: "superuser"
+    expect: "elevated"
+
+  - name: "neither_matches"
+    context:
+      role: "user"
+    expect: "standard"
+
+  - name: "missing_key"
+    context:
+      other: "value"
+    expect: "standard"

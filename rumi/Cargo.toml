@@ -1,31 +1,18 @@
-[package]
-name = "rumi"
-description = "Rust implementation of xDS Unified Matcher API"
-version = "0.1.0"
+[workspace]
+resolver = "2"
+members = ["core", "ext/test", "ext/http", "ext/claude"]
+
+[workspace.package]
+version = "0.0.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/mox-labs/x.uma"
 authors = ["Yashodeep Vyas"]
-keywords = ["xds", "matcher", "envoy", "config"]
-categories = ["config", "data-structures"]
 
-[features]
-default = ["std"]
-std = []
-alloc = []
+[workspace.dependencies]
+# Internal
+rumi = { path = "core" }
 
-# Domain adapters
-test-domain = []
-http = []
-claude = []
-
-# Proto support (future)
-proto = ["dep:prost", "dep:prost-types"]
-
-[dependencies]
-prost = { version = "0.13", optional = true }
-prost-types = { version = "0.13", optional = true }
-
-[dev-dependencies]
+# Testing
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"

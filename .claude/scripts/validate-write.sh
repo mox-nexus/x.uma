@@ -1,6 +1,10 @@
 #!/bin/bash
 # PreToolUse hook for Write/Edit operations
 # Validates x.uma files follow constraints
+# Sources project-paths.sh for canonical path definitions
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/project-paths.sh"
 
 # Read tool input from stdin
 INPUT=$(cat)
@@ -23,17 +27,17 @@ if [[ "$FILE_PATH" == *.proto ]]; then
     fi
 fi
 
-# Rust file validation (rumi-core)
-if [[ "$FILE_PATH" == */rumi-core/* && "$FILE_PATH" == *.rs ]]; then
+# Rust file validation (core crate)
+if [[ "$FILE_PATH" == $CORE_PATH_PATTERN && "$FILE_PATH" == *.rs ]]; then
     # Check for fancy-regex (ReDoS risk)
     if echo "$CONTENT" | grep -qE "fancy.regex"; then
-        echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"block","reason":"fancy-regex blocked in rumi-core (ReDoS risk). Use regex crate only."}}'
+        echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"block","reason":"fancy-regex blocked in core (ReDoS risk). Use regex crate only."}}'
         exit 0
     fi
-    
+
     # Check for std usage without feature gate
     if echo "$CONTENT" | grep -qE "^use\s+std::" && ! echo "$CONTENT" | grep -qE "#\[cfg\(feature\s*=\s*\"std\"\)\]"; then
-        echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","additionalContext":"rumi-core should be no_std compatible. Ensure std usage is behind #[cfg(feature = \"std\")] gate."}}'
+        echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","additionalContext":"Core should be no_std compatible. Ensure std usage is behind #[cfg(feature = \"std\")] gate."}}'
         exit 0
     fi
 fi

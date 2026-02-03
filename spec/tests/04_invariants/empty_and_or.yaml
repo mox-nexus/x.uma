@@ -1,0 +1,37 @@
+name: "empty_and_or"
+description: "Tests empty AND (vacuous truth) and empty OR (vacuous false)"
+
+# Empty AND is vacuously true
+matcher:
+  matchers:
+    - predicate:
+        and: []  # Empty AND
+      on_match:
+        action: "empty_and_matched"
+  on_no_match:
+    action: "should_not_reach"
+
+cases:
+  - name: "empty_and_is_true"
+    context:
+      anything: "value"
+    expect: "empty_and_matched"
+
+---
+name: "empty_or"
+description: "Empty OR is vacuously false"
+
+matcher:
+  matchers:
+    - predicate:
+        or: []  # Empty OR
+      on_match:
+        action: "should_not_match"
+  on_no_match:
+    action: "empty_or_is_false"
+
+cases:
+  - name: "empty_or_is_false"
+    context:
+      anything: "value"
+    expect: "empty_or_is_false"
