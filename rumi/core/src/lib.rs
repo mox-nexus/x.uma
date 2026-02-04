@@ -1,13 +1,12 @@
 //! rumi - Rust implementation of xDS Unified Matcher API
 //!
 //! A matcher engine implementing the xDS Unified Matcher API specification.
-//! Designed for `no_std` compatibility (with alloc) for embedded/WASM use cases.
 //!
 //! # Architecture (Envoy-inspired)
 //!
 //! The type system uses a hybrid erasure approach:
 //!
-//! - [`MatchingData`] — Erased data type (enum of String, Int, Bool, etc.)
+//! - [`MatchingData`] — Erased data type (primitives + extensible Custom variant)
 //! - [`DataInput<Ctx>`] — Domain-specific extraction, returns `MatchingData`
 //! - [`InputMatcher`] — Domain-agnostic matching (non-generic, shareable!)
 //! - [`SinglePredicate<Ctx>`] — Combines `DataInput` + `InputMatcher`
@@ -16,8 +15,7 @@
 //!
 //! # Key Design Insights
 //!
-//! 1. **Type erasure at data level**: `MatchingData` is an enum, not a trait object.
-//!    This allows `InputMatcher` to be non-generic.
+//! 1. **Type erasure at data level**: `MatchingData` enables `InputMatcher` to be non-generic.
 //!
 //! 2. **Non-generic `InputMatcher`**: The same `ExactMatcher` works for HTTP, Claude,
 //!    test contexts, etc. Matchers are domain-agnostic.
@@ -63,11 +61,6 @@
 //! assert_eq!(result, Some("api_backend".to_string()));
 //! ```
 //!
-//! # Features
-//!
-//! - `std` (default) — Standard library support
-//! - `alloc` — `no_std` with alloc support
-//!
 //! # Extensions
 //!
 //! Domain-specific functionality is provided by extension crates:
@@ -75,11 +68,6 @@
 //! - [`rumi-test`](https://docs.rs/rumi-test) — Test domain for conformance
 //! - [`rumi-http`](https://docs.rs/rumi-http) — HTTP request matching
 //! - [`rumi-claude`](https://docs.rs/rumi-claude) — Claude Code hooks
-
-#![cfg_attr(not(feature = "std"), no_std)]
-
-#[cfg(feature = "alloc")]
-extern crate alloc;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Modules
@@ -89,9 +77,11 @@ mod data_input;
 mod field_matcher;
 mod input_matcher;
 mod matcher;
+mod matcher_tree;
 mod matching_data;
 mod on_match;
 mod predicate;
+mod radix_tree;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Public API
@@ -102,12 +92,16 @@ pub use data_input::DataInput;
 pub use field_matcher::FieldMatcher;
 pub use input_matcher::InputMatcher;
 pub use matcher::Matcher;
-pub use matching_data::MatchingData;
+pub use matcher_tree::MatcherTree;
+pub use matching_data::{CustomMatchData, MatchingData};
 pub use on_match::OnMatch;
 pub use predicate::{Predicate, SinglePredicate};
+pub use radix_tree::RadixTree;
 
 // Concrete matchers
-pub use input_matcher::{BoolMatcher, ContainsMatcher, ExactMatcher, PrefixMatcher, SuffixMatcher};
+pub use input_matcher::{
+    BoolMatcher, ContainsMatcher, ExactMatcher, PrefixMatcher, StringMatcher, SuffixMatcher,
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Prelude
@@ -124,6 +118,7 @@ pub mod prelude {
         BoolMatcher,
         ContainsMatcher,
         // Traits
+        CustomMatchData,
         DataInput,
         ExactMatcher,
         // Core types
@@ -134,8 +129,11 @@ pub mod prelude {
         OnMatch,
         Predicate,
         PrefixMatcher,
+        RadixTree,
         SinglePredicate,
+        StringMatcher,
         SuffixMatcher,
+        MatcherTree,
     };
 }
 

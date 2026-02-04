@@ -3,11 +3,8 @@
 //! Per xDS proto semantics, `OnMatch` is **exclusive**: either an action OR
 //! a nested matcher, never both. This is enforced at the type level with an enum.
 
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
-use alloc::boxed::Box;
-
 use crate::Matcher;
-use core::fmt::Debug;
+use std::fmt::Debug;
 
 /// Defines what to do when a predicate matches.
 ///
@@ -74,10 +71,21 @@ impl<Ctx, A: Clone + Send + Sync + 'static> OnMatch<Ctx, A> {
             Self::Matcher(m) => Some(m),
         }
     }
+
+    /// Evaluate this `OnMatch` against a context.
+    ///
+    /// - If this is an `Action`, returns the cloned action.
+    /// - If this is a `Matcher`, delegates to the nested matcher.
+    pub fn evaluate(&self, ctx: &Ctx) -> Option<A> {
+        match self {
+            Self::Action(a) => Some(a.clone()),
+            Self::Matcher(m) => m.evaluate(ctx),
+        }
+    }
 }
 
 impl<Ctx, A: Clone + Send + Sync + Debug + 'static> Debug for OnMatch<Ctx, A> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Action(a) => f.debug_tuple("Action").field(a).finish(),
             Self::Matcher(_) => f.debug_tuple("Matcher").field(&"...").finish(),

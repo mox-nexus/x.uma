@@ -11,14 +11,8 @@
 //! - [`SuffixMatcher`] — String suffix match
 //! - [`ContainsMatcher`] — String contains match
 
-#[cfg(all(not(feature = "std"), feature = "alloc"))]
-use alloc::{boxed::Box, string::String};
-
-#[cfg(feature = "std")]
-use std::string::String;
-
 use crate::MatchingData;
-use core::fmt::Debug;
+use std::fmt::Debug;
 
 /// Matches against type-erased [`MatchingData`].
 ///
@@ -268,6 +262,150 @@ impl InputMatcher for BoolMatcher {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// StringMatcher (xDS Unified)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Unified string matcher matching xDS `StringMatcher` proto.
+///
+/// Combines all string matching strategies with optional case-insensitivity.
+/// This is the xDS-native way to express string matching.
+///
+/// # Example
+///
+/// ```
+/// use rumi::{InputMatcher, MatchingData, StringMatcher};
+///
+/// // Case-insensitive prefix match
+/// let matcher = StringMatcher::prefix("/API/", true);
+/// assert!(matcher.matches(&"/api/users".into()));
+/// assert!(matcher.matches(&"/API/users".into()));
+///
+/// // Regex match
+/// let matcher = StringMatcher::regex(r"^user-\d+$").unwrap();
+/// assert!(matcher.matches(&"user-123".into()));
+/// assert!(!matcher.matches(&"user-abc".into()));
+/// ```
+#[derive(Debug, Clone)]
+pub enum StringMatcher {
+    /// Exact string equality.
+    Exact { value: String, ignore_case: bool },
+    /// String prefix match.
+    Prefix { value: String, ignore_case: bool },
+    /// String suffix match.
+    Suffix { value: String, ignore_case: bool },
+    /// Substring contains match.
+    Contains { value: String, ignore_case: bool },
+    /// Regular expression match (RE2 semantics, linear time).
+    Regex(regex::Regex),
+}
+
+impl StringMatcher {
+    /// Create an exact match.
+    #[must_use]
+    pub fn exact(value: impl Into<String>, ignore_case: bool) -> Self {
+        Self::Exact {
+            value: value.into(),
+            ignore_case,
+        }
+    }
+
+    /// Create a prefix match.
+    #[must_use]
+    pub fn prefix(value: impl Into<String>, ignore_case: bool) -> Self {
+        Self::Prefix {
+            value: value.into(),
+            ignore_case,
+        }
+    }
+
+    /// Create a suffix match.
+    #[must_use]
+    pub fn suffix(value: impl Into<String>, ignore_case: bool) -> Self {
+        Self::Suffix {
+            value: value.into(),
+            ignore_case,
+        }
+    }
+
+    /// Create a contains match.
+    #[must_use]
+    pub fn contains(value: impl Into<String>, ignore_case: bool) -> Self {
+        Self::Contains {
+            value: value.into(),
+            ignore_case,
+        }
+    }
+
+    /// Create a regex match.
+    ///
+    /// Uses Rust's `regex` crate which guarantees linear time matching (no `ReDoS`).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the regex pattern is invalid.
+    pub fn regex(pattern: &str) -> Result<Self, regex::Error> {
+        regex::Regex::new(pattern).map(Self::Regex)
+    }
+
+    /// Create a case-insensitive regex match.
+    ///
+    /// Prepends `(?i)` to the pattern for case-insensitivity.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if the regex pattern is invalid.
+    pub fn regex_ignore_case(pattern: &str) -> Result<Self, regex::Error> {
+        regex::Regex::new(&format!("(?i){pattern}")).map(Self::Regex)
+    }
+}
+
+impl InputMatcher for StringMatcher {
+    fn matches(&self, value: &MatchingData) -> bool {
+        let Some(input) = value.as_str() else {
+            return false;
+        };
+
+        match self {
+            Self::Exact { value, ignore_case } => {
+                if *ignore_case {
+                    input.eq_ignore_ascii_case(value)
+                } else {
+                    input == value
+                }
+            }
+            Self::Prefix { value, ignore_case } => {
+                if *ignore_case {
+                    input
+                        .get(..value.len())
+                        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(value))
+                } else {
+                    input.starts_with(value.as_str())
+                }
+            }
+            Self::Suffix { value, ignore_case } => {
+                if *ignore_case {
+                    input
+                        .len()
+                        .checked_sub(value.len())
+                        .and_then(|start| input.get(start..))
+                        .is_some_and(|suffix| suffix.eq_ignore_ascii_case(value))
+                } else {
+                    input.ends_with(value.as_str())
+                }
+            }
+            Self::Contains { value, ignore_case } => {
+                if *ignore_case {
+                    input.to_ascii_lowercase().contains(&value.to_ascii_lowercase())
+                } else {
+                    input.contains(value.as_str())
+                }
+            }
+            Self::Regex(re) => re.is_match(input),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -323,6 +461,52 @@ mod tests {
         assert_send_sync::<SuffixMatcher>();
         assert_send_sync::<ContainsMatcher>();
         assert_send_sync::<BoolMatcher>();
+        assert_send_sync::<StringMatcher>();
         assert_send_sync::<Box<dyn InputMatcher>>();
+    }
+
+    #[test]
+    fn test_string_matcher_exact() {
+        let m = StringMatcher::exact("hello", false);
+        assert!(m.matches(&"hello".into()));
+        assert!(!m.matches(&"Hello".into()));
+
+        let m = StringMatcher::exact("hello", true);
+        assert!(m.matches(&"hello".into()));
+        assert!(m.matches(&"HELLO".into()));
+    }
+
+    #[test]
+    fn test_string_matcher_prefix() {
+        let m = StringMatcher::prefix("/api/", false);
+        assert!(m.matches(&"/api/users".into()));
+        assert!(!m.matches(&"/API/users".into()));
+
+        let m = StringMatcher::prefix("/api/", true);
+        assert!(m.matches(&"/API/users".into()));
+    }
+
+    #[test]
+    fn test_string_matcher_suffix() {
+        let m = StringMatcher::suffix(".JSON", true);
+        assert!(m.matches(&"file.json".into()));
+        assert!(m.matches(&"file.JSON".into()));
+    }
+
+    #[test]
+    fn test_string_matcher_contains() {
+        let m = StringMatcher::contains("error", true);
+        assert!(m.matches(&"an ERROR occurred".into()));
+    }
+
+    #[test]
+    fn test_string_matcher_regex() {
+        let m = StringMatcher::regex(r"^user-\d+$").unwrap();
+        assert!(m.matches(&"user-123".into()));
+        assert!(!m.matches(&"user-abc".into()));
+        assert!(!m.matches(&"USER-123".into()));
+
+        let m = StringMatcher::regex_ignore_case(r"^user-\d+$").unwrap();
+        assert!(m.matches(&"USER-123".into()));
     }
 }

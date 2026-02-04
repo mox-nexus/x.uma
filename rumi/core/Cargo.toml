@@ -10,12 +10,10 @@ keywords = ["xds", "matcher", "envoy", "config"]
 categories = ["config", "data-structures"]
 
 [features]
-default = ["std"]
-std = []
-alloc = []
+default = []
 
 [dependencies]
-# Core has zero dependencies
+regex = "1"  # Linear-time regex (RE2 semantics, ReDoS-safe)
 
 [dev-dependencies]
 serde.workspace = true
