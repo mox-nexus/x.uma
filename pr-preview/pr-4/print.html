@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "searchindex-670c697b.js";
+            window.path_to_searchindex_js = "searchindex-80c39d86.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-fa7c0e76.js"></script>
+        <script src="toc-7afcf466.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -595,6 +595,62 @@ type.googleapis.com/xuma.claude.v1.HookContext
 <ul>
 <li><a href="https://github.com/mox-labs/x.uma/tree/main/rumi">rumi/</a></li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="roadmap"><a class="header" href="#roadmap">Roadmap</a></h1>
+<p>Current development status and planned phases.</p>
+<h2 id="status"><a class="header" href="#status">Status</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Phase</th><th>Focus</th><th>Status</th></tr>
+</thead>
+<tbody>
+<tr><td>0</td><td>Scaffolding</td><td>✅ Done</td></tr>
+<tr><td>1</td><td>Core Traits</td><td>✅ Done</td></tr>
+<tr><td>2</td><td>Conformance Fixtures</td><td>✅ Done</td></tr>
+<tr><td>2.5</td><td>Extensible MatchingData (<code>Custom</code> variant)</td><td>✅ Done</td></tr>
+<tr><td>3</td><td>StringMatcher, MatcherTree, RadixTree</td><td>✅ Done</td></tr>
+<tr><td>4</td><td>HTTP Domain (ext_proc model)</td><td>🚧 Next</td></tr>
+<tr><td>5</td><td>p.uma (Pure Python)</td><td>Planned</td></tr>
+<tr><td>6</td><td>b.uma (Bun/TypeScript)</td><td>Planned</td></tr>
+<tr><td>7</td><td>crusty/p.uma (uniffi→Python)</td><td>Planned</td></tr>
+<tr><td>8</td><td>crusty/b.uma (uniffi→WASM)</td><td>Planned</td></tr>
+<tr><td>9</td><td>Benchmarks</td><td>Planned</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="phase-4-http-domain"><a class="header" href="#phase-4-http-domain">Phase 4: HTTP Domain</a></h2>
+<p>The HTTP domain uses Envoy’s ext_proc <code>ProcessingRequest</code>/<code>ProcessingResponse</code> as the universal HTTP processing model.</p>
+<p>This covers all HTTP-based protocols:</p>
+<ul>
+<li>REST</li>
+<li>gRPC</li>
+<li>GraphQL</li>
+<li>WebSocket (handshake only)</li>
+</ul>
+<h3 id="architecture-1"><a class="header" href="#architecture-1">Architecture</a></h3>
+<pre><code class="language-text">┌─────────────────────────────────────────┐
+│         User-Facing Config API          │  ← DX-friendly match schema
+│      (Gateway API inspired)             │
+└────────────────────┬────────────────────┘
+                     │ compiles to
+┌────────────────────▼────────────────────┐
+│           x.uma Matchers                │  ← rumi engine
+│   DataInput + Predicate + OnMatch       │
+└────────────────────┬────────────────────┘
+                     │ operates on
+┌────────────────────▼────────────────────┐
+│        ProcessingRequest Context        │  ← ext_proc protocol
+└─────────────────────────────────────────┘
+</code></pre>
+<h3 id="design-principles"><a class="header" href="#design-principles">Design Principles</a></h3>
+<ol>
+<li><strong>Match schema is action-agnostic</strong> — same match syntax works for routing, rate limiting, feature flags, auth policies</li>
+<li><strong>ext_proc as universal model</strong> — covers all HTTP protocols at the transport layer</li>
+<li><strong>Gateway API inspiration</strong> — familiar, DX-friendly configuration</li>
+</ol>
+<h2 id="contributing"><a class="header" href="#contributing">Contributing</a></h2>
+<p>See the <a href="https://github.com/mox-labs/x.uma">GitHub repository</a> for contribution guidelines.</p>
 
                     </main>
 
