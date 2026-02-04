@@ -82,7 +82,7 @@ cases:
 default = []
 ```
 
-```rust
+```rust,ignore
 // rumi/ext/http/src/lib.rs
 pub mod headers;
 pub mod path;

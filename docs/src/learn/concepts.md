@@ -20,7 +20,7 @@ Context → DataInput → MatchingData → InputMatcher → bool
 
 Type-erased data that matchers operate on:
 
-```rust
+```rust,ignore
 pub enum MatchingData {
     None,
     String(String),
@@ -35,7 +35,7 @@ pub enum MatchingData {
 
 Extracts data from your domain context:
 
-```rust
+```rust,ignore
 pub trait DataInput<Ctx>: Send + Sync {
     fn get(&self, ctx: &Ctx) -> MatchingData;
 }
@@ -45,7 +45,7 @@ pub trait DataInput<Ctx>: Send + Sync {
 
 Matches against `MatchingData` (domain-agnostic):
 
-```rust
+```rust,ignore
 pub trait InputMatcher: Send + Sync {
     fn matches(&self, value: &MatchingData) -> bool;
 }
@@ -66,7 +66,7 @@ Boolean composition of matchers:
 
 What happens when a predicate matches:
 
-```rust
+```rust,ignore
 pub enum OnMatch<Ctx, A> {
     Action(A),              // Terminal: return this action
     Matcher(Box<Matcher>),  // Nested: evaluate another matcher
@@ -79,7 +79,7 @@ pub enum OnMatch<Ctx, A> {
 
 Top-level container with first-match-wins semantics:
 
-```rust
+```rust,ignore
 pub struct Matcher<Ctx, A> {
     rules: Vec<FieldMatcher<Ctx, A>>,
     on_no_match: Option<OnMatch<Ctx, A>>,

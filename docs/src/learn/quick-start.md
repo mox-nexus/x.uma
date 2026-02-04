@@ -13,7 +13,7 @@ rumi = "0.1"
 
 ## Basic Usage
 
-```rust
+```rust,ignore
 use rumi::prelude::*;
 
 // 1. Define your context type

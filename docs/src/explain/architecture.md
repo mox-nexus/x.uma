@@ -43,7 +43,7 @@ Every `input` and `action` is a port. Adapters are concrete registered types.
 
 Key insight from the spike phase: erase types at the **data level**, not the predicate level.
 
-```rust
+```rust,ignore
 // MatchingData — the erased type
 pub enum MatchingData { None, String(String), Int(i64), ... }
 
