@@ -8,7 +8,7 @@ A matcher ecosystem implementing the xDS Unified Matcher API across multiple lan
 |---------|----------|-------|
 | **rumi** | Rust | Core engine (reference implementation) |
 | **p.uma** | Python | Pure Python implementation |
-| **j.uma** | TypeScript | Pure TypeScript implementation |
+| **b.uma** | Bun/TypeScript | Pure TypeScript implementation |
 | **p.uma[crusty]** | Python | Rust bindings via uniffi |
 | **@x.uma/crusty** | TypeScript | Rust bindings via WASM |
 
@@ -92,10 +92,10 @@ x.uma/
 │   └── tests/                  # conformance test fixtures (YAML)
 ├── rumi/                       # Rust core (reference implementation)
 ├── p.uma/                      # Pure Python implementation
-├── j.uma/                      # Pure TypeScript implementation
+├── b.uma/                      # Pure Bun/TypeScript implementation
 ├── crusty/                     # Rust→FFI bindings (uniffi)
 │   ├── p.uma/                  # Python bindings
-│   └── j.uma/                  # WASM bindings
+│   └── b.uma/                  # WASM bindings
 ├── docs/                       # mdBook documentation
 └── justfile                    # polyglot task orchestration
 ```
@@ -107,12 +107,12 @@ x.uma/
 | 0 | Scaffolding | ✅ Done |
 | 1 | Core Traits | ✅ Done |
 | 2 | Conformance Fixtures | ✅ Done |
-| 2.5 | Extensible MatchingData | ⏳ Next |
-| 3 | StringMatcher, MatcherTree | Planned |
+| 2.5 | Extensible MatchingData (`Custom` variant) | ✅ Done |
+| 3 | StringMatcher, MatcherTree, RadixTree | ✅ Done |
 | 4 | p.uma (Pure Python) | Planned |
-| 5 | j.uma (Pure TypeScript) | Planned |
+| 5 | b.uma (Bun/TypeScript) | Planned |
 | 6 | crusty/p.uma (uniffi→Python) | Planned |
-| 7 | crusty/j.uma (uniffi→WASM) | Planned |
+| 7 | crusty/b.uma (uniffi→WASM) | Planned |
 | 8 | HTTP Domain | Planned |
 | 9 | Benchmarks (all variants) | Planned |
 
