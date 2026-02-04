@@ -47,6 +47,12 @@ jobs:
           mkdir -p docs/src/generated/rust
           cp -r rumi/target/doc/* docs/src/generated/rust/
 
+      # Placeholder for Proto docs (until buf doc generation is set up)
+      - name: Create Proto docs placeholder
+        run: |
+          mkdir -p docs/src/generated/proto
+          echo '<html><body><h1>Proto docs coming soon</h1><p>Will be auto-generated from proto/xuma/**/*.proto</p></body></html>' > docs/src/generated/proto/index.html
+
       # Build mdBook
       - name: Build mdBook
         run: mdbook build docs
