@@ -191,9 +191,7 @@ impl<V> Node<V> {
             };
 
             // Check if child prefix matches
-            if remaining.len() >= child.prefix.len()
-                && remaining.starts_with(&child.prefix)
-            {
+            if remaining.len() >= child.prefix.len() && remaining.starts_with(&child.prefix) {
                 remaining = &remaining[child.prefix.len()..];
                 current = child;
 
@@ -228,9 +226,7 @@ impl<V> Node<V> {
             };
 
             // Check if child prefix matches
-            if remaining.len() >= child.prefix.len()
-                && remaining.starts_with(&child.prefix)
-            {
+            if remaining.len() >= child.prefix.len() && remaining.starts_with(&child.prefix) {
                 remaining = &remaining[child.prefix.len()..];
                 current = child;
 
@@ -247,10 +243,7 @@ impl<V> Node<V> {
 /// Find the length of the common prefix between two strings.
 #[inline]
 fn common_prefix_len(a: &str, b: &str) -> usize {
-    a.bytes()
-        .zip(b.bytes())
-        .take_while(|(x, y)| x == y)
-        .count()
+    a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count()
 }
 
 #[cfg(test)]
@@ -291,7 +284,10 @@ mod tests {
         tree.insert("/api/v2", "api_v2");
         tree.insert("/api/v2/users", "users");
 
-        assert_eq!(tree.find_longest_prefix("/api/v2/users/123"), Some(&"users"));
+        assert_eq!(
+            tree.find_longest_prefix("/api/v2/users/123"),
+            Some(&"users")
+        );
         assert_eq!(tree.find_longest_prefix("/api/v2/posts"), Some(&"api_v2"));
         assert_eq!(tree.find_longest_prefix("/api/v1"), Some(&"api"));
         assert_eq!(tree.find_longest_prefix("/other"), Some(&"root"));

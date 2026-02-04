@@ -1,6 +1,6 @@
 [package]
 name = "rumi-http"
-description = "HTTP domain for rumi - request matching"
+description = "HTTP domain for rumi - Gateway API matching on ext_proc"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,6 +9,15 @@ authors.workspace = true
 
 [dependencies]
 rumi.workspace = true
+
+# ext_proc types (ProcessingRequest, ProcessingResponse, etc.)
+envoy-grpc-ext-proc = "0.1"
+
+# Gateway API types (HttpRouteMatch, HttpPathMatch, etc.)
+k8s-gateway-api = "0.16"
+
+# k8s-openapi needs a version feature enabled
+k8s-openapi = { version = "0.20", features = ["v1_28"] }
 
 [dev-dependencies]
 serde.workspace = true

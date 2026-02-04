@@ -65,10 +65,7 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
         K: Into<String>,
         I: IntoIterator<Item = (K, OnMatch<Ctx, A>)>,
     {
-        let map = entries
-            .into_iter()
-            .map(|(k, v)| (k.into(), v))
-            .collect();
+        let map = entries.into_iter().map(|(k, v)| (k.into(), v)).collect();
 
         Self::ExactMatch {
             input,
@@ -185,13 +182,19 @@ mod tests {
             Some(OnMatch::Action("default".into())),
         );
 
-        let ctx = TestContext { path: "/health".into() };
+        let ctx = TestContext {
+            path: "/health".into(),
+        };
         assert_eq!(tree.evaluate(&ctx), Some("health".into()));
 
-        let ctx = TestContext { path: "/ready".into() };
+        let ctx = TestContext {
+            path: "/ready".into(),
+        };
         assert_eq!(tree.evaluate(&ctx), Some("ready".into()));
 
-        let ctx = TestContext { path: "/other".into() };
+        let ctx = TestContext {
+            path: "/other".into(),
+        };
         assert_eq!(tree.evaluate(&ctx), Some("default".into()));
     }
 
@@ -208,17 +211,25 @@ mod tests {
         );
 
         // Longest prefix wins
-        let ctx = TestContext { path: "/api/v2/users".into() };
+        let ctx = TestContext {
+            path: "/api/v2/users".into(),
+        };
         assert_eq!(tree.evaluate(&ctx), Some("api_v2".into()));
 
-        let ctx = TestContext { path: "/api/v1/users".into() };
+        let ctx = TestContext {
+            path: "/api/v1/users".into(),
+        };
         assert_eq!(tree.evaluate(&ctx), Some("api".into()));
 
-        let ctx = TestContext { path: "/other".into() };
+        let ctx = TestContext {
+            path: "/other".into(),
+        };
         assert_eq!(tree.evaluate(&ctx), Some("root".into()));
 
         // No match
-        let ctx = TestContext { path: "nope".into() };
+        let ctx = TestContext {
+            path: "nope".into(),
+        };
         assert_eq!(tree.evaluate(&ctx), None);
     }
 
@@ -252,7 +263,9 @@ mod tests {
         );
 
         // Int data can't be looked up in string map
-        let ctx = TestContext { path: "ignored".into() };
+        let ctx = TestContext {
+            path: "ignored".into(),
+        };
         assert_eq!(tree.evaluate(&ctx), Some("fallback".into()));
     }
 }

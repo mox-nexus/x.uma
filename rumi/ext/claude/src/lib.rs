@@ -48,7 +48,7 @@ pub struct HookContext {
 }
 
 impl HookContext {
-    /// Create a PreToolUse hook context.
+    /// Create a `PreToolUse` hook context.
     #[must_use]
     pub fn pre_tool_use(tool_name: impl Into<String>) -> Self {
         Self {
@@ -58,7 +58,7 @@ impl HookContext {
         }
     }
 
-    /// Create a PostToolUse hook context.
+    /// Create a `PostToolUse` hook context.
     #[must_use]
     pub fn post_tool_use(tool_name: impl Into<String>) -> Self {
         Self {
@@ -130,8 +130,7 @@ impl ArgumentInput {
 impl DataInput<HookContext> for ArgumentInput {
     fn get(&self, ctx: &HookContext) -> MatchingData {
         ctx.argument(&self.name)
-            .map(|s| MatchingData::String(s.to_string()))
-            .unwrap_or(MatchingData::None)
+            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
     }
 }
 
@@ -147,8 +146,7 @@ mod tests {
 
     #[test]
     fn test_hook_context_builder() {
-        let ctx = HookContext::pre_tool_use("Bash")
-            .with_arg("command", "ls -la");
+        let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "ls -la");
 
         assert_eq!(ctx.event(), HookEvent::PreToolUse);
         assert_eq!(ctx.tool_name(), "Bash");
@@ -158,19 +156,24 @@ mod tests {
     #[test]
     fn test_tool_name_input() {
         let ctx = HookContext::pre_tool_use("Write");
-        assert_eq!(ToolNameInput.get(&ctx), MatchingData::String("Write".into()));
+        assert_eq!(
+            ToolNameInput.get(&ctx),
+            MatchingData::String("Write".into())
+        );
     }
 
     #[test]
     fn test_event_input() {
         let ctx = HookContext::post_tool_use("Read");
-        assert_eq!(EventInput.get(&ctx), MatchingData::String("PostToolUse".into()));
+        assert_eq!(
+            EventInput.get(&ctx),
+            MatchingData::String("PostToolUse".into())
+        );
     }
 
     #[test]
     fn test_argument_input() {
-        let ctx = HookContext::pre_tool_use("Bash")
-            .with_arg("command", "echo hello");
+        let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "echo hello");
 
         let input = ArgumentInput::new("command");
         assert_eq!(input.get(&ctx), MatchingData::String("echo hello".into()));
@@ -178,26 +181,23 @@ mod tests {
 
     #[test]
     fn test_dangerous_command_matcher() {
-        let ctx = HookContext::pre_tool_use("Bash")
-            .with_arg("command", "rm -rf /important");
+        let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "rm -rf /important");
 
         // Match dangerous Bash commands
         let matcher: Matcher<HookContext, &str> = Matcher::new(
-            vec![
-                FieldMatcher::new(
-                    Predicate::And(vec![
-                        Predicate::Single(SinglePredicate::new(
-                            Box::new(ToolNameInput),
-                            Box::new(ExactMatcher::new("Bash")),
-                        )),
-                        Predicate::Single(SinglePredicate::new(
-                            Box::new(ArgumentInput::new("command")),
-                            Box::new(ContainsMatcher::new("rm -rf")),
-                        )),
-                    ]),
-                    OnMatch::Action("block"),
-                ),
-            ],
+            vec![FieldMatcher::new(
+                Predicate::And(vec![
+                    Predicate::Single(SinglePredicate::new(
+                        Box::new(ToolNameInput),
+                        Box::new(ExactMatcher::new("Bash")),
+                    )),
+                    Predicate::Single(SinglePredicate::new(
+                        Box::new(ArgumentInput::new("command")),
+                        Box::new(ContainsMatcher::new("rm -rf")),
+                    )),
+                ]),
+                OnMatch::Action("block"),
+            )],
             Some(OnMatch::Action("allow")),
         );
 

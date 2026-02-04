@@ -36,7 +36,10 @@ fn run_fixtures_in_dir(dir: &Path) {
         let entry = entry.expect("dir entry");
         let path = entry.path();
 
-        if path.extension().map_or(false, |e| e == "yaml" || e == "yml") {
+        if path
+            .extension()
+            .map_or(false, |e| e == "yaml" || e == "yml")
+        {
             println!("Running fixture: {}", path.display());
 
             let yaml = fs::read_to_string(&path).expect("read yaml");

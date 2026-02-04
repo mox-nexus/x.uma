@@ -396,7 +396,9 @@ impl InputMatcher for StringMatcher {
             }
             Self::Contains { value, ignore_case } => {
                 if *ignore_case {
-                    input.to_ascii_lowercase().contains(&value.to_ascii_lowercase())
+                    input
+                        .to_ascii_lowercase()
+                        .contains(&value.to_ascii_lowercase())
                 } else {
                     input.contains(value.as_str())
                 }
