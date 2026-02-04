@@ -109,11 +109,11 @@ x.uma/
 | 2 | Conformance Fixtures | ✅ Done |
 | 2.5 | Extensible MatchingData (`Custom` variant) | ✅ Done |
 | 3 | StringMatcher, MatcherTree, RadixTree | ✅ Done |
-| 4 | p.uma (Pure Python) | Planned |
-| 5 | b.uma (Bun/TypeScript) | Planned |
-| 6 | crusty/p.uma (uniffi→Python) | Planned |
-| 7 | crusty/b.uma (uniffi→WASM) | Planned |
-| 8 | HTTP Domain | Planned |
+| 4 | HTTP Domain (ext_proc model) | 🚧 Next |
+| 5 | p.uma (Pure Python + HTTP) | Planned |
+| 6 | b.uma (Bun/TypeScript + HTTP) | Planned |
+| 7 | crusty/p.uma (uniffi→Python) | Planned |
+| 8 | crusty/b.uma (uniffi→WASM) | Planned |
 | 9 | Benchmarks (all variants) | Planned |
 
 ## Tooling
