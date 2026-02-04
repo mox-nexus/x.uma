@@ -26,12 +26,22 @@ Core unchanged.
 
 Matchers nest. Predicates AND/OR/NOT. Trees recurse.
 
-```rust
+```rust,ignore
+// Predicates compose naturally with AND/OR/NOT
 Predicate::And(vec![
-    Predicate::single(PathInput, PrefixMatcher::new("/api/")),
+    Predicate::Single(SinglePredicate::new(
+        Box::new(PathInput),
+        Box::new(PrefixMatcher::new("/api/")),
+    )),
     Predicate::Or(vec![
-        Predicate::single(MethodInput, ExactMatcher::new("GET")),
-        Predicate::single(MethodInput, ExactMatcher::new("POST")),
+        Predicate::Single(SinglePredicate::new(
+            Box::new(MethodInput),
+            Box::new(ExactMatcher::new("GET")),
+        )),
+        Predicate::Single(SinglePredicate::new(
+            Box::new(MethodInput),
+            Box::new(ExactMatcher::new("POST")),
+        )),
     ]),
 ])
 ```

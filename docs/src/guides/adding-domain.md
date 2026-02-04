@@ -33,15 +33,18 @@ just gen
 
 ## Step 3: Implement DataInput
 
-```rust
+```rust,ignore
 // rumi/ext/http/src/lib.rs
 use rumi::{DataInput, MatchingData};
+use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct HttpRequest {
     pub headers: HashMap<String, String>,
     pub path: String,
 }
 
+#[derive(Debug)]
 pub struct HeaderInput {
     pub header_name: String,
 }

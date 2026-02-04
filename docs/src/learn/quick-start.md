@@ -13,15 +13,17 @@ rumi = "0.1"
 
 ## Basic Usage
 
-```rust,editable
+```rust
 use rumi::prelude::*;
 
 // 1. Define your context type
+#[derive(Debug)]
 struct MyContext {
     value: String,
 }
 
 // 2. Implement DataInput to extract data
+#[derive(Debug)]
 struct ValueInput;
 
 impl DataInput<MyContext> for ValueInput {
@@ -31,16 +33,22 @@ impl DataInput<MyContext> for ValueInput {
 }
 
 // 3. Build a matcher
-let matcher = Matcher::builder()
-    .add_rule(
-        Predicate::single(ValueInput, ExactMatcher::new("hello")),
-        OnMatch::Action("matched!"),
-    )
-    .build();
+let matcher: Matcher<MyContext, &str> = Matcher::new(
+    vec![
+        FieldMatcher::new(
+            Predicate::Single(SinglePredicate::new(
+                Box::new(ValueInput),
+                Box::new(ExactMatcher::new("hello")),
+            )),
+            OnMatch::Action("matched!"),
+        ),
+    ],
+    None,
+);
 
 // 4. Evaluate
 let ctx = MyContext { value: "hello".into() };
-assert_eq!(matcher.evaluate(&ctx), Some(&"matched!"));
+assert_eq!(matcher.evaluate(&ctx), Some("matched!"));
 ```
 
 ## Next Steps

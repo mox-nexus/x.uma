@@ -27,6 +27,7 @@ pub enum MatchingData {
     Int(i64),
     Bool(bool),
     Bytes(Vec<u8>),
+    Custom(Arc<dyn CustomMatchData>),  // Extensible for domain-specific types
 }
 ```
 

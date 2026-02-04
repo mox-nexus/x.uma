@@ -27,13 +27,16 @@ x.uma provides:
 
 ## Quick Example
 
-```rust,editable
+```rust,ignore
 use rumi::prelude::*;
 
 // Define what data we're matching on
+#[derive(Debug)]
 struct Request { path: String }
 
+#[derive(Debug)]
 struct PathInput;
+
 impl DataInput<Request> for PathInput {
     fn get(&self, ctx: &Request) -> MatchingData {
         MatchingData::String(ctx.path.clone())
@@ -41,13 +44,18 @@ impl DataInput<Request> for PathInput {
 }
 
 // Build a matcher
-let matcher = Matcher::builder()
-    .add_rule(
-        Predicate::single(PathInput, PrefixMatcher::new("/api/")),
-        OnMatch::Action("api_handler"),
-    )
-    .on_no_match(OnMatch::Action("default_handler"))
-    .build();
+let matcher: Matcher<Request, &str> = Matcher::new(
+    vec![
+        FieldMatcher::new(
+            Predicate::Single(SinglePredicate::new(
+                Box::new(PathInput),
+                Box::new(PrefixMatcher::new("/api/")),
+            )),
+            OnMatch::Action("api_handler"),
+        ),
+    ],
+    Some(OnMatch::Action("default_handler")),
+);
 
 // Evaluate
 let req = Request { path: "/api/users".into() };
