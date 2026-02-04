@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "searchindex-c7954d56.js";
+            window.path_to_searchindex_js = "searchindex-670c697b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-fa7c0e76.js"></script>
@@ -255,9 +255,7 @@ let result = matcher.evaluate(&amp;req);
 rumi = "0.1"
 </code></pre>
 <h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rumi::prelude::*;
+<pre><code class="language-rust ignore">use rumi::prelude::*;
 
 // 1. Define your context type
 #[derive(Debug)]
@@ -291,8 +289,7 @@ let matcher: Matcher&lt;MyContext, &amp;str&gt; = Matcher::new(
 
 // 4. Evaluate
 let ctx = MyContext { value: "hello".into() };
-assert_eq!(matcher.evaluate(&amp;ctx), Some("matched!"));
-<span class="boring">}</span></code></pre>
+assert_eq!(matcher.evaluate(&amp;ctx), Some("matched!"));</code></pre>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
 <ul>
 <li><a href="#concepts">Concepts</a> — understand the core abstractions</li>
@@ -313,33 +310,24 @@ assert_eq!(matcher.evaluate(&amp;ctx), Some("matched!"));
 <h2 id="key-types"><a class="header" href="#key-types">Key Types</a></h2>
 <h3 id="matchingdata"><a class="header" href="#matchingdata">MatchingData</a></h3>
 <p>Type-erased data that matchers operate on:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum MatchingData {
+<pre><code class="language-rust ignore">pub enum MatchingData {
     None,
     String(String),
     Int(i64),
     Bool(bool),
     Bytes(Vec&lt;u8&gt;),
     Custom(Arc&lt;dyn CustomMatchData&gt;),  // Extensible for domain-specific types
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <h3 id="datainput"><a class="header" href="#datainput">DataInput</a></h3>
 <p>Extracts data from your domain context:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub trait DataInput&lt;Ctx&gt;: Send + Sync {
+<pre><code class="language-rust ignore">pub trait DataInput&lt;Ctx&gt;: Send + Sync {
     fn get(&amp;self, ctx: &amp;Ctx) -&gt; MatchingData;
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <h3 id="inputmatcher"><a class="header" href="#inputmatcher">InputMatcher</a></h3>
 <p>Matches against <code>MatchingData</code> (domain-agnostic):</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub trait InputMatcher: Send + Sync {
+<pre><code class="language-rust ignore">pub trait InputMatcher: Send + Sync {
     fn matches(&amp;self, value: &amp;MatchingData) -&gt; bool;
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p>Built-in: <code>ExactMatcher</code>, <code>PrefixMatcher</code>, <code>SuffixMatcher</code>, <code>ContainsMatcher</code>, <code>BoolMatcher</code></p>
 <h3 id="predicate"><a class="header" href="#predicate">Predicate</a></h3>
 <p>Boolean composition of matchers:</p>
@@ -351,23 +339,17 @@ assert_eq!(matcher.evaluate(&amp;ctx), Some("matched!"));
 </ul>
 <h3 id="onmatch"><a class="header" href="#onmatch">OnMatch</a></h3>
 <p>What happens when a predicate matches:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum OnMatch&lt;Ctx, A&gt; {
+<pre><code class="language-rust ignore">pub enum OnMatch&lt;Ctx, A&gt; {
     Action(A),              // Terminal: return this action
     Matcher(Box&lt;Matcher&gt;),  // Nested: evaluate another matcher
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>Exclusive:</strong> action XOR nested matcher, never both.</p>
 <h3 id="matcher"><a class="header" href="#matcher">Matcher</a></h3>
 <p>Top-level container with first-match-wins semantics:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct Matcher&lt;Ctx, A&gt; {
+<pre><code class="language-rust ignore">pub struct Matcher&lt;Ctx, A&gt; {
     rules: Vec&lt;FieldMatcher&lt;Ctx, A&gt;&gt;,
     on_no_match: Option&lt;OnMatch&lt;Ctx, A&gt;&gt;,
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="adding-a-domain"><a class="header" href="#adding-a-domain">Adding a Domain</a></h1>
 <p>Create domain-specific matchers for HTTP, gRPC, or your custom protocol.</p>
@@ -431,12 +413,9 @@ cases:
 [features]
 default = []
 </code></pre>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// rumi/ext/http/src/lib.rs
+<pre><code class="language-rust ignore">// rumi/ext/http/src/lib.rs
 pub mod headers;
-pub mod path;
-<span class="boring">}</span></code></pre>
+pub mod path;</code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
 <p>Why x.uma is built the way it is.</p>
@@ -470,9 +449,7 @@ pub mod path;
 <p>Every <code>input</code> and <code>action</code> is a port. Adapters are concrete registered types.</p>
 <h2 id="why-type-erasure-at-data-level"><a class="header" href="#why-type-erasure-at-data-level">Why Type Erasure at Data Level</a></h2>
 <p>Key insight from the spike phase: erase types at the <strong>data level</strong>, not the predicate level.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// MatchingData — the erased type
+<pre><code class="language-rust ignore">// MatchingData — the erased type
 pub enum MatchingData { None, String(String), Int(i64), ... }
 
 // DataInput — domain-specific, returns erased type
@@ -483,8 +460,7 @@ pub trait DataInput&lt;Ctx&gt; {
 // InputMatcher — domain-agnostic, NON-GENERIC
 pub trait InputMatcher {
     fn matches(&amp;self, value: &amp;MatchingData) -&gt; bool;
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>Why this works:</strong></p>
 <ul>
 <li><code>InputMatcher</code> is non-generic → same <code>ExactMatcher</code> works everywhere</li>

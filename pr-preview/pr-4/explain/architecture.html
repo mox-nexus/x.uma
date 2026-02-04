@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-c7954d56.js";
+            window.path_to_searchindex_js = "../searchindex-670c697b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-fa7c0e76.js"></script>
@@ -212,9 +212,7 @@
 <p>Every <code>input</code> and <code>action</code> is a port. Adapters are concrete registered types.</p>
 <h2 id="why-type-erasure-at-data-level"><a class="header" href="#why-type-erasure-at-data-level">Why Type Erasure at Data Level</a></h2>
 <p>Key insight from the spike phase: erase types at the <strong>data level</strong>, not the predicate level.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// MatchingData — the erased type
+<pre><code class="language-rust ignore">// MatchingData — the erased type
 pub enum MatchingData { None, String(String), Int(i64), ... }
 
 // DataInput — domain-specific, returns erased type
@@ -225,8 +223,7 @@ pub trait DataInput&lt;Ctx&gt; {
 // InputMatcher — domain-agnostic, NON-GENERIC
 pub trait InputMatcher {
     fn matches(&amp;self, value: &amp;MatchingData) -&gt; bool;
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>Why this works:</strong></p>
 <ul>
 <li><code>InputMatcher</code> is non-generic → same <code>ExactMatcher</code> works everywhere</li>
