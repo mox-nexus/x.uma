@@ -28,6 +28,7 @@
 
 - [Proto API](reference/proto.md)
 - [Rust API](reference/rust.md)
+- [HTTP Domain](reference/http.md)
 
 ---
 

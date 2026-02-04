@@ -119,10 +119,11 @@ x.uma provides the **match vocabulary**. Actions are domain-specific.
 
 ### Deliverables
 
-- [ ] `rumi-http` crate with `ProcessingRequest` context
-- [ ] DataInputs: `PathInput`, `MethodInput`, `HeaderInput`, `QueryParamInput`
-- [ ] Gateway API `HTTPRouteMatch` schema (import or mirror)
-- [ ] Compiler: `HTTPRouteMatch` → `Matcher<ProcessingRequest, A>`
+- [x] `rumi-http` crate with `ProcessingRequest` context
+- [x] DataInputs: `PathInput`, `MethodInput`, `HeaderInput`, `QueryParamInput`, `SchemeInput`, `AuthorityInput`
+- [x] Gateway API types via `k8s-gateway-api` crate (CNCF standard)
+- [x] Compiler: `HttpRouteMatchExt::compile()` → `Matcher<ProcessingRequest, A>`
+- [ ] Integration tests with real `ProcessingRequest` construction
 - [ ] Conformance tests against Gateway API spec
 
 ### Research
