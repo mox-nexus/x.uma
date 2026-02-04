@@ -125,6 +125,7 @@ pub mod prelude {
         FieldMatcher,
         InputMatcher,
         Matcher,
+        MatcherTree,
         MatchingData,
         OnMatch,
         Predicate,
@@ -133,7 +134,6 @@ pub mod prelude {
         SinglePredicate,
         StringMatcher,
         SuffixMatcher,
-        MatcherTree,
     };
 }
 

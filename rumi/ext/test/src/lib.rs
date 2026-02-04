@@ -54,7 +54,7 @@ impl TestContext {
     }
 }
 
-/// Extracts a string value from TestContext by key.
+/// Extracts a string value from `TestContext` by key.
 #[derive(Debug, Clone)]
 pub struct StringInput {
     key: String,
@@ -70,8 +70,7 @@ impl StringInput {
 impl DataInput<TestContext> for StringInput {
     fn get(&self, ctx: &TestContext) -> MatchingData {
         ctx.get(&self.key)
-            .map(|s| MatchingData::String(s.to_string()))
-            .unwrap_or(MatchingData::None)
+            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
     }
 }
 
@@ -87,9 +86,7 @@ mod tests {
 
     #[test]
     fn test_context_builder() {
-        let ctx = TestContext::new()
-            .with("foo", "bar")
-            .with("baz", "qux");
+        let ctx = TestContext::new().with("foo", "bar").with("baz", "qux");
 
         assert_eq!(ctx.get("foo"), Some("bar"));
         assert_eq!(ctx.get("baz"), Some("qux"));

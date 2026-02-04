@@ -141,7 +141,11 @@ use crate::{StringInput, TestContext};
 impl MatcherConfig {
     /// Build a rumi Matcher from this config
     pub fn build(&self) -> Matcher<TestContext, String> {
-        let field_matchers = self.matchers.iter().map(FieldMatcherConfig::build).collect();
+        let field_matchers = self
+            .matchers
+            .iter()
+            .map(FieldMatcherConfig::build)
+            .collect();
         let on_no_match = self.on_no_match.as_ref().map(|om| om.build());
         Matcher::new(field_matchers, on_no_match)
     }

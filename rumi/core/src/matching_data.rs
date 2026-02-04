@@ -685,6 +685,5 @@ mod tests {
                 Some("default_backend".to_string())
             );
         }
-
     }
 }
