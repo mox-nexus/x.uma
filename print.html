@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "searchindex-80c39d86.js";
+            window.path_to_searchindex_js = "searchindex-5914a018.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-7afcf466.js"></script>
+        <script src="toc-4608792b.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -596,6 +596,171 @@ type.googleapis.com/xuma.claude.v1.HookContext
 <li><a href="https://github.com/mox-labs/x.uma/tree/main/rumi">rumi/</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="http-domain-reference"><a class="header" href="#http-domain-reference">HTTP Domain Reference</a></h1>
+<p><code>rumi-http</code> provides HTTP request matching for Envoy ext_proc.</p>
+<h2 id="architecture-1"><a class="header" href="#architecture-1">Architecture</a></h2>
+<pre><code>Gateway API HttpRouteMatch (config)
+        ↓ compile()
+rumi Matcher&lt;ProcessingRequest, A&gt;
+        ↓ evaluate()
+ext_proc ProcessingRequest (runtime)
+</code></pre>
+<p><strong>Two layers:</strong></p>
+<ul>
+<li><strong>User API</strong>: Gateway API <code>HttpRouteMatch</code> — human-friendly config</li>
+<li><strong>Data Plane API</strong>: Envoy <code>ProcessingRequest</code> — wire protocol</li>
+</ul>
+<h2 id="quick-start-1"><a class="header" href="#quick-start-1">Quick Start</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi_http::prelude::*;
+
+// Config time: compile Gateway API match to rumi matcher
+let route_match = HttpRouteMatch {
+    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+    method: Some("GET".into()),
+    ..Default::default()
+};
+let matcher = route_match.compile("api_backend");
+
+// Runtime: evaluate against ext_proc ProcessingRequest
+let result = matcher.evaluate(&amp;processing_request);
+assert_eq!(result, Some("api_backend"));
+<span class="boring">}</span></code></pre>
+<h2 id="datainputs-for-processingrequest"><a class="header" href="#datainputs-for-processingrequest">DataInputs for ProcessingRequest</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Input</th><th>Extracts</th><th>Example</th></tr>
+</thead>
+<tbody>
+<tr><td><code>PathInput</code></td><td><code>:path</code> pseudo-header (without query)</td><td><code>/api/users</code></td></tr>
+<tr><td><code>MethodInput</code></td><td><code>:method</code> pseudo-header</td><td><code>GET</code></td></tr>
+<tr><td><code>HeaderInput::new("x-api-key")</code></td><td>Named header</td><td><code>Bearer ...</code></td></tr>
+<tr><td><code>QueryParamInput::new("page")</code></td><td>Query parameter</td><td><code>1</code></td></tr>
+<tr><td><code>SchemeInput</code></td><td><code>:scheme</code> pseudo-header</td><td><code>https</code></td></tr>
+<tr><td><code>AuthorityInput</code></td><td><code>:authority</code> pseudo-header</td><td><code>api.example.com</code></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="gateway-api-match-types"><a class="header" href="#gateway-api-match-types">Gateway API Match Types</a></h2>
+<h3 id="path-matching"><a class="header" href="#path-matching">Path Matching</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Exact match
+HttpPathMatch::Exact { value: "/api/v1/users".into() }
+
+// Prefix match
+HttpPathMatch::PathPrefix { value: "/api".into() }
+
+// Regex match
+HttpPathMatch::RegularExpression { value: r"^/api/v\d+/.*".into() }
+<span class="boring">}</span></code></pre>
+<h3 id="header-matching"><a class="header" href="#header-matching">Header Matching</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Exact header value
+HttpHeaderMatch::Exact {
+    name: "content-type".into(),
+    value: "application/json".into()
+}
+
+// Regex header value
+HttpHeaderMatch::RegularExpression {
+    name: "authorization".into(),
+    value: r"^Bearer .+".into()
+}
+<span class="boring">}</span></code></pre>
+<h3 id="query-parameter-matching"><a class="header" href="#query-parameter-matching">Query Parameter Matching</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Exact param value
+HttpQueryParamMatch::Exact {
+    name: "version".into(),
+    value: "2".into()
+}
+
+// Regex param value
+HttpQueryParamMatch::RegularExpression {
+    name: "id".into(),
+    value: r"^\d+$".into()
+}
+<span class="boring">}</span></code></pre>
+<h2 id="match-semantics"><a class="header" href="#match-semantics">Match Semantics</a></h2>
+<p>Per Gateway API spec:</p>
+<ul>
+<li><strong>Within a match</strong>: All conditions are ANDed</li>
+<li><strong>Multiple matches</strong>: ORed together</li>
+</ul>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// This matches: GET /api/* with x-version header
+let route_match = HttpRouteMatch {
+    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+    method: Some("GET".into()),
+    headers: Some(vec![
+        HttpHeaderMatch::Exact {
+            name: "x-version".into(),
+            value: "2".into()
+        }
+    ]),
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre>
+<h2 id="compiling-multiple-matches"><a class="header" href="#compiling-multiple-matches">Compiling Multiple Matches</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi_http::compile_route_matches;
+
+let matches = vec![
+    HttpRouteMatch {
+        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+        ..Default::default()
+    },
+    HttpRouteMatch {
+        path: Some(HttpPathMatch::PathPrefix { value: "/health".into() }),
+        ..Default::default()
+    },
+];
+
+// Multiple matches are ORed
+let matcher = compile_route_matches(&amp;matches, "backend", None);
+<span class="boring">}</span></code></pre>
+<h2 id="testing-with-simplehttprequest"><a class="header" href="#testing-with-simplehttprequest">Testing with SimpleHttpRequest</a></h2>
+<p>For unit tests without constructing full <code>ProcessingRequest</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi_http::prelude::*;
+
+let request = HttpRequest::builder()
+    .method("POST")
+    .path("/api/users")
+    .header("Content-Type", "application/json")
+    .query_param("page", "1")
+    .build();
+
+// Use Simple*Input types for matching
+let method_input = SimpleMethodInput;
+assert_eq!(method_input.get(&amp;request), MatchingData::String("POST".into()));
+<span class="boring">}</span></code></pre>
+<h2 id="dependencies"><a class="header" href="#dependencies">Dependencies</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Crate</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td><code>k8s-gateway-api</code></td><td>Gateway API types</td></tr>
+<tr><td><code>envoy-grpc-ext-proc</code></td><td>ext_proc ProcessingRequest types</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.HTTPRouteMatch">Gateway API HTTPRoute Spec</a></li>
+<li><a href="https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_proc_filter">Envoy ext_proc Documentation</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="roadmap"><a class="header" href="#roadmap">Roadmap</a></h1>
 <p>Current development status and planned phases.</p>
 <h2 id="status"><a class="header" href="#status">Status</a></h2>
@@ -611,8 +776,8 @@ type.googleapis.com/xuma.claude.v1.HookContext
 <tr><td>2.5</td><td>Extensible MatchingData (<code>Custom</code> variant)</td><td>✅ Done</td></tr>
 <tr><td>3</td><td>StringMatcher, MatcherTree, RadixTree</td><td>✅ Done</td></tr>
 <tr><td>4</td><td>HTTP Domain (ext_proc model)</td><td>🚧 Next</td></tr>
-<tr><td>5</td><td>p.uma (Pure Python)</td><td>Planned</td></tr>
-<tr><td>6</td><td>b.uma (Bun/TypeScript)</td><td>Planned</td></tr>
+<tr><td>5</td><td>p.uma (Pure Python + HTTP)</td><td>Planned</td></tr>
+<tr><td>6</td><td>b.uma (Bun/TypeScript + HTTP)</td><td>Planned</td></tr>
 <tr><td>7</td><td>crusty/p.uma (uniffi→Python)</td><td>Planned</td></tr>
 <tr><td>8</td><td>crusty/b.uma (uniffi→WASM)</td><td>Planned</td></tr>
 <tr><td>9</td><td>Benchmarks</td><td>Planned</td></tr>
@@ -620,35 +785,111 @@ type.googleapis.com/xuma.claude.v1.HookContext
 </table>
 </div>
 <h2 id="phase-4-http-domain"><a class="header" href="#phase-4-http-domain">Phase 4: HTTP Domain</a></h2>
-<p>The HTTP domain uses Envoy’s ext_proc <code>ProcessingRequest</code>/<code>ProcessingResponse</code> as the universal HTTP processing model.</p>
-<p>This covers all HTTP-based protocols:</p>
+<h3 id="overview-1"><a class="header" href="#overview-1">Overview</a></h3>
+<p>The HTTP domain provides matching for all HTTP-based protocols using two layered APIs:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Layer</th><th>Standard</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>User API</strong></td><td>Gateway API <code>HTTPRouteMatch</code></td><td>Config-time, DX-friendly YAML/JSON</td></tr>
+<tr><td><strong>Data Plane API</strong></td><td>ext_proc <code>ProcessingRequest</code></td><td>Runtime context from Envoy</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="why-two-layers"><a class="header" href="#why-two-layers">Why Two Layers?</a></h3>
+<p><strong>Gateway API HTTPRouteMatch</strong> (CNCF Standard)</p>
 <ul>
-<li>REST</li>
-<li>gRPC</li>
-<li>GraphQL</li>
-<li>WebSocket (handshake only)</li>
+<li>What users write in config files</li>
+<li>Clean YAML/JSON schema</li>
+<li>Adopted by: Istio, Envoy Gateway, Contour, Kong, etc.</li>
+<li>We use it as-is, not reinvent</li>
 </ul>
-<h3 id="architecture-1"><a class="header" href="#architecture-1">Architecture</a></h3>
-<pre><code class="language-text">┌─────────────────────────────────────────┐
-│         User-Facing Config API          │  ← DX-friendly match schema
-│      (Gateway API inspired)             │
-└────────────────────┬────────────────────┘
-                     │ compiles to
-┌────────────────────▼────────────────────┐
-│           x.uma Matchers                │  ← rumi engine
-│   DataInput + Predicate + OnMatch       │
-└────────────────────┬────────────────────┘
-                     │ operates on
-┌────────────────────▼────────────────────┐
-│        ProcessingRequest Context        │  ← ext_proc protocol
-└─────────────────────────────────────────┘
+<p><strong>ext_proc ProcessingRequest</strong> (Envoy)</p>
+<ul>
+<li>Universal HTTP processing model</li>
+<li>Covers: REST, gRPC, GraphQL, WebSocket handshake</li>
+<li>What matchers actually operate on at runtime</li>
+</ul>
+<h3 id="architecture-2"><a class="header" href="#architecture-2">Architecture</a></h3>
+<pre><code class="language-text">┌─────────────────────────────────────────────────────┐
+│              Gateway API HTTPRouteMatch             │
+│  ─────────────────────────────────────────────────  │
+│  path:                                              │
+│    type: PathPrefix                                 │
+│    value: /api/v2                                   │
+│  headers:                                           │
+│  - name: x-api-key                                  │
+│    type: Exact                                      │
+│    value: secret123                                 │
+└─────────────────────┬───────────────────────────────┘
+                      │ compile() — config time
+                      ▼
+┌─────────────────────────────────────────────────────┐
+│            rumi Matcher&lt;ProcessingRequest, A&gt;       │
+│  ─────────────────────────────────────────────────  │
+│  DataInputs: PathInput, HeaderInput, MethodInput    │
+│  Predicates: composed with AND/OR/NOT               │
+│  Actions: domain-specific (routing, rate limit...)  │
+└─────────────────────┬───────────────────────────────┘
+                      │ evaluate() — runtime
+                      ▼
+┌─────────────────────────────────────────────────────┐
+│              ext_proc ProcessingRequest             │
+│  ─────────────────────────────────────────────────  │
+│  request_headers / response_headers                 │
+│  request_body / response_body                       │
+│  request_trailers / response_trailers               │
+└─────────────────────────────────────────────────────┘
 </code></pre>
-<h3 id="design-principles"><a class="header" href="#design-principles">Design Principles</a></h3>
-<ol>
-<li><strong>Match schema is action-agnostic</strong> — same match syntax works for routing, rate limiting, feature flags, auth policies</li>
-<li><strong>ext_proc as universal model</strong> — covers all HTTP protocols at the transport layer</li>
-<li><strong>Gateway API inspiration</strong> — familiar, DX-friendly configuration</li>
-</ol>
+<h3 id="components"><a class="header" href="#components">Components</a></h3>
+<h4 id="1-datainputs-for-processingrequest"><a class="header" href="#1-datainputs-for-processingrequest">1. DataInputs for ProcessingRequest</a></h4>
+<pre><code class="language-rust ignore">// Extract data from ProcessingRequest for matching
+impl DataInput&lt;ProcessingRequest&gt; for PathInput { ... }
+impl DataInput&lt;ProcessingRequest&gt; for MethodInput { ... }
+impl DataInput&lt;ProcessingRequest&gt; for HeaderInput { ... }
+impl DataInput&lt;ProcessingRequest&gt; for QueryParamInput { ... }</code></pre>
+<h4 id="2-compiler-httproutematch--matcher"><a class="header" href="#2-compiler-httproutematch--matcher">2. Compiler: HTTPRouteMatch → Matcher</a></h4>
+<pre><code class="language-rust ignore">// Config time: compile Gateway API config to rumi matcher
+let config: HTTPRouteMatch = load_yaml("route.yaml");
+let matcher: Matcher&lt;ProcessingRequest, Action&gt; = config.compile();</code></pre>
+<h4 id="3-runtime-evaluation"><a class="header" href="#3-runtime-evaluation">3. Runtime Evaluation</a></h4>
+<pre><code class="language-rust ignore">// Runtime: fast path evaluation
+let action = matcher.evaluate(&amp;processing_request);</code></pre>
+<h3 id="match-schema-is-action-agnostic"><a class="header" href="#match-schema-is-action-agnostic">Match Schema is Action-Agnostic</a></h3>
+<p>The same <code>HTTPRouteMatch</code> works for different use cases:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Use Case</th><th>Match</th><th>Action</th></tr>
+</thead>
+<tbody>
+<tr><td>Routing</td><td>path, headers</td><td>→ backend selection</td></tr>
+<tr><td>Rate Limiting</td><td>path, headers, user</td><td>→ limit config</td></tr>
+<tr><td>Feature Flags</td><td>headers, % rollout</td><td>→ enable features</td></tr>
+<tr><td>Auth Policy</td><td>path, method</td><td>→ require auth</td></tr>
+<tr><td>Observability</td><td>all requests</td><td>→ add tracing</td></tr>
+</tbody>
+</table>
+</div>
+<p>x.uma provides the <strong>match vocabulary</strong>. Actions are domain-specific.</p>
+<h3 id="deliverables"><a class="header" href="#deliverables">Deliverables</a></h3>
+<ul>
+<li><input disabled="" type="checkbox" checked=""> <code>rumi-http</code> crate with <code>ProcessingRequest</code> context</li>
+<li><input disabled="" type="checkbox" checked=""> DataInputs: <code>PathInput</code>, <code>MethodInput</code>, <code>HeaderInput</code>, <code>QueryParamInput</code>, <code>SchemeInput</code>, <code>AuthorityInput</code></li>
+<li><input disabled="" type="checkbox" checked=""> Gateway API types via <code>k8s-gateway-api</code> crate (CNCF standard)</li>
+<li><input disabled="" type="checkbox" checked=""> Compiler: <code>HttpRouteMatchExt::compile()</code> → <code>Matcher&lt;ProcessingRequest, A&gt;</code></li>
+<li><input disabled="" type="checkbox"> Integration tests with real <code>ProcessingRequest</code> construction</li>
+<li><input disabled="" type="checkbox"> Conformance tests against Gateway API spec</li>
+</ul>
+<h3 id="research"><a class="header" href="#research">Research</a></h3>
+<p>See <code>.claude/research/</code> for detailed research on:</p>
+<ul>
+<li>Gateway API schema structure</li>
+<li>ext_proc ProcessingRequest fields</li>
+<li>Adoption patterns from Istio, Envoy Gateway</li>
+</ul>
 <h2 id="contributing"><a class="header" href="#contributing">Contributing</a></h2>
 <p>See the <a href="https://github.com/mox-labs/x.uma">GitHub repository</a> for contribution guidelines.</p>
 
