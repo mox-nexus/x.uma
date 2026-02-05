@@ -1,0 +1,82 @@
+name: "http_method_get"
+description: "Gateway API method matching for GET"
+
+http_route_match:
+  method: GET
+
+action: "read_endpoint"
+
+cases:
+  - name: "get_matches"
+    http_request:
+      method: GET
+      path: /
+    expect: "read_endpoint"
+
+  - name: "post_no_match"
+    http_request:
+      method: POST
+      path: /
+    expect: null
+
+  - name: "put_no_match"
+    http_request:
+      method: PUT
+      path: /
+    expect: null
+
+  - name: "delete_no_match"
+    http_request:
+      method: DELETE
+      path: /
+    expect: null
+
+---
+name: "http_method_post"
+description: "Gateway API method matching for POST"
+
+http_route_match:
+  method: POST
+
+action: "write_endpoint"
+
+cases:
+  - name: "post_matches"
+    http_request:
+      method: POST
+      path: /
+    expect: "write_endpoint"
+
+  - name: "get_no_match"
+    http_request:
+      method: GET
+      path: /
+    expect: null
+
+---
+name: "http_method_case_sensitive"
+description: "HTTP methods are case-sensitive per spec"
+
+http_route_match:
+  method: GET
+
+action: "get_handler"
+
+cases:
+  - name: "uppercase_matches"
+    http_request:
+      method: GET
+      path: /
+    expect: "get_handler"
+
+  - name: "lowercase_no_match"
+    http_request:
+      method: get
+      path: /
+    expect: null
+
+  - name: "mixed_case_no_match"
+    http_request:
+      method: Get
+      path: /
+    expect: null

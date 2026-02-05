@@ -1,0 +1,134 @@
+name: "http_header_exact"
+description: "Gateway API exact header matching"
+
+http_route_match:
+  headers:
+    - type: Exact
+      name: x-api-version
+      value: "v2"
+
+action: "v2_api"
+
+cases:
+  - name: "exact_header_matches"
+    http_request:
+      method: GET
+      path: /
+      headers:
+        x-api-version: "v2"
+    expect: "v2_api"
+
+  - name: "different_value_no_match"
+    http_request:
+      method: GET
+      path: /
+      headers:
+        x-api-version: "v1"
+    expect: null
+
+  - name: "missing_header_no_match"
+    http_request:
+      method: GET
+      path: /
+    expect: null
+
+  - name: "header_case_insensitive_name"
+    http_request:
+      method: GET
+      path: /
+      headers:
+        X-API-VERSION: "v2"
+    expect: "v2_api"
+
+---
+name: "http_header_regex"
+description: "Gateway API regex header matching"
+
+http_route_match:
+  headers:
+    - type: RegularExpression
+      name: authorization
+      value: "^Bearer .+$"
+
+action: "authenticated"
+
+cases:
+  - name: "bearer_token_matches"
+    http_request:
+      method: GET
+      path: /
+      headers:
+        authorization: "Bearer abc123"
+    expect: "authenticated"
+
+  - name: "basic_auth_no_match"
+    http_request:
+      method: GET
+      path: /
+      headers:
+        authorization: "Basic dXNlcjpwYXNz"
+    expect: null
+
+  - name: "empty_bearer_no_match"
+    http_request:
+      method: GET
+      path: /
+      headers:
+        authorization: "Bearer "
+    expect: null
+
+  - name: "missing_header_no_match"
+    http_request:
+      method: GET
+      path: /
+    expect: null
+
+---
+name: "http_multiple_headers_and"
+description: "Multiple headers are ANDed together"
+
+http_route_match:
+  headers:
+    - type: Exact
+      name: content-type
+      value: "application/json"
+    - type: Exact
+      name: accept
+      value: "application/json"
+
+action: "json_api"
+
+cases:
+  - name: "both_headers_match"
+    http_request:
+      method: POST
+      path: /
+      headers:
+        content-type: "application/json"
+        accept: "application/json"
+    expect: "json_api"
+
+  - name: "only_content_type_no_match"
+    http_request:
+      method: POST
+      path: /
+      headers:
+        content-type: "application/json"
+    expect: null
+
+  - name: "only_accept_no_match"
+    http_request:
+      method: POST
+      path: /
+      headers:
+        accept: "application/json"
+    expect: null
+
+  - name: "wrong_content_type_no_match"
+    http_request:
+      method: POST
+      path: /
+      headers:
+        content-type: "text/plain"
+        accept: "application/json"
+    expect: null

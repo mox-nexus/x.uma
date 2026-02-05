@@ -185,6 +185,64 @@ pub fn compile_route_matches<A: Clone + Send + Sync + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use envoy_grpc_ext_proc::envoy::{
+        config::core::v3::{HeaderMap, HeaderValue},
+        service::ext_proc::v3::{processing_request::Request, HttpHeaders},
+    };
+
+    // ========== Test Helpers ==========
+
+    /// Builder for constructing test `ProcessingRequest` instances.
+    struct RequestBuilder {
+        headers: Vec<HeaderValue>,
+    }
+
+    impl RequestBuilder {
+        fn new() -> Self {
+            Self { headers: vec![] }
+        }
+
+        fn path(mut self, path: &str) -> Self {
+            self.headers.push(HeaderValue {
+                key: ":path".into(),
+                value: path.into(),
+                raw_value: vec![],
+            });
+            self
+        }
+
+        fn method(mut self, method: &str) -> Self {
+            self.headers.push(HeaderValue {
+                key: ":method".into(),
+                value: method.into(),
+                raw_value: vec![],
+            });
+            self
+        }
+
+        fn header(mut self, name: &str, value: &str) -> Self {
+            self.headers.push(HeaderValue {
+                key: name.to_lowercase(),
+                value: value.into(),
+                raw_value: vec![],
+            });
+            self
+        }
+
+        fn build(self) -> ProcessingRequest {
+            ProcessingRequest {
+                request: Some(Request::RequestHeaders(HttpHeaders {
+                    headers: Some(HeaderMap {
+                        headers: self.headers,
+                    }),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }
+        }
+    }
+
+    // ========== Predicate Structure Tests ==========
 
     #[test]
     fn test_compile_empty_match() {
@@ -222,5 +280,368 @@ mod tests {
 
         // Multiple conditions should produce AND
         assert!(matches!(predicate, Predicate::And(_)));
+    }
+
+    // ========== End-to-End Path Matching ==========
+
+    #[test]
+    fn e2e_path_prefix_matches() {
+        let route_match = HttpRouteMatch {
+            path: Some(HttpPathMatch::PathPrefix {
+                value: "/api".into(),
+            }),
+            ..Default::default()
+        };
+
+        let matcher = route_match.compile("api_backend");
+
+        // Should match
+        let req = RequestBuilder::new().path("/api/users").build();
+        assert_eq!(matcher.evaluate(&req), Some("api_backend"));
+
+        let req = RequestBuilder::new().path("/api").build();
+        assert_eq!(matcher.evaluate(&req), Some("api_backend"));
+
+        // Should NOT match
+        let req = RequestBuilder::new().path("/other").build();
+        assert_eq!(matcher.evaluate(&req), None);
+
+        let req = RequestBuilder::new().path("/apifoo").build();
+        // Prefix "/api" matches "/apifoo" since it starts with "/api"
+        assert_eq!(matcher.evaluate(&req), Some("api_backend"));
+    }
+
+    #[test]
+    fn e2e_path_exact_matches() {
+        let route_match = HttpRouteMatch {
+            path: Some(HttpPathMatch::Exact {
+                value: "/api/v1/health".into(),
+            }),
+            ..Default::default()
+        };
+
+        let matcher = route_match.compile("health_check");
+
+        // Should match exactly
+        let req = RequestBuilder::new().path("/api/v1/health").build();
+        assert_eq!(matcher.evaluate(&req), Some("health_check"));
+
+        // Should NOT match
+        let req = RequestBuilder::new().path("/api/v1/health/").build();
+        assert_eq!(matcher.evaluate(&req), None);
+
+        let req = RequestBuilder::new().path("/api/v1").build();
+        assert_eq!(matcher.evaluate(&req), None);
+    }
+
+    #[test]
+    fn e2e_path_regex_matches() {
+        let route_match = HttpRouteMatch {
+            path: Some(HttpPathMatch::RegularExpression {
+                value: r"^/users/\d+$".into(),
+            }),
+            ..Default::default()
+        };
+
+        let matcher = route_match.compile("user_detail");
+
+        // Should match
+        let req = RequestBuilder::new().path("/users/123").build();
+        assert_eq!(matcher.evaluate(&req), Some("user_detail"));
+
+        let req = RequestBuilder::new().path("/users/1").build();
+        assert_eq!(matcher.evaluate(&req), Some("user_detail"));
+
+        // Should NOT match
+        let req = RequestBuilder::new().path("/users/abc").build();
+        assert_eq!(matcher.evaluate(&req), None);
+
+        let req = RequestBuilder::new().path("/users/123/edit").build();
+        assert_eq!(matcher.evaluate(&req), None);
+    }
+
+    // ========== End-to-End Method Matching ==========
+
+    #[test]
+    fn e2e_method_matches() {
+        let route_match = HttpRouteMatch {
+            method: Some("POST".into()),
+            ..Default::default()
+        };
+
+        let matcher = route_match.compile("write_endpoint");
+
+        // Should match POST
+        let req = RequestBuilder::new().method("POST").path("/").build();
+        assert_eq!(matcher.evaluate(&req), Some("write_endpoint"));
+
+        // Should NOT match other methods
+        let req = RequestBuilder::new().method("GET").path("/").build();
+        assert_eq!(matcher.evaluate(&req), None);
+
+        let req = RequestBuilder::new().method("PUT").path("/").build();
+        assert_eq!(matcher.evaluate(&req), None);
+    }
+
+    // ========== End-to-End Header Matching ==========
+
+    #[test]
+    fn e2e_header_exact_matches() {
+        let route_match = HttpRouteMatch {
+            headers: Some(vec![HttpHeaderMatch::Exact {
+                name: "x-api-version".into(),
+                value: "v2".into(),
+            }]),
+            ..Default::default()
+        };
+
+        let matcher = route_match.compile("v2_api");
+
+        // Should match
+        let req = RequestBuilder::new()
+            .path("/")
+            .header("x-api-version", "v2")
+            .build();
+        assert_eq!(matcher.evaluate(&req), Some("v2_api"));
+
+        // Should NOT match
+        let req = RequestBuilder::new()
+            .path("/")
+            .header("x-api-version", "v1")
+            .build();
+        assert_eq!(matcher.evaluate(&req), None);
+
+        // Missing header should NOT match
+        let req = RequestBuilder::new().path("/").build();
+        assert_eq!(matcher.evaluate(&req), None);
+    }
+
+    #[test]
+    fn e2e_header_regex_matches() {
+        let route_match = HttpRouteMatch {
+            headers: Some(vec![HttpHeaderMatch::RegularExpression {
+                name: "authorization".into(),
+                value: r"^Bearer .+$".into(),
+            }]),
+            ..Default::default()
+        };
+
+        let matcher = route_match.compile("authenticated");
+
+        // Should match
+        let req = RequestBuilder::new()
+            .path("/")
+            .header("authorization", "Bearer token123")
+            .build();
+        assert_eq!(matcher.evaluate(&req), Some("authenticated"));
+
+        // Should NOT match
+        let req = RequestBuilder::new()
+            .path("/")
+            .header("authorization", "Basic base64creds")
+            .build();
+        assert_eq!(matcher.evaluate(&req), None);
+    }
+
+    // ========== End-to-End Query Param Matching ==========
+
+    #[test]
+    fn e2e_query_param_exact_matches() {
+        let route_match = HttpRouteMatch {
+            query_params: Some(vec![HttpQueryParamMatch::Exact {
+                name: "format".into(),
+                value: "json".into(),
+            }]),
+            ..Default::default()
+        };
+
+        let matcher = route_match.compile("json_response");
+
+        // Should match
+        let req = RequestBuilder::new().path("/data?format=json").build();
+        assert_eq!(matcher.evaluate(&req), Some("json_response"));
+
+        // Should NOT match
+        let req = RequestBuilder::new().path("/data?format=xml").build();
+        assert_eq!(matcher.evaluate(&req), None);
+
+        // Missing param should NOT match
+        let req = RequestBuilder::new().path("/data").build();
+        assert_eq!(matcher.evaluate(&req), None);
+    }
+
+    // ========== End-to-End Combined Conditions (AND) ==========
+
+    #[test]
+    fn e2e_combined_path_and_method() {
+        let route_match = HttpRouteMatch {
+            path: Some(HttpPathMatch::PathPrefix {
+                value: "/api".into(),
+            }),
+            method: Some("POST".into()),
+            ..Default::default()
+        };
+
+        let matcher = route_match.compile("api_write");
+
+        // Both conditions must match
+        let req = RequestBuilder::new()
+            .method("POST")
+            .path("/api/users")
+            .build();
+        assert_eq!(matcher.evaluate(&req), Some("api_write"));
+
+        // Wrong method
+        let req = RequestBuilder::new()
+            .method("GET")
+            .path("/api/users")
+            .build();
+        assert_eq!(matcher.evaluate(&req), None);
+
+        // Wrong path
+        let req = RequestBuilder::new().method("POST").path("/other").build();
+        assert_eq!(matcher.evaluate(&req), None);
+    }
+
+    #[test]
+    fn e2e_combined_all_conditions() {
+        let route_match = HttpRouteMatch {
+            path: Some(HttpPathMatch::PathPrefix {
+                value: "/api/v2".into(),
+            }),
+            method: Some("PUT".into()),
+            headers: Some(vec![HttpHeaderMatch::Exact {
+                name: "content-type".into(),
+                value: "application/json".into(),
+            }]),
+            query_params: Some(vec![HttpQueryParamMatch::Exact {
+                name: "dry-run".into(),
+                value: "true".into(),
+            }]),
+        };
+
+        let matcher = route_match.compile("v2_api_dry_run");
+
+        // All conditions match
+        let req = RequestBuilder::new()
+            .method("PUT")
+            .path("/api/v2/resource?dry-run=true")
+            .header("content-type", "application/json")
+            .build();
+        assert_eq!(matcher.evaluate(&req), Some("v2_api_dry_run"));
+
+        // Missing query param
+        let req = RequestBuilder::new()
+            .method("PUT")
+            .path("/api/v2/resource")
+            .header("content-type", "application/json")
+            .build();
+        assert_eq!(matcher.evaluate(&req), None);
+
+        // Wrong content type
+        let req = RequestBuilder::new()
+            .method("PUT")
+            .path("/api/v2/resource?dry-run=true")
+            .header("content-type", "text/plain")
+            .build();
+        assert_eq!(matcher.evaluate(&req), None);
+    }
+
+    // ========== End-to-End Multiple Routes (OR) ==========
+
+    #[test]
+    fn e2e_multiple_routes_or() {
+        let matches = vec![
+            HttpRouteMatch {
+                path: Some(HttpPathMatch::Exact {
+                    value: "/health".into(),
+                }),
+                ..Default::default()
+            },
+            HttpRouteMatch {
+                path: Some(HttpPathMatch::Exact {
+                    value: "/ready".into(),
+                }),
+                ..Default::default()
+            },
+        ];
+
+        let matcher = compile_route_matches(&matches, "health_check", None);
+
+        // Either path should match
+        let req = RequestBuilder::new().path("/health").build();
+        assert_eq!(matcher.evaluate(&req), Some("health_check"));
+
+        let req = RequestBuilder::new().path("/ready").build();
+        assert_eq!(matcher.evaluate(&req), Some("health_check"));
+
+        // Other paths should NOT match
+        let req = RequestBuilder::new().path("/other").build();
+        assert_eq!(matcher.evaluate(&req), None);
+    }
+
+    #[test]
+    fn e2e_multiple_routes_with_fallback() {
+        let matches = vec![HttpRouteMatch {
+            path: Some(HttpPathMatch::PathPrefix {
+                value: "/api".into(),
+            }),
+            ..Default::default()
+        }];
+
+        let matcher = compile_route_matches(&matches, "api_backend", Some("default_backend"));
+
+        // Matching path
+        let req = RequestBuilder::new().path("/api/users").build();
+        assert_eq!(matcher.evaluate(&req), Some("api_backend"));
+
+        // Non-matching path falls back
+        let req = RequestBuilder::new().path("/other").build();
+        assert_eq!(matcher.evaluate(&req), Some("default_backend"));
+    }
+
+    #[test]
+    fn e2e_empty_matches_matches_everything() {
+        let matcher = compile_route_matches::<&str>(&[], "catch_all", None);
+
+        let req = RequestBuilder::new().path("/anything").build();
+        assert_eq!(matcher.evaluate(&req), Some("catch_all"));
+
+        let req = RequestBuilder::new().path("/").build();
+        assert_eq!(matcher.evaluate(&req), Some("catch_all"));
+    }
+
+    // ========== Edge Cases ==========
+
+    #[test]
+    fn e2e_missing_path_in_request() {
+        let route_match = HttpRouteMatch {
+            path: Some(HttpPathMatch::PathPrefix {
+                value: "/api".into(),
+            }),
+            ..Default::default()
+        };
+
+        let matcher = route_match.compile("api_backend");
+
+        // Request without path should NOT match
+        let req = RequestBuilder::new().method("GET").build();
+        assert_eq!(matcher.evaluate(&req), None);
+    }
+
+    #[test]
+    fn e2e_empty_request() {
+        let route_match = HttpRouteMatch {
+            path: Some(HttpPathMatch::Exact {
+                value: "/test".into(),
+            }),
+            ..Default::default()
+        };
+
+        let matcher = route_match.compile("test");
+
+        // Empty request should NOT match
+        let req = ProcessingRequest::default();
+        assert_eq!(matcher.evaluate(&req), None);
     }
 }

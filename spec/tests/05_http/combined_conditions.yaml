@@ -1,0 +1,102 @@
+name: "http_path_and_method"
+description: "Path and method conditions are ANDed"
+
+http_route_match:
+  path:
+    type: PathPrefix
+    value: "/api"
+  method: POST
+
+action: "api_write"
+
+cases:
+  - name: "both_match"
+    http_request:
+      method: POST
+      path: /api/users
+    expect: "api_write"
+
+  - name: "path_matches_method_no"
+    http_request:
+      method: GET
+      path: /api/users
+    expect: null
+
+  - name: "method_matches_path_no"
+    http_request:
+      method: POST
+      path: /other
+    expect: null
+
+  - name: "neither_matches"
+    http_request:
+      method: GET
+      path: /other
+    expect: null
+
+---
+name: "http_all_conditions"
+description: "All condition types combined (path, method, headers, query params)"
+
+http_route_match:
+  path:
+    type: PathPrefix
+    value: "/api/v2"
+  method: PUT
+  headers:
+    - type: Exact
+      name: content-type
+      value: "application/json"
+  query_params:
+    - type: Exact
+      name: dry-run
+      value: "true"
+
+action: "v2_api_dry_run"
+
+cases:
+  - name: "all_conditions_match"
+    http_request:
+      method: PUT
+      path: /api/v2/resource?dry-run=true
+      headers:
+        content-type: "application/json"
+    expect: "v2_api_dry_run"
+
+  - name: "missing_query_param"
+    http_request:
+      method: PUT
+      path: /api/v2/resource
+      headers:
+        content-type: "application/json"
+    expect: null
+
+  - name: "wrong_method"
+    http_request:
+      method: POST
+      path: /api/v2/resource?dry-run=true
+      headers:
+        content-type: "application/json"
+    expect: null
+
+  - name: "wrong_path"
+    http_request:
+      method: PUT
+      path: /api/v1/resource?dry-run=true
+      headers:
+        content-type: "application/json"
+    expect: null
+
+  - name: "wrong_header"
+    http_request:
+      method: PUT
+      path: /api/v2/resource?dry-run=true
+      headers:
+        content-type: "text/plain"
+    expect: null
+
+  - name: "missing_header"
+    http_request:
+      method: PUT
+      path: /api/v2/resource?dry-run=true
+    expect: null

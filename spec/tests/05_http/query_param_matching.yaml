@@ -1,0 +1,112 @@
+name: "http_query_param_exact"
+description: "Gateway API exact query parameter matching"
+
+http_route_match:
+  query_params:
+    - type: Exact
+      name: format
+      value: "json"
+
+action: "json_response"
+
+cases:
+  - name: "exact_param_matches"
+    http_request:
+      method: GET
+      path: /data?format=json
+    expect: "json_response"
+
+  - name: "different_value_no_match"
+    http_request:
+      method: GET
+      path: /data?format=xml
+    expect: null
+
+  - name: "missing_param_no_match"
+    http_request:
+      method: GET
+      path: /data
+    expect: null
+
+  - name: "param_among_others"
+    http_request:
+      method: GET
+      path: /data?page=1&format=json&limit=10
+    expect: "json_response"
+
+  - name: "empty_value_no_match"
+    http_request:
+      method: GET
+      path: /data?format=
+    expect: null
+
+---
+name: "http_query_param_regex"
+description: "Gateway API regex query parameter matching"
+
+http_route_match:
+  query_params:
+    - type: RegularExpression
+      name: id
+      value: "^\\d+$"
+
+action: "resource_by_id"
+
+cases:
+  - name: "numeric_id_matches"
+    http_request:
+      method: GET
+      path: /resource?id=123
+    expect: "resource_by_id"
+
+  - name: "non_numeric_id_no_match"
+    http_request:
+      method: GET
+      path: /resource?id=abc
+    expect: null
+
+  - name: "mixed_id_no_match"
+    http_request:
+      method: GET
+      path: /resource?id=123abc
+    expect: null
+
+---
+name: "http_multiple_query_params_and"
+description: "Multiple query params are ANDed together"
+
+http_route_match:
+  query_params:
+    - type: Exact
+      name: page
+      value: "1"
+    - type: Exact
+      name: sort
+      value: "name"
+
+action: "paginated_sorted"
+
+cases:
+  - name: "both_params_match"
+    http_request:
+      method: GET
+      path: /list?page=1&sort=name
+    expect: "paginated_sorted"
+
+  - name: "only_page_no_match"
+    http_request:
+      method: GET
+      path: /list?page=1
+    expect: null
+
+  - name: "only_sort_no_match"
+    http_request:
+      method: GET
+      path: /list?sort=name
+    expect: null
+
+  - name: "different_order_matches"
+    http_request:
+      method: GET
+      path: /list?sort=name&page=1
+    expect: "paginated_sorted"

@@ -1,0 +1,142 @@
+name: "http_multiple_routes_or"
+description: "Multiple HttpRouteMatch entries are ORed together"
+
+# Multiple route matches - any can match
+http_route_matches:
+  - path:
+      type: Exact
+      value: "/health"
+  - path:
+      type: Exact
+      value: "/ready"
+  - path:
+      type: Exact
+      value: "/live"
+
+action: "probe_endpoint"
+
+cases:
+  - name: "first_route_matches"
+    http_request:
+      method: GET
+      path: /health
+    expect: "probe_endpoint"
+
+  - name: "second_route_matches"
+    http_request:
+      method: GET
+      path: /ready
+    expect: "probe_endpoint"
+
+  - name: "third_route_matches"
+    http_request:
+      method: GET
+      path: /live
+    expect: "probe_endpoint"
+
+  - name: "no_route_matches"
+    http_request:
+      method: GET
+      path: /other
+    expect: null
+
+---
+name: "http_routes_with_fallback"
+description: "Multiple routes with on_no_match fallback"
+
+http_route_matches:
+  - path:
+      type: PathPrefix
+      value: "/api"
+
+action: "api_backend"
+on_no_match: "default_backend"
+
+cases:
+  - name: "route_matches"
+    http_request:
+      method: GET
+      path: /api/users
+    expect: "api_backend"
+
+  - name: "no_match_falls_back"
+    http_request:
+      method: GET
+      path: /other
+    expect: "default_backend"
+
+---
+name: "http_complex_routes_or"
+description: "Complex routes with different conditions ORed"
+
+http_route_matches:
+  - path:
+      type: PathPrefix
+      value: "/api"
+    method: GET
+  - path:
+      type: PathPrefix
+      value: "/api"
+    method: POST
+    headers:
+      - type: Exact
+        name: content-type
+        value: "application/json"
+
+action: "api_handler"
+
+cases:
+  - name: "first_route_get"
+    http_request:
+      method: GET
+      path: /api/users
+    expect: "api_handler"
+
+  - name: "second_route_post_json"
+    http_request:
+      method: POST
+      path: /api/users
+      headers:
+        content-type: "application/json"
+    expect: "api_handler"
+
+  - name: "post_without_json_no_match"
+    http_request:
+      method: POST
+      path: /api/users
+      headers:
+        content-type: "text/plain"
+    expect: null
+
+  - name: "delete_no_match"
+    http_request:
+      method: DELETE
+      path: /api/users
+    expect: null
+
+---
+name: "http_empty_routes_matches_all"
+description: "Empty route matches array matches everything"
+
+http_route_matches: []
+
+action: "catch_all"
+
+cases:
+  - name: "any_path_matches"
+    http_request:
+      method: GET
+      path: /anything
+    expect: "catch_all"
+
+  - name: "root_matches"
+    http_request:
+      method: GET
+      path: /
+    expect: "catch_all"
+
+  - name: "any_method_matches"
+    http_request:
+      method: DELETE
+      path: /resource/123
+    expect: "catch_all"

@@ -1,0 +1,131 @@
+name: "http_path_prefix"
+description: "Gateway API PathPrefix matching semantics"
+
+# HTTP fixture format uses http_request context
+http_route_match:
+  path:
+    type: PathPrefix
+    value: "/api"
+
+action: "api_backend"
+
+cases:
+  - name: "prefix_matches_exact"
+    http_request:
+      method: GET
+      path: /api
+    expect: "api_backend"
+
+  - name: "prefix_matches_subpath"
+    http_request:
+      method: GET
+      path: /api/users
+    expect: "api_backend"
+
+  - name: "prefix_matches_deep_subpath"
+    http_request:
+      method: GET
+      path: /api/v1/users/123
+    expect: "api_backend"
+
+  - name: "prefix_matches_with_query"
+    http_request:
+      method: GET
+      path: /api/users?page=1
+    expect: "api_backend"
+
+  - name: "prefix_no_match_different_path"
+    http_request:
+      method: GET
+      path: /other
+    expect: null
+
+  - name: "prefix_no_match_partial"
+    http_request:
+      method: GET
+      path: /ap
+    expect: null
+
+---
+name: "http_path_exact"
+description: "Gateway API Exact path matching semantics"
+
+http_route_match:
+  path:
+    type: Exact
+    value: "/api/v1/health"
+
+action: "health_check"
+
+cases:
+  - name: "exact_matches"
+    http_request:
+      method: GET
+      path: /api/v1/health
+    expect: "health_check"
+
+  - name: "exact_no_match_trailing_slash"
+    http_request:
+      method: GET
+      path: /api/v1/health/
+    expect: null
+
+  - name: "exact_no_match_subpath"
+    http_request:
+      method: GET
+      path: /api/v1/health/deep
+    expect: null
+
+  - name: "exact_no_match_parent"
+    http_request:
+      method: GET
+      path: /api/v1
+    expect: null
+
+  - name: "exact_matches_with_query_stripped"
+    http_request:
+      method: GET
+      path: /api/v1/health?check=true
+    expect: "health_check"
+
+---
+name: "http_path_regex"
+description: "Gateway API RegularExpression path matching"
+
+http_route_match:
+  path:
+    type: RegularExpression
+    value: "^/users/\\d+$"
+
+action: "user_detail"
+
+cases:
+  - name: "regex_matches_single_digit"
+    http_request:
+      method: GET
+      path: /users/1
+    expect: "user_detail"
+
+  - name: "regex_matches_multiple_digits"
+    http_request:
+      method: GET
+      path: /users/12345
+    expect: "user_detail"
+
+  - name: "regex_no_match_letters"
+    http_request:
+      method: GET
+      path: /users/abc
+    expect: null
+
+  - name: "regex_no_match_subpath"
+    http_request:
+      method: GET
+      path: /users/123/edit
+    expect: null
+
+  - name: "regex_no_match_no_id"
+    http_request:
+      method: GET
+      path: /users/
+    expect: null
