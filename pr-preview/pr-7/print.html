@@ -1,0 +1,950 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>x.uma</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Cross-Platform Unified Matcher API">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "coal";
+            window.path_to_searchindex_js = "searchindex-5914a018.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-4608792b.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">x.uma</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/mox-labs/x.uma" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="xuma"><a class="header" href="#xuma">x.uma</a></h1>
+<blockquote>
+<p>Cross-Platform Unified Matcher API</p>
+</blockquote>
+<p>x.uma implements the <a href="https://github.com/cncf/xds">xDS Unified Matcher API</a> across multiple languages and domains.</p>
+<h2 id="what-is-it"><a class="header" href="#what-is-it">What is it?</a></h2>
+<p>A <strong>matcher</strong> evaluates data against rules and returns an action. Think: routing, filtering, access control.</p>
+<pre><code class="language-text">Input → Matcher → Action
+</code></pre>
+<p>x.uma provides:</p>
+<ul>
+<li><strong>rumi</strong> — Rust core engine (reference implementation)</li>
+<li><strong>p.uma</strong> — Python bindings (coming soon)</li>
+<li><strong>j.uma</strong> — TypeScript/WASM (coming soon)</li>
+</ul>
+<h2 id="why-xuma"><a class="header" href="#why-xuma">Why x.uma?</a></h2>
+<p><strong>Domain-agnostic core.</strong> The same matcher logic works for HTTP headers, Claude hooks, gRPC metadata, or your custom domain.</p>
+<p><strong>Type-safe composition.</strong> Predicates compose with AND/OR/NOT. Matchers nest. Actions are exclusive.</p>
+<p><strong>xDS compatible.</strong> Built on the same protocol Envoy uses at scale.</p>
+<h2 id="quick-example"><a class="header" href="#quick-example">Quick Example</a></h2>
+<pre><code class="language-rust ignore">use rumi::prelude::*;
+
+// Define what data we're matching on
+#[derive(Debug)]
+struct Request { path: String }
+
+#[derive(Debug)]
+struct PathInput;
+
+impl DataInput&lt;Request&gt; for PathInput {
+    fn get(&amp;self, ctx: &amp;Request) -&gt; MatchingData {
+        MatchingData::String(ctx.path.clone())
+    }
+}
+
+// Build a matcher
+let matcher: Matcher&lt;Request, &amp;str&gt; = Matcher::new(
+    vec![
+        FieldMatcher::new(
+            Predicate::Single(SinglePredicate::new(
+                Box::new(PathInput),
+                Box::new(PrefixMatcher::new("/api/")),
+            )),
+            OnMatch::Action("api_handler"),
+        ),
+    ],
+    Some(OnMatch::Action("default_handler")),
+);
+
+// Evaluate
+let req = Request { path: "/api/users".into() };
+let result = matcher.evaluate(&amp;req);
+// → Some("api_handler")</code></pre>
+<h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Section</th><th>What you’ll learn</th></tr>
+</thead>
+<tbody>
+<tr><td><a href="#quick-start">Quick Start</a></td><td>Get running in 5 minutes</td></tr>
+<tr><td><a href="#concepts">Concepts</a></td><td>Core ideas and terminology</td></tr>
+<tr><td><a href="#architecture">Architecture</a></td><td>Why it’s built this way</td></tr>
+<tr><td><a href="#proto-api-reference">Proto API</a></td><td>Generated from <code>.proto</code> files</td></tr>
+<tr><td><a href="#rust-api-reference">Rust API</a></td><td>Generated from <code>rustdoc</code></td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h1>
+<p>Get x.uma running in your project.</p>
+<h2 id="install"><a class="header" href="#install">Install</a></h2>
+<p>Add to your <code>Cargo.toml</code>:</p>
+<pre><code class="language-toml">[dependencies]
+rumi = "0.1"
+</code></pre>
+<h2 id="basic-usage"><a class="header" href="#basic-usage">Basic Usage</a></h2>
+<pre><code class="language-rust ignore">use rumi::prelude::*;
+
+// 1. Define your context type
+#[derive(Debug)]
+struct MyContext {
+    value: String,
+}
+
+// 2. Implement DataInput to extract data
+#[derive(Debug)]
+struct ValueInput;
+
+impl DataInput&lt;MyContext&gt; for ValueInput {
+    fn get(&amp;self, ctx: &amp;MyContext) -&gt; MatchingData {
+        MatchingData::String(ctx.value.clone())
+    }
+}
+
+// 3. Build a matcher
+let matcher: Matcher&lt;MyContext, &amp;str&gt; = Matcher::new(
+    vec![
+        FieldMatcher::new(
+            Predicate::Single(SinglePredicate::new(
+                Box::new(ValueInput),
+                Box::new(ExactMatcher::new("hello")),
+            )),
+            OnMatch::Action("matched!"),
+        ),
+    ],
+    None,
+);
+
+// 4. Evaluate
+let ctx = MyContext { value: "hello".into() };
+assert_eq!(matcher.evaluate(&amp;ctx), Some("matched!"));</code></pre>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li><a href="#concepts">Concepts</a> — understand the core abstractions</li>
+<li><a href="#adding-a-domain">Adding a Domain</a> — create domain-specific matchers</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="concepts"><a class="header" href="#concepts">Concepts</a></h1>
+<p>Core abstractions in x.uma.</p>
+<h2 id="the-matching-pipeline"><a class="header" href="#the-matching-pipeline">The Matching Pipeline</a></h2>
+<pre><code class="language-text">Context → DataInput → MatchingData → InputMatcher → bool
+                                          ↓
+                      Predicate (AND/OR/NOT composition)
+                                          ↓
+                              Matcher (first-match-wins)
+                                          ↓
+                                       Action
+</code></pre>
+<h2 id="key-types"><a class="header" href="#key-types">Key Types</a></h2>
+<h3 id="matchingdata"><a class="header" href="#matchingdata">MatchingData</a></h3>
+<p>Type-erased data that matchers operate on:</p>
+<pre><code class="language-rust ignore">pub enum MatchingData {
+    None,
+    String(String),
+    Int(i64),
+    Bool(bool),
+    Bytes(Vec&lt;u8&gt;),
+    Custom(Arc&lt;dyn CustomMatchData&gt;),  // Extensible for domain-specific types
+}</code></pre>
+<h3 id="datainput"><a class="header" href="#datainput">DataInput</a></h3>
+<p>Extracts data from your domain context:</p>
+<pre><code class="language-rust ignore">pub trait DataInput&lt;Ctx&gt;: Send + Sync {
+    fn get(&amp;self, ctx: &amp;Ctx) -&gt; MatchingData;
+}</code></pre>
+<h3 id="inputmatcher"><a class="header" href="#inputmatcher">InputMatcher</a></h3>
+<p>Matches against <code>MatchingData</code> (domain-agnostic):</p>
+<pre><code class="language-rust ignore">pub trait InputMatcher: Send + Sync {
+    fn matches(&amp;self, value: &amp;MatchingData) -&gt; bool;
+}</code></pre>
+<p>Built-in: <code>ExactMatcher</code>, <code>PrefixMatcher</code>, <code>SuffixMatcher</code>, <code>ContainsMatcher</code>, <code>BoolMatcher</code></p>
+<h3 id="predicate"><a class="header" href="#predicate">Predicate</a></h3>
+<p>Boolean composition of matchers:</p>
+<ul>
+<li><code>Single</code> — one DataInput + InputMatcher</li>
+<li><code>And</code> — all must match (short-circuit)</li>
+<li><code>Or</code> — any must match (short-circuit)</li>
+<li><code>Not</code> — negation</li>
+</ul>
+<h3 id="onmatch"><a class="header" href="#onmatch">OnMatch</a></h3>
+<p>What happens when a predicate matches:</p>
+<pre><code class="language-rust ignore">pub enum OnMatch&lt;Ctx, A&gt; {
+    Action(A),              // Terminal: return this action
+    Matcher(Box&lt;Matcher&gt;),  // Nested: evaluate another matcher
+}</code></pre>
+<p><strong>Exclusive:</strong> action XOR nested matcher, never both.</p>
+<h3 id="matcher"><a class="header" href="#matcher">Matcher</a></h3>
+<p>Top-level container with first-match-wins semantics:</p>
+<pre><code class="language-rust ignore">pub struct Matcher&lt;Ctx, A&gt; {
+    rules: Vec&lt;FieldMatcher&lt;Ctx, A&gt;&gt;,
+    on_no_match: Option&lt;OnMatch&lt;Ctx, A&gt;&gt;,
+}</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="adding-a-domain"><a class="header" href="#adding-a-domain">Adding a Domain</a></h1>
+<p>Create domain-specific matchers for HTTP, gRPC, or your custom protocol.</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>A “domain” in x.uma is a context type with associated <code>DataInput</code> implementations.</p>
+<pre><code class="language-text">proto/xuma/&lt;domain&gt;/v1/    → Proto definitions
+rumi/ext/&lt;domain&gt;/src/     → Rust implementations
+</code></pre>
+<h2 id="step-1-define-proto"><a class="header" href="#step-1-define-proto">Step 1: Define Proto</a></h2>
+<pre><code class="language-protobuf">// proto/xuma/http/v1/inputs.proto
+syntax = "proto3";
+package xuma.http.v1;
+
+message HeaderInput {
+  string header_name = 1;
+}
+
+message PathInput {}
+</code></pre>
+<h2 id="step-2-generate-bindings"><a class="header" href="#step-2-generate-bindings">Step 2: Generate Bindings</a></h2>
+<pre><code class="language-bash">just gen
+</code></pre>
+<h2 id="step-3-implement-datainput"><a class="header" href="#step-3-implement-datainput">Step 3: Implement DataInput</a></h2>
+<pre><code class="language-rust ignore">// rumi/ext/http/src/lib.rs
+use rumi::{DataInput, MatchingData};
+use std::collections::HashMap;
+
+#[derive(Debug)]
+pub struct HttpRequest {
+    pub headers: HashMap&lt;String, String&gt;,
+    pub path: String,
+}
+
+#[derive(Debug)]
+pub struct HeaderInput {
+    pub header_name: String,
+}
+
+impl DataInput&lt;HttpRequest&gt; for HeaderInput {
+    fn get(&amp;self, ctx: &amp;HttpRequest) -&gt; MatchingData {
+        ctx.headers
+            .get(&amp;self.header_name)
+            .map(|v| MatchingData::String(v.clone()))
+            .unwrap_or(MatchingData::None)
+    }
+}</code></pre>
+<h2 id="step-4-add-conformance-tests"><a class="header" href="#step-4-add-conformance-tests">Step 4: Add Conformance Tests</a></h2>
+<pre><code class="language-yaml"># spec/tests/http/header_exact.yaml
+name: "HTTP header exact match"
+cases:
+  - description: "matches header value"
+    input:
+      headers: { "content-type": "application/json" }
+    matcher:
+      input: { header_name: "content-type" }
+      matcher: { exact: "application/json" }
+    expected: { matches: true }
+</code></pre>
+<h2 id="step-5-feature-gate"><a class="header" href="#step-5-feature-gate">Step 5: Feature Gate</a></h2>
+<pre><code class="language-toml"># rumi/ext/http/Cargo.toml
+[features]
+default = []
+</code></pre>
+<pre><code class="language-rust ignore">// rumi/ext/http/src/lib.rs
+pub mod headers;
+pub mod path;</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
+<p>Why x.uma is built the way it is.</p>
+<h2 id="design-philosophy-aces"><a class="header" href="#design-philosophy-aces">Design Philosophy: ACES</a></h2>
+<p><strong>A</strong>daptable · <strong>C</strong>omposable · <strong>E</strong>xtensible · <strong>S</strong>ustainable</p>
+<pre><code class="language-text">┌─────────────────────────────────────┐
+│         Domain Adapters             │
+│   xuma.http  xuma.claude  xuma.grpc │
+└───────────────┬─────────────────────┘
+                │
+┌───────────────▼─────────────────────┐
+│              PORTS                  │
+│     DataInput       ActionPort      │
+│   (extract data)  (emit result)     │
+└───────────────┬─────────────────────┘
+                │
+┌───────────────▼─────────────────────┐
+│              CORE                   │
+│           rumi engine               │
+│     Matcher · Predicate · Tree      │
+│       (pure, domain-agnostic)       │
+└─────────────────────────────────────┘
+</code></pre>
+<h2 id="the-extension-seam"><a class="header" href="#the-extension-seam">The Extension Seam</a></h2>
+<p><code>TypedExtensionConfig</code> from xDS is the architectural seam:</p>
+<pre><code class="language-protobuf">message TypedExtensionConfig {
+  string name = 1;                       // adapter identifier
+  google.protobuf.Any typed_config = 2;  // adapter config
+}
+</code></pre>
+<p>Every <code>input</code> and <code>action</code> is a port. Adapters are concrete registered types.</p>
+<h2 id="why-type-erasure-at-data-level"><a class="header" href="#why-type-erasure-at-data-level">Why Type Erasure at Data Level</a></h2>
+<p>Key insight from the spike phase: erase types at the <strong>data level</strong>, not the predicate level.</p>
+<pre><code class="language-rust ignore">// MatchingData — the erased type
+pub enum MatchingData { None, String(String), Int(i64), ... }
+
+// DataInput — domain-specific, returns erased type
+pub trait DataInput&lt;Ctx&gt; {
+    fn get(&amp;self, ctx: &amp;Ctx) -&gt; MatchingData;
+}
+
+// InputMatcher — domain-agnostic, NON-GENERIC
+pub trait InputMatcher {
+    fn matches(&amp;self, value: &amp;MatchingData) -&gt; bool;
+}</code></pre>
+<p><strong>Why this works:</strong></p>
+<ul>
+<li><code>InputMatcher</code> is non-generic → same <code>ExactMatcher</code> works everywhere</li>
+<li>No GATs or complex lifetimes</li>
+<li>Battle-tested at Google scale (Envoy uses this approach)</li>
+</ul>
+<h2 id="crate-structure"><a class="header" href="#crate-structure">Crate Structure</a></h2>
+<pre><code class="language-text">rumi/
+├── core/           # Core engine (package: rumi)
+└── ext/            # Domain extensions
+    ├── test/       # rumi-test (conformance)
+    ├── http/       # rumi-http
+    └── claude/     # rumi-claude
+</code></pre>
+<p>Dependencies point inward. Core knows nothing about domains.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="why-aces"><a class="header" href="#why-aces">Why ACES</a></h1>
+<p>The design principles behind x.uma.</p>
+<h2 id="the-problem"><a class="header" href="#the-problem">The Problem</a></h2>
+<p>Matchers are everywhere: routing, filtering, access control, feature flags. But most implementations are:</p>
+<ul>
+<li><strong>Tightly coupled</strong> to one domain (HTTP only, or gRPC only)</li>
+<li><strong>Hard to extend</strong> without forking</li>
+<li><strong>Inconsistent</strong> across languages</li>
+</ul>
+<h2 id="aces-principles"><a class="header" href="#aces-principles">ACES Principles</a></h2>
+<h3 id="adaptable"><a class="header" href="#adaptable">Adaptable</a></h3>
+<p>New domains plug in without touching core.</p>
+<pre><code class="language-text">Adding HTTP support? → Create rumi/ext/http/
+Adding Claude hooks? → Create rumi/ext/claude/
+Core unchanged.
+</code></pre>
+<h3 id="composable"><a class="header" href="#composable">Composable</a></h3>
+<p>Matchers nest. Predicates AND/OR/NOT. Trees recurse.</p>
+<pre><code class="language-rust ignore">// Predicates compose naturally with AND/OR/NOT
+Predicate::And(vec![
+    Predicate::Single(SinglePredicate::new(
+        Box::new(PathInput),
+        Box::new(PrefixMatcher::new("/api/")),
+    )),
+    Predicate::Or(vec![
+        Predicate::Single(SinglePredicate::new(
+            Box::new(MethodInput),
+            Box::new(ExactMatcher::new("GET")),
+        )),
+        Predicate::Single(SinglePredicate::new(
+            Box::new(MethodInput),
+            Box::new(ExactMatcher::new("POST")),
+        )),
+    ]),
+])</code></pre>
+<h3 id="extensible"><a class="header" href="#extensible">Extensible</a></h3>
+<p><code>TypedExtensionConfig</code> is the extension seam. Register new types at startup, use them in configs.</p>
+<pre><code class="language-yaml">input:
+  "@type": "type.googleapis.com/xuma.http.v1.HeaderInput"
+  header_name: "authorization"
+</code></pre>
+<h3 id="sustainable"><a class="header" href="#sustainable">Sustainable</a></h3>
+<p>Core is stable. Growth happens at edges.</p>
+<ul>
+<li><strong>v1.0</strong> → Core traits locked</li>
+<li><strong>v1.x</strong> → New domains, new matchers, same core</li>
+<li><strong>No rewrites</strong> → Hexagonal architecture pays off</li>
+</ul>
+<h2 id="inspired-by"><a class="header" href="#inspired-by">Inspired By</a></h2>
+<ul>
+<li><strong>Envoy</strong> — Production-proven matcher implementation at Google scale</li>
+<li><strong>xDS</strong> — Protocol that powers service mesh configuration</li>
+<li><strong>Hexagonal Architecture</strong> — Ports and adapters pattern</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="proto-api-reference"><a class="header" href="#proto-api-reference">Proto API Reference</a></h1>
+<blockquote>
+<p>Auto-generated from <code>proto/xuma/**/*.proto</code></p>
+</blockquote>
+<h2 id="browse"><a class="header" href="#browse">Browse</a></h2>
+<iframe src="../generated/proto/index.html" width="100%" height="600px" frameborder="0"></iframe>
+<h2 id="packages"><a class="header" href="#packages">Packages</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Package</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>xuma.core.v1</code></td><td>Base types, registry</td></tr>
+<tr><td><code>xuma.test.v1</code></td><td>Conformance testing inputs</td></tr>
+<tr><td><code>xuma.http.v1</code></td><td>HTTP domain (headers, path, method)</td></tr>
+<tr><td><code>xuma.claude.v1</code></td><td>Claude Code hooks domain</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="type-urls"><a class="header" href="#type-urls">Type URLs</a></h2>
+<pre><code class="language-text">type.googleapis.com/xuma.core.v1.TypedExtensionConfig
+type.googleapis.com/xuma.test.v1.StringInput
+type.googleapis.com/xuma.http.v1.HeaderInput
+type.googleapis.com/xuma.claude.v1.HookContext
+</code></pre>
+<h2 id="source"><a class="header" href="#source">Source</a></h2>
+<ul>
+<li><a href="https://github.com/mox-labs/x.uma/tree/main/proto/xuma">proto/xuma/</a></li>
+<li><a href="https://github.com/mox-labs/x.uma/blob/main/buf.yaml">buf.yaml</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="rust-api-reference"><a class="header" href="#rust-api-reference">Rust API Reference</a></h1>
+<blockquote>
+<p>Auto-generated from <code>rumi/**/*.rs</code> via <code>cargo doc</code></p>
+</blockquote>
+<h2 id="browse-1"><a class="header" href="#browse-1">Browse</a></h2>
+<iframe src="../generated/rust/rumi/index.html" width="100%" height="600px" frameborder="0"></iframe>
+<h2 id="crates"><a class="header" href="#crates">Crates</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Crate</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><a href="generated/rust/rumi/index.html"><code>rumi</code></a></td><td>Core engine</td></tr>
+<tr><td><a href="generated/rust/rumi_test/index.html"><code>rumi-test</code></a></td><td>Conformance testing</td></tr>
+<tr><td><a href="generated/rust/rumi_http/index.html"><code>rumi-http</code></a></td><td>HTTP matching</td></tr>
+<tr><td><a href="generated/rust/rumi_claude/index.html"><code>rumi-claude</code></a></td><td>Claude Code hooks</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="quick-links"><a class="header" href="#quick-links">Quick Links</a></h2>
+<ul>
+<li><a href="generated/rust/rumi/trait.DataInput.html"><code>DataInput</code></a> — Extract data from context</li>
+<li><a href="generated/rust/rumi/trait.InputMatcher.html"><code>InputMatcher</code></a> — Match against data</li>
+<li><a href="generated/rust/rumi/enum.Predicate.html"><code>Predicate</code></a> — Boolean composition</li>
+<li><a href="generated/rust/rumi/struct.Matcher.html"><code>Matcher</code></a> — Top-level container</li>
+</ul>
+<h2 id="source-1"><a class="header" href="#source-1">Source</a></h2>
+<ul>
+<li><a href="https://github.com/mox-labs/x.uma/tree/main/rumi">rumi/</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="http-domain-reference"><a class="header" href="#http-domain-reference">HTTP Domain Reference</a></h1>
+<p><code>rumi-http</code> provides HTTP request matching for Envoy ext_proc.</p>
+<h2 id="architecture-1"><a class="header" href="#architecture-1">Architecture</a></h2>
+<pre><code>Gateway API HttpRouteMatch (config)
+        ↓ compile()
+rumi Matcher&lt;ProcessingRequest, A&gt;
+        ↓ evaluate()
+ext_proc ProcessingRequest (runtime)
+</code></pre>
+<p><strong>Two layers:</strong></p>
+<ul>
+<li><strong>User API</strong>: Gateway API <code>HttpRouteMatch</code> — human-friendly config</li>
+<li><strong>Data Plane API</strong>: Envoy <code>ProcessingRequest</code> — wire protocol</li>
+</ul>
+<h2 id="quick-start-1"><a class="header" href="#quick-start-1">Quick Start</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi_http::prelude::*;
+
+// Config time: compile Gateway API match to rumi matcher
+let route_match = HttpRouteMatch {
+    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+    method: Some("GET".into()),
+    ..Default::default()
+};
+let matcher = route_match.compile("api_backend");
+
+// Runtime: evaluate against ext_proc ProcessingRequest
+let result = matcher.evaluate(&amp;processing_request);
+assert_eq!(result, Some("api_backend"));
+<span class="boring">}</span></code></pre>
+<h2 id="datainputs-for-processingrequest"><a class="header" href="#datainputs-for-processingrequest">DataInputs for ProcessingRequest</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Input</th><th>Extracts</th><th>Example</th></tr>
+</thead>
+<tbody>
+<tr><td><code>PathInput</code></td><td><code>:path</code> pseudo-header (without query)</td><td><code>/api/users</code></td></tr>
+<tr><td><code>MethodInput</code></td><td><code>:method</code> pseudo-header</td><td><code>GET</code></td></tr>
+<tr><td><code>HeaderInput::new("x-api-key")</code></td><td>Named header</td><td><code>Bearer ...</code></td></tr>
+<tr><td><code>QueryParamInput::new("page")</code></td><td>Query parameter</td><td><code>1</code></td></tr>
+<tr><td><code>SchemeInput</code></td><td><code>:scheme</code> pseudo-header</td><td><code>https</code></td></tr>
+<tr><td><code>AuthorityInput</code></td><td><code>:authority</code> pseudo-header</td><td><code>api.example.com</code></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="gateway-api-match-types"><a class="header" href="#gateway-api-match-types">Gateway API Match Types</a></h2>
+<h3 id="path-matching"><a class="header" href="#path-matching">Path Matching</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Exact match
+HttpPathMatch::Exact { value: "/api/v1/users".into() }
+
+// Prefix match
+HttpPathMatch::PathPrefix { value: "/api".into() }
+
+// Regex match
+HttpPathMatch::RegularExpression { value: r"^/api/v\d+/.*".into() }
+<span class="boring">}</span></code></pre>
+<h3 id="header-matching"><a class="header" href="#header-matching">Header Matching</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Exact header value
+HttpHeaderMatch::Exact {
+    name: "content-type".into(),
+    value: "application/json".into()
+}
+
+// Regex header value
+HttpHeaderMatch::RegularExpression {
+    name: "authorization".into(),
+    value: r"^Bearer .+".into()
+}
+<span class="boring">}</span></code></pre>
+<h3 id="query-parameter-matching"><a class="header" href="#query-parameter-matching">Query Parameter Matching</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Exact param value
+HttpQueryParamMatch::Exact {
+    name: "version".into(),
+    value: "2".into()
+}
+
+// Regex param value
+HttpQueryParamMatch::RegularExpression {
+    name: "id".into(),
+    value: r"^\d+$".into()
+}
+<span class="boring">}</span></code></pre>
+<h2 id="match-semantics"><a class="header" href="#match-semantics">Match Semantics</a></h2>
+<p>Per Gateway API spec:</p>
+<ul>
+<li><strong>Within a match</strong>: All conditions are ANDed</li>
+<li><strong>Multiple matches</strong>: ORed together</li>
+</ul>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// This matches: GET /api/* with x-version header
+let route_match = HttpRouteMatch {
+    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+    method: Some("GET".into()),
+    headers: Some(vec![
+        HttpHeaderMatch::Exact {
+            name: "x-version".into(),
+            value: "2".into()
+        }
+    ]),
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre>
+<h2 id="compiling-multiple-matches"><a class="header" href="#compiling-multiple-matches">Compiling Multiple Matches</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi_http::compile_route_matches;
+
+let matches = vec![
+    HttpRouteMatch {
+        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+        ..Default::default()
+    },
+    HttpRouteMatch {
+        path: Some(HttpPathMatch::PathPrefix { value: "/health".into() }),
+        ..Default::default()
+    },
+];
+
+// Multiple matches are ORed
+let matcher = compile_route_matches(&amp;matches, "backend", None);
+<span class="boring">}</span></code></pre>
+<h2 id="testing-with-simplehttprequest"><a class="header" href="#testing-with-simplehttprequest">Testing with SimpleHttpRequest</a></h2>
+<p>For unit tests without constructing full <code>ProcessingRequest</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi_http::prelude::*;
+
+let request = HttpRequest::builder()
+    .method("POST")
+    .path("/api/users")
+    .header("Content-Type", "application/json")
+    .query_param("page", "1")
+    .build();
+
+// Use Simple*Input types for matching
+let method_input = SimpleMethodInput;
+assert_eq!(method_input.get(&amp;request), MatchingData::String("POST".into()));
+<span class="boring">}</span></code></pre>
+<h2 id="dependencies"><a class="header" href="#dependencies">Dependencies</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Crate</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td><code>k8s-gateway-api</code></td><td>Gateway API types</td></tr>
+<tr><td><code>envoy-grpc-ext-proc</code></td><td>ext_proc ProcessingRequest types</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.HTTPRouteMatch">Gateway API HTTPRoute Spec</a></li>
+<li><a href="https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_proc_filter">Envoy ext_proc Documentation</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="roadmap"><a class="header" href="#roadmap">Roadmap</a></h1>
+<p>Current development status and planned phases.</p>
+<h2 id="status"><a class="header" href="#status">Status</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Phase</th><th>Focus</th><th>Status</th></tr>
+</thead>
+<tbody>
+<tr><td>0</td><td>Scaffolding</td><td>✅ Done</td></tr>
+<tr><td>1</td><td>Core Traits</td><td>✅ Done</td></tr>
+<tr><td>2</td><td>Conformance Fixtures</td><td>✅ Done</td></tr>
+<tr><td>2.5</td><td>Extensible MatchingData (<code>Custom</code> variant)</td><td>✅ Done</td></tr>
+<tr><td>3</td><td>StringMatcher, MatcherTree, RadixTree</td><td>✅ Done</td></tr>
+<tr><td>4</td><td>HTTP Domain (ext_proc model)</td><td>🚧 Next</td></tr>
+<tr><td>5</td><td>p.uma (Pure Python + HTTP)</td><td>Planned</td></tr>
+<tr><td>6</td><td>b.uma (Bun/TypeScript + HTTP)</td><td>Planned</td></tr>
+<tr><td>7</td><td>crusty/p.uma (uniffi→Python)</td><td>Planned</td></tr>
+<tr><td>8</td><td>crusty/b.uma (uniffi→WASM)</td><td>Planned</td></tr>
+<tr><td>9</td><td>Benchmarks</td><td>Planned</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="phase-4-http-domain"><a class="header" href="#phase-4-http-domain">Phase 4: HTTP Domain</a></h2>
+<h3 id="overview-1"><a class="header" href="#overview-1">Overview</a></h3>
+<p>The HTTP domain provides matching for all HTTP-based protocols using two layered APIs:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Layer</th><th>Standard</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>User API</strong></td><td>Gateway API <code>HTTPRouteMatch</code></td><td>Config-time, DX-friendly YAML/JSON</td></tr>
+<tr><td><strong>Data Plane API</strong></td><td>ext_proc <code>ProcessingRequest</code></td><td>Runtime context from Envoy</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="why-two-layers"><a class="header" href="#why-two-layers">Why Two Layers?</a></h3>
+<p><strong>Gateway API HTTPRouteMatch</strong> (CNCF Standard)</p>
+<ul>
+<li>What users write in config files</li>
+<li>Clean YAML/JSON schema</li>
+<li>Adopted by: Istio, Envoy Gateway, Contour, Kong, etc.</li>
+<li>We use it as-is, not reinvent</li>
+</ul>
+<p><strong>ext_proc ProcessingRequest</strong> (Envoy)</p>
+<ul>
+<li>Universal HTTP processing model</li>
+<li>Covers: REST, gRPC, GraphQL, WebSocket handshake</li>
+<li>What matchers actually operate on at runtime</li>
+</ul>
+<h3 id="architecture-2"><a class="header" href="#architecture-2">Architecture</a></h3>
+<pre><code class="language-text">┌─────────────────────────────────────────────────────┐
+│              Gateway API HTTPRouteMatch             │
+│  ─────────────────────────────────────────────────  │
+│  path:                                              │
+│    type: PathPrefix                                 │
+│    value: /api/v2                                   │
+│  headers:                                           │
+│  - name: x-api-key                                  │
+│    type: Exact                                      │
+│    value: secret123                                 │
+└─────────────────────┬───────────────────────────────┘
+                      │ compile() — config time
+                      ▼
+┌─────────────────────────────────────────────────────┐
+│            rumi Matcher&lt;ProcessingRequest, A&gt;       │
+│  ─────────────────────────────────────────────────  │
+│  DataInputs: PathInput, HeaderInput, MethodInput    │
+│  Predicates: composed with AND/OR/NOT               │
+│  Actions: domain-specific (routing, rate limit...)  │
+└─────────────────────┬───────────────────────────────┘
+                      │ evaluate() — runtime
+                      ▼
+┌─────────────────────────────────────────────────────┐
+│              ext_proc ProcessingRequest             │
+│  ─────────────────────────────────────────────────  │
+│  request_headers / response_headers                 │
+│  request_body / response_body                       │
+│  request_trailers / response_trailers               │
+└─────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="components"><a class="header" href="#components">Components</a></h3>
+<h4 id="1-datainputs-for-processingrequest"><a class="header" href="#1-datainputs-for-processingrequest">1. DataInputs for ProcessingRequest</a></h4>
+<pre><code class="language-rust ignore">// Extract data from ProcessingRequest for matching
+impl DataInput&lt;ProcessingRequest&gt; for PathInput { ... }
+impl DataInput&lt;ProcessingRequest&gt; for MethodInput { ... }
+impl DataInput&lt;ProcessingRequest&gt; for HeaderInput { ... }
+impl DataInput&lt;ProcessingRequest&gt; for QueryParamInput { ... }</code></pre>
+<h4 id="2-compiler-httproutematch--matcher"><a class="header" href="#2-compiler-httproutematch--matcher">2. Compiler: HTTPRouteMatch → Matcher</a></h4>
+<pre><code class="language-rust ignore">// Config time: compile Gateway API config to rumi matcher
+let config: HTTPRouteMatch = load_yaml("route.yaml");
+let matcher: Matcher&lt;ProcessingRequest, Action&gt; = config.compile();</code></pre>
+<h4 id="3-runtime-evaluation"><a class="header" href="#3-runtime-evaluation">3. Runtime Evaluation</a></h4>
+<pre><code class="language-rust ignore">// Runtime: fast path evaluation
+let action = matcher.evaluate(&amp;processing_request);</code></pre>
+<h3 id="match-schema-is-action-agnostic"><a class="header" href="#match-schema-is-action-agnostic">Match Schema is Action-Agnostic</a></h3>
+<p>The same <code>HTTPRouteMatch</code> works for different use cases:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Use Case</th><th>Match</th><th>Action</th></tr>
+</thead>
+<tbody>
+<tr><td>Routing</td><td>path, headers</td><td>→ backend selection</td></tr>
+<tr><td>Rate Limiting</td><td>path, headers, user</td><td>→ limit config</td></tr>
+<tr><td>Feature Flags</td><td>headers, % rollout</td><td>→ enable features</td></tr>
+<tr><td>Auth Policy</td><td>path, method</td><td>→ require auth</td></tr>
+<tr><td>Observability</td><td>all requests</td><td>→ add tracing</td></tr>
+</tbody>
+</table>
+</div>
+<p>x.uma provides the <strong>match vocabulary</strong>. Actions are domain-specific.</p>
+<h3 id="deliverables"><a class="header" href="#deliverables">Deliverables</a></h3>
+<ul>
+<li><input disabled="" type="checkbox" checked=""> <code>rumi-http</code> crate with <code>ProcessingRequest</code> context</li>
+<li><input disabled="" type="checkbox" checked=""> DataInputs: <code>PathInput</code>, <code>MethodInput</code>, <code>HeaderInput</code>, <code>QueryParamInput</code>, <code>SchemeInput</code>, <code>AuthorityInput</code></li>
+<li><input disabled="" type="checkbox" checked=""> Gateway API types via <code>k8s-gateway-api</code> crate (CNCF standard)</li>
+<li><input disabled="" type="checkbox" checked=""> Compiler: <code>HttpRouteMatchExt::compile()</code> → <code>Matcher&lt;ProcessingRequest, A&gt;</code></li>
+<li><input disabled="" type="checkbox"> Integration tests with real <code>ProcessingRequest</code> construction</li>
+<li><input disabled="" type="checkbox"> Conformance tests against Gateway API spec</li>
+</ul>
+<h3 id="research"><a class="header" href="#research">Research</a></h3>
+<p>See <code>.claude/research/</code> for detailed research on:</p>
+<ul>
+<li>Gateway API schema structure</li>
+<li>ext_proc ProcessingRequest fields</li>
+<li>Adoption patterns from Istio, Envoy Gateway</li>
+</ul>
+<h2 id="contributing"><a class="header" href="#contributing">Contributing</a></h2>
+<p>See the <a href="https://github.com/mox-labs/x.uma">GitHub repository</a> for contribution guidelines.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+        <script src="ace-2a3cd908.js"></script>
+        <script src="mode-rust-2c9d5c9a.js"></script>
+        <script src="editor-16ca416c.js"></script>
+        <script src="theme-dawn-4493f9c8.js"></script>
+        <script src="theme-tomorrow_night-9dbe62a9.js"></script>
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+
+    </div>
+    </body>
+</html>
