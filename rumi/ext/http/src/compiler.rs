@@ -1,10 +1,10 @@
-//! Compiler: Gateway API `HttpRouteMatch` → rumi Matcher
+//! Compiler: Gateway API `HttpRouteMatch` -> rumi Matcher
 //!
 //! Translates user-friendly Gateway API configuration into efficient
-//! runtime matchers operating on `ext_proc` `ProcessingRequest`.
+//! runtime matchers operating on `HttpMessage`.
 
 use crate::inputs::{HeaderInput, MethodInput, PathInput, QueryParamInput};
-use envoy_grpc_ext_proc::envoy::service::ext_proc::v3::ProcessingRequest;
+use crate::message::HttpMessage;
 use k8s_gateway_api::{HttpHeaderMatch, HttpPathMatch, HttpQueryParamMatch, HttpRouteMatch};
 use rumi::prelude::*;
 
@@ -12,20 +12,16 @@ use rumi::prelude::*;
 pub trait HttpRouteMatchExt {
     /// Compile this `HttpRouteMatch` into a rumi Matcher.
     ///
-    /// The resulting matcher operates on `ProcessingRequest` and returns
+    /// The resulting matcher operates on `HttpMessage` and returns
     /// the provided action when all conditions match.
-    fn compile<A: Clone + Send + Sync + 'static>(&self, action: A)
-        -> Matcher<ProcessingRequest, A>;
+    fn compile<A: Clone + Send + Sync + 'static>(&self, action: A) -> Matcher<HttpMessage, A>;
 
     /// Compile this `HttpRouteMatch` into a Predicate (without action).
-    fn to_predicate(&self) -> Predicate<ProcessingRequest>;
+    fn to_predicate(&self) -> Predicate<HttpMessage>;
 }
 
 impl HttpRouteMatchExt for HttpRouteMatch {
-    fn compile<A: Clone + Send + Sync + 'static>(
-        &self,
-        action: A,
-    ) -> Matcher<ProcessingRequest, A> {
+    fn compile<A: Clone + Send + Sync + 'static>(&self, action: A) -> Matcher<HttpMessage, A> {
         let predicate = self.to_predicate();
 
         Matcher::new(
@@ -34,8 +30,8 @@ impl HttpRouteMatchExt for HttpRouteMatch {
         )
     }
 
-    fn to_predicate(&self) -> Predicate<ProcessingRequest> {
-        let mut predicates: Vec<Predicate<ProcessingRequest>> = Vec::new();
+    fn to_predicate(&self) -> Predicate<HttpMessage> {
+        let mut predicates: Vec<Predicate<HttpMessage>> = Vec::new();
 
         // Path matching
         if let Some(path_match) = &self.path {
@@ -82,7 +78,7 @@ impl HttpRouteMatchExt for HttpRouteMatch {
 }
 
 /// Compile a path match to a predicate.
-fn compile_path_match(path_match: &HttpPathMatch) -> Predicate<ProcessingRequest> {
+fn compile_path_match(path_match: &HttpPathMatch) -> Predicate<HttpMessage> {
     let input = Box::new(PathInput);
 
     let matcher: Box<dyn InputMatcher> = match path_match {
@@ -100,8 +96,7 @@ fn compile_path_match(path_match: &HttpPathMatch) -> Predicate<ProcessingRequest
 }
 
 /// Compile a header match to a predicate.
-fn compile_header_match(header_match: &HttpHeaderMatch) -> Predicate<ProcessingRequest> {
-    // HttpHeaderMatch is an enum with variants Exact and RegularExpression
+fn compile_header_match(header_match: &HttpHeaderMatch) -> Predicate<HttpMessage> {
     match header_match {
         HttpHeaderMatch::Exact { name, value } => {
             let input = Box::new(HeaderInput::new(name.as_str()));
@@ -119,8 +114,7 @@ fn compile_header_match(header_match: &HttpHeaderMatch) -> Predicate<ProcessingR
 }
 
 /// Compile a query param match to a predicate.
-fn compile_query_param_match(query_match: &HttpQueryParamMatch) -> Predicate<ProcessingRequest> {
-    // HttpQueryParamMatch is an enum with variants Exact and RegularExpression
+fn compile_query_param_match(query_match: &HttpQueryParamMatch) -> Predicate<HttpMessage> {
     match query_match {
         HttpQueryParamMatch::Exact { name, value } => {
             let input = Box::new(QueryParamInput::new(name.as_str()));
@@ -144,7 +138,7 @@ pub fn compile_route_matches<A: Clone + Send + Sync + 'static>(
     matches: &[HttpRouteMatch],
     action: A,
     on_no_match: Option<A>,
-) -> Matcher<ProcessingRequest, A> {
+) -> Matcher<HttpMessage, A> {
     if matches.is_empty() {
         // Empty matches = match everything
         return Matcher::new(
@@ -168,7 +162,7 @@ pub fn compile_route_matches<A: Clone + Send + Sync + 'static>(
     }
 
     // Multiple matches: OR them together
-    let predicates: Vec<Predicate<ProcessingRequest>> = matches
+    let predicates: Vec<Predicate<HttpMessage>> = matches
         .iter()
         .map(HttpRouteMatchExt::to_predicate)
         .collect();
@@ -187,12 +181,12 @@ mod tests {
     use super::*;
     use envoy_grpc_ext_proc::envoy::{
         config::core::v3::{HeaderMap, HeaderValue},
-        service::ext_proc::v3::{processing_request::Request, HttpHeaders},
+        service::ext_proc::v3::{processing_request::Request, HttpHeaders, ProcessingRequest},
     };
 
     // ========== Test Helpers ==========
 
-    /// Builder for constructing test `ProcessingRequest` instances.
+    /// Builder for constructing test requests as `HttpMessage`.
     struct RequestBuilder {
         headers: Vec<HeaderValue>,
     }
@@ -229,8 +223,8 @@ mod tests {
             self
         }
 
-        fn build(self) -> ProcessingRequest {
-            ProcessingRequest {
+        fn build(self) -> HttpMessage {
+            let req = ProcessingRequest {
                 request: Some(Request::RequestHeaders(HttpHeaders {
                     headers: Some(HeaderMap {
                         headers: self.headers,
@@ -238,7 +232,8 @@ mod tests {
                     ..Default::default()
                 })),
                 ..Default::default()
-            }
+            };
+            HttpMessage::from(&req)
         }
     }
 
@@ -248,8 +243,6 @@ mod tests {
     fn test_compile_empty_match() {
         let route_match = HttpRouteMatch::default();
         let predicate = route_match.to_predicate();
-
-        // Empty match should produce a match-all predicate
         assert!(matches!(predicate, Predicate::Single(_)));
     }
 
@@ -277,8 +270,6 @@ mod tests {
         };
 
         let predicate = route_match.to_predicate();
-
-        // Multiple conditions should produce AND
         assert!(matches!(predicate, Predicate::And(_)));
     }
 
@@ -295,20 +286,17 @@ mod tests {
 
         let matcher = route_match.compile("api_backend");
 
-        // Should match
-        let req = RequestBuilder::new().path("/api/users").build();
-        assert_eq!(matcher.evaluate(&req), Some("api_backend"));
+        let msg = RequestBuilder::new().path("/api/users").build();
+        assert_eq!(matcher.evaluate(&msg), Some("api_backend"));
 
-        let req = RequestBuilder::new().path("/api").build();
-        assert_eq!(matcher.evaluate(&req), Some("api_backend"));
+        let msg = RequestBuilder::new().path("/api").build();
+        assert_eq!(matcher.evaluate(&msg), Some("api_backend"));
 
-        // Should NOT match
-        let req = RequestBuilder::new().path("/other").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().path("/other").build();
+        assert_eq!(matcher.evaluate(&msg), None);
 
-        let req = RequestBuilder::new().path("/apifoo").build();
-        // Prefix "/api" matches "/apifoo" since it starts with "/api"
-        assert_eq!(matcher.evaluate(&req), Some("api_backend"));
+        let msg = RequestBuilder::new().path("/apifoo").build();
+        assert_eq!(matcher.evaluate(&msg), Some("api_backend"));
     }
 
     #[test]
@@ -322,16 +310,14 @@ mod tests {
 
         let matcher = route_match.compile("health_check");
 
-        // Should match exactly
-        let req = RequestBuilder::new().path("/api/v1/health").build();
-        assert_eq!(matcher.evaluate(&req), Some("health_check"));
+        let msg = RequestBuilder::new().path("/api/v1/health").build();
+        assert_eq!(matcher.evaluate(&msg), Some("health_check"));
 
-        // Should NOT match
-        let req = RequestBuilder::new().path("/api/v1/health/").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().path("/api/v1/health/").build();
+        assert_eq!(matcher.evaluate(&msg), None);
 
-        let req = RequestBuilder::new().path("/api/v1").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().path("/api/v1").build();
+        assert_eq!(matcher.evaluate(&msg), None);
     }
 
     #[test]
@@ -345,19 +331,17 @@ mod tests {
 
         let matcher = route_match.compile("user_detail");
 
-        // Should match
-        let req = RequestBuilder::new().path("/users/123").build();
-        assert_eq!(matcher.evaluate(&req), Some("user_detail"));
+        let msg = RequestBuilder::new().path("/users/123").build();
+        assert_eq!(matcher.evaluate(&msg), Some("user_detail"));
 
-        let req = RequestBuilder::new().path("/users/1").build();
-        assert_eq!(matcher.evaluate(&req), Some("user_detail"));
+        let msg = RequestBuilder::new().path("/users/1").build();
+        assert_eq!(matcher.evaluate(&msg), Some("user_detail"));
 
-        // Should NOT match
-        let req = RequestBuilder::new().path("/users/abc").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().path("/users/abc").build();
+        assert_eq!(matcher.evaluate(&msg), None);
 
-        let req = RequestBuilder::new().path("/users/123/edit").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().path("/users/123/edit").build();
+        assert_eq!(matcher.evaluate(&msg), None);
     }
 
     // ========== End-to-End Method Matching ==========
@@ -371,16 +355,14 @@ mod tests {
 
         let matcher = route_match.compile("write_endpoint");
 
-        // Should match POST
-        let req = RequestBuilder::new().method("POST").path("/").build();
-        assert_eq!(matcher.evaluate(&req), Some("write_endpoint"));
+        let msg = RequestBuilder::new().method("POST").path("/").build();
+        assert_eq!(matcher.evaluate(&msg), Some("write_endpoint"));
 
-        // Should NOT match other methods
-        let req = RequestBuilder::new().method("GET").path("/").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().method("GET").path("/").build();
+        assert_eq!(matcher.evaluate(&msg), None);
 
-        let req = RequestBuilder::new().method("PUT").path("/").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().method("PUT").path("/").build();
+        assert_eq!(matcher.evaluate(&msg), None);
     }
 
     // ========== End-to-End Header Matching ==========
@@ -397,23 +379,20 @@ mod tests {
 
         let matcher = route_match.compile("v2_api");
 
-        // Should match
-        let req = RequestBuilder::new()
+        let msg = RequestBuilder::new()
             .path("/")
             .header("x-api-version", "v2")
             .build();
-        assert_eq!(matcher.evaluate(&req), Some("v2_api"));
+        assert_eq!(matcher.evaluate(&msg), Some("v2_api"));
 
-        // Should NOT match
-        let req = RequestBuilder::new()
+        let msg = RequestBuilder::new()
             .path("/")
             .header("x-api-version", "v1")
             .build();
-        assert_eq!(matcher.evaluate(&req), None);
+        assert_eq!(matcher.evaluate(&msg), None);
 
-        // Missing header should NOT match
-        let req = RequestBuilder::new().path("/").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().path("/").build();
+        assert_eq!(matcher.evaluate(&msg), None);
     }
 
     #[test]
@@ -428,19 +407,17 @@ mod tests {
 
         let matcher = route_match.compile("authenticated");
 
-        // Should match
-        let req = RequestBuilder::new()
+        let msg = RequestBuilder::new()
             .path("/")
             .header("authorization", "Bearer token123")
             .build();
-        assert_eq!(matcher.evaluate(&req), Some("authenticated"));
+        assert_eq!(matcher.evaluate(&msg), Some("authenticated"));
 
-        // Should NOT match
-        let req = RequestBuilder::new()
+        let msg = RequestBuilder::new()
             .path("/")
             .header("authorization", "Basic base64creds")
             .build();
-        assert_eq!(matcher.evaluate(&req), None);
+        assert_eq!(matcher.evaluate(&msg), None);
     }
 
     // ========== End-to-End Query Param Matching ==========
@@ -457,17 +434,14 @@ mod tests {
 
         let matcher = route_match.compile("json_response");
 
-        // Should match
-        let req = RequestBuilder::new().path("/data?format=json").build();
-        assert_eq!(matcher.evaluate(&req), Some("json_response"));
+        let msg = RequestBuilder::new().path("/data?format=json").build();
+        assert_eq!(matcher.evaluate(&msg), Some("json_response"));
 
-        // Should NOT match
-        let req = RequestBuilder::new().path("/data?format=xml").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().path("/data?format=xml").build();
+        assert_eq!(matcher.evaluate(&msg), None);
 
-        // Missing param should NOT match
-        let req = RequestBuilder::new().path("/data").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().path("/data").build();
+        assert_eq!(matcher.evaluate(&msg), None);
     }
 
     // ========== End-to-End Combined Conditions (AND) ==========
@@ -484,23 +458,20 @@ mod tests {
 
         let matcher = route_match.compile("api_write");
 
-        // Both conditions must match
-        let req = RequestBuilder::new()
+        let msg = RequestBuilder::new()
             .method("POST")
             .path("/api/users")
             .build();
-        assert_eq!(matcher.evaluate(&req), Some("api_write"));
+        assert_eq!(matcher.evaluate(&msg), Some("api_write"));
 
-        // Wrong method
-        let req = RequestBuilder::new()
+        let msg = RequestBuilder::new()
             .method("GET")
             .path("/api/users")
             .build();
-        assert_eq!(matcher.evaluate(&req), None);
+        assert_eq!(matcher.evaluate(&msg), None);
 
-        // Wrong path
-        let req = RequestBuilder::new().method("POST").path("/other").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().method("POST").path("/other").build();
+        assert_eq!(matcher.evaluate(&msg), None);
     }
 
     #[test]
@@ -522,29 +493,26 @@ mod tests {
 
         let matcher = route_match.compile("v2_api_dry_run");
 
-        // All conditions match
-        let req = RequestBuilder::new()
+        let msg = RequestBuilder::new()
             .method("PUT")
             .path("/api/v2/resource?dry-run=true")
             .header("content-type", "application/json")
             .build();
-        assert_eq!(matcher.evaluate(&req), Some("v2_api_dry_run"));
+        assert_eq!(matcher.evaluate(&msg), Some("v2_api_dry_run"));
 
-        // Missing query param
-        let req = RequestBuilder::new()
+        let msg = RequestBuilder::new()
             .method("PUT")
             .path("/api/v2/resource")
             .header("content-type", "application/json")
             .build();
-        assert_eq!(matcher.evaluate(&req), None);
+        assert_eq!(matcher.evaluate(&msg), None);
 
-        // Wrong content type
-        let req = RequestBuilder::new()
+        let msg = RequestBuilder::new()
             .method("PUT")
             .path("/api/v2/resource?dry-run=true")
             .header("content-type", "text/plain")
             .build();
-        assert_eq!(matcher.evaluate(&req), None);
+        assert_eq!(matcher.evaluate(&msg), None);
     }
 
     // ========== End-to-End Multiple Routes (OR) ==========
@@ -568,16 +536,14 @@ mod tests {
 
         let matcher = compile_route_matches(&matches, "health_check", None);
 
-        // Either path should match
-        let req = RequestBuilder::new().path("/health").build();
-        assert_eq!(matcher.evaluate(&req), Some("health_check"));
+        let msg = RequestBuilder::new().path("/health").build();
+        assert_eq!(matcher.evaluate(&msg), Some("health_check"));
 
-        let req = RequestBuilder::new().path("/ready").build();
-        assert_eq!(matcher.evaluate(&req), Some("health_check"));
+        let msg = RequestBuilder::new().path("/ready").build();
+        assert_eq!(matcher.evaluate(&msg), Some("health_check"));
 
-        // Other paths should NOT match
-        let req = RequestBuilder::new().path("/other").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().path("/other").build();
+        assert_eq!(matcher.evaluate(&msg), None);
     }
 
     #[test]
@@ -591,24 +557,22 @@ mod tests {
 
         let matcher = compile_route_matches(&matches, "api_backend", Some("default_backend"));
 
-        // Matching path
-        let req = RequestBuilder::new().path("/api/users").build();
-        assert_eq!(matcher.evaluate(&req), Some("api_backend"));
+        let msg = RequestBuilder::new().path("/api/users").build();
+        assert_eq!(matcher.evaluate(&msg), Some("api_backend"));
 
-        // Non-matching path falls back
-        let req = RequestBuilder::new().path("/other").build();
-        assert_eq!(matcher.evaluate(&req), Some("default_backend"));
+        let msg = RequestBuilder::new().path("/other").build();
+        assert_eq!(matcher.evaluate(&msg), Some("default_backend"));
     }
 
     #[test]
     fn e2e_empty_matches_matches_everything() {
         let matcher = compile_route_matches::<&str>(&[], "catch_all", None);
 
-        let req = RequestBuilder::new().path("/anything").build();
-        assert_eq!(matcher.evaluate(&req), Some("catch_all"));
+        let msg = RequestBuilder::new().path("/anything").build();
+        assert_eq!(matcher.evaluate(&msg), Some("catch_all"));
 
-        let req = RequestBuilder::new().path("/").build();
-        assert_eq!(matcher.evaluate(&req), Some("catch_all"));
+        let msg = RequestBuilder::new().path("/").build();
+        assert_eq!(matcher.evaluate(&msg), Some("catch_all"));
     }
 
     // ========== Edge Cases ==========
@@ -624,9 +588,8 @@ mod tests {
 
         let matcher = route_match.compile("api_backend");
 
-        // Request without path should NOT match
-        let req = RequestBuilder::new().method("GET").build();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = RequestBuilder::new().method("GET").build();
+        assert_eq!(matcher.evaluate(&msg), None);
     }
 
     #[test]
@@ -640,8 +603,7 @@ mod tests {
 
         let matcher = route_match.compile("test");
 
-        // Empty request should NOT match
-        let req = ProcessingRequest::default();
-        assert_eq!(matcher.evaluate(&req), None);
+        let msg = HttpMessage::from(&ProcessingRequest::default());
+        assert_eq!(matcher.evaluate(&msg), None);
     }
 }
