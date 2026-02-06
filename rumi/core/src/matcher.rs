@@ -3,7 +3,7 @@
 //! The `Matcher` is the entry point for evaluation. It contains a list of
 //! field matchers and evaluates them in order, returning the first match.
 
-use crate::{FieldMatcher, OnMatch};
+use crate::{FieldMatcher, MatcherError, OnMatch, MAX_DEPTH};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -165,6 +165,27 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
         });
 
         1 + field_depth.max(no_match_depth)
+    }
+
+    /// Validate this matcher against safety constraints.
+    ///
+    /// Checks:
+    /// - Nesting depth does not exceed [`MAX_DEPTH`]
+    ///
+    /// Call this at config load time to catch errors early.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MatcherError::DepthExceeded`] if nesting is too deep.
+    pub fn validate(&self) -> Result<(), MatcherError> {
+        let depth = self.depth();
+        if depth > MAX_DEPTH {
+            return Err(MatcherError::DepthExceeded {
+                depth,
+                max: MAX_DEPTH,
+            });
+        }
+        Ok(())
     }
 }
 
@@ -344,5 +365,65 @@ mod tests {
     fn test_matcher_is_send_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<Matcher<TestCtx, String>>();
+    }
+
+    #[test]
+    fn test_validate_shallow_matcher_ok() {
+        let matcher = Matcher::<TestCtx, String>::new(vec![create_field_matcher("x", "y")], None);
+        assert!(matcher.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_deeply_nested_matcher_fails() {
+        // Build a matcher chain deeper than MAX_DEPTH
+        let mut current =
+            Matcher::<TestCtx, String>::new(vec![create_field_matcher("leaf", "action")], None);
+
+        // Nest MAX_DEPTH + 1 times to exceed the limit
+        // Each nesting adds 1 to depth (the wrapping Matcher)
+        for _ in 0..crate::MAX_DEPTH {
+            current = Matcher::new(
+                vec![FieldMatcher::new(
+                    Predicate::Single(SinglePredicate::new(
+                        Box::new(ValueInput),
+                        Box::new(ExactMatcher::new("x")),
+                    )),
+                    OnMatch::matcher(current),
+                )],
+                None,
+            );
+        }
+
+        let result = current.validate();
+        assert!(result.is_err());
+        assert!(matches!(
+            result,
+            Err(crate::MatcherError::DepthExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_at_max_depth_ok() {
+        // Build exactly at MAX_DEPTH — should pass
+        let mut current =
+            Matcher::<TestCtx, String>::new(vec![create_field_matcher("leaf", "action")], None);
+
+        // depth starts at 2 (1 matcher + 1 predicate), each nesting adds 1
+        // We need total depth == MAX_DEPTH
+        for _ in 0..(crate::MAX_DEPTH - 2) {
+            current = Matcher::new(
+                vec![FieldMatcher::new(
+                    Predicate::Single(SinglePredicate::new(
+                        Box::new(ValueInput),
+                        Box::new(ExactMatcher::new("x")),
+                    )),
+                    OnMatch::matcher(current),
+                )],
+                None,
+            );
+        }
+
+        assert_eq!(current.depth(), crate::MAX_DEPTH);
+        assert!(current.validate().is_ok());
     }
 }

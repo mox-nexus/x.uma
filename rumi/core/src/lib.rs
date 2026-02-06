@@ -125,6 +125,8 @@ pub mod prelude {
         FieldMatcher,
         InputMatcher,
         Matcher,
+        // Errors
+        MatcherError,
         MatcherTree,
         MatchingData,
         OnMatch,
@@ -144,5 +146,36 @@ pub mod prelude {
 /// Maximum allowed depth for nested matchers.
 ///
 /// This limit protects against stack overflow from deeply nested predicates.
-/// Depth should be validated at config load time, not evaluation time.
+/// Validate at config load time via [`Matcher::validate`].
 pub const MAX_DEPTH: usize = 32;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Errors
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Errors from matcher validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MatcherError {
+    /// Matcher nesting exceeds [`MAX_DEPTH`].
+    DepthExceeded {
+        /// Actual depth of the matcher tree.
+        depth: usize,
+        /// Maximum allowed depth.
+        max: usize,
+    },
+}
+
+impl std::fmt::Display for MatcherError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DepthExceeded { depth, max } => {
+                write!(
+                    f,
+                    "matcher depth {depth} exceeds maximum allowed depth {max}"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for MatcherError {}
