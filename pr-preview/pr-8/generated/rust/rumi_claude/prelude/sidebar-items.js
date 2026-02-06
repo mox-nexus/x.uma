@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["MatcherError","MatcherTree","MatchingData","OnMatch","Predicate","StringMatcher"],"struct":["BoolMatcher","ContainsMatcher","ExactMatcher","FieldMatcher","Matcher","PrefixMatcher","RadixTree","SinglePredicate","SuffixMatcher"],"trait":["CustomMatchData","DataInput","InputMatcher"]};
