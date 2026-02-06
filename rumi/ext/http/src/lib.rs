@@ -3,16 +3,16 @@
 //! This crate provides two layers:
 //!
 //! 1. **User API**: Gateway API `HttpRouteMatch` for configuration
-//! 2. **Data Plane API**: `ext_proc` `ProcessingRequest` for runtime
+//! 2. **Data Plane API**: `HttpMessage` (indexed from `ProcessingRequest`) for runtime
 //!
 //! # Architecture
 //!
 //! ```text
 //! Gateway API HttpRouteMatch (config)
 //!         ↓ compile()
-//! rumi Matcher<ProcessingRequest, A>
+//! rumi Matcher<HttpMessage, A>
 //!         ↓ evaluate()
-//! ext_proc ProcessingRequest (runtime)
+//! HttpMessage (indexed from ext_proc ProcessingRequest)
 //! ```
 //!
 //! # Example
@@ -27,18 +27,20 @@
 //! };
 //! let matcher = route_match.compile::<&str>("api_backend");
 //!
-//! // Runtime: evaluate against ext_proc ProcessingRequest
-//! let result = matcher.evaluate(&processing_request);
+//! // Runtime: index ProcessingRequest into HttpMessage, then evaluate
+//! let msg = HttpMessage::from(&processing_request);
+//! let result = matcher.evaluate(&msg);
 //! ```
 
 mod compiler;
 mod context;
 mod inputs;
+mod message;
 mod simple;
 
 pub use compiler::*;
-pub use context::*;
 pub use inputs::*;
+pub use message::HttpMessage;
 pub use simple::{
     HttpRequest, HttpRequestBuilder, SimpleHeaderInput, SimpleMethodInput, SimplePathInput,
     SimpleQueryParamInput,
@@ -46,7 +48,7 @@ pub use simple::{
 
 // Re-export ext_proc types for convenience
 pub use envoy_grpc_ext_proc::envoy::service::ext_proc::v3::{
-    HttpBody, HttpHeaders, HttpTrailers, ProcessingRequest, ProcessingResponse,
+    ProcessingRequest, ProcessingResponse,
 };
 
 // Re-export Gateway API types for convenience
@@ -57,11 +59,13 @@ pub use k8s_gateway_api::{
 /// Prelude for convenient imports.
 pub mod prelude {
     pub use super::{
-        // DataInputs for ProcessingRequest
+        // DataInputs for HttpMessage
         AuthorityInput,
         HeaderInput,
         // Re-exports: Gateway API
         HttpHeaderMatch,
+        // Indexed context
+        HttpMessage,
         HttpMethod,
         HttpPathMatch,
         HttpQueryParamMatch,
@@ -92,8 +96,8 @@ mod tests {
 
     #[test]
     fn test_crate_compiles() {
-        // Basic smoke test that dependencies are wired correctly
         let _: Option<ProcessingRequest> = None;
         let _: Option<HttpRouteMatch> = None;
+        let _: Option<HttpMessage> = None;
     }
 }

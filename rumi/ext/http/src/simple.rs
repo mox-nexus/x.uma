@@ -8,7 +8,7 @@ use std::collections::HashMap;
 /// Simple HTTP request context for matching.
 ///
 /// Use this for testing or simple use cases. For production `ext_proc`
-/// integration, use `ProcessingRequest` instead.
+/// integration, use [`HttpMessage`](crate::HttpMessage) instead.
 #[derive(Debug, Clone, Default)]
 pub struct HttpRequest {
     method: String,
