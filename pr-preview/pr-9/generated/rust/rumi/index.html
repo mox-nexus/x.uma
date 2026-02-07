@@ -1,0 +1,67 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="rumi - Rust implementation of xDS Unified Matcher API"><title>rumi - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="rumi" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../static.files/storage-e2aeef58.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Crate rumi</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../rumi/index.html">rumi</a><span class="version">0.0.1</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#architecture-envoy-inspired" title="Architecture (Envoy-inspired)">Architecture (Envoy-inspired)</a></li><li><a href="#key-design-insights" title="Key Design Insights">Key Design Insights</a></li><li><a href="#example" title="Example">Example</a></li><li><a href="#extensions" title="Extensions">Extensions</a></li></ul><h3><a href="#modules">Crate Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#traits" title="Traits">Traits</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>rumi</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/rumi/lib.rs.html#1-181">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>rumi - Rust implementation of xDS Unified Matcher API</p>
+<p>A matcher engine implementing the xDS Unified Matcher API specification.</p>
+<h2 id="architecture-envoy-inspired"><a class="doc-anchor" href="#architecture-envoy-inspired">§</a>Architecture (Envoy-inspired)</h2>
+<p>The type system uses a hybrid erasure approach:</p>
+<ul>
+<li><a href="enum.MatchingData.html" title="enum rumi::MatchingData"><code>MatchingData</code></a> — Erased data type (primitives + extensible Custom variant)</li>
+<li><a href="trait.DataInput.html" title="trait rumi::DataInput"><code>DataInput&lt;Ctx&gt;</code></a> — Domain-specific extraction, returns <code>MatchingData</code></li>
+<li><a href="trait.InputMatcher.html" title="trait rumi::InputMatcher"><code>InputMatcher</code></a> — Domain-agnostic matching (non-generic, shareable!)</li>
+<li><a href="struct.SinglePredicate.html" title="struct rumi::SinglePredicate"><code>SinglePredicate&lt;Ctx&gt;</code></a> — Combines <code>DataInput</code> + <code>InputMatcher</code></li>
+<li><a href="enum.Predicate.html" title="enum rumi::Predicate"><code>Predicate&lt;Ctx&gt;</code></a> — Boolean composition (And, Or, Not)</li>
+<li><a href="struct.Matcher.html" title="struct rumi::Matcher"><code>Matcher&lt;Ctx, A&gt;</code></a> — Top-level matcher with first-match-wins semantics</li>
+</ul>
+<h2 id="key-design-insights"><a class="doc-anchor" href="#key-design-insights">§</a>Key Design Insights</h2>
+<ol>
+<li>
+<p><strong>Type erasure at data level</strong>: <code>MatchingData</code> enables <code>InputMatcher</code> to be non-generic.</p>
+</li>
+<li>
+<p><strong>Non-generic <code>InputMatcher</code></strong>: The same <code>ExactMatcher</code> works for HTTP, Claude,
+test contexts, etc. Matchers are domain-agnostic.</p>
+</li>
+<li>
+<p><strong><code>DataInput</code> None → false</strong>: When a <code>DataInput</code> returns <code>MatchingData::None</code>,
+the predicate evaluates to <code>false</code>. This is a critical invariant.</p>
+</li>
+</ol>
+<h2 id="example"><a class="doc-anchor" href="#example">§</a>Example</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>rumi::prelude::<span class="kw-2">*</span>;
+
+<span class="comment">// Define a context
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">struct </span>Request { path: String }
+
+<span class="comment">// Define a DataInput
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">struct </span>PathInput;
+
+<span class="kw">impl </span>DataInput&lt;Request&gt; <span class="kw">for </span>PathInput {
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, ctx: <span class="kw-2">&amp;</span>Request) -&gt; MatchingData {
+        MatchingData::String(ctx.path.clone())
+    }
+}
+
+<span class="comment">// Build a matcher (OnMatch is an enum: Action or Matcher, per xDS proto)
+</span><span class="kw">let </span>matcher: Matcher&lt;Request, String&gt; = Matcher::new(
+    <span class="macro">vec!</span>[
+        FieldMatcher::new(
+            Predicate::Single(SinglePredicate::new(
+                Box::new(PathInput),
+                Box::new(ExactMatcher::new(<span class="string">"/api"</span>)),
+            )),
+            OnMatch::Action(<span class="string">"api_backend"</span>.to_string()),
+        ),
+    ],
+    <span class="prelude-val">Some</span>(OnMatch::Action(<span class="string">"default_backend"</span>.to_string())),
+);
+
+<span class="comment">// Evaluate
+</span><span class="kw">let </span>result = matcher.evaluate(<span class="kw-2">&amp;</span>Request { path: <span class="string">"/api"</span>.to_string() });
+<span class="macro">assert_eq!</span>(result, <span class="prelude-val">Some</span>(<span class="string">"api_backend"</span>.to_string()));</code></pre></div><h2 id="extensions"><a class="doc-anchor" href="#extensions">§</a>Extensions</h2>
+<p>Domain-specific functionality is provided by extension crates:</p>
+<ul>
+<li><a href="https://docs.rs/rumi-test"><code>rumi-test</code></a> — Test domain for conformance</li>
+<li><a href="https://docs.rs/rumi-http"><code>rumi-http</code></a> — HTTP request matching</li>
+<li><a href="https://docs.rs/rumi-claude"><code>rumi-claude</code></a> — Claude Code hooks</li>
+</ul>
+</div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="prelude/index.html" title="mod rumi::prelude">prelude</a></dt><dd>Prelude module for convenient imports.</dd></dl><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.BoolMatcher.html" title="struct rumi::BoolMatcher">Bool<wbr>Matcher</a></dt><dd>Boolean equality matcher.</dd><dt><a class="struct" href="struct.ContainsMatcher.html" title="struct rumi::ContainsMatcher">Contains<wbr>Matcher</a></dt><dd>Contains string matcher.</dd><dt><a class="struct" href="struct.ExactMatcher.html" title="struct rumi::ExactMatcher">Exact<wbr>Matcher</a></dt><dd>Exact string equality matcher.</dd><dt><a class="struct" href="struct.FieldMatcher.html" title="struct rumi::FieldMatcher">Field<wbr>Matcher</a></dt><dd>A field matcher: predicate + <code>on_match</code>.</dd><dt><a class="struct" href="struct.Matcher.html" title="struct rumi::Matcher">Matcher</a></dt><dd>Top-level matcher with first-match-wins semantics.</dd><dt><a class="struct" href="struct.PrefixMatcher.html" title="struct rumi::PrefixMatcher">Prefix<wbr>Matcher</a></dt><dd>Prefix string matcher.</dd><dt><a class="struct" href="struct.RadixTree.html" title="struct rumi::RadixTree">Radix<wbr>Tree</a></dt><dd>A radix tree (compressed trie) for efficient prefix lookups.</dd><dt><a class="struct" href="struct.SinglePredicate.html" title="struct rumi::SinglePredicate">Single<wbr>Predicate</a></dt><dd>A single predicate: combines a <a href="trait.DataInput.html" title="trait rumi::DataInput"><code>DataInput</code></a> with an <a href="trait.InputMatcher.html" title="trait rumi::InputMatcher"><code>InputMatcher</code></a>.</dd><dt><a class="struct" href="struct.SuffixMatcher.html" title="struct rumi::SuffixMatcher">Suffix<wbr>Matcher</a></dt><dd>Suffix string matcher.</dd></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.MatcherError.html" title="enum rumi::MatcherError">Matcher<wbr>Error</a></dt><dd>Errors from matcher validation.</dd><dt><a class="enum" href="enum.MatcherTree.html" title="enum rumi::MatcherTree">Matcher<wbr>Tree</a></dt><dd>Tree-based matcher using map lookups instead of predicate evaluation.</dd><dt><a class="enum" href="enum.MatchingData.html" title="enum rumi::MatchingData">Matching<wbr>Data</a></dt><dd>The erased data type that flows between <code>DataInput</code> and <code>InputMatcher</code>.</dd><dt><a class="enum" href="enum.OnMatch.html" title="enum rumi::OnMatch">OnMatch</a></dt><dd>Defines what to do when a predicate matches.</dd><dt><a class="enum" href="enum.Predicate.html" title="enum rumi::Predicate">Predicate</a></dt><dd>Composite predicate with boolean logic.</dd><dt><a class="enum" href="enum.StringMatcher.html" title="enum rumi::StringMatcher">String<wbr>Matcher</a></dt><dd>Unified string matcher matching xDS <code>StringMatcher</code> proto.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.MAX_DEPTH.html" title="constant rumi::MAX_DEPTH">MAX_<wbr>DEPTH</a></dt><dd>Maximum allowed depth for nested matchers.</dd></dl><h2 id="traits" class="section-header">Traits<a href="#traits" class="anchor">§</a></h2><dl class="item-table"><dt><a class="trait" href="trait.CustomMatchData.html" title="trait rumi::CustomMatchData">Custom<wbr>Match<wbr>Data</a></dt><dd>Extension trait for custom matching data types.</dd><dt><a class="trait" href="trait.DataInput.html" title="trait rumi::DataInput">Data<wbr>Input</a></dt><dd>Extracts data from a domain-specific context.</dd><dt><a class="trait" href="trait.InputMatcher.html" title="trait rumi::InputMatcher">Input<wbr>Matcher</a></dt><dd>Matches against type-erased <a href="enum.MatchingData.html" title="enum rumi::MatchingData"><code>MatchingData</code></a>.</dd></dl></section></div></main></body></html>

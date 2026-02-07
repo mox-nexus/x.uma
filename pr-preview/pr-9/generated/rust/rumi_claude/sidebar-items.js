@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HookEvent"],"mod":["prelude"],"struct":["ArgumentInput","EventInput","HookContext","ToolNameInput"]};
