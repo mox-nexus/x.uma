@@ -8,9 +8,9 @@ A matcher ecosystem implementing the xDS Unified Matcher API across multiple lan
 |---------|----------|-------|
 | **rumi** | Rust | Core engine (reference implementation) |
 | **p.uma** | Python | Pure Python implementation (package: `puma`) |
-| **b.uma** | Bun/TypeScript | Pure TypeScript implementation (package: `@x.uma/buma`) |
+| **b.uma** | Bun/TypeScript | Pure TypeScript implementation (package: `@x.uma/bumi`) |
 | **puma-crusty** | Python | Rust bindings via uniffi (from `rumi/crusts/python/`) |
-| **@x.uma/buma-crusty** | TypeScript | Rust bindings via WASM (from `rumi/crusts/wasm/`) |
+| **@x.uma/bumi-crusty** | TypeScript | Rust bindings via WASM (from `rumi/crusts/wasm/`) |
 
 All implementations pass the same conformance test suite (`spec/tests/`).
 
@@ -25,7 +25,7 @@ x.uma follows ACES principles using hexagonal architecture (ports & adapters) to
 ```
                     ┌─────────────────────────────────┐
                     │         Domain Adapters         │
-                    │ xuma.http xuma.claude xuma.grpc │
+                    │ xuma.http xuma.act xuma.grpc │
                     └───────────────┬─────────────────┘
                                     │
                     ┌───────────────▼─────────────────┐
@@ -72,14 +72,14 @@ All x.uma extensions use the `xuma` proto package namespace:
 xuma.core.v1      # Base types, registry
 xuma.test.v1      # Conformance testing
 xuma.http.v1      # HTTP matching
-xuma.claude.v1    # Claude Code hooks
+xuma.act.v1       # Agent tool control (ACT)
 xuma.grpc.v1      # gRPC matching
 ```
 
 Type URLs:
 - `type.googleapis.com/xuma.test.v1.StringInput`
 - `type.googleapis.com/xuma.http.v1.HeaderInput`
-- `type.googleapis.com/xuma.claude.v1.HookContext`
+- `type.googleapis.com/xuma.act.v1.ToolInvocation`
 
 ## Project Structure
 
@@ -92,7 +92,7 @@ x.uma/
 │   └── tests/                  # conformance test fixtures (YAML)
 ├── rumi/                       # Rust workspace (core + extensions + crusts)
 ├── p.uma/                      # Pure Python implementation (package: puma)
-├── b.uma/                      # Pure Bun/TypeScript implementation (@x.uma/buma)
+├── b.uma/                      # Pure Bun/TypeScript implementation (@x.uma/bumi)
 ├── docs/                       # mdBook documentation
 └── justfile                    # polyglot task orchestration
 ```
@@ -111,7 +111,7 @@ x.uma/
 | 5.1 | p.uma arch-guild hardening | ✅ Done |
 | 6 | b.uma (Bun/TypeScript + HTTP) | 🚧 Next |
 | 7 | rumi/crusts/python (uniffi→puma-crusty) | Planned |
-| 8 | rumi/crusts/wasm (wasm-pack→@x.uma/buma-crusty) | Planned |
+| 8 | rumi/crusts/wasm (wasm-pack→@x.uma/bumi-crusty) | Planned |
 | 9 | Benchmarks (all variants) | Planned |
 
 ## Tooling
@@ -206,10 +206,10 @@ rumi/
 ├── ext/
 │   ├── test/           # rumi-test (conformance)
 │   ├── http/           # rumi-http (HTTP matching)
-│   └── claude/         # rumi-claude (Claude Code hooks)
+│   └── act/            # rumi-act (agent tool control)
 └── crusts/             # Language bindings (🦀 crustacean → crusty)
     ├── python/         # uniffi → puma-crusty wheel (maturin)
-    └── wasm/           # wasm-bindgen → @x.uma/buma-crusty (wasm-pack)
+    └── wasm/           # wasm-bindgen → @x.uma/bumi-crusty (wasm-pack)
 ```
 
 **Extension pattern:** Users depend on an extension crate, get core transitively:

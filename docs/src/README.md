@@ -12,9 +12,9 @@ x.uma implements the [xDS Unified Matcher API](https://github.com/cncf/xds) acro
 |---------|----------|--------|
 | **rumi** | Rust | Production-ready core |
 | **puma** | Python 3.12+ | Alpha (v0.1.0) |
-| **buma** | TypeScript/Bun | Planned |
+| **bumi** | TypeScript/Bun | Planned |
 | **puma-crusty** | Python (Rust bindings) | Planned |
-| **buma-crusty** | TypeScript (WASM bindings) | Planned |
+| **bumi-crusty** | TypeScript (WASM bindings) | Planned |
 
 All implementations pass the same conformance test suite.
 
@@ -128,8 +128,8 @@ x.uma is alpha software. The API is under active development and will change.
 | Phase | Focus | Status |
 |-------|-------|--------|
 | 5 | Python (puma) | ✅ Done (v0.1.0) |
-| 6 | TypeScript (buma) | Next |
+| 6 | TypeScript (bumi) | Next |
 | 7 | Python Rust bindings (puma-crusty) | Planned |
-| 8 | TypeScript WASM bindings (buma-crusty) | Planned |
+| 8 | TypeScript WASM bindings (bumi-crusty) | Planned |
 
 See [Roadmap](development/roadmap.md) for details.

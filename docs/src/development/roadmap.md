@@ -10,7 +10,7 @@ Two implementations exist:
 - **rumi** (Rust) — reference implementation, production-hardened constraints
 - **puma** (Python) — pure Python port, zero dependencies, 194 tests passing
 
-Both pass the same conformance test suite (`spec/tests/`). TypeScript (buma) is next.
+Both pass the same conformance test suite (`spec/tests/`). TypeScript (bumi) is next.
 
 ## Phase Overview
 
@@ -26,7 +26,7 @@ Both pass the same conformance test suite (`spec/tests/`). TypeScript (buma) is 
 | 5.1 | p.uma arch-guild hardening | ✅ Done |
 | 6 | b.uma (Bun/TypeScript + HTTP) | 🚧 Next |
 | 7 | rumi/crusts/python (uniffi→puma-crusty) | Planned |
-| 8 | rumi/crusts/wasm (wasm-pack→@x.uma/buma-crusty) | Planned |
+| 8 | rumi/crusts/wasm (wasm-pack→@x.uma/bumi-crusty) | Planned |
 | 9 | Benchmarks (all variants) | Planned |
 
 ## Phase 5: p.uma (Pure Python)
@@ -95,7 +95,7 @@ Pure TypeScript implementation using Bun runtime.
 
 **Type System Mapping (Rust → TypeScript):**
 
-| Rust (rumi) | TypeScript (buma) | Notes |
+| Rust (rumi) | TypeScript (bumi) | Notes |
 |-------------|-------------------|-------|
 | `trait DataInput<Ctx>` | `interface DataInput<Ctx>` | Generic interface |
 | `trait InputMatcher` | `interface InputMatcher` | Non-generic |
@@ -117,7 +117,7 @@ Rust-backed Python package providing the same puma API with Rust performance + s
 
 **Trade-off:** Adds compiled Rust binary dependency. Pure puma remains zero-dependency option.
 
-## Phase 8: buma-crusty (Rust Bindings → WASM)
+## Phase 8: bumi-crusty (Rust Bindings → WASM)
 
 **Status:** Planned
 
@@ -126,7 +126,7 @@ Rust-backed TypeScript package via WASM.
 **Approach:**
 - wasm-bindgen from `rumi/crusts/wasm/`
 - wasm-pack for bundling
-- Same API as pure buma (drop-in replacement)
+- Same API as pure bumi (drop-in replacement)
 - Linear-time regex (ReDoS-safe)
 
 ## Phase 9: Benchmarks
@@ -139,8 +139,8 @@ Cross-language performance comparison.
 - rumi (Rust native)
 - puma (pure Python)
 - puma-crusty (Python → Rust via uniffi)
-- buma (pure TypeScript)
-- buma-crusty (TypeScript → Rust via WASM)
+- bumi (pure TypeScript)
+- bumi-crusty (TypeScript → Rust via WASM)
 
 **Metrics:**
 - Matcher compilation time

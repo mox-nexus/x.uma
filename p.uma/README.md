@@ -263,7 +263,7 @@ See [SECURITY.md](SECURITY.md) for details.
 
 puma is alpha software (v0.1.0). The API is under active development and will change.
 
-Part of the x.uma matcher ecosystem — implementing the xDS Unified Matcher API across Rust (rumi), Python (puma), and TypeScript (buma). All implementations pass the same conformance test suite.
+Part of the x.uma matcher ecosystem — implementing the xDS Unified Matcher API across Rust (rumi), Python (puma), and TypeScript (bumi). All implementations pass the same conformance test suite.
 
 See the [x.uma README](https://github.com/mox-labs/x.uma) for the full project roadmap.
 

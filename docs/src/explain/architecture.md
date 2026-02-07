@@ -9,7 +9,7 @@ Why x.uma is built the way it is, and how the same architecture maps across Rust
 ```text
 ┌─────────────────────────────────────┐
 │         Domain Adapters             │
-│   xuma.http  xuma.claude  xuma.grpc │
+│   xuma.http  xuma.act  xuma.grpc │
 └───────────────┬─────────────────────┘
                 │
 ┌───────────────▼─────────────────────┐
@@ -26,7 +26,7 @@ Why x.uma is built the way it is, and how the same architecture maps across Rust
 └─────────────────────────────────────┘
 ```
 
-This architecture applies to **all implementations** — rumi (Rust), puma (Python), buma (TypeScript). The ports and hexagonal design are language-agnostic.
+This architecture applies to **all implementations** — rumi (Rust), puma (Python), bumi (TypeScript). The ports and hexagonal design are language-agnostic.
 
 ## The Extension Seam
 
@@ -89,7 +89,7 @@ class InputMatcher(Protocol):
 - Protocols instead of traits (runtime-checkable)
 - `MatchingValue` is just a type alias, not a wrapped type
 
-### TypeScript (buma, planned)
+### TypeScript (bumi, planned)
 
 ```typescript
 // MatchingValue — union type
@@ -114,7 +114,7 @@ interface InputMatcher {
 
 How the same architecture translates across languages:
 
-| Concept | Rust (rumi) | Python (puma) | TypeScript (buma) |
+| Concept | Rust (rumi) | Python (puma) | TypeScript (bumi) |
 |---------|-------------|---------------|-------------------|
 | **Erased data** | `enum MatchingData` | `type MatchingValue` (union) | `type MatchingValue` (union) |
 | **Extraction port** | `trait DataInput<Ctx>` | `Protocol[Ctx]` | `interface DataInput<Ctx>` |
@@ -229,7 +229,7 @@ rumi/
 └── ext/                # Domain extensions
     ├── test/           # rumi-test (conformance)
     ├── http/           # rumi-http
-    └── claude/         # rumi-claude
+    └── act/            # rumi-act (agent tool control)
 ```
 
 Dependencies point inward. Core knows nothing about domains.
@@ -253,7 +253,7 @@ p.uma/
 
 Flat exports via `__init__.py`. Private modules prefixed with `_`.
 
-### TypeScript (buma, planned)
+### TypeScript (bumi, planned)
 
 ```text
 b.uma/
@@ -279,8 +279,8 @@ Standard TypeScript barrel exports.
 | rumi (Rust) | `regex` crate (linear-time) | Send + Sync | Zero-copy where possible |
 | puma (Python) | `re` module (backtracking) | GIL (not parallel-safe) | Reference-counted |
 | puma-crusty | `regex` via uniffi (linear-time) | GIL | Crossing FFI boundary |
-| buma (TypeScript) | JS `RegExp` (V8 engine) | Single-threaded | Garbage-collected |
-| buma-crusty | `regex` via WASM (linear-time) | Single-threaded | Crossing WASM boundary |
+| bumi (TypeScript) | JS `RegExp` (V8 engine) | Single-threaded | Garbage-collected |
+| bumi-crusty | `regex` via WASM (linear-time) | Single-threaded | Crossing WASM boundary |
 
 ## Why Multiple Implementations?
 
@@ -291,7 +291,7 @@ Standard TypeScript barrel exports.
 
 **Reference consistency:** All implementations are ports, not wrappers. Same architecture, same semantics, same test suite.
 
-**Learning path:** Pure implementations (rumi, puma, buma) are readable references. Crusty variants (uniffi, WASM) provide Rust performance when needed.
+**Learning path:** Pure implementations (rumi, puma, bumi) are readable references. Crusty variants (uniffi, WASM) provide Rust performance when needed.
 
 ## See Also
 
