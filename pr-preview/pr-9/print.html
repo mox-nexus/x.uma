@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "searchindex-618bf292.js";
+            window.path_to_searchindex_js = "searchindex-a2ea8057.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-2a05d733.js"></script>
+        <script src="toc-9ddb2f6c.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -193,9 +193,9 @@
 <tbody>
 <tr><td><strong>rumi</strong></td><td>Rust</td><td>Production-ready core</td></tr>
 <tr><td><strong>puma</strong></td><td>Python 3.12+</td><td>Alpha (v0.1.0)</td></tr>
-<tr><td><strong>buma</strong></td><td>TypeScript/Bun</td><td>Planned</td></tr>
+<tr><td><strong>bumi</strong></td><td>TypeScript/Bun</td><td>Planned</td></tr>
 <tr><td><strong>puma-crusty</strong></td><td>Python (Rust bindings)</td><td>Planned</td></tr>
-<tr><td><strong>buma-crusty</strong></td><td>TypeScript (WASM bindings)</td><td>Planned</td></tr>
+<tr><td><strong>bumi-crusty</strong></td><td>TypeScript (WASM bindings)</td><td>Planned</td></tr>
 </tbody>
 </table>
 </div>
@@ -295,9 +295,9 @@ action = matcher.evaluate(request)  # "api_handler"
 </thead>
 <tbody>
 <tr><td>5</td><td>Python (puma)</td><td>✅ Done (v0.1.0)</td></tr>
-<tr><td>6</td><td>TypeScript (buma)</td><td>Next</td></tr>
+<tr><td>6</td><td>TypeScript (bumi)</td><td>Next</td></tr>
 <tr><td>7</td><td>Python Rust bindings (puma-crusty)</td><td>Planned</td></tr>
-<tr><td>8</td><td>TypeScript WASM bindings (buma-crusty)</td><td>Planned</td></tr>
+<tr><td>8</td><td>TypeScript WASM bindings (bumi-crusty)</td><td>Planned</td></tr>
 </tbody>
 </table>
 </div>
@@ -1105,7 +1105,7 @@ impl DataInput&lt;CloudEvent&gt; for EventSubjectInput {
 │       (pure, domain-agnostic)       │
 └─────────────────────────────────────┘
 </code></pre>
-<p>This architecture applies to <strong>all implementations</strong> — rumi (Rust), puma (Python), buma (TypeScript). The ports and hexagonal design are language-agnostic.</p>
+<p>This architecture applies to <strong>all implementations</strong> — rumi (Rust), puma (Python), bumi (TypeScript). The ports and hexagonal design are language-agnostic.</p>
 <h2 id="the-extension-seam"><a class="header" href="#the-extension-seam">The Extension Seam</a></h2>
 <p><code>TypedExtensionConfig</code> from xDS is the architectural seam:</p>
 <pre><code class="language-protobuf">message TypedExtensionConfig {
@@ -1157,7 +1157,7 @@ class InputMatcher(Protocol):
 <li>Protocols instead of traits (runtime-checkable)</li>
 <li><code>MatchingValue</code> is just a type alias, not a wrapped type</li>
 </ul>
-<h3 id="typescript-buma-planned"><a class="header" href="#typescript-buma-planned">TypeScript (buma, planned)</a></h3>
+<h3 id="typescript-bumi-planned"><a class="header" href="#typescript-bumi-planned">TypeScript (bumi, planned)</a></h3>
 <pre><code class="language-typescript">// MatchingValue — union type
 type MatchingValue = string | number | boolean | Uint8Array | null;
 
@@ -1181,7 +1181,7 @@ interface InputMatcher {
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Concept</th><th>Rust (rumi)</th><th>Python (puma)</th><th>TypeScript (buma)</th></tr>
+<tr><th>Concept</th><th>Rust (rumi)</th><th>Python (puma)</th><th>TypeScript (bumi)</th></tr>
 </thead>
 <tbody>
 <tr><td><strong>Erased data</strong></td><td><code>enum MatchingData</code></td><td><code>type MatchingValue</code> (union)</td><td><code>type MatchingValue</code> (union)</td></tr>
@@ -1279,7 +1279,7 @@ cases:
 └── ext/                # Domain extensions
     ├── test/           # rumi-test (conformance)
     ├── http/           # rumi-http
-    └── claude/         # rumi-claude
+    └── claude/         # rumi-claude (Claude Code hooks)
 </code></pre>
 <p>Dependencies point inward. Core knows nothing about domains.</p>
 <h3 id="python-puma-1"><a class="header" href="#python-puma-1">Python (puma)</a></h3>
@@ -1297,7 +1297,7 @@ cases:
         └── _gateway.py # Gateway API compiler
 </code></pre>
 <p>Flat exports via <code>__init__.py</code>. Private modules prefixed with <code>_</code>.</p>
-<h3 id="typescript-buma-planned-1"><a class="header" href="#typescript-buma-planned-1">TypeScript (buma, planned)</a></h3>
+<h3 id="typescript-bumi-planned-1"><a class="header" href="#typescript-bumi-planned-1">TypeScript (bumi, planned)</a></h3>
 <pre><code class="language-text">b.uma/
 └── src/
     ├── index.ts        # Core types
@@ -1322,8 +1322,8 @@ cases:
 <tr><td>rumi (Rust)</td><td><code>regex</code> crate (linear-time)</td><td>Send + Sync</td><td>Zero-copy where possible</td></tr>
 <tr><td>puma (Python)</td><td><code>re</code> module (backtracking)</td><td>GIL (not parallel-safe)</td><td>Reference-counted</td></tr>
 <tr><td>puma-crusty</td><td><code>regex</code> via uniffi (linear-time)</td><td>GIL</td><td>Crossing FFI boundary</td></tr>
-<tr><td>buma (TypeScript)</td><td>JS <code>RegExp</code> (V8 engine)</td><td>Single-threaded</td><td>Garbage-collected</td></tr>
-<tr><td>buma-crusty</td><td><code>regex</code> via WASM (linear-time)</td><td>Single-threaded</td><td>Crossing WASM boundary</td></tr>
+<tr><td>bumi (TypeScript)</td><td>JS <code>RegExp</code> (V8 engine)</td><td>Single-threaded</td><td>Garbage-collected</td></tr>
+<tr><td>bumi-crusty</td><td><code>regex</code> via WASM (linear-time)</td><td>Single-threaded</td><td>Crossing WASM boundary</td></tr>
 </tbody>
 </table>
 </div>
@@ -1335,7 +1335,7 @@ cases:
 <li>TypeScript: Edge workers (Cloudflare, Deno), serverless</li>
 </ul>
 <p><strong>Reference consistency:</strong> All implementations are ports, not wrappers. Same architecture, same semantics, same test suite.</p>
-<p><strong>Learning path:</strong> Pure implementations (rumi, puma, buma) are readable references. Crusty variants (uniffi, WASM) provide Rust performance when needed.</p>
+<p><strong>Learning path:</strong> Pure implementations (rumi, puma, bumi) are readable references. Crusty variants (uniffi, WASM) provide Rust performance when needed.</p>
 <h2 id="see-also-1"><a class="header" href="#see-also-1">See Also</a></h2>
 <ul>
 <li><a href="#roadmap">Roadmap</a> — Implementation status</li>
@@ -1356,7 +1356,7 @@ cases:
 <h3 id="adaptable"><a class="header" href="#adaptable">Adaptable</a></h3>
 <p>New domains plug in without touching core.</p>
 <pre><code class="language-text">Adding HTTP support? → Create rumi/ext/http/
-Adding Claude hooks? → Create rumi/ext/claude/
+Adding Claude Code hooks? → Create rumi/ext/claude/
 Core unchanged.
 </code></pre>
 <h3 id="composable"><a class="header" href="#composable">Composable</a></h3>
@@ -1396,6 +1396,243 @@ Predicate::And(vec![
 <li><strong>Envoy</strong> — Production-proven matcher implementation at Google scale</li>
 <li><strong>xDS</strong> — Protocol that powers service mesh configuration</li>
 <li><strong>Hexagonal Architecture</strong> — Ports and adapters pattern</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="policy-landscape"><a class="header" href="#policy-landscape">Policy Landscape</a></h1>
+<p>Where x.uma fits in the broader policy engine ecosystem, and why agent tool control is greenfield territory.</p>
+<h2 id="xuma-is-a-policy-engine"><a class="header" href="#xuma-is-a-policy-engine">x.uma IS a Policy Engine</a></h2>
+<p>At its core, x.uma evaluates structured input against composable rules and returns a decision. This is the fundamental contract of every policy engine:</p>
+<pre><code class="language-text">Input → Rules → Decision
+</code></pre>
+<p>x.uma implements the xDS Unified Matcher API — the same matching engine Envoy uses for RBAC enforcement, rate limiting, and routing at Google scale. The architecture is proven in production at companies running millions of requests per second.</p>
+<p>The mechanics:</p>
+<ol>
+<li>Structured input (HTTP request, agent context, etc.)</li>
+<li>Evaluation against a matcher tree (AND/OR/NOT predicates)</li>
+<li>Return a decision (generic action <code>A</code>)</li>
+</ol>
+<p>This is policy evaluation. The domain-agnostic core means the same engine handles HTTP routing decisions and agent tool control decisions.</p>
+<h2 id="the-established-standards"><a class="header" href="#the-established-standards">The Established Standards</a></h2>
+<p>The policy engine landscape has mature, well-adopted standards. Each emerged to solve specific problems.</p>
+<h3 id="opa-open-policy-agent"><a class="header" href="#opa-open-policy-agent">OPA (Open Policy Agent)</a></h3>
+<p><strong>What it is:</strong> CNCF graduated project maintained by Styra. Domain-agnostic policy evaluation using the Rego language (Datalog-based).</p>
+<p><strong>Model:</strong> Input→Rules→Decision. You write Rego policies that query input documents and produce allow/deny decisions (or complex JSON responses).</p>
+<p><strong>Adoption:</strong> Netflix (microservice authorization), Goldman Sachs (compliance), Kubernetes Gatekeeper (admission control).</p>
+<p><strong>Strength:</strong> Highly flexible. Works for any domain because Rego is a general-purpose query language.</p>
+<h3 id="cedar"><a class="header" href="#cedar">Cedar</a></h3>
+<p><strong>What it is:</strong> AWS-developed authorization language, open-sourced in 2023. Purpose-built for access control with formal verification.</p>
+<p><strong>Model:</strong> PARC (Principal-Action-Resource-Context). Policies explicitly state which principals can perform which actions on which resources, given context.</p>
+<pre><code class="language-cedar">permit(
+  principal == User::"alice",
+  action == Action::"readFile",
+  resource in Folder::"docs"
+);
+</code></pre>
+<p><strong>Adoption:</strong> Amazon Verified Permissions (GA), AWS Verified Access.</p>
+<p><strong>Strength:</strong> Formal verification via Dafny — provably correct policies. The language design prevents entire classes of authorization bugs.</p>
+<h3 id="xacml"><a class="header" href="#xacml">XACML</a></h3>
+<p><strong>What it is:</strong> OASIS standard since 2001. XML-based policy language that coined the PEP/PDP/PAP/PIP vocabulary the entire industry uses.</p>
+<p><strong>Model:</strong> Policy Decision Point (PDP) evaluates requests from Policy Enforcement Points (PEP). Policies authored in Policy Administration Points (PAP), context from Policy Information Points (PIP).</p>
+<p><strong>Adoption:</strong> Government, healthcare, finance (HIPAA compliance workflows).</p>
+<p><strong>Strength:</strong> Standardization. When two systems need to interoperate on authorization, XACML is the lingua franca.</p>
+<h3 id="zanzibar-and-relationship-engines"><a class="header" href="#zanzibar-and-relationship-engines">Zanzibar and Relationship Engines</a></h3>
+<p><strong>What they are:</strong> Google’s Zanzibar (2019 paper), OpenFGA, SpiceDB. Relationship-based access control (ReBAC) via graph traversal.</p>
+<p><strong>Model:</strong> Not rule evaluation. Instead: “Does a path exist in the authorization graph from user to resource?”</p>
+<p>Example: “Can alice view doc123?” → Check if graph contains <code>alice -[member]→ team -[viewer]→ doc123</code>.</p>
+<p><strong>Adoption:</strong> Google (Drive, Calendar, Cloud), Airbnb (OpenFGA), Auth0 (FGA product).</p>
+<p><strong>Strength:</strong> Scales to billions of relationships. Natural fit for social graphs and hierarchical permissions.</p>
+<p><strong>Key difference:</strong> ReBAC engines don’t evaluate predicates. They traverse graphs. Different problem space.</p>
+<h2 id="the-agent-policy-gap"><a class="header" href="#the-agent-policy-gap">The Agent Policy Gap</a></h2>
+<p>As of February 2026, there is no established standard for AI agent tool control policies. The space is fragmented.</p>
+<h3 id="what-exists-today"><a class="header" href="#what-exists-today">What Exists Today</a></h3>
+<p><strong>AWS Bedrock AgentCore</strong> (re:Invent 2025): Cedar-based policy engine for agent-to-tool interactions. Closest production system. Uses Cedar’s PARC model: agent is principal, tool is action, parameters are context.</p>
+<p><strong>OpenAI Agents SDK</strong>: “Guardrails” with binary tripwires. Simple allow/deny on tool invocations based on pattern matching.</p>
+<p><strong>NVIDIA NeMo Guardrails</strong>: “Rails” DSL (Colang) for conversation flow control. Includes tool call filtering but tightly coupled to NeMo.</p>
+<p><strong>Claude Code</strong>: Hooks system with matcher patterns. <code>PreToolUse</code> hooks support allow/deny/ask (ternary decision) plus parameter mutation.</p>
+<p><strong>MCP (Model Context Protocol)</strong>: No built-in policy layer. Delegates to host implementation. The protocol itself is policy-agnostic.</p>
+<h3 id="industry-recognition-of-the-gap"><a class="header" href="#industry-recognition-of-the-gap">Industry Recognition of the Gap</a></h3>
+<p><strong>OWASP Top 10 for Agentic Applications (2026)</strong> identifies “Tool Misuse” as risk #2. Recommendations:</p>
+<ul>
+<li>Policy controls at tool boundaries</li>
+<li>Principle of Least Agency (minimize tool access)</li>
+<li>Audit logging of tool invocations</li>
+</ul>
+<p><strong>MIT Technology Review</strong> (Feb 2026, “From Guardrails to Governance”): Advocates treating agents as semi-autonomous users and enforcing rules at boundaries, not just prompting.</p>
+<p>The pattern is clear: the industry recognizes the need for policy control but lacks a unified standard. Current approaches are vendor-specific.</p>
+<h2 id="where-xuma-fits"><a class="header" href="#where-xuma-fits">Where x.uma Fits</a></h2>
+<p>x.uma is uniquely positioned because it was designed domain-agnostic from day one.</p>
+<h3 id="why-this-matters"><a class="header" href="#why-this-matters">Why This Matters</a></h3>
+<p>Most policy engines are built for one domain and later adapted:</p>
+<ul>
+<li>OPA: started as microservice authorization, generalized</li>
+<li>Cedar: built for AWS resource authorization</li>
+<li>Guardrails: built for LLM conversation control</li>
+</ul>
+<p>x.uma started with the insight that <strong>matching is matching</strong>, whether you’re routing HTTP traffic or controlling agent tool access. The same AND/OR/NOT predicate logic, the same first-match-wins semantics, the same depth limits and ReDoS protection.</p>
+<p>The architecture makes this natural:</p>
+<pre><code class="language-text">┌─────────────────────────────────┐
+│       Domain Adapters           │
+│  xuma.http  xuma.claude  xuma.grpc │
+└───────────────┬─────────────────┘
+                │
+┌───────────────▼─────────────────┐
+│            PORTS                │
+│   DataInput      ActionPort     │
+└───────────────┬─────────────────┘
+                │
+┌───────────────▼─────────────────┐
+│            CORE                 │
+│        Matcher Engine           │
+│    (domain-agnostic)            │
+└─────────────────────────────────┘
+</code></pre>
+<p>Adding Claude Code hooks is just another domain adapter. Core unchanged. Adding MCP, OpenAI, or any other agent framework would be another.</p>
+<h3 id="cross-language-reality"><a class="header" href="#cross-language-reality">Cross-Language Reality</a></h3>
+<p>Real systems are polyglot:</p>
+<ul>
+<li>ML inference pipelines: Python</li>
+<li>Edge workers: TypeScript (Cloudflare, Deno)</li>
+<li>High-throughput services: Rust</li>
+</ul>
+<p>x.uma works natively in all three:</p>
+<ul>
+<li><strong>rumi</strong> (Rust): Zero-overhead, Send+Sync for concurrency</li>
+<li><strong>puma</strong> (Python): Pure Python, no FFI for simple cases</li>
+<li><strong>bumi</strong> (TypeScript): Edge-native, runs in V8 isolates</li>
+</ul>
+<p>Plus Rust-backed bindings (<code>puma-crusty</code>, <code>bumi-crusty</code>) when performance matters.</p>
+<p>This isn’t just convenience. Agent systems span languages. Your agent runtime might be Python, your ext_proc filter might be Rust, your edge worker might be TypeScript. One policy standard that works everywhere.</p>
+<h3 id="battle-tested-semantics"><a class="header" href="#battle-tested-semantics">Battle-Tested Semantics</a></h3>
+<p>x.uma doesn’t invent new policy semantics. It implements xDS Unified Matcher API — the protocol Envoy uses. This means:</p>
+<ul>
+<li><strong>Proven at scale</strong>: Google runs this in production</li>
+<li><strong>Well-specified</strong>: xDS proto definitions are the source of truth</li>
+<li><strong>Debugged edge cases</strong>: nested matcher failure semantics, on_no_match fallback behavior</li>
+</ul>
+<p>You’re not betting on a new policy language. You’re using Google’s battle-tested approach in a new domain.</p>
+<h2 id="xumaclaude--claude-code-as-first-agent-domain"><a class="header" href="#xumaclaude--claude-code-as-first-agent-domain">xuma.claude — Claude Code as First Agent Domain</a></h2>
+<p>The <code>xuma.claude.v1</code> domain applies x.uma’s matcher architecture to Claude Code’s hook event system — the first concrete agent adapter.</p>
+<h3 id="why-start-with-claude-code"><a class="header" href="#why-start-with-claude-code">Why Start with Claude Code?</a></h3>
+<p>Claude Code has a rich hook event model with 9 event types spanning tool lifecycle, agent lifecycle, user interaction, and session management. This makes it an ideal first domain adapter:</p>
+<ul>
+<li><strong>Structured context</strong>: Every hook receives <code>session_id</code>, <code>cwd</code>, <code>permission_mode</code>, plus event-specific fields</li>
+<li><strong>Multiple decision models</strong>: allow/deny/ask + modify (tools), approve/block (stop), feedback (post-tool)</li>
+<li><strong>Real enforcement point</strong>: Hooks ARE a Policy Enforcement Point (PEP) — x.uma becomes the PDP behind them</li>
+</ul>
+<h3 id="mapping-the-parc-model"><a class="header" href="#mapping-the-parc-model">Mapping the PARC Model</a></h3>
+<p>Cedar’s PARC model (Principal-Action-Resource-Context) maps naturally to agent scenarios:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>PARC Element</th><th>Agent Equivalent</th><th>Example</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Principal</strong></td><td>Agent (or user delegating to agent)</td><td><code>agent:claude-sonnet-4</code></td></tr>
+<tr><td><strong>Action</strong></td><td>Tool being invoked</td><td><code>tools:bash</code>, <code>tools:read_file</code></td></tr>
+<tr><td><strong>Resource</strong></td><td>What the tool operates on</td><td><code>/etc/passwd</code>, <code>s3://bucket/data</code></td></tr>
+<tr><td><strong>Context</strong></td><td>Parameters, session state</td><td><code>{depth: 5, recursive: true}</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="decision-model-spectrum"><a class="header" href="#decision-model-spectrum">Decision Model Spectrum</a></h3>
+<p>Agent policy engines need to support the full decision spectrum:</p>
+<p><strong>Binary:</strong> Allow or deny.</p>
+<pre><code class="language-yaml">action: { allow: true }
+</code></pre>
+<p><strong>Ternary:</strong> Allow, deny, or escalate to human.</p>
+<pre><code class="language-yaml">action: { escalate: { reason: "Sensitive file access" } }
+</code></pre>
+<p><strong>Mutation:</strong> Modify tool input before execution.</p>
+<pre><code class="language-yaml">action: {
+  modify: {
+    max_depth: 3,  # Override requested depth
+    exclude_patterns: ["*.key", "*.pem"]
+  }
+}
+</code></pre>
+<p>Claude Code’s hook model (allow/deny/ask + modify) is the richest in the industry. Starting here means the architecture handles simpler models (binary, ternary) by subsumption.</p>
+<h3 id="proto-namespace"><a class="header" href="#proto-namespace">Proto Namespace</a></h3>
+<p><code>xuma.claude.v1</code> is the proto package for Claude Code hooks.</p>
+<p>Type URLs follow the standard pattern:</p>
+<ul>
+<li><code>type.googleapis.com/xuma.claude.v1.HookContext</code></li>
+<li><code>type.googleapis.com/xuma.claude.v1.AllowAction</code></li>
+<li><code>type.googleapis.com/xuma.claude.v1.BlockAction</code></li>
+</ul>
+<p>The hexagonal architecture means adding other agent frameworks is just another domain adapter — <code>xuma.mcp.v1</code>, <code>xuma.openai.v1</code>, etc. — without touching core or the Claude adapter.</p>
+<h2 id="comparison-to-established-engines"><a class="header" href="#comparison-to-established-engines">Comparison to Established Engines</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th>OPA</th><th>Cedar</th><th>x.uma</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Language</strong></td><td>Rego (Datalog)</td><td>Cedar (custom)</td><td>Matcher trees (compiled from proto)</td></tr>
+<tr><td><strong>Model</strong></td><td>Input→Rules→JSON</td><td>PARC→permit/forbid</td><td>Context→Predicates→Action</td></tr>
+<tr><td><strong>Domain focus</strong></td><td>Agnostic</td><td>Authorization</td><td>Agnostic</td></tr>
+<tr><td><strong>Agent-native</strong></td><td>No</td><td>Partial (AgentCore uses it)</td><td>Yes (<code>xuma.claude</code> first, more domains planned)</td></tr>
+<tr><td><strong>Cross-language</strong></td><td>Go + WASM bindings</td><td>Rust + Java bindings</td><td>Rust, Python, TypeScript (native + bindings)</td></tr>
+<tr><td><strong>Formal verification</strong></td><td>No</td><td>Yes (Dafny proofs)</td><td>Type safety + depth limits + linear-time regex</td></tr>
+<tr><td><strong>Extension model</strong></td><td>Rego functions</td><td>Cedar extensions (limited)</td><td><code>TypedExtensionConfig</code> (open)</td></tr>
+<tr><td><strong>Evaluation model</strong></td><td>Query language</td><td>Policy search + decision</td><td>Tree traversal (first-match-wins)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="when-to-use-what"><a class="header" href="#when-to-use-what">When to Use What</a></h3>
+<p><strong>Use OPA if:</strong></p>
+<ul>
+<li>You need a general-purpose policy language</li>
+<li>Complex queries over input data</li>
+<li>Integration with Kubernetes (Gatekeeper)</li>
+</ul>
+<p><strong>Use Cedar if:</strong></p>
+<ul>
+<li>AWS ecosystem</li>
+<li>Formal verification is critical</li>
+<li>Classic authorization (PARC model is natural)</li>
+</ul>
+<p><strong>Use x.uma if:</strong></p>
+<ul>
+<li>Agent event policy is your domain</li>
+<li>Polyglot codebase (Rust + Python + TypeScript)</li>
+<li>You want Envoy-proven semantics</li>
+<li>Domain adapters fit your architecture</li>
+</ul>
+<p>They’re not mutually exclusive. Some systems use OPA for high-level policy and x.uma for low-level matcher logic (HTTP routing, tool filtering).</p>
+<h2 id="the-vision"><a class="header" href="#the-vision">The Vision</a></h2>
+<p>x.uma is alpha (v0.1). This is the roadmap:</p>
+<p><strong>Phase 6-7 (current):</strong> Complete <code>bumi</code> (TypeScript) and Rust bindings (<code>puma-crusty</code>, <code>bumi-crusty</code>).</p>
+<p><strong>Phase 8:</strong> Enrich <code>xuma.claude.v1</code> with full hook event model.</p>
+<p><strong>Phase 9:</strong> Benchmarks. Prove performance against native implementations.</p>
+<p><strong>v1.0:</strong> Lock core traits. Extension ecosystem opens.</p>
+<p><strong>Beyond v1.0:</strong> Additional agent domains (<code>xuma.mcp</code>, <code>xuma.openai</code>) as the need materializes. The vendor-agnostic agent policy standard emerges from concrete implementations, not from premature abstraction.</p>
+<p>No established standard exists for AI agent tool policy. This is greenfield. x.uma’s approach — start concrete with one agent (Claude Code), prove the architecture, then generalize — is how standards earn adoption.</p>
+<p>The gap exists. The need is recognized (OWASP, MIT Tech Review, AWS AgentCore). x.uma fills it with production-proven architecture, cross-language support, and domain-agnostic design.</p>
+<h2 id="sources"><a class="header" href="#sources">Sources</a></h2>
+<p><strong>Policy Standards:</strong></p>
+<ul>
+<li><a href="https://www.openpolicyagent.org/">OPA Documentation</a> — CNCF graduated project</li>
+<li><a href="https://www.cedarpolicy.com/">Cedar Language Guide</a> — AWS open-source authorization language</li>
+<li><a href="https://www.oasis-open.org/committees/xacml/">XACML v3.0 Specification</a> — OASIS standard</li>
+<li><a href="https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/">Zanzibar: Google’s Authorization System</a> — ReBAC research paper</li>
+</ul>
+<p><strong>Agent Policy Landscape:</strong></p>
+<ul>
+<li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy.html">AWS Bedrock AgentCore Policy Engine</a> — Cedar-based agent authorization</li>
+<li><a href="https://openai.github.io/openai-agents-python/guardrails/">OpenAI Agents SDK Guardrails</a> — Binary tripwire model</li>
+<li><a href="https://github.com/NVIDIA-NeMo/Guardrails">NVIDIA NeMo Guardrails</a> — Rails DSL for conversation control</li>
+<li><a href="https://docs.anthropic.com/en/docs/claude-code/hooks">Claude Code Hooks</a> — PreToolUse matcher patterns</li>
+<li><a href="https://modelcontextprotocol.io/specification/2025-11-25">Model Context Protocol</a> — Protocol specification</li>
+</ul>
+<p><strong>Security &amp; Governance:</strong></p>
+<ul>
+<li><a href="https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/">OWASP Top 10 for Agentic Applications (2026)</a> — Tool Misuse as risk #2</li>
+<li><a href="https://www.technologyreview.com/2026/02/04/1131014/from-guardrails-to-governance-a-ceos-guide-for-securing-agentic-systems/">MIT Technology Review: From Guardrails to Governance</a> — Treating agents as semi-autonomous users</li>
+</ul>
+<p><strong>xDS &amp; Envoy:</strong></p>
+<ul>
+<li><a href="https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol">xDS Protocol</a> — Service mesh configuration protocol</li>
+<li><a href="https://github.com/envoyproxy/envoy/tree/main/source/common/matcher">Envoy Matcher Implementation</a> — Reference C++ implementation</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="proto-api-reference"><a class="header" href="#proto-api-reference">Proto API Reference</a></h1>
@@ -2008,7 +2245,7 @@ matcher = route.compile("api_backend")
 <li><strong>rumi</strong> (Rust) — reference implementation, production-hardened constraints</li>
 <li><strong>puma</strong> (Python) — pure Python port, zero dependencies, 194 tests passing</li>
 </ul>
-<p>Both pass the same conformance test suite (<code>spec/tests/</code>). TypeScript (buma) is next.</p>
+<p>Both pass the same conformance test suite (<code>spec/tests/</code>). TypeScript (bumi) is next.</p>
 <h2 id="phase-overview"><a class="header" href="#phase-overview">Phase Overview</a></h2>
 <div class="table-wrapper">
 <table>
@@ -2026,7 +2263,7 @@ matcher = route.compile("api_backend")
 <tr><td>5.1</td><td>p.uma arch-guild hardening</td><td>✅ Done</td></tr>
 <tr><td>6</td><td>b.uma (Bun/TypeScript + HTTP)</td><td>🚧 Next</td></tr>
 <tr><td>7</td><td>rumi/crusts/python (uniffi→puma-crusty)</td><td>Planned</td></tr>
-<tr><td>8</td><td>rumi/crusts/wasm (wasm-pack→@x.uma/buma-crusty)</td><td>Planned</td></tr>
+<tr><td>8</td><td>rumi/crusts/wasm (wasm-pack→@x.uma/bumi-crusty)</td><td>Planned</td></tr>
 <tr><td>9</td><td>Benchmarks (all variants)</td><td>Planned</td></tr>
 </tbody>
 </table>
@@ -2099,7 +2336,7 @@ matcher = route.compile("api_backend")
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Rust (rumi)</th><th>TypeScript (buma)</th><th>Notes</th></tr>
+<tr><th>Rust (rumi)</th><th>TypeScript (bumi)</th><th>Notes</th></tr>
 </thead>
 <tbody>
 <tr><td><code>trait DataInput&lt;Ctx&gt;</code></td><td><code>interface DataInput&lt;Ctx&gt;</code></td><td>Generic interface</td></tr>
@@ -2121,14 +2358,14 @@ matcher = route.compile("api_backend")
 <li>Linear-time regex (ReDoS-safe)</li>
 </ul>
 <p><strong>Trade-off:</strong> Adds compiled Rust binary dependency. Pure puma remains zero-dependency option.</p>
-<h2 id="phase-8-buma-crusty-rust-bindings--wasm"><a class="header" href="#phase-8-buma-crusty-rust-bindings--wasm">Phase 8: buma-crusty (Rust Bindings → WASM)</a></h2>
+<h2 id="phase-8-bumi-crusty-rust-bindings--wasm"><a class="header" href="#phase-8-bumi-crusty-rust-bindings--wasm">Phase 8: bumi-crusty (Rust Bindings → WASM)</a></h2>
 <p><strong>Status:</strong> Planned</p>
 <p>Rust-backed TypeScript package via WASM.</p>
 <p><strong>Approach:</strong></p>
 <ul>
 <li>wasm-bindgen from <code>rumi/crusts/wasm/</code></li>
 <li>wasm-pack for bundling</li>
-<li>Same API as pure buma (drop-in replacement)</li>
+<li>Same API as pure bumi (drop-in replacement)</li>
 <li>Linear-time regex (ReDoS-safe)</li>
 </ul>
 <h2 id="phase-9-benchmarks"><a class="header" href="#phase-9-benchmarks">Phase 9: Benchmarks</a></h2>
@@ -2139,8 +2376,8 @@ matcher = route.compile("api_backend")
 <li>rumi (Rust native)</li>
 <li>puma (pure Python)</li>
 <li>puma-crusty (Python → Rust via uniffi)</li>
-<li>buma (pure TypeScript)</li>
-<li>buma-crusty (TypeScript → Rust via WASM)</li>
+<li>bumi (pure TypeScript)</li>
+<li>bumi-crusty (TypeScript → Rust via WASM)</li>
 </ul>
 <p><strong>Metrics:</strong></p>
 <ul>

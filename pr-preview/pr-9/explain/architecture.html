@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-618bf292.js";
+            window.path_to_searchindex_js = "../searchindex-a2ea8057.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-2a05d733.js"></script>
+        <script src="../toc-9ddb2f6c.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -202,7 +202,7 @@
 │       (pure, domain-agnostic)       │
 └─────────────────────────────────────┘
 </code></pre>
-<p>This architecture applies to <strong>all implementations</strong> — rumi (Rust), puma (Python), buma (TypeScript). The ports and hexagonal design are language-agnostic.</p>
+<p>This architecture applies to <strong>all implementations</strong> — rumi (Rust), puma (Python), bumi (TypeScript). The ports and hexagonal design are language-agnostic.</p>
 <h2 id="the-extension-seam"><a class="header" href="#the-extension-seam">The Extension Seam</a></h2>
 <p><code>TypedExtensionConfig</code> from xDS is the architectural seam:</p>
 <pre><code class="language-protobuf">message TypedExtensionConfig {
@@ -254,7 +254,7 @@ class InputMatcher(Protocol):
 <li>Protocols instead of traits (runtime-checkable)</li>
 <li><code>MatchingValue</code> is just a type alias, not a wrapped type</li>
 </ul>
-<h3 id="typescript-buma-planned"><a class="header" href="#typescript-buma-planned">TypeScript (buma, planned)</a></h3>
+<h3 id="typescript-bumi-planned"><a class="header" href="#typescript-bumi-planned">TypeScript (bumi, planned)</a></h3>
 <pre><code class="language-typescript">// MatchingValue — union type
 type MatchingValue = string | number | boolean | Uint8Array | null;
 
@@ -278,7 +278,7 @@ interface InputMatcher {
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Concept</th><th>Rust (rumi)</th><th>Python (puma)</th><th>TypeScript (buma)</th></tr>
+<tr><th>Concept</th><th>Rust (rumi)</th><th>Python (puma)</th><th>TypeScript (bumi)</th></tr>
 </thead>
 <tbody>
 <tr><td><strong>Erased data</strong></td><td><code>enum MatchingData</code></td><td><code>type MatchingValue</code> (union)</td><td><code>type MatchingValue</code> (union)</td></tr>
@@ -376,7 +376,7 @@ cases:
 └── ext/                # Domain extensions
     ├── test/           # rumi-test (conformance)
     ├── http/           # rumi-http
-    └── claude/         # rumi-claude
+    └── claude/         # rumi-claude (Claude Code hooks)
 </code></pre>
 <p>Dependencies point inward. Core knows nothing about domains.</p>
 <h3 id="python-puma-1"><a class="header" href="#python-puma-1">Python (puma)</a></h3>
@@ -394,7 +394,7 @@ cases:
         └── _gateway.py # Gateway API compiler
 </code></pre>
 <p>Flat exports via <code>__init__.py</code>. Private modules prefixed with <code>_</code>.</p>
-<h3 id="typescript-buma-planned-1"><a class="header" href="#typescript-buma-planned-1">TypeScript (buma, planned)</a></h3>
+<h3 id="typescript-bumi-planned-1"><a class="header" href="#typescript-bumi-planned-1">TypeScript (bumi, planned)</a></h3>
 <pre><code class="language-text">b.uma/
 └── src/
     ├── index.ts        # Core types
@@ -419,8 +419,8 @@ cases:
 <tr><td>rumi (Rust)</td><td><code>regex</code> crate (linear-time)</td><td>Send + Sync</td><td>Zero-copy where possible</td></tr>
 <tr><td>puma (Python)</td><td><code>re</code> module (backtracking)</td><td>GIL (not parallel-safe)</td><td>Reference-counted</td></tr>
 <tr><td>puma-crusty</td><td><code>regex</code> via uniffi (linear-time)</td><td>GIL</td><td>Crossing FFI boundary</td></tr>
-<tr><td>buma (TypeScript)</td><td>JS <code>RegExp</code> (V8 engine)</td><td>Single-threaded</td><td>Garbage-collected</td></tr>
-<tr><td>buma-crusty</td><td><code>regex</code> via WASM (linear-time)</td><td>Single-threaded</td><td>Crossing WASM boundary</td></tr>
+<tr><td>bumi (TypeScript)</td><td>JS <code>RegExp</code> (V8 engine)</td><td>Single-threaded</td><td>Garbage-collected</td></tr>
+<tr><td>bumi-crusty</td><td><code>regex</code> via WASM (linear-time)</td><td>Single-threaded</td><td>Crossing WASM boundary</td></tr>
 </tbody>
 </table>
 </div>
@@ -432,7 +432,7 @@ cases:
 <li>TypeScript: Edge workers (Cloudflare, Deno), serverless</li>
 </ul>
 <p><strong>Reference consistency:</strong> All implementations are ports, not wrappers. Same architecture, same semantics, same test suite.</p>
-<p><strong>Learning path:</strong> Pure implementations (rumi, puma, buma) are readable references. Crusty variants (uniffi, WASM) provide Rust performance when needed.</p>
+<p><strong>Learning path:</strong> Pure implementations (rumi, puma, bumi) are readable references. Crusty variants (uniffi, WASM) provide Rust performance when needed.</p>
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>
 <li><a href="../development/roadmap.html">Roadmap</a> — Implementation status</li>

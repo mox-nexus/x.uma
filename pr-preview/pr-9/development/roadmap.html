@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-618bf292.js";
+            window.path_to_searchindex_js = "../searchindex-a2ea8057.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-2a05d733.js"></script>
+        <script src="../toc-9ddb2f6c.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -189,7 +189,7 @@
 <li><strong>rumi</strong> (Rust) — reference implementation, production-hardened constraints</li>
 <li><strong>puma</strong> (Python) — pure Python port, zero dependencies, 194 tests passing</li>
 </ul>
-<p>Both pass the same conformance test suite (<code>spec/tests/</code>). TypeScript (buma) is next.</p>
+<p>Both pass the same conformance test suite (<code>spec/tests/</code>). TypeScript (bumi) is next.</p>
 <h2 id="phase-overview"><a class="header" href="#phase-overview">Phase Overview</a></h2>
 <div class="table-wrapper">
 <table>
@@ -207,7 +207,7 @@
 <tr><td>5.1</td><td>p.uma arch-guild hardening</td><td>✅ Done</td></tr>
 <tr><td>6</td><td>b.uma (Bun/TypeScript + HTTP)</td><td>🚧 Next</td></tr>
 <tr><td>7</td><td>rumi/crusts/python (uniffi→puma-crusty)</td><td>Planned</td></tr>
-<tr><td>8</td><td>rumi/crusts/wasm (wasm-pack→@x.uma/buma-crusty)</td><td>Planned</td></tr>
+<tr><td>8</td><td>rumi/crusts/wasm (wasm-pack→@x.uma/bumi-crusty)</td><td>Planned</td></tr>
 <tr><td>9</td><td>Benchmarks (all variants)</td><td>Planned</td></tr>
 </tbody>
 </table>
@@ -280,7 +280,7 @@
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Rust (rumi)</th><th>TypeScript (buma)</th><th>Notes</th></tr>
+<tr><th>Rust (rumi)</th><th>TypeScript (bumi)</th><th>Notes</th></tr>
 </thead>
 <tbody>
 <tr><td><code>trait DataInput&lt;Ctx&gt;</code></td><td><code>interface DataInput&lt;Ctx&gt;</code></td><td>Generic interface</td></tr>
@@ -302,14 +302,14 @@
 <li>Linear-time regex (ReDoS-safe)</li>
 </ul>
 <p><strong>Trade-off:</strong> Adds compiled Rust binary dependency. Pure puma remains zero-dependency option.</p>
-<h2 id="phase-8-buma-crusty-rust-bindings--wasm"><a class="header" href="#phase-8-buma-crusty-rust-bindings--wasm">Phase 8: buma-crusty (Rust Bindings → WASM)</a></h2>
+<h2 id="phase-8-bumi-crusty-rust-bindings--wasm"><a class="header" href="#phase-8-bumi-crusty-rust-bindings--wasm">Phase 8: bumi-crusty (Rust Bindings → WASM)</a></h2>
 <p><strong>Status:</strong> Planned</p>
 <p>Rust-backed TypeScript package via WASM.</p>
 <p><strong>Approach:</strong></p>
 <ul>
 <li>wasm-bindgen from <code>rumi/crusts/wasm/</code></li>
 <li>wasm-pack for bundling</li>
-<li>Same API as pure buma (drop-in replacement)</li>
+<li>Same API as pure bumi (drop-in replacement)</li>
 <li>Linear-time regex (ReDoS-safe)</li>
 </ul>
 <h2 id="phase-9-benchmarks"><a class="header" href="#phase-9-benchmarks">Phase 9: Benchmarks</a></h2>
@@ -320,8 +320,8 @@
 <li>rumi (Rust native)</li>
 <li>puma (pure Python)</li>
 <li>puma-crusty (Python → Rust via uniffi)</li>
-<li>buma (pure TypeScript)</li>
-<li>buma-crusty (TypeScript → Rust via WASM)</li>
+<li>bumi (pure TypeScript)</li>
+<li>bumi-crusty (TypeScript → Rust via WASM)</li>
 </ul>
 <p><strong>Metrics:</strong></p>
 <ul>
