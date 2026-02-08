@@ -88,6 +88,45 @@ check-no-std:
     cargo build --manifest-path rumi/Cargo.toml -p rumi --no-default-features --features alloc
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Python (puma)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Run puma tests
+puma-test:
+    cd p.uma && uv run pytest
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TypeScript (bumi)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Install bumi dependencies
+bumi-install:
+    cd bumi && bun install
+
+# Run bumi tests
+bumi-test:
+    cd bumi && bun test
+
+# Type-check bumi
+bumi-typecheck:
+    cd bumi && bun run typecheck
+
+# Lint bumi
+bumi-lint:
+    cd bumi && bun run lint
+
+# Format bumi
+bumi-fmt:
+    cd bumi && bun run fmt
+
+# Check bumi formatting
+bumi-fmt-check:
+    cd bumi && bun run fmt:check
+
+# Run all bumi checks
+bumi-check: bumi-lint bumi-fmt-check bumi-typecheck bumi-test
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Conformance Testing
 # ═══════════════════════════════════════════════════════════════════════════════
 
