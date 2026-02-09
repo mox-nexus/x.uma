@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["core", "ext/test", "ext/http", "ext/claude", "crusts/python"]
+members = ["core", "ext/test", "ext/http", "ext/claude", "crusts/python", "crusts/wasm"]
 
-# puma-crusty uses PyO3 extension-module (no libpython link) — test via maturin, not cargo test
+# Crusts use FFI-specific build tools (maturin / wasm-pack), not cargo test
 default-members = ["core", "ext/test", "ext/http", "ext/claude"]
 
 [workspace.package]
