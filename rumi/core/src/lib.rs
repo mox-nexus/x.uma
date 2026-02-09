@@ -82,6 +82,7 @@ mod matching_data;
 mod on_match;
 mod predicate;
 mod radix_tree;
+mod trace;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Public API
@@ -97,6 +98,9 @@ pub use matching_data::{CustomMatchData, MatchingData};
 pub use on_match::OnMatch;
 pub use predicate::{Predicate, SinglePredicate};
 pub use radix_tree::RadixTree;
+
+// Trace types
+pub use trace::{EvalStep, EvalTrace, OnMatchTrace, PredicateTrace};
 
 // Concrete matchers
 pub use input_matcher::{
@@ -120,6 +124,9 @@ pub mod prelude {
         // Traits
         CustomMatchData,
         DataInput,
+        // Trace types
+        EvalStep,
+        EvalTrace,
         ExactMatcher,
         // Core types
         FieldMatcher,
@@ -130,7 +137,9 @@ pub mod prelude {
         MatcherTree,
         MatchingData,
         OnMatch,
+        OnMatchTrace,
         Predicate,
+        PredicateTrace,
         PrefixMatcher,
         RadixTree,
         SinglePredicate,

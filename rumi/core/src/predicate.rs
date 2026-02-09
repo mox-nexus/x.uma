@@ -3,7 +3,7 @@
 //! Predicates combine [`DataInput`] and [`InputMatcher`] to create boolean
 //! conditions that can be composed with AND/OR/NOT.
 
-use crate::{DataInput, InputMatcher, MatchingData};
+use crate::{DataInput, InputMatcher, MatchingData, PredicateTrace};
 use std::fmt::Debug;
 
 /// A single predicate: combines a [`DataInput`] with an [`InputMatcher`].
@@ -62,6 +62,25 @@ impl<Ctx> SinglePredicate<Ctx> {
         match data {
             MatchingData::None => false, // INV: None → false
             _ => self.matcher.matches(&data),
+        }
+    }
+
+    /// Evaluate with full trace for debugging.
+    ///
+    /// Returns a [`PredicateTrace::Single`] capturing the input, extracted
+    /// data, matcher, and whether the predicate matched.
+    #[must_use]
+    pub fn evaluate_with_trace(&self, ctx: &Ctx) -> PredicateTrace {
+        let data = self.input.get(ctx);
+        let matched = match &data {
+            MatchingData::None => false,
+            _ => self.matcher.matches(&data),
+        };
+        PredicateTrace::Single {
+            matched,
+            input: format!("{:?}", self.input),
+            data: format!("{data:?}"),
+            matcher: format!("{:?}", self.matcher),
         }
     }
 }
@@ -131,6 +150,41 @@ impl<Ctx> Predicate<Ctx> {
             Predicate::And(predicates) => predicates.iter().all(|p| p.evaluate(ctx)),
             Predicate::Or(predicates) => predicates.iter().any(|p| p.evaluate(ctx)),
             Predicate::Not(p) => !p.evaluate(ctx),
+        }
+    }
+
+    /// Evaluate with full trace for debugging.
+    ///
+    /// Unlike [`evaluate()`](Self::evaluate), this does NOT short-circuit
+    /// And/Or — all children are evaluated for maximum debugging visibility.
+    /// The `matched` result is still correct.
+    #[must_use]
+    pub fn evaluate_with_trace(&self, ctx: &Ctx) -> PredicateTrace {
+        match self {
+            Self::Single(p) => p.evaluate_with_trace(ctx),
+            Self::And(predicates) => {
+                let children: Vec<PredicateTrace> = predicates
+                    .iter()
+                    .map(|p| p.evaluate_with_trace(ctx))
+                    .collect();
+                let matched = children.iter().all(PredicateTrace::matched);
+                PredicateTrace::And { matched, children }
+            }
+            Self::Or(predicates) => {
+                let children: Vec<PredicateTrace> = predicates
+                    .iter()
+                    .map(|p| p.evaluate_with_trace(ctx))
+                    .collect();
+                let matched = children.iter().any(PredicateTrace::matched);
+                PredicateTrace::Or { matched, children }
+            }
+            Self::Not(p) => {
+                let inner = p.evaluate_with_trace(ctx);
+                PredicateTrace::Not {
+                    matched: !inner.matched(),
+                    inner: Box::new(inner),
+                }
+            }
         }
     }
 
@@ -345,5 +399,208 @@ mod tests {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<SinglePredicate<TestContext>>();
         assert_send_sync::<Predicate<TestContext>>();
+    }
+
+    // ========== Trace Tests ==========
+
+    #[test]
+    fn trace_single_match() {
+        let ctx = TestContext {
+            value: "hello".into(),
+        };
+        let pred = SinglePredicate::new(Box::new(ValueInput), Box::new(ExactMatcher::new("hello")));
+        let trace = pred.evaluate_with_trace(&ctx);
+
+        assert!(trace.matched());
+        if let PredicateTrace::Single {
+            matched,
+            input,
+            data,
+            matcher,
+        } = &trace
+        {
+            assert!(matched);
+            assert!(input.contains("ValueInput"));
+            assert!(data.contains("hello"));
+            assert!(matcher.contains("hello"));
+        } else {
+            panic!("expected Single trace");
+        }
+    }
+
+    #[test]
+    fn trace_single_no_match() {
+        let ctx = TestContext {
+            value: "world".into(),
+        };
+        let pred = SinglePredicate::new(Box::new(ValueInput), Box::new(ExactMatcher::new("hello")));
+        let trace = pred.evaluate_with_trace(&ctx);
+
+        assert!(!trace.matched());
+    }
+
+    #[test]
+    fn trace_single_none_returns_false() {
+        let ctx = TestContext {
+            value: "hello".into(),
+        };
+        let pred = SinglePredicate::new(Box::new(NoneInput), Box::new(ExactMatcher::new("hello")));
+        let trace = pred.evaluate_with_trace(&ctx);
+
+        assert!(!trace.matched());
+        if let PredicateTrace::Single { data, .. } = &trace {
+            assert!(data.contains("None"));
+        } else {
+            panic!("expected Single trace");
+        }
+    }
+
+    #[test]
+    fn trace_and_all_match() {
+        let ctx = TestContext {
+            value: "hello world".into(),
+        };
+        let pred = Predicate::And(vec![
+            Predicate::Single(SinglePredicate::new(
+                Box::new(ValueInput),
+                Box::new(ContainsMatcher::new("hello")),
+            )),
+            Predicate::Single(SinglePredicate::new(
+                Box::new(ValueInput),
+                Box::new(ContainsMatcher::new("world")),
+            )),
+        ]);
+        let trace = pred.evaluate_with_trace(&ctx);
+
+        assert!(trace.matched());
+        if let PredicateTrace::And { children, .. } = &trace {
+            assert_eq!(children.len(), 2);
+            assert!(children[0].matched());
+            assert!(children[1].matched());
+        } else {
+            panic!("expected And trace");
+        }
+    }
+
+    #[test]
+    fn trace_and_partial_failure_evaluates_all() {
+        let ctx = TestContext {
+            value: "hello".into(),
+        };
+        // First fails, second would match — both should be evaluated in trace
+        let pred = Predicate::And(vec![
+            Predicate::Single(SinglePredicate::new(
+                Box::new(ValueInput),
+                Box::new(ExactMatcher::new("nope")),
+            )),
+            Predicate::Single(SinglePredicate::new(
+                Box::new(ValueInput),
+                Box::new(ExactMatcher::new("hello")),
+            )),
+        ]);
+        let trace = pred.evaluate_with_trace(&ctx);
+
+        assert!(!trace.matched());
+        if let PredicateTrace::And { children, .. } = &trace {
+            // Both children evaluated (no short-circuit in trace)
+            assert_eq!(children.len(), 2);
+            assert!(!children[0].matched());
+            assert!(children[1].matched()); // would have been skipped in evaluate()
+        } else {
+            panic!("expected And trace");
+        }
+    }
+
+    #[test]
+    fn trace_or_first_match() {
+        let ctx = TestContext {
+            value: "hello".into(),
+        };
+        let pred = Predicate::Or(vec![
+            Predicate::Single(SinglePredicate::new(
+                Box::new(ValueInput),
+                Box::new(ExactMatcher::new("hello")),
+            )),
+            Predicate::Single(SinglePredicate::new(
+                Box::new(ValueInput),
+                Box::new(ExactMatcher::new("nope")),
+            )),
+        ]);
+        let trace = pred.evaluate_with_trace(&ctx);
+
+        assert!(trace.matched());
+        if let PredicateTrace::Or { children, .. } = &trace {
+            // Both evaluated in trace mode
+            assert_eq!(children.len(), 2);
+            assert!(children[0].matched());
+            assert!(!children[1].matched());
+        } else {
+            panic!("expected Or trace");
+        }
+    }
+
+    #[test]
+    fn trace_not() {
+        let ctx = TestContext {
+            value: "hello".into(),
+        };
+        let pred = Predicate::Not(Box::new(Predicate::Single(SinglePredicate::new(
+            Box::new(ValueInput),
+            Box::new(ExactMatcher::new("world")),
+        ))));
+        let trace = pred.evaluate_with_trace(&ctx);
+
+        assert!(trace.matched()); // NOT(false) = true
+        if let PredicateTrace::Not { inner, .. } = &trace {
+            assert!(!inner.matched()); // inner didn't match
+        } else {
+            panic!("expected Not trace");
+        }
+    }
+
+    #[test]
+    fn trace_empty_and_returns_true() {
+        let ctx = TestContext { value: "x".into() };
+        let pred = Predicate::<TestContext>::And(vec![]);
+        let trace = pred.evaluate_with_trace(&ctx);
+        assert!(trace.matched()); // vacuous truth
+    }
+
+    #[test]
+    fn trace_empty_or_returns_false() {
+        let ctx = TestContext { value: "x".into() };
+        let pred = Predicate::<TestContext>::Or(vec![]);
+        let trace = pred.evaluate_with_trace(&ctx);
+        assert!(!trace.matched());
+    }
+
+    #[test]
+    fn trace_result_matches_evaluate() {
+        let ctx = TestContext {
+            value: "hello world".into(),
+        };
+
+        // Complex nested predicate
+        let pred = Predicate::And(vec![
+            Predicate::Or(vec![
+                Predicate::Single(SinglePredicate::new(
+                    Box::new(ValueInput),
+                    Box::new(ExactMatcher::new("nope")),
+                )),
+                Predicate::Single(SinglePredicate::new(
+                    Box::new(ValueInput),
+                    Box::new(ContainsMatcher::new("hello")),
+                )),
+            ]),
+            Predicate::Not(Box::new(Predicate::Single(SinglePredicate::new(
+                Box::new(ValueInput),
+                Box::new(ExactMatcher::new("nope")),
+            )))),
+        ]);
+
+        let eval_result = pred.evaluate(&ctx);
+        let trace = pred.evaluate_with_trace(&ctx);
+
+        assert_eq!(eval_result, trace.matched());
     }
 }

@@ -3,7 +3,7 @@
 //! The `Matcher` is the entry point for evaluation. It contains a list of
 //! field matchers and evaluates them in order, returning the first match.
 
-use crate::{FieldMatcher, MatcherError, OnMatch, MAX_DEPTH};
+use crate::{EvalStep, EvalTrace, FieldMatcher, MatcherError, OnMatch, OnMatchTrace, MAX_DEPTH};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -124,6 +124,80 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
             OnMatch::Action(a) => Some(a.clone()),
             OnMatch::Matcher(nested) => nested.evaluate(ctx),
         })
+    }
+
+    /// Evaluate with full trace for debugging.
+    ///
+    /// Returns the same result as [`evaluate()`](Self::evaluate) plus
+    /// the full evaluation path: which field matchers were checked, which
+    /// predicates fired, and whether the fallback was used.
+    ///
+    /// # INV: `result` == `evaluate()` result
+    ///
+    /// The returned [`EvalTrace::result`] always equals what `evaluate()`
+    /// would return for the same context.
+    #[must_use]
+    pub fn evaluate_with_trace(&self, ctx: &Ctx) -> EvalTrace<A> {
+        let mut steps = Vec::new();
+        let mut result = None;
+
+        for (index, field_matcher) in self.matcher_list.iter().enumerate() {
+            let predicate_trace = field_matcher.predicate.evaluate_with_trace(ctx);
+            let pred_matched = predicate_trace.matched();
+
+            if pred_matched {
+                let on_match = match &field_matcher.on_match {
+                    OnMatch::Action(action) => {
+                        result = Some(action.clone());
+                        Some(OnMatchTrace::Action(action.clone()))
+                    }
+                    OnMatch::Matcher(nested) => {
+                        let nested_trace = nested.evaluate_with_trace(ctx);
+                        result.clone_from(&nested_trace.result);
+                        Some(OnMatchTrace::Nested(Box::new(nested_trace)))
+                    }
+                };
+
+                steps.push(EvalStep {
+                    index,
+                    matched: true,
+                    predicate_trace,
+                    on_match,
+                });
+
+                // First-match-wins: stop if we got a result
+                if result.is_some() {
+                    return EvalTrace {
+                        result,
+                        steps,
+                        used_fallback: false,
+                    };
+                }
+                // Nested matcher returned None → continue to next field_matcher
+            } else {
+                steps.push(EvalStep {
+                    index,
+                    matched: false,
+                    predicate_trace,
+                    on_match: None,
+                });
+            }
+        }
+
+        // Fallback
+        let used_fallback = result.is_none() && self.on_no_match.is_some();
+        if result.is_none() {
+            result = self.on_no_match.as_ref().and_then(|om| match om {
+                OnMatch::Action(a) => Some(a.clone()),
+                OnMatch::Matcher(nested) => nested.evaluate(ctx),
+            });
+        }
+
+        EvalTrace {
+            result,
+            steps,
+            used_fallback,
+        }
     }
 
     /// Returns the number of field matchers.
@@ -425,5 +499,223 @@ mod tests {
 
         assert_eq!(current.depth(), crate::MAX_DEPTH);
         assert!(current.validate().is_ok());
+    }
+
+    // ========== Trace Tests ==========
+
+    #[test]
+    fn trace_first_match_wins() {
+        let matcher = Matcher::new(
+            vec![
+                create_field_matcher("hello", "first"),
+                create_field_matcher("hello", "second"),
+            ],
+            None,
+        );
+
+        let ctx = TestCtx {
+            value: "hello".into(),
+        };
+        let trace = matcher.evaluate_with_trace(&ctx);
+
+        assert_eq!(trace.result, Some("first".to_string()));
+        assert!(!trace.used_fallback);
+        // Only one step: stopped at first match
+        assert_eq!(trace.steps.len(), 1);
+        assert!(trace.steps[0].matched);
+        assert_eq!(trace.steps[0].index, 0);
+    }
+
+    #[test]
+    fn trace_second_match() {
+        let matcher = Matcher::new(
+            vec![
+                create_field_matcher("nope", "first"),
+                create_field_matcher("hello", "second"),
+            ],
+            None,
+        );
+
+        let ctx = TestCtx {
+            value: "hello".into(),
+        };
+        let trace = matcher.evaluate_with_trace(&ctx);
+
+        assert_eq!(trace.result, Some("second".to_string()));
+        assert_eq!(trace.steps.len(), 2);
+        assert!(!trace.steps[0].matched); // first didn't match
+        assert!(trace.steps[1].matched); // second matched
+    }
+
+    #[test]
+    fn trace_no_match_with_fallback() {
+        let matcher = Matcher::new(
+            vec![create_field_matcher("nope", "first")],
+            Some(OnMatch::action("fallback".to_string())),
+        );
+
+        let ctx = TestCtx {
+            value: "hello".into(),
+        };
+        let trace = matcher.evaluate_with_trace(&ctx);
+
+        assert_eq!(trace.result, Some("fallback".to_string()));
+        assert!(trace.used_fallback);
+        assert_eq!(trace.steps.len(), 1);
+        assert!(!trace.steps[0].matched);
+    }
+
+    #[test]
+    fn trace_no_match_no_fallback() {
+        let matcher: Matcher<TestCtx, String> =
+            Matcher::new(vec![create_field_matcher("nope", "first")], None);
+
+        let ctx = TestCtx {
+            value: "hello".into(),
+        };
+        let trace = matcher.evaluate_with_trace(&ctx);
+
+        assert_eq!(trace.result, None);
+        assert!(!trace.used_fallback);
+        assert_eq!(trace.steps.len(), 1);
+    }
+
+    #[test]
+    fn trace_nested_matcher_success() {
+        let nested = Matcher::new(vec![create_field_matcher("hello", "nested_action")], None);
+
+        let parent = Matcher::new(
+            vec![FieldMatcher::new(
+                Predicate::Single(SinglePredicate::new(
+                    Box::new(ValueInput),
+                    Box::new(ExactMatcher::new("hello")),
+                )),
+                OnMatch::matcher(nested),
+            )],
+            None,
+        );
+
+        let ctx = TestCtx {
+            value: "hello".into(),
+        };
+        let trace = parent.evaluate_with_trace(&ctx);
+
+        assert_eq!(trace.result, Some("nested_action".to_string()));
+        assert_eq!(trace.steps.len(), 1);
+        assert!(trace.steps[0].matched);
+
+        // Verify nested trace exists
+        match &trace.steps[0].on_match {
+            Some(OnMatchTrace::Nested(nested_trace)) => {
+                assert_eq!(nested_trace.result, Some("nested_action".to_string()));
+                assert_eq!(nested_trace.steps.len(), 1);
+            }
+            _ => panic!("expected nested trace"),
+        }
+    }
+
+    #[test]
+    fn trace_nested_matcher_failure_propagates() {
+        let nested = Matcher::new(
+            vec![create_field_matcher("will_not_match", "nested_action")],
+            None,
+        );
+
+        let parent = Matcher::new(
+            vec![
+                FieldMatcher::new(
+                    Predicate::Single(SinglePredicate::new(
+                        Box::new(ValueInput),
+                        Box::new(ExactMatcher::new("hello")),
+                    )),
+                    OnMatch::matcher(nested),
+                ),
+                create_field_matcher("hello", "second_action"),
+            ],
+            None,
+        );
+
+        let ctx = TestCtx {
+            value: "hello".into(),
+        };
+        let trace = parent.evaluate_with_trace(&ctx);
+
+        // Nested failed, fell through to second field matcher
+        assert_eq!(trace.result, Some("second_action".to_string()));
+        assert_eq!(trace.steps.len(), 2);
+
+        // First step: predicate matched but nested returned None
+        assert!(trace.steps[0].matched);
+        match &trace.steps[0].on_match {
+            Some(OnMatchTrace::Nested(nested_trace)) => {
+                assert_eq!(nested_trace.result, None);
+            }
+            _ => panic!("expected nested trace"),
+        }
+
+        // Second step: matched with action
+        assert!(trace.steps[1].matched);
+    }
+
+    #[test]
+    fn trace_result_matches_evaluate() {
+        // Various matchers — trace result must always match evaluate result
+        let cases: Vec<(Matcher<TestCtx, String>, TestCtx)> = vec![
+            // Match
+            (
+                Matcher::new(vec![create_field_matcher("hello", "hit")], None),
+                TestCtx {
+                    value: "hello".into(),
+                },
+            ),
+            // No match, no fallback
+            (
+                Matcher::new(vec![create_field_matcher("nope", "hit")], None),
+                TestCtx {
+                    value: "hello".into(),
+                },
+            ),
+            // No match, with fallback
+            (
+                Matcher::new(
+                    vec![create_field_matcher("nope", "hit")],
+                    Some(OnMatch::action("fallback".into())),
+                ),
+                TestCtx {
+                    value: "hello".into(),
+                },
+            ),
+            // Empty matcher
+            (
+                Matcher::empty(),
+                TestCtx {
+                    value: "hello".into(),
+                },
+            ),
+        ];
+
+        for (matcher, ctx) in &cases {
+            let eval_result = matcher.evaluate(ctx);
+            let trace = matcher.evaluate_with_trace(ctx);
+            assert_eq!(
+                eval_result, trace.result,
+                "trace result diverged from evaluate result"
+            );
+        }
+    }
+
+    #[test]
+    fn trace_on_match_action_captured() {
+        let matcher = Matcher::new(vec![create_field_matcher("hello", "the_action")], None);
+
+        let ctx = TestCtx {
+            value: "hello".into(),
+        };
+        let trace = matcher.evaluate_with_trace(&ctx);
+
+        match &trace.steps[0].on_match {
+            Some(OnMatchTrace::Action(a)) => assert_eq!(a, "the_action"),
+            _ => panic!("expected Action in on_match trace"),
+        }
     }
 }
