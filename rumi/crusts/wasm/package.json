@@ -1,0 +1,8 @@
+{
+  "name": "bumi-crusty-tests",
+  "private": true,
+  "scripts": {
+    "build": "wasm-pack build --target nodejs",
+    "test": "bun test"
+  }
+}
