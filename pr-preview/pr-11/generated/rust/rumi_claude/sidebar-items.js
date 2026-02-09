@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HookEvent","StringMatch"],"fn":["compile_hook_matches"],"mod":["prelude"],"struct":["ArgumentInput","ArgumentMatch","CompileError","CwdInput","EventInput","GitBranchInput","HookContext","HookMatch","HookMatchTrace","SessionIdInput","ToolNameInput","TraceStep"],"trait":["HookMatchExt"]};

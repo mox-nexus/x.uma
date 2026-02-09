@@ -1,0 +1,2471 @@
+<!DOCTYPE HTML>
+<html lang="en" class="rust sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>x.uma</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Cross-Platform Unified Matcher API">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "rust";
+            const default_dark_theme = "coal";
+            window.path_to_searchindex_js = "searchindex-6b1472f2.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-9ddb2f6c.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('rust')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">x.uma</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/mox-labs/x.uma" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="xuma"><a class="header" href="#xuma">x.uma</a></h1>
+<blockquote>
+<p>Cross-Platform Unified Matcher API</p>
+</blockquote>
+<p><strong>Alpha status</strong> — API is under active development and will change.</p>
+<p>x.uma implements the <a href="https://github.com/cncf/xds">xDS Unified Matcher API</a> across multiple languages. Match structured data (HTTP requests, events, messages) against rule trees with first-match-wins semantics.</p>
+<h2 id="implementations"><a class="header" href="#implementations">Implementations</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Package</th><th>Language</th><th>Status</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>rumi</strong></td><td>Rust</td><td>Production-ready core</td></tr>
+<tr><td><strong>puma</strong></td><td>Python 3.12+</td><td>Alpha (v0.1.0)</td></tr>
+<tr><td><strong>bumi</strong></td><td>TypeScript/Bun</td><td>Planned</td></tr>
+<tr><td><strong>puma-crusty</strong></td><td>Python (Rust bindings)</td><td>Planned</td></tr>
+<tr><td><strong>bumi-crusty</strong></td><td>TypeScript (WASM bindings)</td><td>Planned</td></tr>
+</tbody>
+</table>
+</div>
+<p>All implementations pass the same conformance test suite.</p>
+<h2 id="quick-example"><a class="header" href="#quick-example">Quick Example</a></h2>
+<p>The same pattern in Rust and Python.</p>
+<h3 id="rust"><a class="header" href="#rust">Rust</a></h3>
+<pre><code class="language-rust ignore">use rumi::prelude::*;
+use rumi_http::{HttpMessage, PathInput, PrefixMatcher};
+
+let matcher = Matcher::new(
+    vec![
+        FieldMatcher::new(
+            Predicate::Single(SinglePredicate::new(
+                Box::new(PathInput),
+                Box::new(PrefixMatcher::new("/api")),
+            )),
+            OnMatch::Action("api_handler"),
+        ),
+    ],
+    Some(OnMatch::Action("default")),
+);
+
+// ProcessingRequest -&gt; HttpMessage -&gt; evaluate
+let action = matcher.evaluate(&amp;http_message);</code></pre>
+<h3 id="python"><a class="header" href="#python">Python</a></h3>
+<pre><code class="language-python">from puma import Matcher, FieldMatcher, SinglePredicate, Action
+from puma import PrefixMatcher
+from puma.http import HttpRequest, PathInput
+
+matcher = Matcher(
+    matcher_list=(
+        FieldMatcher(
+            predicate=SinglePredicate(
+                input=PathInput(),
+                matcher=PrefixMatcher("/api")
+            ),
+            on_match=Action("api_handler")
+        ),
+    ),
+    on_no_match=Action("default")
+)
+
+request = HttpRequest(method="GET", raw_path="/api/users")
+action = matcher.evaluate(request)  # "api_handler"
+</code></pre>
+<h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
+<p>x.uma follows hexagonal architecture (ports and adapters). The core is domain-agnostic. Domains plug in at the edges.</p>
+<pre><code class="language-text">┌─────────────────────────────────┐
+│       Domain Adapters           │
+│   HTTP  CloudEvent  Custom      │
+└───────────────┬─────────────────┘
+                │
+┌───────────────▼─────────────────┐
+│           PORTS                 │
+│  DataInput[Ctx] → MatchingValue │
+│  InputMatcher → bool            │
+└───────────────┬─────────────────┘
+                │
+┌───────────────▼─────────────────┐
+│           CORE                  │
+│  Matcher, Predicate, Actions    │
+│    (domain-agnostic)            │
+└─────────────────────────────────┘
+</code></pre>
+<p><strong>DataInput</strong> extracts values from your context (HTTP request, event, custom type).</p>
+<p><strong>InputMatcher</strong> matches the extracted value (exact, prefix, regex, etc).</p>
+<p><strong>Matcher</strong> composes predicates with first-match-wins semantics.</p>
+<p>The same <code>ExactMatcher</code> works for HTTP headers, event types, or your custom domain. This is the key design insight from Envoy’s matcher architecture.</p>
+<h2 id="why-xuma"><a class="header" href="#why-xuma">Why x.uma?</a></h2>
+<p><strong>Domain-agnostic core.</strong> The same matcher logic works for HTTP routing, event filtering, access control, or your custom domain. Add a new domain by implementing <code>DataInput</code> for your context type.</p>
+<p><strong>Type-safe composition.</strong> Predicates compose with AND/OR/NOT. Matchers nest. Actions are exclusive (action XOR nested matcher, never both).</p>
+<p><strong>Battle-tested semantics.</strong> Built on the same xDS protocol Envoy uses at Google scale. First-match-wins, nested matcher failure propagation, depth limits — all enforced by design.</p>
+<p><strong>Multi-language.</strong> Same API across Rust, Python, and TypeScript. Write matchers once, run anywhere.</p>
+<h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Section</th><th>What you’ll learn</th></tr>
+</thead>
+<tbody>
+<tr><td><a href="#quick-start">Quick Start</a></td><td>Get running in 5 minutes (Rust and Python)</td></tr>
+<tr><td><a href="#concepts">Concepts</a></td><td>Core abstractions and terminology</td></tr>
+<tr><td><a href="#architecture-1">Architecture</a></td><td>Why it’s built this way</td></tr>
+<tr><td><a href="#proto-api-reference">Proto API</a></td><td>xDS protocol definitions</td></tr>
+<tr><td><a href="#rust-api-reference">Rust API</a></td><td>rumi API reference</td></tr>
+<tr><td><a href="#python-api-reference">Python API</a></td><td>puma API reference</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="status"><a class="header" href="#status">Status</a></h2>
+<p>x.uma is alpha software. The API is under active development and will change.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Phase</th><th>Focus</th><th>Status</th></tr>
+</thead>
+<tbody>
+<tr><td>5</td><td>Python (puma)</td><td>✅ Done (v0.1.0)</td></tr>
+<tr><td>6</td><td>TypeScript (bumi)</td><td>Next</td></tr>
+<tr><td>7</td><td>Python Rust bindings (puma-crusty)</td><td>Planned</td></tr>
+<tr><td>8</td><td>TypeScript WASM bindings (bumi-crusty)</td><td>Planned</td></tr>
+</tbody>
+</table>
+</div>
+<p>See <a href="#roadmap">Roadmap</a> for details.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h1>
+<p>Get x.uma running in your project. Both Rust and Python follow the same pattern: define your context, implement DataInput to extract values, build a matcher tree, evaluate.</p>
+<h2 id="rust-1"><a class="header" href="#rust-1">Rust</a></h2>
+<h3 id="install"><a class="header" href="#install">Install</a></h3>
+<p>Add to your <code>Cargo.toml</code>:</p>
+<pre><code class="language-toml">[dependencies]
+rumi = "0.1"
+</code></pre>
+<h3 id="basic-example-match-a-dict-like-struct"><a class="header" href="#basic-example-match-a-dict-like-struct">Basic Example: Match a Dict-like Struct</a></h3>
+<p>Start with the simplest case — extract a value from a struct and match it.</p>
+<pre><code class="language-rust ignore">use rumi::prelude::*;
+
+// 1. Define your context
+#[derive(Debug)]
+struct User {
+    name: String,
+}
+
+// 2. Implement DataInput to extract data
+#[derive(Debug)]
+struct NameInput;
+
+impl DataInput&lt;User&gt; for NameInput {
+    fn get(&amp;self, ctx: &amp;User) -&gt; MatchingData {
+        MatchingData::String(ctx.name.clone())
+    }
+}
+
+// 3. Build a matcher
+let matcher: Matcher&lt;User, &amp;str&gt; = Matcher::new(
+    vec![
+        FieldMatcher::new(
+            Predicate::Single(SinglePredicate::new(
+                Box::new(NameInput),
+                Box::new(ExactMatcher::new("alice")),
+            )),
+            OnMatch::Action("admin"),
+        ),
+        FieldMatcher::new(
+            Predicate::Single(SinglePredicate::new(
+                Box::new(NameInput),
+                Box::new(ExactMatcher::new("bob")),
+            )),
+            OnMatch::Action("user"),
+        ),
+    ],
+    Some(OnMatch::Action("guest")),
+);
+
+// 4. Evaluate
+let user = User { name: "alice".into() };
+assert_eq!(matcher.evaluate(&amp;user), Some("admin"));
+
+let user = User { name: "eve".into() };
+assert_eq!(matcher.evaluate(&amp;user), Some("guest"));</code></pre>
+<p><strong>What happened:</strong></p>
+<ul>
+<li><code>NameInput</code> extracts the name field (DataInput port)</li>
+<li><code>ExactMatcher</code> checks if the name matches (InputMatcher port)</li>
+<li><code>SinglePredicate</code> combines extraction + matching</li>
+<li><code>Matcher</code> evaluates predicates in order, returns the first match</li>
+<li><code>on_no_match</code> provides a fallback when nothing matches</li>
+</ul>
+<h3 id="http-matching"><a class="header" href="#http-matching">HTTP Matching</a></h3>
+<p>Now apply the same pattern to HTTP requests.</p>
+<pre><code class="language-rust ignore">use rumi::prelude::*;
+use rumi_http::{HttpMessage, PathInput, PrefixMatcher};
+
+let matcher = Matcher::new(
+    vec![
+        FieldMatcher::new(
+            Predicate::Single(SinglePredicate::new(
+                Box::new(PathInput),
+                Box::new(PrefixMatcher::new("/api")),
+            )),
+            OnMatch::Action("api_handler"),
+        ),
+        FieldMatcher::new(
+            Predicate::Single(SinglePredicate::new(
+                Box::new(PathInput),
+                Box::new(PrefixMatcher::new("/admin")),
+            )),
+            OnMatch::Action("admin_handler"),
+        ),
+    ],
+    Some(OnMatch::Action("default")),
+);
+
+// HttpMessage is the indexed view over ext_proc ProcessingRequest
+// It provides O(1) header/query lookups
+let action = matcher.evaluate(&amp;http_message);</code></pre>
+<p>Under the hood, <code>PathInput</code> implements <code>DataInput&lt;HttpMessage&gt;</code> and extracts the request path. The same <code>PrefixMatcher</code> works here because <code>InputMatcher</code> is domain-agnostic.</p>
+<h2 id="python-1"><a class="header" href="#python-1">Python</a></h2>
+<h3 id="install-1"><a class="header" href="#install-1">Install</a></h3>
+<pre><code class="language-bash">pip install puma
+# or with uv
+uv add puma
+</code></pre>
+<p>Requires Python 3.12+ (uses PEP 695 type parameter syntax).</p>
+<h3 id="basic-example-match-a-dictionary"><a class="header" href="#basic-example-match-a-dictionary">Basic Example: Match a Dictionary</a></h3>
+<p>Start with the simplest case — extract a value from a dict and match it.</p>
+<pre><code class="language-python">from puma import Matcher, FieldMatcher, SinglePredicate, ExactMatcher, Action
+from dataclasses import dataclass
+
+# 1. Define a data input (extraction port)
+@dataclass(frozen=True, slots=True)
+class DictInput:
+    key: str
+
+    def get(self, ctx: dict[str, str], /) -&gt; str | None:
+        return ctx.get(self.key)
+
+# 2. Build a matcher tree
+matcher = Matcher(
+    matcher_list=(
+        FieldMatcher(
+            predicate=SinglePredicate(
+                input=DictInput("name"),
+                matcher=ExactMatcher("alice")
+            ),
+            on_match=Action("admin")
+        ),
+        FieldMatcher(
+            predicate=SinglePredicate(
+                input=DictInput("name"),
+                matcher=ExactMatcher("bob")
+            ),
+            on_match=Action("user")
+        ),
+    ),
+    on_no_match=Action("guest")
+)
+
+# 3. Evaluate
+matcher.evaluate({"name": "alice"})  # "admin"
+matcher.evaluate({"name": "bob"})    # "user"
+matcher.evaluate({"name": "eve"})    # "guest"
+matcher.evaluate({})                 # "guest"
+</code></pre>
+<p><strong>What happened:</strong></p>
+<ul>
+<li><code>DictInput</code> extracts a value from the dict (DataInput protocol)</li>
+<li><code>ExactMatcher</code> checks if that value matches (InputMatcher protocol)</li>
+<li><code>SinglePredicate</code> combines extraction + matching</li>
+<li><code>Matcher</code> evaluates predicates in order, returns the first match</li>
+<li><code>on_no_match</code> provides a fallback when nothing matches</li>
+</ul>
+<p>This is the core pattern. Everything else builds on it.</p>
+<h3 id="http-matching-1"><a class="header" href="#http-matching-1">HTTP Matching</a></h3>
+<p>Now the same pattern applied to HTTP — match requests against route rules.</p>
+<pre><code class="language-python">from puma.http import HttpRequest, HttpPathMatch, HttpRouteMatch, compile_route_matches
+
+# Define route rules (Gateway API style)
+api_route = HttpRouteMatch(
+    path=HttpPathMatch(type="PathPrefix", value="/api"),
+    method="GET"
+)
+
+admin_route = HttpRouteMatch(
+    path=HttpPathMatch(type="PathPrefix", value="/admin"),
+)
+
+# Compile to a matcher
+matcher = compile_route_matches(
+    matches=[api_route, admin_route],
+    action="matched",
+    on_no_match="404"
+)
+
+# Evaluate requests
+req1 = HttpRequest(method="GET", raw_path="/api/users")
+matcher.evaluate(req1)  # "matched" (api_route)
+
+req2 = HttpRequest(method="POST", raw_path="/api/users")
+matcher.evaluate(req2)  # "404" (wrong method)
+
+req3 = HttpRequest(raw_path="/admin/settings")
+matcher.evaluate(req3)  # "matched" (admin_route)
+</code></pre>
+<p>Under the hood, <code>compile_route_matches</code> builds the same <code>Matcher</code> tree you saw in the basic example, using <code>PathInput</code>, <code>MethodInput</code>, <code>HeaderInput</code>, and <code>QueryParamInput</code>. These implement <code>DataInput[HttpRequest]</code> and extract the relevant fields.</p>
+<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<ul>
+<li><a href="#concepts">Concepts</a> — understand the core abstractions</li>
+<li><a href="#adding-a-domain">Adding a Domain</a> — create domain-specific matchers</li>
+<li><a href="#python-api-reference">Python API Reference</a> — full puma API</li>
+<li><a href="#rust-api-reference">Rust API Reference</a> — full rumi API</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="concepts"><a class="header" href="#concepts">Concepts</a></h1>
+<p>Core abstractions in x.uma. The same concepts apply across Rust and Python implementations.</p>
+<h2 id="the-matching-pipeline"><a class="header" href="#the-matching-pipeline">The Matching Pipeline</a></h2>
+<pre><code class="language-text">Context → DataInput → MatchingValue → InputMatcher → bool
+                                           ↓
+                       Predicate (AND/OR/NOT composition)
+                                           ↓
+                               Matcher (first-match-wins)
+                                           ↓
+                                        Action
+</code></pre>
+<p>Each step is a port. Domain-specific adapters plug in at the edges. The core is domain-agnostic.</p>
+<h2 id="key-types"><a class="header" href="#key-types">Key Types</a></h2>
+<h3 id="matchingvalue-type-erased-data"><a class="header" href="#matchingvalue-type-erased-data">MatchingValue (Type-Erased Data)</a></h3>
+<p>Matchers operate on type-erased data. This is what allows the same <code>ExactMatcher</code> to work for HTTP headers, event types, or custom domains.</p>
+<p><strong>Rust:</strong></p>
+<pre><code class="language-rust ignore">pub enum MatchingData {
+    None,
+    String(String),
+    Int(i64),
+    Bool(bool),
+    Bytes(Vec&lt;u8&gt;),
+    Custom(Arc&lt;dyn CustomMatchData&gt;),  // Extensible
+}</code></pre>
+<p><strong>Python:</strong></p>
+<pre><code class="language-python"># Type alias — Python gets union types for free
+MatchingValue = str | int | bool | bytes | None
+</code></pre>
+<p>Python’s union type replaces Rust’s enum. Both serve the same purpose: type erasure at the data level.</p>
+<h3 id="datainput-extraction-port"><a class="header" href="#datainput-extraction-port">DataInput (Extraction Port)</a></h3>
+<p>Extracts data from your domain context. Domain-specific and generic over the context type.</p>
+<p><strong>Rust:</strong></p>
+<pre><code class="language-rust ignore">pub trait DataInput&lt;Ctx&gt;: Send + Sync {
+    fn get(&amp;self, ctx: &amp;Ctx) -&gt; MatchingData;
+}</code></pre>
+<p><strong>Python:</strong></p>
+<pre><code class="language-python">@runtime_checkable
+class DataInput(Protocol[Ctx]):
+    """Extract a value from a domain-specific context."""
+    def get(self, ctx: Ctx, /) -&gt; MatchingValue: ...
+</code></pre>
+<p>Python uses <code>Protocol</code> (structural typing) instead of Rust’s trait. Both define the extraction port contract.</p>
+<p><strong>Examples:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Domain</th><th>Rust</th><th>Python</th></tr>
+</thead>
+<tbody>
+<tr><td>HTTP path</td><td><code>PathInput</code> (rumi-http)</td><td><code>PathInput()</code> (puma.http)</td></tr>
+<tr><td>HTTP header</td><td><code>HeaderInput { name }</code></td><td><code>HeaderInput(name)</code></td></tr>
+<tr><td>Dict key</td><td>(custom)</td><td><code>DictInput(key)</code></td></tr>
+<tr><td>Event type</td><td>(custom)</td><td><code>EventTypeInput()</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="inputmatcher-matching-port"><a class="header" href="#inputmatcher-matching-port">InputMatcher (Matching Port)</a></h3>
+<p>Matches against the type-erased value. Domain-agnostic and non-generic.</p>
+<p><strong>Rust:</strong></p>
+<pre><code class="language-rust ignore">pub trait InputMatcher: Send + Sync {
+    fn matches(&amp;self, value: &amp;MatchingData) -&gt; bool;
+}</code></pre>
+<p><strong>Python:</strong></p>
+<pre><code class="language-python">@runtime_checkable
+class InputMatcher(Protocol):
+    """Match against a type-erased value."""
+    def matches(self, value: MatchingValue, /) -&gt; bool: ...
+</code></pre>
+<p><strong>The key insight:</strong> <code>InputMatcher</code> is non-generic. The same <code>ExactMatcher</code> works for any domain because it operates on <code>MatchingData</code> / <code>MatchingValue</code>, not the original context type.</p>
+<p>Built-in matchers:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Matcher</th><th>Matches</th><th>Rust</th><th>Python</th></tr>
+</thead>
+<tbody>
+<tr><td>Exact</td><td>Exact equality</td><td><code>ExactMatcher::new("foo")</code></td><td><code>ExactMatcher("foo")</code></td></tr>
+<tr><td>Prefix</td><td>String starts with</td><td><code>PrefixMatcher::new("/api")</code></td><td><code>PrefixMatcher("/api")</code></td></tr>
+<tr><td>Suffix</td><td>String ends with</td><td><code>SuffixMatcher::new(".json")</code></td><td><code>SuffixMatcher(".json")</code></td></tr>
+<tr><td>Contains</td><td>Substring present</td><td><code>ContainsMatcher::new("world")</code></td><td><code>ContainsMatcher("world")</code></td></tr>
+<tr><td>Regex</td><td>Regex search</td><td><code>RegexMatcher::new(r"\d+")</code></td><td><code>RegexMatcher(r"\d+")</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>All matchers (except <code>RegexMatcher</code>) support optional case-insensitive matching via <code>ignore_case</code>.</p>
+<h3 id="predicate-boolean-composition"><a class="header" href="#predicate-boolean-composition">Predicate (Boolean Composition)</a></h3>
+<p>Combines <code>DataInput</code> + <code>InputMatcher</code> with boolean logic.</p>
+<p><strong>Rust:</strong></p>
+<pre><code class="language-rust ignore">pub enum Predicate&lt;Ctx&gt; {
+    Single(SinglePredicate&lt;Ctx&gt;),  // extract + match
+    And(Vec&lt;Predicate&lt;Ctx&gt;&gt;),      // all must match
+    Or(Vec&lt;Predicate&lt;Ctx&gt;&gt;),       // any must match
+    Not(Box&lt;Predicate&lt;Ctx&gt;&gt;),      // negation
+}
+
+pub struct SinglePredicate&lt;Ctx&gt; {
+    input: Box&lt;dyn DataInput&lt;Ctx&gt;&gt;,
+    matcher: Box&lt;dyn InputMatcher&gt;,
+}</code></pre>
+<p><strong>Python:</strong></p>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class SinglePredicate[Ctx]:
+    input: DataInput[Ctx]
+    matcher: InputMatcher
+
+@dataclass(frozen=True, slots=True)
+class And[Ctx]:
+    predicates: tuple[Predicate[Ctx], ...]
+
+@dataclass(frozen=True, slots=True)
+class Or[Ctx]:
+    predicates: tuple[Predicate[Ctx], ...]
+
+@dataclass(frozen=True, slots=True)
+class Not[Ctx]:
+    predicate: Predicate[Ctx]
+
+# Union type (replaces Rust's enum)
+type Predicate[Ctx] = SinglePredicate[Ctx] | And[Ctx] | Or[Ctx] | Not[Ctx]
+</code></pre>
+<p>Python uses a type alias union instead of an enum. Both are pattern-matchable in their respective languages.</p>
+<p><strong>Short-circuit evaluation:</strong></p>
+<ul>
+<li><code>And</code> returns <code>False</code> on the first non-matching predicate</li>
+<li><code>Or</code> returns <code>True</code> on the first matching predicate</li>
+</ul>
+<h3 id="onmatch-action-or-nested-matcher"><a class="header" href="#onmatch-action-or-nested-matcher">OnMatch (Action or Nested Matcher)</a></h3>
+<p>What happens when a predicate matches. Exclusive: action XOR nested matcher, never both.</p>
+<p><strong>Rust:</strong></p>
+<pre><code class="language-rust ignore">pub enum OnMatch&lt;Ctx, A&gt; {
+    Action(A),              // Terminal: return this action
+    Matcher(Box&lt;Matcher&gt;),  // Nested: evaluate another matcher
+}</code></pre>
+<p><strong>Python:</strong></p>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class Action[A]:
+    value: A
+
+@dataclass(frozen=True, slots=True)
+class NestedMatcher[Ctx, A]:
+    matcher: Matcher[Ctx, A]
+
+# Type alias (replaces Rust's enum)
+type OnMatch[Ctx, A] = Action[A] | NestedMatcher[Ctx, A]
+</code></pre>
+<p>The exclusivity is enforced by the type system — illegal states are unrepresentable.</p>
+<h3 id="matcher-first-match-wins"><a class="header" href="#matcher-first-match-wins">Matcher (First-Match-Wins)</a></h3>
+<p>Top-level container. Evaluates field matchers in order and returns the action from the first match.</p>
+<p><strong>Rust:</strong></p>
+<pre><code class="language-rust ignore">pub struct Matcher&lt;Ctx, A&gt; {
+    matcher_list: Vec&lt;FieldMatcher&lt;Ctx, A&gt;&gt;,
+    on_no_match: Option&lt;OnMatch&lt;Ctx, A&gt;&gt;,
+}
+
+pub struct FieldMatcher&lt;Ctx, A&gt; {
+    predicate: Predicate&lt;Ctx&gt;,
+    on_match: OnMatch&lt;Ctx, A&gt;,
+}</code></pre>
+<p><strong>Python:</strong></p>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class Matcher[Ctx, A]:
+    matcher_list: tuple[FieldMatcher[Ctx, A], ...]
+    on_no_match: OnMatch[Ctx, A] | None = None
+
+@dataclass(frozen=True, slots=True)
+class FieldMatcher[Ctx, A]:
+    predicate: Predicate[Ctx]
+    on_match: OnMatch[Ctx, A]
+</code></pre>
+<p><strong>Evaluation semantics (xDS):</strong></p>
+<ol>
+<li>
+<p><strong>First-match-wins</strong> — Evaluate field matchers in order. Return the action from the first matching predicate. Later matches are never consulted.</p>
+</li>
+<li>
+<p><strong>OnMatch exclusivity</strong> — Each <code>OnMatch</code> is either an <code>Action</code> (terminal) or a nested <code>Matcher</code>, never both.</p>
+</li>
+<li>
+<p><strong>Nested matcher failure propagates</strong> — If a nested matcher returns <code>None</code>, evaluation continues to the next field matcher (no implicit fallback).</p>
+</li>
+<li>
+<p><strong>on_no_match fallback</strong> — If no predicate matches, <code>on_no_match</code> is consulted. If absent, the matcher returns <code>None</code>.</p>
+</li>
+<li>
+<p><strong>None → false invariant</strong> — If a <code>DataInput</code> returns <code>None</code>, the predicate evaluates to <code>False</code> without consulting the matcher.</p>
+</li>
+<li>
+<p><strong>Depth validation</strong> — Matcher trees exceeding <code>MAX_DEPTH</code> (32 levels) are rejected at construction.</p>
+</li>
+</ol>
+<h2 id="type-comparison"><a class="header" href="#type-comparison">Type Comparison</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Concept</th><th>Rust Type</th><th>Python Type</th></tr>
+</thead>
+<tbody>
+<tr><td>Type-erased data</td><td><code>enum MatchingData</code></td><td><code>type MatchingValue = str | int | bool | bytes | None</code></td></tr>
+<tr><td>Extraction port</td><td><code>trait DataInput&lt;Ctx&gt;</code></td><td><code>Protocol[Ctx]</code> with <code>get()</code></td></tr>
+<tr><td>Matching port</td><td><code>trait InputMatcher</code></td><td><code>Protocol</code> with <code>matches()</code></td></tr>
+<tr><td>Boolean logic</td><td><code>enum Predicate&lt;Ctx&gt;</code></td><td><code>type Predicate = Single | And | Or | Not</code></td></tr>
+<tr><td>Action/nested</td><td><code>enum OnMatch&lt;Ctx, A&gt;</code></td><td><code>type OnMatch = Action | NestedMatcher</code></td></tr>
+<tr><td>Top-level</td><td><code>struct Matcher&lt;Ctx, A&gt;</code></td><td><code>@dataclass Matcher[Ctx, A]</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Same concepts, idiomatic types for each language.</p>
+<h2 id="next-steps-1"><a class="header" href="#next-steps-1">Next Steps</a></h2>
+<ul>
+<li><a href="#architecture-1">Architecture</a> — why this design</li>
+<li><a href="#adding-a-domain">Adding a Domain</a> — create custom matchers</li>
+<li><a href="#http-domain-reference">HTTP Domain Reference</a> — HTTP-specific types</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="adding-a-domain"><a class="header" href="#adding-a-domain">Adding a Domain</a></h1>
+<p>Create domain-specific matchers for HTTP, gRPC, CloudEvents, or your custom protocol.</p>
+<p>A “domain” in x.uma is a context type with associated <code>DataInput</code> implementations. This guide shows how to add a domain in both Rust (rumi) and Python (puma).</p>
+<h2 id="concept-cloudevent-matching"><a class="header" href="#concept-cloudevent-matching">Concept: CloudEvent Matching</a></h2>
+<p>We’ll build a matcher for <a href="https://cloudevents.io/">CloudEvents</a> — a CNCF spec for event metadata.</p>
+<pre><code class="language-json">{
+  "specversion": "1.0",
+  "type": "com.example.user.created",
+  "source": "api-server",
+  "id": "abc-123",
+  "subject": "user/42"
+}
+</code></pre>
+<p><strong>Goal:</strong> Match events by type, source, or subject.</p>
+<h2 id="python-implementation-puma"><a class="header" href="#python-implementation-puma">Python Implementation (puma)</a></h2>
+<h3 id="step-1-define-the-context-type"><a class="header" href="#step-1-define-the-context-type">Step 1: Define the Context Type</a></h3>
+<pre><code class="language-python"># my_events.py
+from dataclasses import dataclass
+
+@dataclass(frozen=True, slots=True)
+class CloudEvent:
+    """CloudEvents v1.0 context."""
+    type: str
+    source: str
+    id: str
+    subject: str | None = None
+</code></pre>
+<h3 id="step-2-implement-datainput"><a class="header" href="#step-2-implement-datainput">Step 2: Implement DataInput</a></h3>
+<pre><code class="language-python">from puma import DataInput, MatchingValue
+
+@dataclass(frozen=True, slots=True)
+class EventTypeInput:
+    """Extract event type."""
+    def get(self, ctx: CloudEvent, /) -&gt; MatchingValue:
+        return ctx.type
+
+@dataclass(frozen=True, slots=True)
+class EventSourceInput:
+    """Extract event source."""
+    def get(self, ctx: CloudEvent, /) -&gt; MatchingValue:
+        return ctx.source
+
+@dataclass(frozen=True, slots=True)
+class EventSubjectInput:
+    """Extract event subject (may be None)."""
+    def get(self, ctx: CloudEvent, /) -&gt; MatchingValue:
+        return ctx.subject  # None triggers None → false invariant
+</code></pre>
+<h3 id="step-3-build-matchers"><a class="header" href="#step-3-build-matchers">Step 3: Build Matchers</a></h3>
+<pre><code class="language-python">from puma import (
+    Matcher, FieldMatcher, SinglePredicate, Action,
+    ExactMatcher, PrefixMatcher, And,
+)
+
+# Match user creation events from api-server
+user_created_matcher = Matcher(
+    matcher_list=(
+        FieldMatcher(
+            predicate=And((
+                SinglePredicate(
+                    EventTypeInput(),
+                    PrefixMatcher("com.example.user.")
+                ),
+                SinglePredicate(
+                    EventSourceInput(),
+                    ExactMatcher("api-server")
+                ),
+            )),
+            on_match=Action("handle_user_event"),
+        ),
+    ),
+    on_no_match=Action("ignore"),
+)
+
+# Evaluate
+event = CloudEvent(
+    type="com.example.user.created",
+    source="api-server",
+    id="abc-123",
+)
+action = user_created_matcher.evaluate(event)
+assert action == "handle_user_event"
+</code></pre>
+<h3 id="step-4-optional-compiler-gateway-api-style"><a class="header" href="#step-4-optional-compiler-gateway-api-style">Step 4: Optional Compiler (Gateway API Style)</a></h3>
+<p>For ergonomic config-time APIs, add a compiler:</p>
+<pre><code class="language-python">from dataclasses import dataclass, field
+from typing import Literal
+from puma import Predicate, SinglePredicate, ExactMatcher, PrefixMatcher, Matcher, FieldMatcher, Action
+
+@dataclass(frozen=True, slots=True)
+class EventMatch:
+    """Config-time event match specification."""
+    type: str | None = None
+    source: str | None = None
+    subject: str | None = None
+
+    def to_predicate(self) -&gt; Predicate[CloudEvent]:
+        """Compile to predicate tree."""
+        predicates: list[SinglePredicate[CloudEvent]] = []
+
+        if self.type is not None:
+            predicates.append(
+                SinglePredicate(EventTypeInput(), ExactMatcher(self.type))
+            )
+        if self.source is not None:
+            predicates.append(
+                SinglePredicate(EventSourceInput(), ExactMatcher(self.source))
+            )
+        if self.subject is not None:
+            predicates.append(
+                SinglePredicate(EventSubjectInput(), ExactMatcher(self.subject))
+            )
+
+        if not predicates:
+            # Match everything
+            return SinglePredicate(EventTypeInput(), PrefixMatcher(""))
+
+        if len(predicates) == 1:
+            return predicates[0]
+
+        return And(tuple(predicates))
+
+    def compile[A](self, action: A) -&gt; Matcher[CloudEvent, A]:
+        """Compile to matcher."""
+        return Matcher(
+            matcher_list=(FieldMatcher(self.to_predicate(), Action(action)),),
+        )
+
+# Usage
+match_config = EventMatch(type="com.example.user.created", source="api-server")
+matcher = match_config.compile("handle_user_event")
+</code></pre>
+<p>That’s it. The same string matchers, predicates, and matcher tree logic work for CloudEvents.</p>
+<h2 id="rust-implementation-rumi"><a class="header" href="#rust-implementation-rumi">Rust Implementation (rumi)</a></h2>
+<h3 id="step-1-define-proto-optional"><a class="header" href="#step-1-define-proto-optional">Step 1: Define Proto (Optional)</a></h3>
+<p>If using xDS proto extension mechanism:</p>
+<pre><code class="language-protobuf">// proto/xuma/events/v1/inputs.proto
+syntax = "proto3";
+package xuma.events.v1;
+
+message EventTypeInput {}
+message EventSourceInput {}
+message EventSubjectInput {}
+</code></pre>
+<p>Generate Rust bindings:</p>
+<pre><code class="language-bash">just gen
+</code></pre>
+<h3 id="step-2-define-the-context-type"><a class="header" href="#step-2-define-the-context-type">Step 2: Define the Context Type</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// rumi/ext/events/src/lib.rs
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+pub struct CloudEvent {
+    pub event_type: String,
+    pub source: String,
+    pub id: String,
+    pub subject: Option&lt;String&gt;,
+}
+<span class="boring">}</span></code></pre>
+<h3 id="step-3-implement-datainput"><a class="header" href="#step-3-implement-datainput">Step 3: Implement DataInput</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi::{DataInput, MatchingData};
+
+#[derive(Debug)]
+pub struct EventTypeInput;
+
+impl DataInput&lt;CloudEvent&gt; for EventTypeInput {
+    fn get(&amp;self, ctx: &amp;CloudEvent) -&gt; MatchingData {
+        MatchingData::String(ctx.event_type.clone())
+    }
+}
+
+#[derive(Debug)]
+pub struct EventSourceInput;
+
+impl DataInput&lt;CloudEvent&gt; for EventSourceInput {
+    fn get(&amp;self, ctx: &amp;CloudEvent) -&gt; MatchingData {
+        MatchingData::String(ctx.source.clone())
+    }
+}
+
+#[derive(Debug)]
+pub struct EventSubjectInput;
+
+impl DataInput&lt;CloudEvent&gt; for EventSubjectInput {
+    fn get(&amp;self, ctx: &amp;CloudEvent) -&gt; MatchingData {
+        ctx.subject
+            .as_ref()
+            .map(|s| MatchingData::String(s.clone()))
+            .unwrap_or(MatchingData::None)
+    }
+}
+<span class="boring">}</span></code></pre>
+<h3 id="step-4-build-matchers"><a class="header" href="#step-4-build-matchers">Step 4: Build Matchers</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi::prelude::*;
+
+// Match user creation events from api-server
+let user_created_matcher = Matcher::new(
+    vec![
+        FieldMatcher::new(
+            Predicate::And {
+                predicates: vec![
+                    Predicate::Single(SinglePredicate::new(
+                        Box::new(EventTypeInput),
+                        Box::new(PrefixMatcher::new("com.example.user.")),
+                    )),
+                    Predicate::Single(SinglePredicate::new(
+                        Box::new(EventSourceInput),
+                        Box::new(ExactMatcher::new("api-server")),
+                    )),
+                ],
+            },
+            OnMatch::Action("handle_user_event"),
+        ),
+    ],
+    Some(OnMatch::Action("ignore")),
+)?;
+
+// Evaluate
+let event = CloudEvent {
+    event_type: "com.example.user.created".into(),
+    source: "api-server".into(),
+    id: "abc-123".into(),
+    subject: None,
+};
+
+let action = user_created_matcher.evaluate(&amp;event);
+assert_eq!(action, Some("handle_user_event"));
+<span class="boring">}</span></code></pre>
+<h3 id="step-5-optional-compiler-gateway-api-style"><a class="header" href="#step-5-optional-compiler-gateway-api-style">Step 5: Optional Compiler (Gateway API Style)</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub struct EventMatch {
+    pub event_type: Option&lt;String&gt;,
+    pub source: Option&lt;String&gt;,
+    pub subject: Option&lt;String&gt;,
+}
+
+impl EventMatch {
+    pub fn compile&lt;A&gt;(self, action: A) -&gt; Result&lt;Matcher&lt;CloudEvent, A&gt;, MatcherError&gt;
+    where
+        A: Clone,
+    {
+        let predicate = self.to_predicate();
+        Matcher::new(
+            vec![FieldMatcher::new(predicate, OnMatch::Action(action))],
+            None,
+        )
+    }
+
+    fn to_predicate(&amp;self) -&gt; Predicate&lt;CloudEvent&gt; {
+        let mut predicates = Vec::new();
+
+        if let Some(ref t) = self.event_type {
+            predicates.push(Predicate::Single(SinglePredicate::new(
+                Box::new(EventTypeInput),
+                Box::new(ExactMatcher::new(t)),
+            )));
+        }
+        if let Some(ref s) = self.source {
+            predicates.push(Predicate::Single(SinglePredicate::new(
+                Box::new(EventSourceInput),
+                Box::new(ExactMatcher::new(s)),
+            )));
+        }
+        if let Some(ref subj) = self.subject {
+            predicates.push(Predicate::Single(SinglePredicate::new(
+                Box::new(EventSubjectInput),
+                Box::new(ExactMatcher::new(subj)),
+            )));
+        }
+
+        if predicates.is_empty() {
+            // Match everything
+            Predicate::Single(SinglePredicate::new(
+                Box::new(EventTypeInput),
+                Box::new(PrefixMatcher::new("")),
+            ))
+        } else if predicates.len() == 1 {
+            predicates.into_iter().next().unwrap()
+        } else {
+            Predicate::And { predicates }
+        }
+    }
+}
+
+// Usage
+let match_config = EventMatch {
+    event_type: Some("com.example.user.created".into()),
+    source: Some("api-server".into()),
+    subject: None,
+};
+let matcher = match_config.compile("handle_user_event")?;
+<span class="boring">}</span></code></pre>
+<h2 id="add-conformance-tests"><a class="header" href="#add-conformance-tests">Add Conformance Tests</a></h2>
+<p>Both implementations should pass the same test fixtures.</p>
+<pre><code class="language-yaml"># spec/tests/events/type_exact.yaml
+name: "CloudEvent type exact match"
+context:
+  type: "com.example.user.created"
+  source: "api-server"
+  id: "abc-123"
+cases:
+  - description: "matches event type"
+    matcher:
+      input: { event_type: {} }
+      matcher: { exact: "com.example.user.created" }
+    expected: { matches: true }
+
+  - description: "rejects wrong type"
+    matcher:
+      input: { event_type: {} }
+      matcher: { exact: "com.example.order.created" }
+    expected: { matches: false }
+</code></pre>
+<p><strong>Test runners:</strong></p>
+<ul>
+<li>Rust: Parse YAML, construct <code>CloudEvent</code> and <code>Matcher&lt;CloudEvent, _&gt;</code>, assert</li>
+<li>Python: Parse YAML, construct <code>CloudEvent</code> and <code>Matcher[CloudEvent, _]</code>, assert</li>
+</ul>
+<h2 id="key-patterns"><a class="header" href="#key-patterns">Key Patterns</a></h2>
+<h3 id="none-handling"><a class="header" href="#none-handling">None Handling</a></h3>
+<p>When a <code>DataInput</code> returns <code>None</code> (Rust) or <code>None</code> (Python), the predicate evaluates to <code>False</code> without consulting the matcher. This is the <strong>None → false invariant</strong>.</p>
+<pre><code class="language-python"># Python
+@dataclass(frozen=True, slots=True)
+class EventSubjectInput:
+    def get(self, ctx: CloudEvent, /) -&gt; MatchingValue:
+        return ctx.subject  # May be None
+
+# If subject is None, predicate returns False
+</code></pre>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Rust
+impl DataInput&lt;CloudEvent&gt; for EventSubjectInput {
+    fn get(&amp;self, ctx: &amp;CloudEvent) -&gt; MatchingData {
+        ctx.subject
+            .as_ref()
+            .map(|s| MatchingData::String(s.clone()))
+            .unwrap_or(MatchingData::None)  // Triggers None → false
+    }
+}
+<span class="boring">}</span></code></pre>
+<h3 id="immutability"><a class="header" href="#immutability">Immutability</a></h3>
+<p>All context types should be immutable:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Language</th><th>Pattern</th></tr>
+</thead>
+<tbody>
+<tr><td>Rust</td><td>Don’t provide <code>&amp;mut</code> access, clone when needed</td></tr>
+<tr><td>Python</td><td><code>@dataclass(frozen=True)</code></td></tr>
+<tr><td>TypeScript</td><td><code>readonly</code> fields</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="type-safety"><a class="header" href="#type-safety">Type Safety</a></h3>
+<p>The compiler ensures:</p>
+<ul>
+<li><code>DataInput&lt;CloudEvent&gt;</code> can only be used with <code>Matcher&lt;CloudEvent, A&gt;</code></li>
+<li>You can’t accidentally mix HTTP and CloudEvent inputs in the same matcher</li>
+<li><code>OnMatch</code> is exclusive — action XOR nested matcher, never both</li>
+</ul>
+<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
+<ul>
+<li><a href="#python-api-reference">Python API Reference</a> — puma types</li>
+<li><a href="#rust-api-reference">Rust API Reference</a> — rumi types</li>
+<li><a href="#http-domain-reference">HTTP Domain</a> — Real-world example</li>
+<li><a href="#architecture-1">Architecture</a> — Type system deep dive</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="architecture-1"><a class="header" href="#architecture-1">Architecture</a></h1>
+<p>Why x.uma is built the way it is, and how the same architecture maps across Rust, Python, and TypeScript.</p>
+<h2 id="design-philosophy-aces"><a class="header" href="#design-philosophy-aces">Design Philosophy: ACES</a></h2>
+<p><strong>A</strong>daptable · <strong>C</strong>omposable · <strong>E</strong>xtensible · <strong>S</strong>ustainable</p>
+<pre><code class="language-text">┌─────────────────────────────────────┐
+│         Domain Adapters             │
+│   xuma.http  xuma.claude  xuma.grpc │
+└───────────────┬─────────────────────┘
+                │
+┌───────────────▼─────────────────────┐
+│              PORTS                  │
+│     DataInput       ActionPort      │
+│   (extract data)  (emit result)     │
+└───────────────┬─────────────────────┘
+                │
+┌───────────────▼─────────────────────┐
+│              CORE                   │
+│           Matcher Engine            │
+│     Matcher · Predicate · Tree      │
+│       (pure, domain-agnostic)       │
+└─────────────────────────────────────┘
+</code></pre>
+<p>This architecture applies to <strong>all implementations</strong> — rumi (Rust), puma (Python), bumi (TypeScript). The ports and hexagonal design are language-agnostic.</p>
+<h2 id="the-extension-seam"><a class="header" href="#the-extension-seam">The Extension Seam</a></h2>
+<p><code>TypedExtensionConfig</code> from xDS is the architectural seam:</p>
+<pre><code class="language-protobuf">message TypedExtensionConfig {
+  string name = 1;                       // adapter identifier
+  google.protobuf.Any typed_config = 2;  // adapter config
+}
+</code></pre>
+<p>Every <code>input</code> and <code>action</code> is a port. Adapters are concrete registered types.</p>
+<h2 id="why-type-erasure-at-data-level"><a class="header" href="#why-type-erasure-at-data-level">Why Type Erasure at Data Level</a></h2>
+<p>Key insight from the spike phase: erase types at the <strong>data level</strong>, not the predicate level.</p>
+<h3 id="rust-rumi"><a class="header" href="#rust-rumi">Rust (rumi)</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// MatchingData — the erased type
+pub enum MatchingData { None, String(String), Int(i64), Bool(bool), Bytes(Vec&lt;u8&gt;) }
+
+// DataInput — domain-specific, returns erased type
+pub trait DataInput&lt;Ctx&gt;: Send + Sync + Debug {
+    fn get(&amp;self, ctx: &amp;Ctx) -&gt; MatchingData;
+}
+
+// InputMatcher — domain-agnostic, NON-GENERIC
+pub trait InputMatcher: Send + Sync + Debug {
+    fn matches(&amp;self, value: &amp;MatchingData) -&gt; bool;
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Why this works:</strong></p>
+<ul>
+<li><code>InputMatcher</code> is non-generic → same <code>ExactMatcher</code> works everywhere</li>
+<li>No GATs or complex lifetimes</li>
+<li>Battle-tested at Google scale (Envoy uses this approach)</li>
+</ul>
+<h3 id="python-puma"><a class="header" href="#python-puma">Python (puma)</a></h3>
+<p>Python gets type erasure for free via union types:</p>
+<pre><code class="language-python"># MatchingValue — union type replaces Rust's enum
+type MatchingValue = str | int | bool | bytes | None
+
+# DataInput — protocol with contravariant Ctx
+class DataInput(Protocol[Ctx]):
+    def get(self, ctx: Ctx, /) -&gt; MatchingValue: ...
+
+# InputMatcher — protocol, non-generic
+class InputMatcher(Protocol):
+    def matches(self, value: MatchingValue, /) -&gt; bool: ...
+</code></pre>
+<p><strong>Key differences:</strong></p>
+<ul>
+<li>No enum needed — union types are native</li>
+<li>Protocols instead of traits (runtime-checkable)</li>
+<li><code>MatchingValue</code> is just a type alias, not a wrapped type</li>
+</ul>
+<h3 id="typescript-bumi-planned"><a class="header" href="#typescript-bumi-planned">TypeScript (bumi, planned)</a></h3>
+<pre><code class="language-typescript">// MatchingValue — union type
+type MatchingValue = string | number | boolean | Uint8Array | null;
+
+// DataInput — generic interface
+interface DataInput&lt;Ctx&gt; {
+  get(ctx: Ctx): MatchingValue;
+}
+
+// InputMatcher — non-generic interface
+interface InputMatcher {
+  matches(value: MatchingValue): boolean;
+}
+</code></pre>
+<p><strong>Key differences:</strong></p>
+<ul>
+<li>Interfaces instead of traits/protocols</li>
+<li>Structural typing (duck-typed) vs nominal (Rust) vs runtime-checkable (Python)</li>
+</ul>
+<h2 id="type-system-mappings"><a class="header" href="#type-system-mappings">Type System Mappings</a></h2>
+<p>How the same architecture translates across languages:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Concept</th><th>Rust (rumi)</th><th>Python (puma)</th><th>TypeScript (bumi)</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Erased data</strong></td><td><code>enum MatchingData</code></td><td><code>type MatchingValue</code> (union)</td><td><code>type MatchingValue</code> (union)</td></tr>
+<tr><td><strong>Extraction port</strong></td><td><code>trait DataInput&lt;Ctx&gt;</code></td><td><code>Protocol[Ctx]</code></td><td><code>interface DataInput&lt;Ctx&gt;</code></td></tr>
+<tr><td><strong>Matching port</strong></td><td><code>trait InputMatcher</code></td><td><code>Protocol</code></td><td><code>interface InputMatcher</code></td></tr>
+<tr><td><strong>Predicate tree</strong></td><td><code>enum Predicate&lt;Ctx&gt;</code></td><td><code>type Predicate[Ctx]</code> (union)</td><td><code>type Predicate&lt;Ctx&gt;</code> (discriminated union)</td></tr>
+<tr><td><strong>OnMatch</strong></td><td><code>enum OnMatch&lt;Ctx, A&gt;</code></td><td><code>type OnMatch[Ctx, A]</code> (union)</td><td><code>type OnMatch&lt;Ctx, A&gt;</code> (discriminated union)</td></tr>
+<tr><td><strong>Pattern match</strong></td><td><code>match</code> expression</td><td><code>match</code>/<code>case</code> statement</td><td>Type guards + <code>if</code>/<code>else</code></td></tr>
+<tr><td><strong>Immutability</strong></td><td>Owned types, no <code>mut</code></td><td><code>@dataclass(frozen=True)</code></td><td><code>readonly</code> fields</td></tr>
+<tr><td><strong>Thread safety</strong></td><td><code>Send + Sync</code> bounds</td><td>Not applicable (GIL)</td><td>Not applicable (single-threaded)</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="predicate-composition"><a class="header" href="#predicate-composition">Predicate Composition</a></h2>
+<p>All three languages express the same Boolean logic:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Rust
+pub enum Predicate&lt;Ctx&gt; {
+    Single(SinglePredicate&lt;Ctx&gt;),
+    And { predicates: Vec&lt;Predicate&lt;Ctx&gt;&gt; },
+    Or { predicates: Vec&lt;Predicate&lt;Ctx&gt;&gt; },
+    Not { predicate: Box&lt;Predicate&lt;Ctx&gt;&gt; },
+}
+<span class="boring">}</span></code></pre>
+<pre><code class="language-python"># Python
+type Predicate[Ctx] = SinglePredicate[Ctx] | And[Ctx] | Or[Ctx] | Not[Ctx]
+
+@dataclass(frozen=True)
+class And[Ctx]:
+    predicates: tuple[Predicate[Ctx], ...]
+</code></pre>
+<pre><code class="language-typescript">// TypeScript (planned)
+type Predicate&lt;Ctx&gt; =
+  | { type: 'single'; input: DataInput&lt;Ctx&gt;; matcher: InputMatcher }
+  | { type: 'and'; predicates: Predicate&lt;Ctx&gt;[] }
+  | { type: 'or'; predicates: Predicate&lt;Ctx&gt;[] }
+  | { type: 'not'; predicate: Predicate&lt;Ctx&gt; };
+</code></pre>
+<h2 id="onmatch-exclusivity-xds-semantics"><a class="header" href="#onmatch-exclusivity-xds-semantics">OnMatch Exclusivity (xDS Semantics)</a></h2>
+<p>All three enforce the xDS invariant: action XOR nested matcher, never both.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Rust — illegal states unrepresentable
+pub enum OnMatch&lt;Ctx, A&gt; {
+    Action(A),
+    Matcher(Box&lt;Matcher&lt;Ctx, A&gt;&gt;),
+}
+<span class="boring">}</span></code></pre>
+<pre><code class="language-python"># Python — union type enforces exclusivity
+type OnMatch[Ctx, A] = Action[A] | NestedMatcher[Ctx, A]
+
+@dataclass(frozen=True)
+class Action[A]:
+    value: A
+
+@dataclass(frozen=True)
+class NestedMatcher[Ctx, A]:
+    matcher: Matcher[Ctx, A]
+</code></pre>
+<pre><code class="language-typescript">// TypeScript — discriminated union
+type OnMatch&lt;Ctx, A&gt; =
+  | { type: 'action'; value: A }
+  | { type: 'matcher'; matcher: Matcher&lt;Ctx, A&gt; };
+</code></pre>
+<h2 id="evaluation-semantics"><a class="header" href="#evaluation-semantics">Evaluation Semantics</a></h2>
+<p>First-match-wins is identical across all implementations:</p>
+<ol>
+<li>Evaluate <code>field_matchers</code> in order</li>
+<li>Return action from first matching predicate</li>
+<li>If nested matcher returns <code>None</code>/<code>null</code>, continue to next field</li>
+<li>If no matches, consult <code>on_no_match</code> fallback</li>
+<li>If no fallback, return <code>None</code>/<code>null</code></li>
+</ol>
+<h2 id="cross-language-conformance"><a class="header" href="#cross-language-conformance">Cross-Language Conformance</a></h2>
+<p>All implementations pass the same YAML conformance test suite (<code>spec/tests/</code>):</p>
+<pre><code class="language-yaml"># spec/tests/predicate/single/exact.yaml
+name: "Single predicate with exact match"
+cases:
+  - input: "hello"
+    matcher: { exact: "hello" }
+    expected: { matches: true }
+</code></pre>
+<p><strong>Test runners:</strong></p>
+<ul>
+<li>Rust: <code>cargo test</code> (rumi-test crate)</li>
+<li>Python: <code>pytest</code> (puma/tests/)</li>
+<li>TypeScript: <code>bun test</code> (b.uma/tests/, planned)</li>
+</ul>
+<p>Each language’s test runner parses the same YAML fixtures, constructs matchers in its type system, and asserts the same expected outcomes.</p>
+<h2 id="cratepackage-structure"><a class="header" href="#cratepackage-structure">Crate/Package Structure</a></h2>
+<h3 id="rust-rumi-1"><a class="header" href="#rust-rumi-1">Rust (rumi)</a></h3>
+<pre><code class="language-text">rumi/
+├── rumi/               # Core engine (package: rumi)
+└── ext/                # Domain extensions
+    ├── test/           # rumi-test (conformance)
+    ├── http/           # rumi-http
+    └── claude/         # rumi-claude (Claude Code hooks)
+</code></pre>
+<p>Dependencies point inward. Core knows nothing about domains.</p>
+<h3 id="python-puma-1"><a class="header" href="#python-puma-1">Python (puma)</a></h3>
+<pre><code class="language-text">puma/
+└── src/puma/
+    ├── __init__.py     # Core types (flat exports)
+    ├── _types.py       # Protocols
+    ├── _predicate.py   # Predicates
+    ├── _matcher.py     # Matcher tree
+    ├── _string_matchers.py
+    └── http/
+        ├── __init__.py # HTTP domain (flat exports)
+        ├── _request.py
+        ├── _inputs.py
+        └── _gateway.py # Gateway API compiler
+</code></pre>
+<p>Flat exports via <code>__init__.py</code>. Private modules prefixed with <code>_</code>.</p>
+<h3 id="typescript-bumi-planned-1"><a class="header" href="#typescript-bumi-planned-1">TypeScript (bumi, planned)</a></h3>
+<pre><code class="language-text">b.uma/
+└── src/
+    ├── index.ts        # Core types
+    ├── types.ts        # Protocols/interfaces
+    ├── predicate.ts
+    ├── matcher.ts
+    ├── string-matchers.ts
+    └── http/
+        ├── index.ts    # HTTP domain
+        ├── request.ts
+        ├── inputs.ts
+        └── gateway.ts  # Gateway API compiler
+</code></pre>
+<p>Standard TypeScript barrel exports.</p>
+<h2 id="performance-characteristics"><a class="header" href="#performance-characteristics">Performance Characteristics</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Implementation</th><th>Regex Engine</th><th>Thread Safety</th><th>Memory Model</th></tr>
+</thead>
+<tbody>
+<tr><td>rumi (Rust)</td><td><code>regex</code> crate (linear-time)</td><td>Send + Sync</td><td>Zero-copy where possible</td></tr>
+<tr><td>puma (Python)</td><td><code>re</code> module (backtracking)</td><td>GIL (not parallel-safe)</td><td>Reference-counted</td></tr>
+<tr><td>puma-crusty</td><td><code>regex</code> via uniffi (linear-time)</td><td>GIL</td><td>Crossing FFI boundary</td></tr>
+<tr><td>bumi (TypeScript)</td><td>JS <code>RegExp</code> (V8 engine)</td><td>Single-threaded</td><td>Garbage-collected</td></tr>
+<tr><td>bumi-crusty</td><td><code>regex</code> via WASM (linear-time)</td><td>Single-threaded</td><td>Crossing WASM boundary</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="why-multiple-implementations"><a class="header" href="#why-multiple-implementations">Why Multiple Implementations?</a></h2>
+<p><strong>Ecosystem reach:</strong> Deploy matchers where your code lives.</p>
+<ul>
+<li>Rust: Envoy ext_proc, high-performance services</li>
+<li>Python: Data pipelines, ML inference, scripting</li>
+<li>TypeScript: Edge workers (Cloudflare, Deno), serverless</li>
+</ul>
+<p><strong>Reference consistency:</strong> All implementations are ports, not wrappers. Same architecture, same semantics, same test suite.</p>
+<p><strong>Learning path:</strong> Pure implementations (rumi, puma, bumi) are readable references. Crusty variants (uniffi, WASM) provide Rust performance when needed.</p>
+<h2 id="see-also-1"><a class="header" href="#see-also-1">See Also</a></h2>
+<ul>
+<li><a href="#roadmap">Roadmap</a> — Implementation status</li>
+<li><a href="#adding-a-domain">Adding a Domain</a> — Extend with custom contexts</li>
+<li><a href="#why-aces">Why ACES</a> — Design philosophy deep dive</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="why-aces"><a class="header" href="#why-aces">Why ACES</a></h1>
+<p>The design principles behind x.uma.</p>
+<h2 id="the-problem"><a class="header" href="#the-problem">The Problem</a></h2>
+<p>Matchers are everywhere: routing, filtering, access control, feature flags. But most implementations are:</p>
+<ul>
+<li><strong>Tightly coupled</strong> to one domain (HTTP only, or gRPC only)</li>
+<li><strong>Hard to extend</strong> without forking</li>
+<li><strong>Inconsistent</strong> across languages</li>
+</ul>
+<h2 id="aces-principles"><a class="header" href="#aces-principles">ACES Principles</a></h2>
+<h3 id="adaptable"><a class="header" href="#adaptable">Adaptable</a></h3>
+<p>New domains plug in without touching core.</p>
+<pre><code class="language-text">Adding HTTP support? → Create rumi/ext/http/
+Adding Claude Code hooks? → Create rumi/ext/claude/
+Core unchanged.
+</code></pre>
+<h3 id="composable"><a class="header" href="#composable">Composable</a></h3>
+<p>Matchers nest. Predicates AND/OR/NOT. Trees recurse.</p>
+<pre><code class="language-rust ignore">// Predicates compose naturally with AND/OR/NOT
+Predicate::And(vec![
+    Predicate::Single(SinglePredicate::new(
+        Box::new(PathInput),
+        Box::new(PrefixMatcher::new("/api/")),
+    )),
+    Predicate::Or(vec![
+        Predicate::Single(SinglePredicate::new(
+            Box::new(MethodInput),
+            Box::new(ExactMatcher::new("GET")),
+        )),
+        Predicate::Single(SinglePredicate::new(
+            Box::new(MethodInput),
+            Box::new(ExactMatcher::new("POST")),
+        )),
+    ]),
+])</code></pre>
+<h3 id="extensible"><a class="header" href="#extensible">Extensible</a></h3>
+<p><code>TypedExtensionConfig</code> is the extension seam. Register new types at startup, use them in configs.</p>
+<pre><code class="language-yaml">input:
+  "@type": "type.googleapis.com/xuma.http.v1.HeaderInput"
+  header_name: "authorization"
+</code></pre>
+<h3 id="sustainable"><a class="header" href="#sustainable">Sustainable</a></h3>
+<p>Core is stable. Growth happens at edges.</p>
+<ul>
+<li><strong>v1.0</strong> → Core traits locked</li>
+<li><strong>v1.x</strong> → New domains, new matchers, same core</li>
+<li><strong>No rewrites</strong> → Hexagonal architecture pays off</li>
+</ul>
+<h2 id="inspired-by"><a class="header" href="#inspired-by">Inspired By</a></h2>
+<ul>
+<li><strong>Envoy</strong> — Production-proven matcher implementation at Google scale</li>
+<li><strong>xDS</strong> — Protocol that powers service mesh configuration</li>
+<li><strong>Hexagonal Architecture</strong> — Ports and adapters pattern</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="policy-landscape"><a class="header" href="#policy-landscape">Policy Landscape</a></h1>
+<p>Where x.uma fits in the broader policy engine ecosystem, and why agent tool control is greenfield territory.</p>
+<h2 id="xuma-is-a-policy-engine"><a class="header" href="#xuma-is-a-policy-engine">x.uma IS a Policy Engine</a></h2>
+<p>At its core, x.uma evaluates structured input against composable rules and returns a decision. This is the fundamental contract of every policy engine:</p>
+<pre><code class="language-text">Input → Rules → Decision
+</code></pre>
+<p>x.uma implements the xDS Unified Matcher API — the same matching engine Envoy uses for RBAC enforcement, rate limiting, and routing at Google scale. The architecture is proven in production at companies running millions of requests per second.</p>
+<p>The mechanics:</p>
+<ol>
+<li>Structured input (HTTP request, agent context, etc.)</li>
+<li>Evaluation against a matcher tree (AND/OR/NOT predicates)</li>
+<li>Return a decision (generic action <code>A</code>)</li>
+</ol>
+<p>This is policy evaluation. The domain-agnostic core means the same engine handles HTTP routing decisions and agent tool control decisions.</p>
+<h2 id="the-established-standards"><a class="header" href="#the-established-standards">The Established Standards</a></h2>
+<p>The policy engine landscape has mature, well-adopted standards. Each emerged to solve specific problems.</p>
+<h3 id="opa-open-policy-agent"><a class="header" href="#opa-open-policy-agent">OPA (Open Policy Agent)</a></h3>
+<p><strong>What it is:</strong> CNCF graduated project maintained by Styra. Domain-agnostic policy evaluation using the Rego language (Datalog-based).</p>
+<p><strong>Model:</strong> Input→Rules→Decision. You write Rego policies that query input documents and produce allow/deny decisions (or complex JSON responses).</p>
+<p><strong>Adoption:</strong> Netflix (microservice authorization), Goldman Sachs (compliance), Kubernetes Gatekeeper (admission control).</p>
+<p><strong>Strength:</strong> Highly flexible. Works for any domain because Rego is a general-purpose query language.</p>
+<h3 id="cedar"><a class="header" href="#cedar">Cedar</a></h3>
+<p><strong>What it is:</strong> AWS-developed authorization language, open-sourced in 2023. Purpose-built for access control with formal verification.</p>
+<p><strong>Model:</strong> PARC (Principal-Action-Resource-Context). Policies explicitly state which principals can perform which actions on which resources, given context.</p>
+<pre><code class="language-cedar">permit(
+  principal == User::"alice",
+  action == Action::"readFile",
+  resource in Folder::"docs"
+);
+</code></pre>
+<p><strong>Adoption:</strong> Amazon Verified Permissions (GA), AWS Verified Access.</p>
+<p><strong>Strength:</strong> Formal verification via Dafny — provably correct policies. The language design prevents entire classes of authorization bugs.</p>
+<h3 id="xacml"><a class="header" href="#xacml">XACML</a></h3>
+<p><strong>What it is:</strong> OASIS standard since 2001. XML-based policy language that coined the PEP/PDP/PAP/PIP vocabulary the entire industry uses.</p>
+<p><strong>Model:</strong> Policy Decision Point (PDP) evaluates requests from Policy Enforcement Points (PEP). Policies authored in Policy Administration Points (PAP), context from Policy Information Points (PIP).</p>
+<p><strong>Adoption:</strong> Government, healthcare, finance (HIPAA compliance workflows).</p>
+<p><strong>Strength:</strong> Standardization. When two systems need to interoperate on authorization, XACML is the lingua franca.</p>
+<h3 id="zanzibar-and-relationship-engines"><a class="header" href="#zanzibar-and-relationship-engines">Zanzibar and Relationship Engines</a></h3>
+<p><strong>What they are:</strong> Google’s Zanzibar (2019 paper), OpenFGA, SpiceDB. Relationship-based access control (ReBAC) via graph traversal.</p>
+<p><strong>Model:</strong> Not rule evaluation. Instead: “Does a path exist in the authorization graph from user to resource?”</p>
+<p>Example: “Can alice view doc123?” → Check if graph contains <code>alice -[member]→ team -[viewer]→ doc123</code>.</p>
+<p><strong>Adoption:</strong> Google (Drive, Calendar, Cloud), Airbnb (OpenFGA), Auth0 (FGA product).</p>
+<p><strong>Strength:</strong> Scales to billions of relationships. Natural fit for social graphs and hierarchical permissions.</p>
+<p><strong>Key difference:</strong> ReBAC engines don’t evaluate predicates. They traverse graphs. Different problem space.</p>
+<h2 id="the-agent-policy-gap"><a class="header" href="#the-agent-policy-gap">The Agent Policy Gap</a></h2>
+<p>As of February 2026, there is no established standard for AI agent tool control policies. The space is fragmented.</p>
+<h3 id="what-exists-today"><a class="header" href="#what-exists-today">What Exists Today</a></h3>
+<p><strong>AWS Bedrock AgentCore</strong> (re:Invent 2025): Cedar-based policy engine for agent-to-tool interactions. Closest production system. Uses Cedar’s PARC model: agent is principal, tool is action, parameters are context.</p>
+<p><strong>OpenAI Agents SDK</strong>: “Guardrails” with binary tripwires. Simple allow/deny on tool invocations based on pattern matching.</p>
+<p><strong>NVIDIA NeMo Guardrails</strong>: “Rails” DSL (Colang) for conversation flow control. Includes tool call filtering but tightly coupled to NeMo.</p>
+<p><strong>Claude Code</strong>: Hooks system with matcher patterns. <code>PreToolUse</code> hooks support allow/deny/ask (ternary decision) plus parameter mutation.</p>
+<p><strong>MCP (Model Context Protocol)</strong>: No built-in policy layer. Delegates to host implementation. The protocol itself is policy-agnostic.</p>
+<h3 id="industry-recognition-of-the-gap"><a class="header" href="#industry-recognition-of-the-gap">Industry Recognition of the Gap</a></h3>
+<p><strong>OWASP Top 10 for Agentic Applications (2026)</strong> identifies “Tool Misuse” as risk #2. Recommendations:</p>
+<ul>
+<li>Policy controls at tool boundaries</li>
+<li>Principle of Least Agency (minimize tool access)</li>
+<li>Audit logging of tool invocations</li>
+</ul>
+<p><strong>MIT Technology Review</strong> (Feb 2026, “From Guardrails to Governance”): Advocates treating agents as semi-autonomous users and enforcing rules at boundaries, not just prompting.</p>
+<p>The pattern is clear: the industry recognizes the need for policy control but lacks a unified standard. Current approaches are vendor-specific.</p>
+<h2 id="where-xuma-fits"><a class="header" href="#where-xuma-fits">Where x.uma Fits</a></h2>
+<p>x.uma is uniquely positioned because it was designed domain-agnostic from day one.</p>
+<h3 id="why-this-matters"><a class="header" href="#why-this-matters">Why This Matters</a></h3>
+<p>Most policy engines are built for one domain and later adapted:</p>
+<ul>
+<li>OPA: started as microservice authorization, generalized</li>
+<li>Cedar: built for AWS resource authorization</li>
+<li>Guardrails: built for LLM conversation control</li>
+</ul>
+<p>x.uma started with the insight that <strong>matching is matching</strong>, whether you’re routing HTTP traffic or controlling agent tool access. The same AND/OR/NOT predicate logic, the same first-match-wins semantics, the same depth limits and ReDoS protection.</p>
+<p>The architecture makes this natural:</p>
+<pre><code class="language-text">┌─────────────────────────────────┐
+│       Domain Adapters           │
+│  xuma.http  xuma.claude  xuma.grpc │
+└───────────────┬─────────────────┘
+                │
+┌───────────────▼─────────────────┐
+│            PORTS                │
+│   DataInput      ActionPort     │
+└───────────────┬─────────────────┘
+                │
+┌───────────────▼─────────────────┐
+│            CORE                 │
+│        Matcher Engine           │
+│    (domain-agnostic)            │
+└─────────────────────────────────┘
+</code></pre>
+<p>Adding Claude Code hooks is just another domain adapter. Core unchanged. Adding MCP, OpenAI, or any other agent framework would be another.</p>
+<h3 id="cross-language-reality"><a class="header" href="#cross-language-reality">Cross-Language Reality</a></h3>
+<p>Real systems are polyglot:</p>
+<ul>
+<li>ML inference pipelines: Python</li>
+<li>Edge workers: TypeScript (Cloudflare, Deno)</li>
+<li>High-throughput services: Rust</li>
+</ul>
+<p>x.uma works natively in all three:</p>
+<ul>
+<li><strong>rumi</strong> (Rust): Zero-overhead, Send+Sync for concurrency</li>
+<li><strong>puma</strong> (Python): Pure Python, no FFI for simple cases</li>
+<li><strong>bumi</strong> (TypeScript): Edge-native, runs in V8 isolates</li>
+</ul>
+<p>Plus Rust-backed bindings (<code>puma-crusty</code>, <code>bumi-crusty</code>) when performance matters.</p>
+<p>This isn’t just convenience. Agent systems span languages. Your agent runtime might be Python, your ext_proc filter might be Rust, your edge worker might be TypeScript. One policy standard that works everywhere.</p>
+<h3 id="battle-tested-semantics"><a class="header" href="#battle-tested-semantics">Battle-Tested Semantics</a></h3>
+<p>x.uma doesn’t invent new policy semantics. It implements xDS Unified Matcher API — the protocol Envoy uses. This means:</p>
+<ul>
+<li><strong>Proven at scale</strong>: Google runs this in production</li>
+<li><strong>Well-specified</strong>: xDS proto definitions are the source of truth</li>
+<li><strong>Debugged edge cases</strong>: nested matcher failure semantics, on_no_match fallback behavior</li>
+</ul>
+<p>You’re not betting on a new policy language. You’re using Google’s battle-tested approach in a new domain.</p>
+<h2 id="xumaclaude--claude-code-as-first-agent-domain"><a class="header" href="#xumaclaude--claude-code-as-first-agent-domain">xuma.claude — Claude Code as First Agent Domain</a></h2>
+<p>The <code>xuma.claude.v1</code> domain applies x.uma’s matcher architecture to Claude Code’s hook event system — the first concrete agent adapter.</p>
+<h3 id="why-start-with-claude-code"><a class="header" href="#why-start-with-claude-code">Why Start with Claude Code?</a></h3>
+<p>Claude Code has a rich hook event model with 9 event types spanning tool lifecycle, agent lifecycle, user interaction, and session management. This makes it an ideal first domain adapter:</p>
+<ul>
+<li><strong>Structured context</strong>: Every hook receives <code>session_id</code>, <code>cwd</code>, <code>permission_mode</code>, plus event-specific fields</li>
+<li><strong>Multiple decision models</strong>: allow/deny/ask + modify (tools), approve/block (stop), feedback (post-tool)</li>
+<li><strong>Real enforcement point</strong>: Hooks ARE a Policy Enforcement Point (PEP) — x.uma becomes the PDP behind them</li>
+</ul>
+<h3 id="mapping-the-parc-model"><a class="header" href="#mapping-the-parc-model">Mapping the PARC Model</a></h3>
+<p>Cedar’s PARC model (Principal-Action-Resource-Context) maps naturally to agent scenarios:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>PARC Element</th><th>Agent Equivalent</th><th>Example</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Principal</strong></td><td>Agent (or user delegating to agent)</td><td><code>agent:claude-sonnet-4</code></td></tr>
+<tr><td><strong>Action</strong></td><td>Tool being invoked</td><td><code>tools:bash</code>, <code>tools:read_file</code></td></tr>
+<tr><td><strong>Resource</strong></td><td>What the tool operates on</td><td><code>/etc/passwd</code>, <code>s3://bucket/data</code></td></tr>
+<tr><td><strong>Context</strong></td><td>Parameters, session state</td><td><code>{depth: 5, recursive: true}</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="decision-model-spectrum"><a class="header" href="#decision-model-spectrum">Decision Model Spectrum</a></h3>
+<p>Agent policy engines need to support the full decision spectrum:</p>
+<p><strong>Binary:</strong> Allow or deny.</p>
+<pre><code class="language-yaml">action: { allow: true }
+</code></pre>
+<p><strong>Ternary:</strong> Allow, deny, or escalate to human.</p>
+<pre><code class="language-yaml">action: { escalate: { reason: "Sensitive file access" } }
+</code></pre>
+<p><strong>Mutation:</strong> Modify tool input before execution.</p>
+<pre><code class="language-yaml">action: {
+  modify: {
+    max_depth: 3,  # Override requested depth
+    exclude_patterns: ["*.key", "*.pem"]
+  }
+}
+</code></pre>
+<p>Claude Code’s hook model (allow/deny/ask + modify) is the richest in the industry. Starting here means the architecture handles simpler models (binary, ternary) by subsumption.</p>
+<h3 id="proto-namespace"><a class="header" href="#proto-namespace">Proto Namespace</a></h3>
+<p><code>xuma.claude.v1</code> is the proto package for Claude Code hooks.</p>
+<p>Type URLs follow the standard pattern:</p>
+<ul>
+<li><code>type.googleapis.com/xuma.claude.v1.HookContext</code></li>
+<li><code>type.googleapis.com/xuma.claude.v1.AllowAction</code></li>
+<li><code>type.googleapis.com/xuma.claude.v1.BlockAction</code></li>
+</ul>
+<p>The hexagonal architecture means adding other agent frameworks is just another domain adapter — <code>xuma.mcp.v1</code>, <code>xuma.openai.v1</code>, etc. — without touching core or the Claude adapter.</p>
+<h2 id="comparison-to-established-engines"><a class="header" href="#comparison-to-established-engines">Comparison to Established Engines</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th></th><th>OPA</th><th>Cedar</th><th>x.uma</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Language</strong></td><td>Rego (Datalog)</td><td>Cedar (custom)</td><td>Matcher trees (compiled from proto)</td></tr>
+<tr><td><strong>Model</strong></td><td>Input→Rules→JSON</td><td>PARC→permit/forbid</td><td>Context→Predicates→Action</td></tr>
+<tr><td><strong>Domain focus</strong></td><td>Agnostic</td><td>Authorization</td><td>Agnostic</td></tr>
+<tr><td><strong>Agent-native</strong></td><td>No</td><td>Partial (AgentCore uses it)</td><td>Yes (<code>xuma.claude</code> first, more domains planned)</td></tr>
+<tr><td><strong>Cross-language</strong></td><td>Go + WASM bindings</td><td>Rust + Java bindings</td><td>Rust, Python, TypeScript (native + bindings)</td></tr>
+<tr><td><strong>Formal verification</strong></td><td>No</td><td>Yes (Dafny proofs)</td><td>Type safety + depth limits + linear-time regex</td></tr>
+<tr><td><strong>Extension model</strong></td><td>Rego functions</td><td>Cedar extensions (limited)</td><td><code>TypedExtensionConfig</code> (open)</td></tr>
+<tr><td><strong>Evaluation model</strong></td><td>Query language</td><td>Policy search + decision</td><td>Tree traversal (first-match-wins)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="when-to-use-what"><a class="header" href="#when-to-use-what">When to Use What</a></h3>
+<p><strong>Use OPA if:</strong></p>
+<ul>
+<li>You need a general-purpose policy language</li>
+<li>Complex queries over input data</li>
+<li>Integration with Kubernetes (Gatekeeper)</li>
+</ul>
+<p><strong>Use Cedar if:</strong></p>
+<ul>
+<li>AWS ecosystem</li>
+<li>Formal verification is critical</li>
+<li>Classic authorization (PARC model is natural)</li>
+</ul>
+<p><strong>Use x.uma if:</strong></p>
+<ul>
+<li>Agent event policy is your domain</li>
+<li>Polyglot codebase (Rust + Python + TypeScript)</li>
+<li>You want Envoy-proven semantics</li>
+<li>Domain adapters fit your architecture</li>
+</ul>
+<p>They’re not mutually exclusive. Some systems use OPA for high-level policy and x.uma for low-level matcher logic (HTTP routing, tool filtering).</p>
+<h2 id="the-vision"><a class="header" href="#the-vision">The Vision</a></h2>
+<p>x.uma is alpha (v0.1). This is the roadmap:</p>
+<p><strong>Phase 6-7 (current):</strong> Complete <code>bumi</code> (TypeScript) and Rust bindings (<code>puma-crusty</code>, <code>bumi-crusty</code>).</p>
+<p><strong>Phase 8:</strong> Enrich <code>xuma.claude.v1</code> with full hook event model.</p>
+<p><strong>Phase 9:</strong> Benchmarks. Prove performance against native implementations.</p>
+<p><strong>v1.0:</strong> Lock core traits. Extension ecosystem opens.</p>
+<p><strong>Beyond v1.0:</strong> Additional agent domains (<code>xuma.mcp</code>, <code>xuma.openai</code>) as the need materializes. The vendor-agnostic agent policy standard emerges from concrete implementations, not from premature abstraction.</p>
+<p>No established standard exists for AI agent tool policy. This is greenfield. x.uma’s approach — start concrete with one agent (Claude Code), prove the architecture, then generalize — is how standards earn adoption.</p>
+<p>The gap exists. The need is recognized (OWASP, MIT Tech Review, AWS AgentCore). x.uma fills it with production-proven architecture, cross-language support, and domain-agnostic design.</p>
+<h2 id="sources"><a class="header" href="#sources">Sources</a></h2>
+<p><strong>Policy Standards:</strong></p>
+<ul>
+<li><a href="https://www.openpolicyagent.org/">OPA Documentation</a> — CNCF graduated project</li>
+<li><a href="https://www.cedarpolicy.com/">Cedar Language Guide</a> — AWS open-source authorization language</li>
+<li><a href="https://www.oasis-open.org/committees/xacml/">XACML v3.0 Specification</a> — OASIS standard</li>
+<li><a href="https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/">Zanzibar: Google’s Authorization System</a> — ReBAC research paper</li>
+</ul>
+<p><strong>Agent Policy Landscape:</strong></p>
+<ul>
+<li><a href="https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/policy.html">AWS Bedrock AgentCore Policy Engine</a> — Cedar-based agent authorization</li>
+<li><a href="https://openai.github.io/openai-agents-python/guardrails/">OpenAI Agents SDK Guardrails</a> — Binary tripwire model</li>
+<li><a href="https://github.com/NVIDIA-NeMo/Guardrails">NVIDIA NeMo Guardrails</a> — Rails DSL for conversation control</li>
+<li><a href="https://docs.anthropic.com/en/docs/claude-code/hooks">Claude Code Hooks</a> — PreToolUse matcher patterns</li>
+<li><a href="https://modelcontextprotocol.io/specification/2025-11-25">Model Context Protocol</a> — Protocol specification</li>
+</ul>
+<p><strong>Security &amp; Governance:</strong></p>
+<ul>
+<li><a href="https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/">OWASP Top 10 for Agentic Applications (2026)</a> — Tool Misuse as risk #2</li>
+<li><a href="https://www.technologyreview.com/2026/02/04/1131014/from-guardrails-to-governance-a-ceos-guide-for-securing-agentic-systems/">MIT Technology Review: From Guardrails to Governance</a> — Treating agents as semi-autonomous users</li>
+</ul>
+<p><strong>xDS &amp; Envoy:</strong></p>
+<ul>
+<li><a href="https://www.envoyproxy.io/docs/envoy/latest/api-docs/xds_protocol">xDS Protocol</a> — Service mesh configuration protocol</li>
+<li><a href="https://github.com/envoyproxy/envoy/tree/main/source/common/matcher">Envoy Matcher Implementation</a> — Reference C++ implementation</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="proto-api-reference"><a class="header" href="#proto-api-reference">Proto API Reference</a></h1>
+<blockquote>
+<p>Auto-generated from <code>proto/xuma/**/*.proto</code></p>
+</blockquote>
+<h2 id="browse"><a class="header" href="#browse">Browse</a></h2>
+<iframe src="../generated/proto/index.html" width="100%" height="600px" frameborder="0"></iframe>
+<h2 id="packages"><a class="header" href="#packages">Packages</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Package</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>xuma.core.v1</code></td><td>Base types, registry</td></tr>
+<tr><td><code>xuma.test.v1</code></td><td>Conformance testing inputs</td></tr>
+<tr><td><code>xuma.http.v1</code></td><td>HTTP domain (headers, path, method)</td></tr>
+<tr><td><code>xuma.claude.v1</code></td><td>Claude Code hooks domain</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="type-urls"><a class="header" href="#type-urls">Type URLs</a></h2>
+<pre><code class="language-text">type.googleapis.com/xuma.core.v1.TypedExtensionConfig
+type.googleapis.com/xuma.test.v1.StringInput
+type.googleapis.com/xuma.http.v1.HeaderInput
+type.googleapis.com/xuma.claude.v1.HookContext
+</code></pre>
+<h2 id="source"><a class="header" href="#source">Source</a></h2>
+<ul>
+<li><a href="https://github.com/mox-labs/x.uma/tree/main/proto/xuma">proto/xuma/</a></li>
+<li><a href="https://github.com/mox-labs/x.uma/blob/main/buf.yaml">buf.yaml</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="rust-api-reference"><a class="header" href="#rust-api-reference">Rust API Reference</a></h1>
+<blockquote>
+<p>Auto-generated from <code>rumi/**/*.rs</code> via <code>cargo doc</code></p>
+</blockquote>
+<h2 id="browse-1"><a class="header" href="#browse-1">Browse</a></h2>
+<iframe src="../generated/rust/rumi/index.html" width="100%" height="600px" frameborder="0"></iframe>
+<h2 id="crates"><a class="header" href="#crates">Crates</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Crate</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><a href="generated/rust/rumi/index.html"><code>rumi</code></a></td><td>Core engine</td></tr>
+<tr><td><a href="generated/rust/rumi_test/index.html"><code>rumi-test</code></a></td><td>Conformance testing</td></tr>
+<tr><td><a href="generated/rust/rumi_http/index.html"><code>rumi-http</code></a></td><td>HTTP matching</td></tr>
+<tr><td><a href="generated/rust/rumi_claude/index.html"><code>rumi-claude</code></a></td><td>Claude Code hooks</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="quick-links"><a class="header" href="#quick-links">Quick Links</a></h2>
+<ul>
+<li><a href="generated/rust/rumi/trait.DataInput.html"><code>DataInput</code></a> — Extract data from context</li>
+<li><a href="generated/rust/rumi/trait.InputMatcher.html"><code>InputMatcher</code></a> — Match against data</li>
+<li><a href="generated/rust/rumi/enum.Predicate.html"><code>Predicate</code></a> — Boolean composition</li>
+<li><a href="generated/rust/rumi/struct.Matcher.html"><code>Matcher</code></a> — Top-level container</li>
+</ul>
+<h2 id="source-1"><a class="header" href="#source-1">Source</a></h2>
+<ul>
+<li><a href="https://github.com/mox-labs/x.uma/tree/main/rumi">rumi/</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="python-api-reference"><a class="header" href="#python-api-reference">Python API Reference</a></h1>
+<p>puma implements the xDS Unified Matcher API in pure Python. Zero dependencies. Python 3.12+.</p>
+<p><strong>Package:</strong> <code>puma</code> (from <code>puma/</code> directory)</p>
+<p><strong>Installation:</strong></p>
+<pre><code class="language-bash">pip install puma
+# or with uv
+uv add puma
+</code></pre>
+<h2 id="import-hierarchy"><a class="header" href="#import-hierarchy">Import Hierarchy</a></h2>
+<p>All public types exported flat from top level:</p>
+<pre><code class="language-python">from puma import (
+    # Protocols
+    DataInput, InputMatcher, MatchingData,
+    # Predicates
+    SinglePredicate, And, Or, Not, Predicate, predicate_depth,
+    # Matcher
+    Matcher, FieldMatcher, OnMatch, Action, NestedMatcher, MatcherError,
+    # String matchers
+    ExactMatcher, PrefixMatcher, SuffixMatcher, ContainsMatcher, RegexMatcher,
+)
+
+from puma.http import (
+    # Context
+    HttpRequest,
+    # DataInputs
+    PathInput, MethodInput, HeaderInput, QueryParamInput,
+    # Gateway API types
+    HttpPathMatch, HttpHeaderMatch, HttpQueryParamMatch, HttpRouteMatch,
+    compile_route_matches,
+)
+</code></pre>
+<h2 id="type-hierarchy"><a class="header" href="#type-hierarchy">Type Hierarchy</a></h2>
+<pre><code>┌─────────────────────────────────────┐
+│          Matcher[Ctx, A]            │
+│   Top-level tree, returns A|None    │
+└───┬─────────────────────────────────┘
+    │ contains
+    ├──► FieldMatcher[Ctx, A]
+    │       predicate + on_match
+    │
+    └──► OnMatch[Ctx, A]  (fallback)
+         ├─ Action[A]
+         └─ NestedMatcher[Ctx, A]
+
+┌─────────────────────────────────────┐
+│         Predicate[Ctx]              │
+│      Boolean logic tree             │
+└───┬─────────────────────────────────┘
+    ├─ SinglePredicate[Ctx] → input + matcher
+    ├─ And[Ctx] → all match
+    ├─ Or[Ctx] → any match
+    └─ Not[Ctx] → invert
+
+┌─────────────────────────────────────┐
+│    DataInput[Ctx] protocol          │
+│   extract MatchingData from Ctx    │
+└─────────────────────────────────────┘
+
+┌─────────────────────────────────────┐
+│    InputMatcher protocol            │
+│   match MatchingData → bool        │
+└───┬─────────────────────────────────┘
+    ├─ ExactMatcher
+    ├─ PrefixMatcher
+    ├─ SuffixMatcher
+    ├─ ContainsMatcher
+    └─ RegexMatcher
+</code></pre>
+<h2 id="core-protocols"><a class="header" href="#core-protocols">Core Protocols</a></h2>
+<h3 id="matchingdata"><a class="header" href="#matchingdata">MatchingData</a></h3>
+<pre><code class="language-python">type MatchingData = str | int | bool | bytes | None
+</code></pre>
+<p>Type-erased value returned by <code>DataInput.get()</code>. Replaces Rust’s <code>MatchingData</code> enum.</p>
+<p>Returning <code>None</code> triggers the <strong>None → false invariant</strong>: predicate evaluates to <code>False</code> without consulting the matcher.</p>
+<h3 id="datainputctx"><a class="header" href="#datainputctx">DataInput[Ctx]</a></h3>
+<pre><code class="language-python">class DataInput(Protocol[Ctx]):
+    def get(self, ctx: Ctx, /) -&gt; MatchingData: ...
+</code></pre>
+<p>Domain-specific extraction port. Implementations:</p>
+<ul>
+<li><code>PathInput</code> extracts HTTP path</li>
+<li><code>HeaderInput</code> extracts HTTP header by name</li>
+<li>Custom: implement this protocol for your domain</li>
+</ul>
+<p><strong>Contravariant in Ctx</strong> — accepts <code>Ctx</code> or any supertype.</p>
+<h3 id="inputmatcher"><a class="header" href="#inputmatcher">InputMatcher</a></h3>
+<pre><code class="language-python">class InputMatcher(Protocol):
+    def matches(self, value: MatchingData, /) -&gt; bool: ...
+</code></pre>
+<p>Domain-agnostic matching port. Non-generic by design — same <code>ExactMatcher</code> works for HTTP, CloudEvent, or any custom domain.</p>
+<h2 id="predicates"><a class="header" href="#predicates">Predicates</a></h2>
+<h3 id="singlepredicatectx"><a class="header" href="#singlepredicatectx">SinglePredicate[Ctx]</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class SinglePredicate[Ctx]:
+    input: DataInput[Ctx]
+    matcher: InputMatcher
+
+    def evaluate(self, ctx: Any) -&gt; bool: ...
+</code></pre>
+<p>Combines extraction + matching. Enforces the <strong>None → false invariant</strong>.</p>
+<h3 id="andctx"><a class="header" href="#andctx">And[Ctx]</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class And[Ctx]:
+    predicates: tuple[Predicate[Ctx], ...]
+
+    def evaluate(self, ctx: Any) -&gt; bool: ...
+</code></pre>
+<p>All predicates must match. Short-circuits on first <code>False</code>. Empty tuple returns <code>True</code> (vacuous truth).</p>
+<h3 id="orctx"><a class="header" href="#orctx">Or[Ctx]</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class Or[Ctx]:
+    predicates: tuple[Predicate[Ctx], ...]
+
+    def evaluate(self, ctx: Any) -&gt; bool: ...
+</code></pre>
+<p>Any predicate must match. Short-circuits on first <code>True</code>. Empty tuple returns <code>False</code>.</p>
+<h3 id="notctx"><a class="header" href="#notctx">Not[Ctx]</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class Not[Ctx]:
+    predicate: Predicate[Ctx]
+
+    def evaluate(self, ctx: Any) -&gt; bool: ...
+</code></pre>
+<p>Inverts inner predicate result.</p>
+<h3 id="predicatectx"><a class="header" href="#predicatectx">Predicate[Ctx]</a></h3>
+<pre><code class="language-python">type Predicate[Ctx] = SinglePredicate[Ctx] | And[Ctx] | Or[Ctx] | Not[Ctx]
+</code></pre>
+<p>Union type for pattern matching via <code>match</code>/<code>case</code>.</p>
+<h3 id="predicate_depth"><a class="header" href="#predicate_depth">predicate_depth()</a></h3>
+<pre><code class="language-python">def predicate_depth(p: Predicate[Any]) -&gt; int: ...
+</code></pre>
+<p>Calculate nesting depth of predicate tree. Used by <code>Matcher.validate()</code> for depth limit enforcement.</p>
+<h2 id="matcher-tree"><a class="header" href="#matcher-tree">Matcher Tree</a></h2>
+<h3 id="matcherctx-a"><a class="header" href="#matcherctx-a">Matcher[Ctx, A]</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class Matcher[Ctx, A]:
+    matcher_list: tuple[FieldMatcher[Ctx, A], ...]
+    on_no_match: OnMatch[Ctx, A] | None = None
+
+    def evaluate(self, ctx: Any) -&gt; A | None: ...
+    def validate(self) -&gt; None: ...
+    def depth(self) -&gt; int: ...
+</code></pre>
+<p>Top-level matcher tree. Evaluates <code>matcher_list</code> in order (first-match-wins). Returns action <code>A</code> or <code>None</code>.</p>
+<p><strong>Auto-validation:</strong> <code>validate()</code> is called in <code>__post_init__</code>. Trees exceeding <code>MAX_DEPTH</code> (32) raise <code>MatcherError</code>.</p>
+<p><strong>Methods:</strong></p>
+<ul>
+<li><code>evaluate(ctx)</code> — Returns first matching action or <code>None</code></li>
+<li><code>validate()</code> — Checks depth limit (called automatically)</li>
+<li><code>depth()</code> — Returns total tree depth</li>
+</ul>
+<h3 id="fieldmatcherctx-a"><a class="header" href="#fieldmatcherctx-a">FieldMatcher[Ctx, A]</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class FieldMatcher[Ctx, A]:
+    predicate: Predicate[Ctx]
+    on_match: OnMatch[Ctx, A]
+</code></pre>
+<p>Pairs a predicate with an outcome (action or nested matcher).</p>
+<h3 id="onmatchctx-a"><a class="header" href="#onmatchctx-a">OnMatch[Ctx, A]</a></h3>
+<pre><code class="language-python">type OnMatch[Ctx, A] = Action[A] | NestedMatcher[Ctx, A]
+</code></pre>
+<p>xDS exclusivity — action XOR nested matcher, never both.</p>
+<h3 id="actiona"><a class="header" href="#actiona">Action[A]</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class Action[A]:
+    value: A
+</code></pre>
+<p>Terminal outcome. Returns <code>value</code> when matched.</p>
+<h3 id="nestedmatcherctx-a"><a class="header" href="#nestedmatcherctx-a">NestedMatcher[Ctx, A]</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class NestedMatcher[Ctx, A]:
+    matcher: Matcher[Ctx, A]
+</code></pre>
+<p>Continue evaluation into nested matcher. If nested matcher returns <code>None</code>, evaluation continues to next <code>FieldMatcher</code> (xDS nested matcher failure propagation).</p>
+<h3 id="matchererror"><a class="header" href="#matchererror">MatcherError</a></h3>
+<pre><code class="language-python">class MatcherError(Exception): ...
+</code></pre>
+<p>Raised when <code>validate()</code> detects depth exceeding <code>MAX_DEPTH</code>.</p>
+<h3 id="max_depth"><a class="header" href="#max_depth">MAX_DEPTH</a></h3>
+<pre><code class="language-python">MAX_DEPTH: int = 32
+</code></pre>
+<p>Maximum allowed matcher tree depth. Enforced at construction time.</p>
+<h2 id="string-matchers"><a class="header" href="#string-matchers">String Matchers</a></h2>
+<p>All matchers are frozen dataclasses implementing <code>InputMatcher</code> protocol. Return <code>False</code> for non-string or <code>None</code> input.</p>
+<h3 id="exactmatcher"><a class="header" href="#exactmatcher">ExactMatcher</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class ExactMatcher:
+    value: str
+    ignore_case: bool = False
+
+    def matches(self, value: MatchingData, /) -&gt; bool: ...
+</code></pre>
+<p>Exact string equality. When <code>ignore_case=True</code>, comparison uses <code>.casefold()</code>.</p>
+<p><strong>Optimization:</strong> Pattern is pre-lowercased at construction time (<code>_cmp_value</code> field).</p>
+<h3 id="prefixmatcher"><a class="header" href="#prefixmatcher">PrefixMatcher</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class PrefixMatcher:
+    prefix: str
+    ignore_case: bool = False
+
+    def matches(self, value: MatchingData, /) -&gt; bool: ...
+</code></pre>
+<p>String starts with prefix. Pre-lowercased at construction when <code>ignore_case=True</code>.</p>
+<h3 id="suffixmatcher"><a class="header" href="#suffixmatcher">SuffixMatcher</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class SuffixMatcher:
+    suffix: str
+    ignore_case: bool = False
+
+    def matches(self, value: MatchingData, /) -&gt; bool: ...
+</code></pre>
+<p>String ends with suffix. Pre-lowercased at construction when <code>ignore_case=True</code>.</p>
+<h3 id="containsmatcher"><a class="header" href="#containsmatcher">ContainsMatcher</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class ContainsMatcher:
+    substring: str
+    ignore_case: bool = False
+
+    def matches(self, value: MatchingData, /) -&gt; bool: ...
+</code></pre>
+<p>Substring search. Pre-lowercased at construction when <code>ignore_case=True</code> (Knuth optimization: avoid repeated pattern lowercasing).</p>
+<h3 id="regexmatcher"><a class="header" href="#regexmatcher">RegexMatcher</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class RegexMatcher:
+    pattern: str
+
+    def matches(self, value: MatchingData, /) -&gt; bool: ...
+</code></pre>
+<p>Regular expression search (not fullmatch). Pattern compiled at construction time.</p>
+<p><strong>Security:</strong> Uses Python <code>re</code> module (backtracking NFA, ReDoS-vulnerable). See <code>SECURITY.md</code> in the puma package for details. For adversarial input, use <code>puma-crusty</code> (Phase 7).</p>
+<h2 id="http-domain"><a class="header" href="#http-domain">HTTP Domain</a></h2>
+<h3 id="httprequest"><a class="header" href="#httprequest">HttpRequest</a></h3>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class HttpRequest:
+    method: str = "GET"
+    raw_path: str = "/"
+    headers: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def path(self) -&gt; str: ...
+    @property
+    def query_params(self) -&gt; dict[str, str]: ...
+    def header(self, name: str) -&gt; str | None: ...
+    def query_param(self, name: str) -&gt; str | None: ...
+</code></pre>
+<p>HTTP request context for matching.</p>
+<p><strong>Parsing:</strong> Query string automatically parsed from <code>raw_path</code>. Headers stored lowercased for case-insensitive lookup.</p>
+<p><strong>Properties:</strong></p>
+<ul>
+<li><code>path</code> — path without query string</li>
+<li><code>query_params</code> — parsed query parameters</li>
+</ul>
+<p><strong>Methods:</strong></p>
+<ul>
+<li><code>header(name)</code> — Case-insensitive header lookup</li>
+<li><code>query_param(name)</code> — Query parameter lookup</li>
+</ul>
+<h3 id="datainputs"><a class="header" href="#datainputs">DataInputs</a></h3>
+<h4 id="pathinput"><a class="header" href="#pathinput">PathInput</a></h4>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class PathInput:
+    def get(self, ctx: HttpRequest, /) -&gt; MatchingData: ...
+</code></pre>
+<p>Extracts <code>ctx.path</code> (without query string).</p>
+<h4 id="methodinput"><a class="header" href="#methodinput">MethodInput</a></h4>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class MethodInput:
+    def get(self, ctx: HttpRequest, /) -&gt; MatchingData: ...
+</code></pre>
+<p>Extracts HTTP method (case-sensitive).</p>
+<h4 id="headerinput"><a class="header" href="#headerinput">HeaderInput</a></h4>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class HeaderInput:
+    name: str
+
+    def get(self, ctx: HttpRequest, /) -&gt; MatchingData: ...
+</code></pre>
+<p>Extracts header value by name (case-insensitive lookup). Returns <code>None</code> if header not present.</p>
+<h4 id="queryparaminput"><a class="header" href="#queryparaminput">QueryParamInput</a></h4>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class QueryParamInput:
+    name: str
+
+    def get(self, ctx: HttpRequest, /) -&gt; MatchingData: ...
+</code></pre>
+<p>Extracts query parameter value by name. Returns <code>None</code> if parameter not present.</p>
+<h3 id="gateway-api-types"><a class="header" href="#gateway-api-types">Gateway API Types</a></h3>
+<p>Pure Python types mirroring Gateway API spec (no Kubernetes dependency).</p>
+<h4 id="httppathmatch"><a class="header" href="#httppathmatch">HttpPathMatch</a></h4>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class HttpPathMatch:
+    type: Literal["Exact", "PathPrefix", "RegularExpression"]
+    value: str
+</code></pre>
+<p>Path match specification.</p>
+<h4 id="httpheadermatch"><a class="header" href="#httpheadermatch">HttpHeaderMatch</a></h4>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class HttpHeaderMatch:
+    type: Literal["Exact", "RegularExpression"]
+    name: str
+    value: str
+</code></pre>
+<p>Header match specification.</p>
+<h4 id="httpqueryparammatch"><a class="header" href="#httpqueryparammatch">HttpQueryParamMatch</a></h4>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class HttpQueryParamMatch:
+    type: Literal["Exact", "RegularExpression"]
+    name: str
+    value: str
+</code></pre>
+<p>Query parameter match specification.</p>
+<h4 id="httproutematch"><a class="header" href="#httproutematch">HttpRouteMatch</a></h4>
+<pre><code class="language-python">@dataclass(frozen=True, slots=True)
+class HttpRouteMatch:
+    path: HttpPathMatch | None = None
+    method: str | None = None
+    headers: list[HttpHeaderMatch] = field(default_factory=list)
+    query_params: list[HttpQueryParamMatch] = field(default_factory=list)
+
+    def compile[A](self, action: A) -&gt; Matcher[HttpRequest, A]: ...
+    def to_predicate(self) -&gt; Predicate[HttpRequest]: ...
+</code></pre>
+<p>Gateway API route match config. All conditions within a single <code>HttpRouteMatch</code> are ANDed.</p>
+<p><strong>Methods:</strong></p>
+<ul>
+<li><code>compile(action)</code> — Build a <code>Matcher</code> with this match → action</li>
+<li><code>to_predicate()</code> — Convert to predicate tree (used by compiler)</li>
+</ul>
+<h3 id="compile_route_matches"><a class="header" href="#compile_route_matches">compile_route_matches()</a></h3>
+<pre><code class="language-python">def compile_route_matches[A](
+    matches: list[HttpRouteMatch],
+    action: A,
+    on_no_match: A | None = None,
+) -&gt; Matcher[HttpRequest, A]: ...
+</code></pre>
+<p>Compile multiple <code>HttpRouteMatch</code> entries into a single <code>Matcher</code>. Multiple matches are ORed per Gateway API semantics.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">matcher = compile_route_matches(
+    matches=[api_route, admin_route],
+    action="matched",
+    on_no_match="404",
+)
+</code></pre>
+<h2 id="requirements"><a class="header" href="#requirements">Requirements</a></h2>
+<ul>
+<li><strong>Python 3.12+</strong> — uses PEP 695 type parameter syntax (<code>class Foo[T]:</code>)</li>
+<li><strong>Zero dependencies</strong> — pure Python stdlib only</li>
+<li><strong>py.typed</strong> — PEP 561 marker included, downstream type checkers (mypy, pyright) recognize puma as typed</li>
+</ul>
+<h2 id="security"><a class="header" href="#security">Security</a></h2>
+<p>See <code>SECURITY.md</code> in the puma package for ReDoS risk and mitigation.</p>
+<p><strong>Summary:</strong></p>
+<ul>
+<li><code>RegexMatcher</code> uses Python <code>re</code> (backtracking, ReDoS-vulnerable)</li>
+<li>Safe for trusted patterns (your route config, known fixtures)</li>
+<li>For adversarial input, use <code>puma-crusty</code> (Rust-backed, linear-time regex)</li>
+<li>Depth validation automatic at construction (max 32 levels)</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="http-domain-reference"><a class="header" href="#http-domain-reference">HTTP Domain Reference</a></h1>
+<p>HTTP request matching across rumi (Rust) and puma (Python).</p>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Both implementations provide the same HTTP matching capabilities with Gateway API-style config and DataInput implementations for HTTP contexts.</p>
+<p><strong>For Python users:</strong> See <a href="#python-api-reference">Python API Reference</a> for the <code>puma.http</code> module.</p>
+<p><strong>This page focuses on Rust (rumi-http).</strong></p>
+<h2 id="architecture-rumi-http"><a class="header" href="#architecture-rumi-http">Architecture (rumi-http)</a></h2>
+<pre><code>Gateway API HttpRouteMatch (config)
+        ↓ compile()
+rumi Matcher&lt;HttpMessage, A&gt;
+        ↓ evaluate()
+ext_proc ProcessingRequest (runtime)
+</code></pre>
+<p><strong>Two layers:</strong></p>
+<ul>
+<li><strong>User API</strong>: Gateway API <code>HttpRouteMatch</code> — human-friendly config</li>
+<li><strong>Data Plane API</strong>: Envoy <code>ProcessingRequest</code> — wire protocol (indexed as <code>HttpMessage</code>)</li>
+</ul>
+<h2 id="quick-start-1"><a class="header" href="#quick-start-1">Quick Start</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi_http::prelude::*;
+
+// Config time: compile Gateway API match to rumi matcher
+let route_match = HttpRouteMatch {
+    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+    method: Some("GET".into()),
+    ..Default::default()
+};
+let matcher = route_match.compile("api_backend");
+
+// Runtime: evaluate against HttpMessage (indexed view over ProcessingRequest)
+let result = matcher.evaluate(&amp;http_message);
+assert_eq!(result, Some("api_backend"));
+<span class="boring">}</span></code></pre>
+<h2 id="datainputs-for-httpmessage"><a class="header" href="#datainputs-for-httpmessage">DataInputs for HttpMessage</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Input</th><th>Extracts</th><th>Example</th></tr>
+</thead>
+<tbody>
+<tr><td><code>PathInput</code></td><td><code>:path</code> pseudo-header (without query)</td><td><code>/api/users</code></td></tr>
+<tr><td><code>MethodInput</code></td><td><code>:method</code> pseudo-header</td><td><code>GET</code></td></tr>
+<tr><td><code>HeaderInput::new("x-api-key")</code></td><td>Named header</td><td><code>Bearer ...</code></td></tr>
+<tr><td><code>QueryParamInput::new("page")</code></td><td>Query parameter</td><td><code>1</code></td></tr>
+<tr><td><code>SchemeInput</code></td><td><code>:scheme</code> pseudo-header</td><td><code>https</code></td></tr>
+<tr><td><code>AuthorityInput</code></td><td><code>:authority</code> pseudo-header</td><td><code>api.example.com</code></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="gateway-api-match-types"><a class="header" href="#gateway-api-match-types">Gateway API Match Types</a></h2>
+<h3 id="path-matching"><a class="header" href="#path-matching">Path Matching</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Exact match
+HttpPathMatch::Exact { value: "/api/v1/users".into() }
+
+// Prefix match
+HttpPathMatch::PathPrefix { value: "/api".into() }
+
+// Regex match
+HttpPathMatch::RegularExpression { value: r"^/api/v\d+/.*".into() }
+<span class="boring">}</span></code></pre>
+<h3 id="header-matching"><a class="header" href="#header-matching">Header Matching</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Exact header value
+HttpHeaderMatch::Exact {
+    name: "content-type".into(),
+    value: "application/json".into()
+}
+
+// Regex header value
+HttpHeaderMatch::RegularExpression {
+    name: "authorization".into(),
+    value: r"^Bearer .+".into()
+}
+<span class="boring">}</span></code></pre>
+<h3 id="query-parameter-matching"><a class="header" href="#query-parameter-matching">Query Parameter Matching</a></h3>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Exact param value
+HttpQueryParamMatch::Exact {
+    name: "version".into(),
+    value: "2".into()
+}
+
+// Regex param value
+HttpQueryParamMatch::RegularExpression {
+    name: "id".into(),
+    value: r"^\d+$".into()
+}
+<span class="boring">}</span></code></pre>
+<h2 id="match-semantics"><a class="header" href="#match-semantics">Match Semantics</a></h2>
+<p>Per Gateway API spec:</p>
+<ul>
+<li><strong>Within a match</strong>: All conditions are ANDed</li>
+<li><strong>Multiple matches</strong>: ORed together</li>
+</ul>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// This matches: GET /api/* with x-version header
+let route_match = HttpRouteMatch {
+    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+    method: Some("GET".into()),
+    headers: Some(vec![
+        HttpHeaderMatch::Exact {
+            name: "x-version".into(),
+            value: "2".into()
+        }
+    ]),
+    ..Default::default()
+};
+<span class="boring">}</span></code></pre>
+<h2 id="compiling-multiple-matches"><a class="header" href="#compiling-multiple-matches">Compiling Multiple Matches</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi_http::compile_route_matches;
+
+let matches = vec![
+    HttpRouteMatch {
+        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+        ..Default::default()
+    },
+    HttpRouteMatch {
+        path: Some(HttpPathMatch::PathPrefix { value: "/health".into() }),
+        ..Default::default()
+    },
+];
+
+// Multiple matches are ORed
+let matcher = compile_route_matches(&amp;matches, "backend", None);
+<span class="boring">}</span></code></pre>
+<h2 id="python-equivalent"><a class="header" href="#python-equivalent">Python Equivalent</a></h2>
+<p>See <a href="#python-api-reference">Python API Reference</a> for the Python implementation.</p>
+<p>Quick comparison:</p>
+<p><strong>Rust (rumi-http):</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi_http::{HttpRouteMatch, HttpPathMatch, compile_route_matches};
+
+let route = HttpRouteMatch {
+    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+    method: Some("GET".into()),
+    ..Default::default()
+};
+let matcher = route.compile("api_backend");
+<span class="boring">}</span></code></pre>
+<p><strong>Python (puma.http):</strong></p>
+<pre><code class="language-python">from puma.http import HttpRouteMatch, HttpPathMatch, compile_route_matches
+
+route = HttpRouteMatch(
+    path=HttpPathMatch(type="PathPrefix", value="/api"),
+    method="GET",
+)
+matcher = route.compile("api_backend")
+</code></pre>
+<p>Both produce functionally identical matchers that pass the same conformance tests.</p>
+<h2 id="dependencies-rust"><a class="header" href="#dependencies-rust">Dependencies (Rust)</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Crate</th><th>Purpose</th></tr>
+</thead>
+<tbody>
+<tr><td><code>k8s-gateway-api</code></td><td>Gateway API types</td></tr>
+<tr><td><code>envoy-grpc-ext-proc</code></td><td>ext_proc ProcessingRequest types</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="see-also-2"><a class="header" href="#see-also-2">See Also</a></h2>
+<ul>
+<li><a href="#python-api-reference">Python API Reference</a> — puma.http module</li>
+<li><a href="https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.HTTPRouteMatch">Gateway API HTTPRoute Spec</a></li>
+<li><a href="https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_proc_filter">Envoy ext_proc Documentation</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="roadmap"><a class="header" href="#roadmap">Roadmap</a></h1>
+<p>Development phases and current status.</p>
+<h2 id="current-status"><a class="header" href="#current-status">Current Status</a></h2>
+<p><strong>x.uma is alpha software.</strong> The API is under active development and will change.</p>
+<p>Two implementations exist:</p>
+<ul>
+<li><strong>rumi</strong> (Rust) — reference implementation, production-hardened constraints</li>
+<li><strong>puma</strong> (Python) — pure Python port, zero dependencies, 194 tests passing</li>
+</ul>
+<p>Both pass the same conformance test suite (<code>spec/tests/</code>). TypeScript (bumi) is next.</p>
+<h2 id="phase-overview"><a class="header" href="#phase-overview">Phase Overview</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Phase</th><th>Focus</th><th>Status</th></tr>
+</thead>
+<tbody>
+<tr><td>0</td><td>Scaffolding</td><td>✅ Done</td></tr>
+<tr><td>1</td><td>Core Traits</td><td>✅ Done</td></tr>
+<tr><td>2</td><td>Conformance Fixtures</td><td>✅ Done</td></tr>
+<tr><td>2.5</td><td>Extensible MatchingData (<code>Custom</code> variant)</td><td>✅ Done</td></tr>
+<tr><td>3</td><td>StringMatcher, MatcherTree, RadixTree</td><td>✅ Done</td></tr>
+<tr><td>4</td><td>HTTP Domain (ext_proc model)</td><td>✅ Done</td></tr>
+<tr><td>5</td><td>puma (Pure Python + HTTP)</td><td>✅ Done</td></tr>
+<tr><td>5.1</td><td>puma arch-guild hardening</td><td>✅ Done</td></tr>
+<tr><td>6</td><td>bumi (Bun/TypeScript + HTTP)</td><td>✅ Done</td></tr>
+<tr><td>6.1</td><td>bumi arch-guild hardening</td><td>✅ Done</td></tr>
+<tr><td>7</td><td>rumi/crusts/python (uniffi→puma-crusty)</td><td>Planned</td></tr>
+<tr><td>8</td><td>rumi/crusts/wasm (wasm-pack→@x.uma/bumi-crusty)</td><td>Planned</td></tr>
+<tr><td>9</td><td>Benchmarks (all variants)</td><td>Planned</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="phase-5-puma-pure-python"><a class="header" href="#phase-5-puma-pure-python">Phase 5: puma (Pure Python)</a></h2>
+<p><strong>Status:</strong> Complete (v0.1.0)</p>
+<p>Pure Python implementation of the xDS Unified Matcher API. Zero dependencies. Python 3.12+.</p>
+<p><strong>Architecture:</strong></p>
+<ul>
+<li>PEP 695 type params (<code>class Foo[T]:</code>) — modern Python generics</li>
+<li><code>@dataclass(frozen=True, slots=True)</code> — immutability + performance</li>
+<li>Protocol-based ports (runtime-checkable)</li>
+<li>Union type aliases (<code>type Predicate = Single | And | Or | Not</code>)</li>
+</ul>
+<p><strong>Type System Mapping:</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Rust (rumi)</th><th>Python (puma)</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>trait DataInput&lt;Ctx&gt;</code></td><td><code>Protocol[Ctx]</code></td><td>Contravariant in <code>Ctx</code></td></tr>
+<tr><td><code>trait InputMatcher</code></td><td><code>Protocol</code></td><td>Non-generic, runtime-checkable</td></tr>
+<tr><td><code>enum MatchingData</code></td><td><code>MatchingData = str | int | bool | bytes | None</code></td><td>Type alias replaces enum</td></tr>
+<tr><td><code>enum Predicate&lt;Ctx&gt;</code></td><td><code>type Predicate[Ctx] = Single | And | Or | Not</code></td><td>Pattern-matchable</td></tr>
+<tr><td><code>enum OnMatch&lt;Ctx, A&gt;</code></td><td><code>type OnMatch[Ctx, A] = Action | NestedMatcher</code></td><td>xDS exclusivity</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li><input disabled="" type="checkbox" checked=""> Core types (<code>Matcher</code>, <code>Predicate</code>, <code>FieldMatcher</code>, <code>OnMatch</code>)</li>
+<li><input disabled="" type="checkbox" checked=""> String matchers (<code>Exact</code>, <code>Prefix</code>, <code>Suffix</code>, <code>Contains</code>, <code>Regex</code>)</li>
+<li><input disabled="" type="checkbox" checked=""> HTTP domain (<code>HttpRequest</code>, <code>PathInput</code>, <code>MethodInput</code>, <code>HeaderInput</code>, <code>QueryParamInput</code>)</li>
+<li><input disabled="" type="checkbox" checked=""> Gateway API compiler (<code>HttpRouteMatch</code> → <code>Matcher</code>)</li>
+<li><input disabled="" type="checkbox" checked=""> 194 conformance tests passing (0.10s)</li>
+<li><input disabled="" type="checkbox" checked=""> <code>py.typed</code> marker for type checker support</li>
+<li><input disabled="" type="checkbox" checked=""> Auto-validation (depth limit enforced at construction)</li>
+<li><input disabled="" type="checkbox" checked=""> Typed Gateway API (Literal types, proper return annotations)</li>
+<li><input disabled="" type="checkbox" checked=""> Security documentation (ReDoS contract)</li>
+</ul>
+<p><strong>Known Limitations:</strong></p>
+<ul>
+<li><code>RegexMatcher</code> uses Python <code>re</code> (backtracking, ReDoS-vulnerable)</li>
+<li>For adversarial input, use <code>puma-crusty</code> (Phase 7) with Rust-backed linear-time regex</li>
+<li>No proto codegen (pure Python types only)</li>
+</ul>
+<h2 id="phase-51-arch-guild-hardening"><a class="header" href="#phase-51-arch-guild-hardening">Phase 5.1: Arch-Guild Hardening</a></h2>
+<p><strong>Status:</strong> Complete</p>
+<p>13-agent architecture review identified 4 gaps, all resolved:</p>
+<ol>
+<li><strong>py.typed marker</strong> — Type checkers now recognize puma as typed</li>
+<li><strong>Auto-validation</strong> — <code>Matcher.__post_init__</code> calls <code>validate()</code>, depth limits enforced</li>
+<li><strong>Typed Gateway API</strong> — Literal types for match types, proper return annotations</li>
+<li><strong>ReDoS documentation</strong> — SECURITY.md explains Python <code>re</code> vs Rust <code>regex</code> trade-off</li>
+</ol>
+<p><strong>Verdict:</strong> Architecture excellent (zero boundary violations, hexagonal textbook). Safety gap closed via strategic documentation + puma-crusty path for adversarial use cases.</p>
+<h2 id="phase-6-bumi-buntypescript"><a class="header" href="#phase-6-bumi-buntypescript">Phase 6: bumi (Bun/TypeScript)</a></h2>
+<p><strong>Status:</strong> Next</p>
+<p>Pure TypeScript implementation using Bun runtime.</p>
+<p><strong>Planned:</strong></p>
+<ul>
+<li>Modern TypeScript with discriminated unions</li>
+<li>Bun-native testing (<code>bun test</code>)</li>
+<li>Zero runtime dependencies (no axios, no lodash)</li>
+<li>Same conformance test suite</li>
+<li>HTTP domain with Gateway API compiler</li>
+</ul>
+<p><strong>Type System Mapping (Rust → TypeScript):</strong></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Rust (rumi)</th><th>TypeScript (bumi)</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>trait DataInput&lt;Ctx&gt;</code></td><td><code>interface DataInput&lt;Ctx&gt;</code></td><td>Generic interface</td></tr>
+<tr><td><code>trait InputMatcher</code></td><td><code>interface InputMatcher</code></td><td>Non-generic</td></tr>
+<tr><td><code>enum MatchingData</code></td><td><code>type MatchingData = string | number | boolean | Uint8Array | null</code></td><td>Union type</td></tr>
+<tr><td><code>enum Predicate&lt;Ctx&gt;</code></td><td><code>type Predicate&lt;Ctx&gt; = Single&lt;Ctx&gt; | And&lt;Ctx&gt; | Or&lt;Ctx&gt; | Not&lt;Ctx&gt;</code></td><td>Discriminated union</td></tr>
+<tr><td><code>enum OnMatch&lt;Ctx, A&gt;</code></td><td><code>type OnMatch&lt;Ctx, A&gt; = Action&lt;A&gt; | NestedMatcher&lt;Ctx, A&gt;</code></td><td>Discriminated union</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="phase-7-puma-crusty-rust-bindings--python"><a class="header" href="#phase-7-puma-crusty-rust-bindings--python">Phase 7: puma-crusty (Rust Bindings → Python)</a></h2>
+<p><strong>Status:</strong> Planned</p>
+<p>Rust-backed Python package providing the same puma API with Rust performance + safety.</p>
+<p><strong>Approach:</strong></p>
+<ul>
+<li>uniffi bindings from <code>rumi/crusts/python/</code></li>
+<li>maturin for wheel building</li>
+<li>Same API as pure puma (drop-in replacement)</li>
+<li>Linear-time regex (ReDoS-safe)</li>
+</ul>
+<p><strong>Trade-off:</strong> Adds compiled Rust binary dependency. Pure puma remains zero-dependency option.</p>
+<h2 id="phase-8-bumi-crusty-rust-bindings--wasm"><a class="header" href="#phase-8-bumi-crusty-rust-bindings--wasm">Phase 8: bumi-crusty (Rust Bindings → WASM)</a></h2>
+<p><strong>Status:</strong> Planned</p>
+<p>Rust-backed TypeScript package via WASM.</p>
+<p><strong>Approach:</strong></p>
+<ul>
+<li>wasm-bindgen from <code>rumi/crusts/wasm/</code></li>
+<li>wasm-pack for bundling</li>
+<li>Same API as pure bumi (drop-in replacement)</li>
+<li>Linear-time regex (ReDoS-safe)</li>
+</ul>
+<h2 id="phase-9-benchmarks"><a class="header" href="#phase-9-benchmarks">Phase 9: Benchmarks</a></h2>
+<p><strong>Status:</strong> Planned</p>
+<p>Cross-language performance comparison.</p>
+<p><strong>Variants to benchmark:</strong></p>
+<ul>
+<li>rumi (Rust native)</li>
+<li>puma (pure Python)</li>
+<li>puma-crusty (Python → Rust via uniffi)</li>
+<li>bumi (pure TypeScript)</li>
+<li>bumi-crusty (TypeScript → Rust via WASM)</li>
+</ul>
+<p><strong>Metrics:</strong></p>
+<ul>
+<li>Matcher compilation time</li>
+<li>Evaluation throughput (matches/sec)</li>
+<li>Memory usage</li>
+<li>Startup overhead (FFI/WASM)</li>
+</ul>
+<h2 id="historical-phase-4-http-domain"><a class="header" href="#historical-phase-4-http-domain">Historical: Phase 4 (HTTP Domain)</a></h2>
+<p>Phase 4 delivered the HTTP domain for rumi (Rust). Two-layer architecture:</p>
+<p><strong>User API:</strong> Gateway API <code>HttpRouteMatch</code> (config-time, YAML/JSON)
+<strong>Data Plane API:</strong> Envoy <code>ext_proc ProcessingRequest</code> (runtime)</p>
+<pre><code class="language-text">Gateway API HttpRouteMatch (config)
+        ↓ compile()
+rumi Matcher&lt;ProcessingRequest, A&gt;
+        ↓ evaluate()
+ext_proc ProcessingRequest (runtime)
+</code></pre>
+<p><strong>Why Two Layers?</strong></p>
+<ul>
+<li>Gateway API is the CNCF standard (Istio, Envoy Gateway, Contour, Kong)</li>
+<li>ext_proc is Envoy’s universal HTTP processing model (REST, gRPC, GraphQL)</li>
+<li>x.uma provides the match vocabulary, actions are domain-specific</li>
+</ul>
+<p><strong>Deliverables:</strong></p>
+<ul>
+<li>rumi-http crate with <code>HttpMessage</code> indexed context</li>
+<li>DataInputs: <code>PathInput</code>, <code>MethodInput</code>, <code>HeaderInput</code>, <code>QueryParamInput</code>, <code>SchemeInput</code>, <code>AuthorityInput</code></li>
+<li>Gateway API types via <code>k8s-gateway-api</code> crate</li>
+<li>Compiler: <code>HttpRouteMatch::compile()</code> → <code>Matcher&lt;HttpMessage, A&gt;</code></li>
+<li>Integration tests with ext_proc fixtures</li>
+</ul>
+<h2 id="contributing"><a class="header" href="#contributing">Contributing</a></h2>
+<p>See the <a href="https://github.com/mox-labs/x.uma">GitHub repository</a> for contribution guidelines.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+        <script src="ace-2a3cd908.js"></script>
+        <script src="mode-rust-2c9d5c9a.js"></script>
+        <script src="editor-16ca416c.js"></script>
+        <script src="theme-dawn-4493f9c8.js"></script>
+        <script src="theme-tomorrow_night-9dbe62a9.js"></script>
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+
+    </div>
+    </body>
+</html>
