@@ -111,9 +111,10 @@ x.uma/
 | 5.1 | puma arch-guild hardening | ✅ Done |
 | 6 | bumi (Bun/TypeScript + HTTP) | ✅ Done |
 | 6.1 | bumi arch-guild hardening | ✅ Done |
-| 7 | rumi/crusts/python (uniffi → puma-crusty) | Planned |
-| 8 | rumi/crusts/wasm (wasm-pack → bumi-crusty) | Planned |
-| 9 | Benchmarks (all 5 variants) | Planned |
+| 7 | Claude domain compiler (`HookMatch` + `compile_hook_matches()`) | ✅ Done |
+| 8 | rumi/crusts/python (uniffi → puma-crusty) | Planned |
+| 9 | rumi/crusts/wasm (wasm-pack → bumi-crusty) | Planned |
+| 10 | Benchmarks (all 5 variants) | Planned |
 
 ## Tooling
 

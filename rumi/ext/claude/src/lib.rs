@@ -1,148 +1,64 @@
 //! rumi-claude: Claude Code hooks domain
 //!
-//! Provides context and `DataInput` implementations for Claude Code hook matching.
+//! Provides context types, `DataInput` extractors, and a **domain compiler**
+//! for matching Claude Code hook events.
 //!
-//! # Example
+//! # Compiler (recommended)
 //!
 //! ```ignore
 //! use rumi_claude::prelude::*;
 //!
-//! let ctx = HookContext::pre_tool_use("Bash")
-//!     .with_arg("command", "rm -rf /");
+//! // Declarative: block dangerous Bash commands
+//! let rule = HookMatch {
+//!     event: Some(HookEvent::PreToolUse),
+//!     tool_name: Some(StringMatch::Exact("Bash".into())),
+//!     arguments: Some(vec![ArgumentMatch {
+//!         name: "command".into(),
+//!         value: StringMatch::Contains("rm -rf".into()),
+//!     }]),
+//!     ..Default::default()
+//! };
+//! let matcher = rule.compile("block")?;
 //!
-//! let input = ToolNameInput;
-//! assert_eq!(input.get(&ctx), MatchingData::String("Bash".into()));
+//! let ctx = HookContext::pre_tool_use("Bash")
+//!     .with_arg("command", "rm -rf /important");
+//! assert_eq!(matcher.evaluate(&ctx), Some("block"));
+//! ```
+//!
+//! # Trace (debugging)
+//!
+//! ```ignore
+//! let trace = rule.trace(&ctx);
+//! for step in &trace.steps {
+//!     println!("{}: expected={}, actual={}, matched={}",
+//!         step.field, step.expected, step.actual, step.matched);
+//! }
 //! ```
 
-use rumi::prelude::*;
-use std::collections::HashMap;
+mod compiler;
+mod config;
+mod context;
+mod inputs;
 
-/// Hook event types in Claude Code.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HookEvent {
-    PreToolUse,
-    PostToolUse,
-    Stop,
-    SubagentStop,
-}
-
-impl HookEvent {
-    /// Convert to string representation.
-    #[must_use]
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::PreToolUse => "PreToolUse",
-            Self::PostToolUse => "PostToolUse",
-            Self::Stop => "Stop",
-            Self::SubagentStop => "SubagentStop",
-        }
-    }
-}
-
-/// Claude Code hook context for matching.
-#[derive(Debug, Clone)]
-pub struct HookContext {
-    event: HookEvent,
-    tool_name: String,
-    arguments: HashMap<String, String>,
-}
-
-impl HookContext {
-    /// Create a `PreToolUse` hook context.
-    #[must_use]
-    pub fn pre_tool_use(tool_name: impl Into<String>) -> Self {
-        Self {
-            event: HookEvent::PreToolUse,
-            tool_name: tool_name.into(),
-            arguments: HashMap::new(),
-        }
-    }
-
-    /// Create a `PostToolUse` hook context.
-    #[must_use]
-    pub fn post_tool_use(tool_name: impl Into<String>) -> Self {
-        Self {
-            event: HookEvent::PostToolUse,
-            tool_name: tool_name.into(),
-            arguments: HashMap::new(),
-        }
-    }
-
-    /// Add an argument (builder pattern).
-    #[must_use]
-    pub fn with_arg(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
-        self.arguments.insert(name.into(), value.into());
-        self
-    }
-
-    /// Get the hook event type.
-    #[must_use]
-    pub fn event(&self) -> HookEvent {
-        self.event
-    }
-
-    /// Get the tool name.
-    #[must_use]
-    pub fn tool_name(&self) -> &str {
-        &self.tool_name
-    }
-
-    /// Get an argument by name.
-    #[must_use]
-    pub fn argument(&self, name: &str) -> Option<&str> {
-        self.arguments.get(name).map(String::as_str)
-    }
-}
-
-/// Extracts the hook event type.
-#[derive(Debug, Clone)]
-pub struct EventInput;
-
-impl DataInput<HookContext> for EventInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        MatchingData::String(ctx.event.as_str().to_string())
-    }
-}
-
-/// Extracts the tool name.
-#[derive(Debug, Clone)]
-pub struct ToolNameInput;
-
-impl DataInput<HookContext> for ToolNameInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        MatchingData::String(ctx.tool_name.clone())
-    }
-}
-
-/// Extracts a tool argument by name.
-#[derive(Debug, Clone)]
-pub struct ArgumentInput {
-    name: String,
-}
-
-impl ArgumentInput {
-    /// Create a new argument input extractor.
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into() }
-    }
-}
-
-impl DataInput<HookContext> for ArgumentInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        ctx.argument(&self.name)
-            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
-    }
-}
+pub use compiler::*;
+pub use config::*;
+pub use context::*;
+pub use inputs::*;
 
 /// Prelude for convenient imports.
 pub mod prelude {
-    pub use super::{ArgumentInput, EventInput, HookContext, HookEvent, ToolNameInput};
+    pub use super::{
+        compile_hook_matches, ArgumentInput, ArgumentMatch, CompileError, CwdInput, EventInput,
+        GitBranchInput, HookContext, HookEvent, HookMatch, HookMatchExt, HookMatchTrace,
+        SessionIdInput, StringMatch, ToolNameInput, TraceStep,
+    };
     pub use rumi::prelude::*;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rumi::prelude::*;
 
     #[test]
     fn test_hook_context_builder() {
