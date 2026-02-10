@@ -2,7 +2,20 @@
 
 Create domain-specific matchers for HTTP, gRPC, CloudEvents, or your custom protocol.
 
-A "domain" in x.uma is a context type with associated `DataInput` implementations. This guide shows how to add a domain in both Rust (rumi) and Python (puma).
+A "domain" in x.uma is a context type with associated `DataInput` implementations and a compiler that turns config into matchers.
+
+**Every domain ships four things:**
+
+| Deliverable | What | Example (HTTP) |
+|-------------|------|----------------|
+| **Context type** | The runtime data structure | `HttpRequest`, `HttpMessage` |
+| **DataInputs** | Extract fields from context | `PathInput`, `HeaderInput` |
+| **Config types** | User-friendly match specification | `HttpRouteMatch`, `HttpPathMatch` |
+| **Compiler** | Config → Matcher tree | `compile_route_matches()` |
+
+The compiler is the user-facing API. Without it, users must construct matcher trees by hand.
+
+This guide shows how to add a domain in Rust (rumi), Python (puma), and TypeScript (bumi).
 
 ## Concept: CloudEvent Matching
 
@@ -99,9 +112,14 @@ action = user_created_matcher.evaluate(event)
 assert action == "handle_user_event"
 ```
 
-### Step 4: Optional Compiler (Gateway API Style)
+### Step 4: Add a Compiler (User-Facing API)
 
-For ergonomic config-time APIs, add a compiler:
+The compiler is the user-facing API for your domain. Every x.uma domain ships one:
+
+- HTTP: `compile_route_matches()` turns `HttpRouteMatch` config into a `Matcher`
+- Claude: `compile_hook_matches()` turns `HookMatch` config into a `Matcher`
+
+Without a compiler, users must construct matcher trees by hand. The compiler is what makes a domain usable.
 
 ```python
 from dataclasses import dataclass, field
@@ -265,7 +283,7 @@ let action = user_created_matcher.evaluate(&event);
 assert_eq!(action, Some("handle_user_event"));
 ```
 
-### Step 5: Optional Compiler (Gateway API Style)
+### Step 5: Add a Compiler (User-Facing API)
 
 ```rust
 #[derive(Debug, Clone)]
@@ -332,9 +350,98 @@ let match_config = EventMatch {
 let matcher = match_config.compile("handle_user_event")?;
 ```
 
+## TypeScript Implementation (bumi)
+
+The same pattern applies in TypeScript. Classes with `readonly` fields replace dataclasses.
+
+### Steps 1-3: Context, DataInputs, and Matchers
+
+```typescript
+import {
+    Matcher, FieldMatcher, SinglePredicate, And, Action,
+    ExactMatcher, PrefixMatcher,
+    type DataInput, type MatchingData,
+} from "bumi";
+
+// Step 1: Context type
+class CloudEvent {
+    constructor(
+        readonly type: string,
+        readonly source: string,
+        readonly id: string,
+        readonly subject: string | null = null,
+    ) {}
+}
+
+// Step 2: DataInputs
+class EventTypeInput implements DataInput<CloudEvent> {
+    get(ctx: CloudEvent): MatchingData { return ctx.type; }
+}
+
+class EventSourceInput implements DataInput<CloudEvent> {
+    get(ctx: CloudEvent): MatchingData { return ctx.source; }
+}
+
+class EventSubjectInput implements DataInput<CloudEvent> {
+    get(ctx: CloudEvent): MatchingData { return ctx.subject; }  // null → false invariant
+}
+
+// Step 3: Build matchers
+const matcher = new Matcher([
+    new FieldMatcher(
+        new And([
+            new SinglePredicate(new EventTypeInput(), new PrefixMatcher("com.example.user.")),
+            new SinglePredicate(new EventSourceInput(), new ExactMatcher("api-server")),
+        ]),
+        new Action("handle_user_event"),
+    ),
+], new Action("ignore"));
+```
+
+### Steps 4-5: Config Types and Compiler
+
+```typescript
+import { Matcher, FieldMatcher, SinglePredicate, And, Action, ExactMatcher, PrefixMatcher } from "bumi";
+import type { Predicate } from "bumi";
+
+interface EventMatch {
+    readonly type?: string;
+    readonly source?: string;
+    readonly subject?: string;
+}
+
+function compileEventMatch<A>(config: EventMatch, action: A): Matcher<CloudEvent, A> {
+    const predicates: Predicate<CloudEvent>[] = [];
+
+    if (config.type !== undefined) {
+        predicates.push(new SinglePredicate(new EventTypeInput(), new ExactMatcher(config.type)));
+    }
+    if (config.source !== undefined) {
+        predicates.push(new SinglePredicate(new EventSourceInput(), new ExactMatcher(config.source)));
+    }
+    if (config.subject !== undefined) {
+        predicates.push(new SinglePredicate(new EventSubjectInput(), new ExactMatcher(config.subject)));
+    }
+
+    const predicate = predicates.length === 0
+        ? new SinglePredicate(new EventTypeInput(), new PrefixMatcher(""))
+        : predicates.length === 1
+            ? predicates[0]
+            : new And(predicates);
+
+    return new Matcher([new FieldMatcher(predicate, new Action(action))]);
+}
+
+// Usage
+const matcher = compileEventMatch(
+    { type: "com.example.user.created", source: "api-server" },
+    "handle_user_event",
+);
+```
+
 ## Add Conformance Tests
 
-Both implementations should pass the same test fixtures.
+All three implementations should pass the same test fixtures.
 
 ```yaml
 # spec/tests/events/type_exact.yaml
@@ -360,32 +467,38 @@ cases:
 **Test runners:**
 - Rust: Parse YAML, construct `CloudEvent` and `Matcher<CloudEvent, _>`, assert
 - Python: Parse YAML, construct `CloudEvent` and `Matcher[CloudEvent, _]`, assert
+- TypeScript: Parse YAML, construct `CloudEvent` and `Matcher<CloudEvent, _>`, assert
 
 ## Key Patterns
 
 ### None Handling
 
-When a `DataInput` returns `None` (Rust) or `None` (Python), the predicate evaluates to `False` without consulting the matcher. This is the **None → false invariant**.
-
-```python
-# Python
-@dataclass(frozen=True, slots=True)
-class EventSubjectInput:
-    def get(self, ctx: CloudEvent, /) -> MatchingValue:
-        return ctx.subject  # May be None
-
-# If subject is None, predicate returns False
-```
+When a `DataInput` returns `None`/`null`, the predicate evaluates to `false` without consulting the matcher. This is the **null → false invariant**.
 
 ```rust
-// Rust
+// Rust — return MatchingData::None
 impl DataInput<CloudEvent> for EventSubjectInput {
     fn get(&self, ctx: &CloudEvent) -> MatchingData {
         ctx.subject
             .as_ref()
             .map(|s| MatchingData::String(s.clone()))
-            .unwrap_or(MatchingData::None)  // Triggers None → false
+            .unwrap_or(MatchingData::None)  // Triggers null → false
     }
+}
+```
+
+```python
+# Python — return None
+@dataclass(frozen=True, slots=True)
+class EventSubjectInput:
+    def get(self, ctx: CloudEvent, /) -> MatchingValue:
+        return ctx.subject  # None triggers null → false
+```
+
+```typescript
+// TypeScript — return null
+class EventSubjectInput implements DataInput<CloudEvent> {
+    get(ctx: CloudEvent): MatchingData { return ctx.subject; }  // null triggers null → false
 }
 ```
 
@@ -408,7 +521,8 @@ The compiler ensures:
 
 ## See Also
 
-- [Python API Reference](../reference/python.md) — puma types
 - [Rust API Reference](../reference/rust.md) — rumi types
+- [Python API Reference](../reference/python.md) — puma types
+- [TypeScript API Reference](../reference/typescript.md) — bumi types
 - [HTTP Domain](../reference/http.md) — Real-world example
 - [Architecture](../explain/architecture.md) — Type system deep dive
