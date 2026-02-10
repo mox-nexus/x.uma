@@ -16,5 +16,18 @@ default = []
 regex = "1"  # Linear-time regex (RE2 semantics, ReDoS-safe)
 
 [dev-dependencies]
+divan = "0.1"
 serde.workspace = true
 serde_yaml.workspace = true
+
+[[bench]]
+name = "evaluate"
+harness = false
+
+[[bench]]
+name = "compile"
+harness = false
+
+[[bench]]
+name = "redos"
+harness = false

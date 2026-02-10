@@ -1,0 +1,10 @@
+[project]
+name = "x-uma-scripts"
+version = "0.1.0"
+description = "Benchmark scripts for x.uma"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.0",
+    "duckdb>=1.0",
+    "rich>=13.0",
+]

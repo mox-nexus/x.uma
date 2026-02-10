@@ -9,8 +9,8 @@ A matcher engine implementing the xDS Unified Matcher API across multiple langua
 | **rumi** | Rust | Core engine (reference implementation) |
 | **puma** | Python | Pure Python implementation (dir: `puma/`) |
 | **bumi** | Bun/TypeScript | Pure TypeScript implementation (dir: `bumi/`) |
-| **puma-crusty** | Python | Rust bindings via uniffi (from `rumi/crusts/python/`) |
-| **bumi-crusty** | TypeScript | Rust bindings via WASM (from `rumi/crusts/wasm/`) |
+| **puma-crusty** | Python | Rust bindings via PyO3 (from `rumi/crusts/python/`) |
+| **bumi-crusty** | TypeScript | Rust bindings via wasm-bindgen (from `rumi/crusts/wasm/`) |
 
 All implementations pass the same conformance test suite (`spec/tests/`).
 
@@ -111,10 +111,12 @@ x.uma/
 | 5.1 | puma arch-guild hardening | ✅ Done |
 | 6 | bumi (Bun/TypeScript + HTTP) | ✅ Done |
 | 6.1 | bumi arch-guild hardening | ✅ Done |
-| 7 | Claude domain compiler (`HookMatch` + `compile_hook_matches()`) | ✅ Done |
-| 8 | rumi/crusts/python (uniffi → puma-crusty) | Planned |
-| 9 | rumi/crusts/wasm (wasm-pack → bumi-crusty) | Planned |
-| 10 | Benchmarks (all 5 variants) | Planned |
+| 7 | puma-crusty: PyO3 Python bindings | ✅ Done |
+| 7.5 | rumi-claude: trace + HookMatch compiler | ✅ Done |
+| 8 | bumi-crusty: wasm-bindgen TypeScript bindings | ✅ Done |
+| 9 | Cross-language benchmarks (all 5 variants) | 🚧 In Progress |
+| 10 | Semantic matching (cosine similarity via `CustomMatchData`) | Planned |
+| 11 | RE2 migration: `google-re2` for puma, `re2js` for bumi | Planned |
 
 ## Tooling
 

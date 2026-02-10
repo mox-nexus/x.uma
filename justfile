@@ -79,9 +79,35 @@ docs-serve:
 docs-clean:
     rm -rf docs/book docs/src/generated
 
-# Run benchmarks
-bench:
+# ═══════════════════════════════════════════════════════════════════════════════
+# Benchmarks
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Run Rust benchmarks (divan)
+bench-rust:
     cargo bench --manifest-path rumi/Cargo.toml
+
+# Run Python benchmarks (pytest-benchmark)
+bench-puma:
+    cd puma && uv run pytest tests/bench/ --benchmark-only --benchmark-disable-gc
+
+# Run TypeScript benchmarks (mitata)
+bench-bumi:
+    cd bumi && bun run bench
+
+# Run puma-crusty vs puma comparison benchmarks
+bench-crusty-puma:
+    cd rumi/crusts/python && maturin develop && uv run pytest tests/test_bench_crusty.py --benchmark-only --benchmark-disable-gc
+
+# Run bumi-crusty vs bumi comparison benchmarks
+bench-crusty-bumi:
+    cd rumi/crusts/wasm && wasm-pack build --target nodejs && bun run bench/crusty.bench.ts
+
+# Run all benchmarks
+bench-all: bench-rust bench-puma bench-bumi bench-crusty-puma bench-crusty-bumi
+
+# Alias for bench-all
+bench: bench-all
 
 # Verify no_std compatibility (core only)
 check-no-std:
