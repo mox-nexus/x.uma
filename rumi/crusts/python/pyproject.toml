@@ -17,4 +17,8 @@ python-source = "python"
 module-name = "puma_crusty"
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-benchmark>=5.0",
+    "puma @ file:///${PROJECT_ROOT}/../../../puma",
+]
