@@ -7,8 +7,13 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[features]
+default = []
+registry = ["rumi/registry", "serde"]
+
 [dependencies]
 rumi.workspace = true
+serde = { workspace = true, optional = true }
 
 # ext_proc types (ProcessingRequest, ProcessingResponse, etc.)
 envoy-grpc-ext-proc = "0.1"

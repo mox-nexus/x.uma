@@ -90,6 +90,31 @@ pub mod prelude {
     pub use rumi::prelude::*;
 }
 
+// Registry config types
+#[cfg(feature = "registry")]
+pub use inputs::{HeaderInputConfig, QueryParamInputConfig};
+
+/// Register all rumi-http `DataInput` types for [`HttpMessage`] with the given builder.
+///
+/// Type URLs:
+/// - `xuma.http.v1.PathInput` → [`PathInput`]
+/// - `xuma.http.v1.MethodInput` → [`MethodInput`]
+/// - `xuma.http.v1.HeaderInput` → [`HeaderInput`]
+/// - `xuma.http.v1.QueryParamInput` → [`QueryParamInput`]
+/// - `xuma.http.v1.SchemeInput` → [`SchemeInput`]
+/// - `xuma.http.v1.AuthorityInput` → [`AuthorityInput`]
+#[cfg(feature = "registry")]
+#[must_use]
+pub fn register(builder: rumi::RegistryBuilder<HttpMessage>) -> rumi::RegistryBuilder<HttpMessage> {
+    builder
+        .input::<PathInput>("xuma.http.v1.PathInput")
+        .input::<MethodInput>("xuma.http.v1.MethodInput")
+        .input::<HeaderInput>("xuma.http.v1.HeaderInput")
+        .input::<QueryParamInput>("xuma.http.v1.QueryParamInput")
+        .input::<SchemeInput>("xuma.http.v1.SchemeInput")
+        .input::<AuthorityInput>("xuma.http.v1.AuthorityInput")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
