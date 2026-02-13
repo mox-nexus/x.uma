@@ -78,28 +78,21 @@ class EventSubjectInput:
 
 ```python
 from puma import (
-    Matcher, FieldMatcher, SinglePredicate, Action,
-    ExactMatcher, PrefixMatcher, And,
+    SinglePredicate, ExactMatcher, PrefixMatcher,
+    and_predicate, matcher_from_predicate,
 )
 
 # Match user creation events from api-server
-user_created_matcher = Matcher(
-    matcher_list=(
-        FieldMatcher(
-            predicate=And((
-                SinglePredicate(
-                    EventTypeInput(),
-                    PrefixMatcher("com.example.user.")
-                ),
-                SinglePredicate(
-                    EventSourceInput(),
-                    ExactMatcher("api-server")
-                ),
-            )),
-            on_match=Action("handle_user_event"),
-        ),
+user_created_matcher = matcher_from_predicate(
+    and_predicate(
+        [
+            SinglePredicate(EventTypeInput(), PrefixMatcher("com.example.user.")),
+            SinglePredicate(EventSourceInput(), ExactMatcher("api-server")),
+        ],
+        SinglePredicate(EventTypeInput(), PrefixMatcher("")),  # catch-all
     ),
-    on_no_match=Action("ignore"),
+    "handle_user_event",
+    on_no_match="ignore",
 )
 
 # Evaluate
@@ -122,9 +115,14 @@ The compiler is the user-facing API for your domain. Every x.uma domain ships on
 Without a compiler, users must construct matcher trees by hand. The compiler is what makes a domain usable.
 
 ```python
-from dataclasses import dataclass, field
-from typing import Literal
-from puma import Predicate, SinglePredicate, ExactMatcher, PrefixMatcher, Matcher, FieldMatcher, Action
+from dataclasses import dataclass
+from puma import (
+    Predicate, SinglePredicate, ExactMatcher, PrefixMatcher,
+    Matcher, and_predicate, or_predicate, matcher_from_predicate,
+)
+
+def _catch_all() -> Predicate[CloudEvent]:
+    return SinglePredicate(EventTypeInput(), PrefixMatcher(""))
 
 @dataclass(frozen=True, slots=True)
 class EventMatch:
@@ -134,7 +132,7 @@ class EventMatch:
     subject: str | None = None
 
     def to_predicate(self) -> Predicate[CloudEvent]:
-        """Compile to predicate tree."""
+        """Compile to predicate tree (AND all present fields)."""
         predicates: list[SinglePredicate[CloudEvent]] = []
 
         if self.type is not None:
@@ -150,25 +148,30 @@ class EventMatch:
                 SinglePredicate(EventSubjectInput(), ExactMatcher(self.subject))
             )
 
-        if not predicates:
-            # Match everything
-            return SinglePredicate(EventTypeInput(), PrefixMatcher(""))
-
-        if len(predicates) == 1:
-            return predicates[0]
-
-        return And(tuple(predicates))
+        return and_predicate(predicates, _catch_all())
 
     def compile[A](self, action: A) -> Matcher[CloudEvent, A]:
         """Compile to matcher."""
-        return Matcher(
-            matcher_list=(FieldMatcher(self.to_predicate(), Action(action)),),
-        )
+        return matcher_from_predicate(self.to_predicate(), action)
+
+def compile_event_matches[A](
+    matches: list[EventMatch], action: A, on_no_match: A | None = None,
+) -> Matcher[CloudEvent, A]:
+    """Compile multiple event matches (ORed) into a single Matcher."""
+    predicates = [m.to_predicate() for m in matches]
+    return matcher_from_predicate(
+        or_predicate(predicates, _catch_all()), action, on_no_match,
+    )
 
 # Usage
 match_config = EventMatch(type="com.example.user.created", source="api-server")
 matcher = match_config.compile("handle_user_event")
 ```
+
+**The pattern is always the same across every domain:**
+1. `to_predicate()` uses `and_predicate(fields, catch_all)` to AND the fields
+2. `compile()` uses `matcher_from_predicate(predicate, action)` to wrap into a Matcher
+3. `compile_*_matches()` uses `or_predicate(predicates, catch_all)` to OR multiple configs
 
 That's it. The same string matchers, predicates, and matcher tree logic work for CloudEvents.
 
@@ -250,25 +253,22 @@ impl DataInput<CloudEvent> for EventSubjectInput {
 use rumi::prelude::*;
 
 // Match user creation events from api-server
-let user_created_matcher = Matcher::new(
-    vec![
-        FieldMatcher::new(
-            Predicate::And {
-                predicates: vec![
-                    Predicate::Single(SinglePredicate::new(
-                        Box::new(EventTypeInput),
-                        Box::new(PrefixMatcher::new("com.example.user.")),
-                    )),
-                    Predicate::Single(SinglePredicate::new(
-                        Box::new(EventSourceInput),
-                        Box::new(ExactMatcher::new("api-server")),
-                    )),
-                ],
-            },
-            OnMatch::Action("handle_user_event"),
-        ),
-    ],
-    Some(OnMatch::Action("ignore")),
+let user_created_matcher = Matcher::from_predicate(
+    Predicate::from_all(
+        vec![
+            Predicate::Single(SinglePredicate::new(
+                Box::new(EventTypeInput),
+                Box::new(PrefixMatcher::new("com.example.user.")),
+            )),
+            Predicate::Single(SinglePredicate::new(
+                Box::new(EventSourceInput),
+                Box::new(ExactMatcher::new("api-server")),
+            )),
+        ],
+        catch_all(),
+    ),
+    "handle_user_event",
+    Some("ignore"),
 )?;
 
 // Evaluate
@@ -281,6 +281,13 @@ let event = CloudEvent {
 
 let action = user_created_matcher.evaluate(&event);
 assert_eq!(action, Some("handle_user_event"));
+
+fn catch_all() -> Predicate<CloudEvent> {
+    Predicate::Single(SinglePredicate::new(
+        Box::new(EventTypeInput),
+        Box::new(PrefixMatcher::new("")),
+    ))
+}
 ```
 
 ### Step 5: Add a Compiler (User-Facing API)
@@ -296,13 +303,9 @@ pub struct EventMatch {
 impl EventMatch {
     pub fn compile<A>(self, action: A) -> Result<Matcher<CloudEvent, A>, MatcherError>
     where
-        A: Clone,
+        A: Clone + Send + Sync + 'static,
     {
-        let predicate = self.to_predicate();
-        Matcher::new(
-            vec![FieldMatcher::new(predicate, OnMatch::Action(action))],
-            None,
-        )
+        Ok(Matcher::from_predicate(self.to_predicate(), action, None))
     }
 
     fn to_predicate(&self) -> Predicate<CloudEvent> {
@@ -327,18 +330,32 @@ impl EventMatch {
             )));
         }
 
-        if predicates.is_empty() {
-            // Match everything
-            Predicate::Single(SinglePredicate::new(
-                Box::new(EventTypeInput),
-                Box::new(PrefixMatcher::new("")),
-            ))
-        } else if predicates.len() == 1 {
-            predicates.into_iter().next().unwrap()
-        } else {
-            Predicate::And { predicates }
-        }
+        Predicate::from_all(predicates, catch_all())
     }
+}
+
+/// Compile multiple event matches (ORed) into a single Matcher.
+pub fn compile_event_matches<A>(
+    matches: &[EventMatch],
+    action: A,
+    on_no_match: Option<A>,
+) -> Result<Matcher<CloudEvent, A>, MatcherError>
+where
+    A: Clone + Send + Sync + 'static,
+{
+    let predicates: Vec<_> = matches.iter().map(EventMatch::to_predicate).collect();
+    Ok(Matcher::from_predicate(
+        Predicate::from_any(predicates, catch_all()),
+        action,
+        on_no_match,
+    ))
+}
+
+fn catch_all() -> Predicate<CloudEvent> {
+    Predicate::Single(SinglePredicate::new(
+        Box::new(EventTypeInput),
+        Box::new(PrefixMatcher::new("")),
+    ))
 }
 
 // Usage
@@ -358,8 +375,8 @@ The same pattern applies in TypeScript. Classes with `readonly` fields replace d
 
 ```typescript
 import {
-    Matcher, FieldMatcher, SinglePredicate, And, Action,
-    ExactMatcher, PrefixMatcher,
+    SinglePredicate, ExactMatcher, PrefixMatcher,
+    andPredicate, matcherFromPredicate,
     type DataInput, type MatchingData,
 } from "bumi";
 
@@ -386,23 +403,32 @@ class EventSubjectInput implements DataInput<CloudEvent> {
     get(ctx: CloudEvent): MatchingData { return ctx.subject; }  // null → false invariant
 }
 
+function catchAll() {
+    return new SinglePredicate(new EventTypeInput(), new PrefixMatcher(""));
+}
+
 // Step 3: Build matchers
-const matcher = new Matcher([
-    new FieldMatcher(
-        new And([
+const matcher = matcherFromPredicate(
+    andPredicate(
+        [
             new SinglePredicate(new EventTypeInput(), new PrefixMatcher("com.example.user.")),
             new SinglePredicate(new EventSourceInput(), new ExactMatcher("api-server")),
-        ]),
-        new Action("handle_user_event"),
+        ],
+        catchAll(),
     ),
-], new Action("ignore"));
+    "handle_user_event",
+    "ignore",
+);
 ```
 
 ### Steps 4-5: Config Types and Compiler
 
 ```typescript
-import { Matcher, FieldMatcher, SinglePredicate, And, Action, ExactMatcher, PrefixMatcher } from "bumi";
-import type { Predicate } from "bumi";
+import {
+    SinglePredicate, ExactMatcher, PrefixMatcher,
+    andPredicate, orPredicate, matcherFromPredicate,
+} from "bumi";
+import type { Predicate, Matcher } from "bumi";
 
 interface EventMatch {
     readonly type?: string;
@@ -410,7 +436,7 @@ interface EventMatch {
     readonly subject?: string;
 }
 
-function compileEventMatch<A>(config: EventMatch, action: A): Matcher<CloudEvent, A> {
+function eventMatchToPredicate(config: EventMatch): Predicate<CloudEvent> {
     const predicates: Predicate<CloudEvent>[] = [];
 
     if (config.type !== undefined) {
@@ -423,18 +449,21 @@ function compileEventMatch<A>(config: EventMatch, action: A): Matcher<CloudEvent
         predicates.push(new SinglePredicate(new EventSubjectInput(), new ExactMatcher(config.subject)));
     }
 
-    const predicate = predicates.length === 0
-        ? new SinglePredicate(new EventTypeInput(), new PrefixMatcher(""))
-        : predicates.length === 1
-            ? predicates[0]
-            : new And(predicates);
+    return andPredicate(predicates, catchAll());
+}
 
-    return new Matcher([new FieldMatcher(predicate, new Action(action))]);
+function compileEventMatches<A>(
+    configs: readonly EventMatch[],
+    action: A,
+    onNoMatch?: A,
+): Matcher<CloudEvent, A> {
+    const predicates = configs.map(eventMatchToPredicate);
+    return matcherFromPredicate(orPredicate(predicates, catchAll()), action, onNoMatch);
 }
 
 // Usage
-const matcher = compileEventMatch(
-    { type: "com.example.user.created", source: "api-server" },
+const matcher = compileEventMatches(
+    [{ type: "com.example.user.created", source: "api-server" }],
     "handle_user_event",
 );
 ```
@@ -511,6 +540,20 @@ All context types should be immutable:
 | Rust | Don't provide `&mut` access, clone when needed |
 | Python | `@dataclass(frozen=True)` |
 | TypeScript | `readonly` fields |
+
+### Compiler Composition Pipeline
+
+Every domain compiler follows the same three-step pipeline:
+
+```
+Domain provides                          Core composes
+─────────────                            ──────────────
+(input, spec) pairs per field     →  and_predicate(fields, catch_all)  →  one Predicate per config
+                                  →  or_predicate(configs, catch_all)  →  one Predicate total
+                                  →  matcher_from_predicate(pred, action, fallback) → Matcher
+```
+
+The only domain-specific code is `to_predicate()` — mapping config fields to `(DataInput, StringMatcher)` pairs. Everything else is structural composition provided by the core helpers.
 
 ### Type Safety
 
