@@ -241,6 +241,7 @@ For detailed documentation, see:
 
 | Need | Load |
 |------|------|
+| Design principles (from 7 elite codebases) | [design-principles.md](references/design-principles.md) |
 | Arch-guild constraints | [arch-constraints.md](references/arch-constraints.md) |
 | xDS specification details | [xds-semantics.md](references/xds-semantics.md) |
 | Build system workflows | [build-system.md](references/build-system.md) |
