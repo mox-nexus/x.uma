@@ -45,6 +45,31 @@ pub use config::*;
 pub use context::*;
 pub use inputs::*;
 
+// Registry config types
+#[cfg(feature = "registry")]
+pub use inputs::ArgumentInputConfig;
+
+/// Register all rumi-claude `DataInput` types for [`HookContext`] with the given builder.
+///
+/// Type URLs:
+/// - `xuma.claude.v1.EventInput` → [`EventInput`]
+/// - `xuma.claude.v1.ToolNameInput` → [`ToolNameInput`]
+/// - `xuma.claude.v1.ArgumentInput` → [`ArgumentInput`]
+/// - `xuma.claude.v1.SessionIdInput` → [`SessionIdInput`]
+/// - `xuma.claude.v1.CwdInput` → [`CwdInput`]
+/// - `xuma.claude.v1.GitBranchInput` → [`GitBranchInput`]
+#[cfg(feature = "registry")]
+#[must_use]
+pub fn register(builder: rumi::RegistryBuilder<HookContext>) -> rumi::RegistryBuilder<HookContext> {
+    builder
+        .input::<EventInput>("xuma.claude.v1.EventInput")
+        .input::<ToolNameInput>("xuma.claude.v1.ToolNameInput")
+        .input::<ArgumentInput>("xuma.claude.v1.ArgumentInput")
+        .input::<SessionIdInput>("xuma.claude.v1.SessionIdInput")
+        .input::<CwdInput>("xuma.claude.v1.CwdInput")
+        .input::<GitBranchInput>("xuma.claude.v1.GitBranchInput")
+}
+
 /// Prelude for convenient imports.
 pub mod prelude {
     pub use super::{
