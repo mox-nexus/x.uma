@@ -40,6 +40,12 @@ use std::fmt::Debug;
 ///     }
 /// }
 /// ```
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement `DataInput<{Ctx}>`",
+    label = "this type cannot extract data from `{Ctx}`",
+    note = "DataInput<Ctx> extracts data from a specific context type",
+    note = "ensure your input type implements DataInput for the correct context (e.g., DataInput<HttpRequest>, DataInput<HookContext>)"
+)]
 pub trait DataInput<Ctx>: Send + Sync + Debug {
     /// Extract data from the given context.
     ///
@@ -57,6 +63,7 @@ pub trait DataInput<Ctx>: Send + Sync + Debug {
 }
 
 // Blanket implementation for boxed DataInputs
+#[diagnostic::do_not_recommend]
 impl<Ctx> DataInput<Ctx> for Box<dyn DataInput<Ctx>> {
     fn get(&self, ctx: &Ctx) -> MatchingData {
         (**self).get(ctx)

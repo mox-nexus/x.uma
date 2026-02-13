@@ -82,6 +82,7 @@ mod matching_data;
 mod on_match;
 mod predicate;
 mod radix_tree;
+mod string_match;
 mod trace;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -98,6 +99,7 @@ pub use matching_data::{CustomMatchData, MatchingData};
 pub use on_match::OnMatch;
 pub use predicate::{Predicate, SinglePredicate};
 pub use radix_tree::RadixTree;
+pub use string_match::StringMatchSpec;
 
 // Trace types
 pub use trace::{EvalStep, EvalTrace, OnMatchTrace, PredicateTrace};
@@ -143,6 +145,8 @@ pub mod prelude {
         PrefixMatcher,
         RadixTree,
         SinglePredicate,
+        // Config types
+        StringMatchSpec,
         StringMatcher,
         SuffixMatcher,
     };
@@ -162,7 +166,10 @@ pub const MAX_DEPTH: usize = 32;
 // Errors
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Errors from matcher validation.
+/// Errors from matcher construction and validation.
+///
+/// These errors are caught at config load time, not evaluation time.
+/// Fix the configuration and reconstruct the matcher.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MatcherError {
     /// Matcher nesting exceeds [`MAX_DEPTH`].
@@ -172,6 +179,13 @@ pub enum MatcherError {
         /// Maximum allowed depth.
         max: usize,
     },
+    /// A regex or string pattern is invalid.
+    InvalidPattern {
+        /// The pattern that failed to compile.
+        pattern: String,
+        /// The underlying error message.
+        source: String,
+    },
 }
 
 impl std::fmt::Display for MatcherError {
@@ -180,8 +194,12 @@ impl std::fmt::Display for MatcherError {
             Self::DepthExceeded { depth, max } => {
                 write!(
                     f,
-                    "matcher depth {depth} exceeds maximum allowed depth {max}"
+                    "matcher nesting depth is {depth}, but maximum allowed is {max} \
+                     — reduce nesting or flatten your matcher tree"
                 )
+            }
+            Self::InvalidPattern { pattern, source } => {
+                write!(f, "invalid pattern \"{pattern}\": {source}")
             }
         }
     }

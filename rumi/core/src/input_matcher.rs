@@ -34,6 +34,11 @@ use std::fmt::Debug;
 /// assert!(matcher.matches(&MatchingData::String("hello".to_string())));
 /// assert!(!matcher.matches(&MatchingData::String("world".to_string())));
 /// ```
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement `InputMatcher`",
+    label = "this type cannot match against MatchingData",
+    note = "InputMatcher is domain-agnostic — use built-in matchers (ExactMatcher, PrefixMatcher, StringMatcher, etc.) or implement the `matches(&self, &MatchingData) -> bool` method"
+)]
 pub trait InputMatcher: Send + Sync + Debug {
     /// Check if the given value matches.
     ///
@@ -49,6 +54,7 @@ pub trait InputMatcher: Send + Sync + Debug {
 }
 
 // Blanket implementation for boxed InputMatchers
+#[diagnostic::do_not_recommend]
 impl InputMatcher for Box<dyn InputMatcher> {
     fn matches(&self, value: &MatchingData) -> bool {
         (**self).matches(value)

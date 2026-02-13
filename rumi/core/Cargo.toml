@@ -11,9 +11,11 @@ categories = ["config", "data-structures"]
 
 [features]
 default = []
+serde = ["dep:serde"]
 
 [dependencies]
 regex = "1"  # Linear-time regex (RE2 semantics, ReDoS-safe)
+serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 divan = "0.1"
