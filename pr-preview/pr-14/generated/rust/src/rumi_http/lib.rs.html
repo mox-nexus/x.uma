@@ -94,9 +94,9 @@
 <a href=#94 id=94 data-nosnippet>94</a></span><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
 <a href=#95 id=95 data-nosnippet>95</a></span><span class="kw">pub use </span>inputs::{HeaderInputConfig, QueryParamInputConfig};
 <a href=#96 id=96 data-nosnippet>96</a>
-<a href=#97 id=97 data-nosnippet>97</a><span class="doccomment">/// Register all rumi-http `DataInput` types for [`HttpMessage`] with the given builder.
+<a href=#97 id=97 data-nosnippet>97</a><span class="doccomment">/// Register all rumi-http types for [`HttpMessage`] with the given builder.
 <a href=#98 id=98 data-nosnippet>98</a>///
-<a href=#99 id=99 data-nosnippet>99</a>/// Type URLs:
+<a href=#99 id=99 data-nosnippet>99</a>/// Registers core matchers (`BoolMatcher`, `StringMatcher`) and HTTP-domain inputs:
 <a href=#100 id=100 data-nosnippet>100</a>/// - `xuma.http.v1.PathInput` → [`PathInput`]
 <a href=#101 id=101 data-nosnippet>101</a>/// - `xuma.http.v1.MethodInput` → [`MethodInput`]
 <a href=#102 id=102 data-nosnippet>102</a>/// - `xuma.http.v1.HeaderInput` → [`HeaderInput`]
@@ -106,7 +106,7 @@
 <a href=#106 id=106 data-nosnippet>106</a></span><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
 <a href=#107 id=107 data-nosnippet>107</a>#[must_use]
 <a href=#108 id=108 data-nosnippet>108</a></span><span class="kw">pub fn </span>register(builder: rumi::RegistryBuilder&lt;HttpMessage&gt;) -&gt; rumi::RegistryBuilder&lt;HttpMessage&gt; {
-<a href=#109 id=109 data-nosnippet>109</a>    builder
+<a href=#109 id=109 data-nosnippet>109</a>    rumi::register_core_matchers(builder)
 <a href=#110 id=110 data-nosnippet>110</a>        .input::&lt;PathInput&gt;(<span class="string">"xuma.http.v1.PathInput"</span>)
 <a href=#111 id=111 data-nosnippet>111</a>        .input::&lt;MethodInput&gt;(<span class="string">"xuma.http.v1.MethodInput"</span>)
 <a href=#112 id=112 data-nosnippet>112</a>        .input::&lt;HeaderInput&gt;(<span class="string">"xuma.http.v1.HeaderInput"</span>)

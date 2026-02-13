@@ -103,14 +103,14 @@
 <a href=#103 id=103 data-nosnippet>103</a>    }
 <a href=#104 id=104 data-nosnippet>104</a>}
 <a href=#105 id=105 data-nosnippet>105</a>
-<a href=#106 id=106 data-nosnippet>106</a><span class="doccomment">/// Register all rumi-test `DataInput` types with the given builder.
+<a href=#106 id=106 data-nosnippet>106</a><span class="doccomment">/// Register all rumi-test types with the given builder.
 <a href=#107 id=107 data-nosnippet>107</a>///
-<a href=#108 id=108 data-nosnippet>108</a>/// Type URLs:
+<a href=#108 id=108 data-nosnippet>108</a>/// Registers core matchers (`BoolMatcher`, `StringMatcher`) and test-domain inputs:
 <a href=#109 id=109 data-nosnippet>109</a>/// - `xuma.test.v1.StringInput` → [`StringInput`]
 <a href=#110 id=110 data-nosnippet>110</a></span><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
 <a href=#111 id=111 data-nosnippet>111</a>#[must_use]
 <a href=#112 id=112 data-nosnippet>112</a></span><span class="kw">pub fn </span>register(builder: rumi::RegistryBuilder&lt;TestContext&gt;) -&gt; rumi::RegistryBuilder&lt;TestContext&gt; {
-<a href=#113 id=113 data-nosnippet>113</a>    builder.input::&lt;StringInput&gt;(<span class="string">"xuma.test.v1.StringInput"</span>)
+<a href=#113 id=113 data-nosnippet>113</a>    rumi::register_core_matchers(builder).input::&lt;StringInput&gt;(<span class="string">"xuma.test.v1.StringInput"</span>)
 <a href=#114 id=114 data-nosnippet>114</a>}
 <a href=#115 id=115 data-nosnippet>115</a>
 <a href=#116 id=116 data-nosnippet>116</a><span class="attr">#[cfg(test)]

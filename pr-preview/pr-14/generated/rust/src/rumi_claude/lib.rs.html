@@ -49,9 +49,9 @@
 <a href=#49 id=49 data-nosnippet>49</a></span><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
 <a href=#50 id=50 data-nosnippet>50</a></span><span class="kw">pub use </span>inputs::ArgumentInputConfig;
 <a href=#51 id=51 data-nosnippet>51</a>
-<a href=#52 id=52 data-nosnippet>52</a><span class="doccomment">/// Register all rumi-claude `DataInput` types for [`HookContext`] with the given builder.
+<a href=#52 id=52 data-nosnippet>52</a><span class="doccomment">/// Register all rumi-claude types for [`HookContext`] with the given builder.
 <a href=#53 id=53 data-nosnippet>53</a>///
-<a href=#54 id=54 data-nosnippet>54</a>/// Type URLs:
+<a href=#54 id=54 data-nosnippet>54</a>/// Registers core matchers (`BoolMatcher`, `StringMatcher`) and Claude-domain inputs:
 <a href=#55 id=55 data-nosnippet>55</a>/// - `xuma.claude.v1.EventInput` → [`EventInput`]
 <a href=#56 id=56 data-nosnippet>56</a>/// - `xuma.claude.v1.ToolNameInput` → [`ToolNameInput`]
 <a href=#57 id=57 data-nosnippet>57</a>/// - `xuma.claude.v1.ArgumentInput` → [`ArgumentInput`]
@@ -61,7 +61,7 @@
 <a href=#61 id=61 data-nosnippet>61</a></span><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
 <a href=#62 id=62 data-nosnippet>62</a>#[must_use]
 <a href=#63 id=63 data-nosnippet>63</a></span><span class="kw">pub fn </span>register(builder: rumi::RegistryBuilder&lt;HookContext&gt;) -&gt; rumi::RegistryBuilder&lt;HookContext&gt; {
-<a href=#64 id=64 data-nosnippet>64</a>    builder
+<a href=#64 id=64 data-nosnippet>64</a>    rumi::register_core_matchers(builder)
 <a href=#65 id=65 data-nosnippet>65</a>        .input::&lt;EventInput&gt;(<span class="string">"xuma.claude.v1.EventInput"</span>)
 <a href=#66 id=66 data-nosnippet>66</a>        .input::&lt;ToolNameInput&gt;(<span class="string">"xuma.claude.v1.ToolNameInput"</span>)
 <a href=#67 id=67 data-nosnippet>67</a>        .input::&lt;ArgumentInput&gt;(<span class="string">"xuma.claude.v1.ArgumentInput"</span>)
