@@ -85,6 +85,11 @@ mod radix_tree;
 mod string_match;
 mod trace;
 
+#[cfg(feature = "registry")]
+mod config;
+#[cfg(feature = "registry")]
+mod registry;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Public API
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -100,6 +105,15 @@ pub use on_match::OnMatch;
 pub use predicate::{Predicate, SinglePredicate};
 pub use radix_tree::RadixTree;
 pub use string_match::StringMatchSpec;
+
+// Registry (feature-gated)
+#[cfg(feature = "registry")]
+pub use config::{
+    FieldMatcherConfig, MatcherConfig, OnMatchConfig, PredicateConfig, SinglePredicateConfig,
+    TypedConfig, UnitConfig,
+};
+#[cfg(feature = "registry")]
+pub use registry::{IntoDataInput, Registry, RegistryBuilder};
 
 // Trace types
 pub use trace::{EvalStep, EvalTrace, OnMatchTrace, PredicateTrace};
@@ -186,6 +200,16 @@ pub enum MatcherError {
         /// The underlying error message.
         source: String,
     },
+    /// Configuration deserialization or construction failed.
+    InvalidConfig {
+        /// The underlying error message.
+        source: String,
+    },
+    /// An input type URL was not found in the registry.
+    UnknownTypeUrl {
+        /// The unregistered type URL.
+        type_url: String,
+    },
 }
 
 impl std::fmt::Display for MatcherError {
@@ -200,6 +224,15 @@ impl std::fmt::Display for MatcherError {
             }
             Self::InvalidPattern { pattern, source } => {
                 write!(f, "invalid pattern \"{pattern}\": {source}")
+            }
+            Self::InvalidConfig { source } => {
+                write!(f, "invalid config: {source}")
+            }
+            Self::UnknownTypeUrl { type_url } => {
+                write!(
+                    f,
+                    "unknown type URL \"{type_url}\" — register it with RegistryBuilder::input()"
+                )
             }
         }
     }
