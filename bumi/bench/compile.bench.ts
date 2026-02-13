@@ -11,6 +11,7 @@ import { bench, run, summary } from "mitata";
 
 import {
 	Action,
+	ContainsMatcher,
 	ExactMatcher,
 	FieldMatcher,
 	Matcher,
@@ -18,7 +19,6 @@ import {
 	RegexMatcher,
 	SinglePredicate,
 	SuffixMatcher,
-	ContainsMatcher,
 } from "../src/index.ts";
 import type { DataInput, MatchingData } from "../src/index.ts";
 
@@ -45,10 +45,12 @@ summary(() => {
 
 summary(() => {
 	bench("compile_regex_simple", () => new RegexMatcher(String.raw`^/api/v\d+/users$`));
-	bench("compile_regex_complex", () =>
-		new RegexMatcher(
-			String.raw`^/api/v[1-3]/(users|orders|products)/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`,
-		),
+	bench(
+		"compile_regex_complex",
+		() =>
+			new RegexMatcher(
+				String.raw`^/api/v[1-3]/(users|orders|products)/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`,
+			),
 	);
 });
 

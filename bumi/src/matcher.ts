@@ -81,6 +81,20 @@ export class Matcher<Ctx, A> {
 	}
 }
 
+/**
+ * Create a Matcher from a single predicate, action, and optional fallback.
+ *
+ * Eliminates repeated `new Matcher([new FieldMatcher(pred, new Action(action))], ...)` boilerplate.
+ */
+export function matcherFromPredicate<Ctx, A>(
+	predicate: Predicate<Ctx>,
+	action: A,
+	onNoMatch?: A,
+): Matcher<Ctx, A> {
+	const onNoMatchOm = onNoMatch !== undefined ? new Action(onNoMatch) : null;
+	return new Matcher([new FieldMatcher(predicate, new Action(action))], onNoMatchOm);
+}
+
 function evaluateOnMatch<Ctx, A>(onMatch: OnMatch<Ctx, A>, ctx: Ctx): A | null {
 	if (onMatch instanceof Action) return onMatch.value;
 	if (onMatch instanceof NestedMatcher) return onMatch.matcher.evaluate(ctx);

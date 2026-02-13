@@ -4,7 +4,16 @@ export type { DataInput, InputMatcher, MatchingData } from "./types.ts";
 // Test utilities (DictInput): import from "bumi/testing"
 
 // Predicates
-export { And, Not, Or, SinglePredicate, evaluatePredicate, predicateDepth } from "./predicate.ts";
+export {
+	And,
+	Not,
+	Or,
+	SinglePredicate,
+	andPredicate,
+	evaluatePredicate,
+	orPredicate,
+	predicateDepth,
+} from "./predicate.ts";
 export type { Predicate } from "./predicate.ts";
 
 // Matcher tree
@@ -15,6 +24,7 @@ export {
 	Matcher,
 	MatcherError,
 	NestedMatcher,
+	matcherFromPredicate,
 } from "./matcher.ts";
 export type { OnMatch } from "./matcher.ts";
 
