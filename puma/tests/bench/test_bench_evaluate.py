@@ -24,7 +24,6 @@ from puma import (
     SinglePredicate,
 )
 
-
 # ── Test fixtures ────────────────────────────────────────────────────────────
 
 
@@ -192,9 +191,7 @@ def test_bench_rule_count_100_miss_evaluate(benchmark):
 
 
 def test_bench_miss_heavy_10_rules_evaluate(benchmark):
-    rules = tuple(
-        field_matcher(f"/blocked/{i}", f"block_{i}") for i in range(10)
-    )
+    rules = tuple(field_matcher(f"/blocked/{i}", f"block_{i}") for i in range(10))
     matcher = Matcher(matcher_list=rules, on_no_match=Action("allow"))
     ctx = Ctx(value="/api/v1/users")
     benchmark(matcher.evaluate, ctx)

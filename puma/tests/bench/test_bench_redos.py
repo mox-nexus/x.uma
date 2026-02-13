@@ -20,7 +20,6 @@ from dataclasses import dataclass
 from puma import (
     Action,
     DataInput,
-    ExactMatcher,
     FieldMatcher,
     Matcher,
     RegexMatcher,

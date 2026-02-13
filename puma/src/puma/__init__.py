@@ -17,10 +17,20 @@ from puma._matcher import (
     MatcherError,
     NestedMatcher,
     OnMatch,
+    matcher_from_predicate,
 )
 
 # Predicates
-from puma._predicate import And, Not, Or, Predicate, SinglePredicate, predicate_depth
+from puma._predicate import (
+    And,
+    Not,
+    Or,
+    Predicate,
+    SinglePredicate,
+    and_predicate,
+    or_predicate,
+    predicate_depth,
+)
 
 # Concrete matchers
 from puma._string_matchers import (
@@ -43,6 +53,8 @@ __all__ = [
     "Or",
     "Not",
     "Predicate",
+    "and_predicate",
+    "or_predicate",
     "predicate_depth",
     # Matcher
     "Action",
@@ -51,6 +63,7 @@ __all__ = [
     "FieldMatcher",
     "Matcher",
     "MatcherError",
+    "matcher_from_predicate",
     "MAX_DEPTH",
     # Concrete matchers
     "ExactMatcher",
