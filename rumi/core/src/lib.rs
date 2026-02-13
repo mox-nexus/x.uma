@@ -82,7 +82,13 @@ mod matching_data;
 mod on_match;
 mod predicate;
 mod radix_tree;
+mod string_match;
 mod trace;
+
+#[cfg(feature = "registry")]
+mod config;
+#[cfg(feature = "registry")]
+mod registry;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Public API
@@ -98,6 +104,19 @@ pub use matching_data::{CustomMatchData, MatchingData};
 pub use on_match::OnMatch;
 pub use predicate::{Predicate, SinglePredicate};
 pub use radix_tree::RadixTree;
+pub use string_match::StringMatchSpec;
+
+// Registry (feature-gated)
+#[cfg(feature = "registry")]
+pub use config::{
+    FieldMatcherConfig, MatcherConfig, OnMatchConfig, PredicateConfig, SinglePredicateConfig,
+    TypedConfig, UnitConfig, ValueMatchConfig,
+};
+#[cfg(feature = "registry")]
+pub use registry::{
+    register_core_matchers, ActionRegistry, ActionRegistryBuilder, IntoAction, IntoDataInput,
+    IntoInputMatcher, Registry, RegistryBuilder,
+};
 
 // Trace types
 pub use trace::{EvalStep, EvalTrace, OnMatchTrace, PredicateTrace};
@@ -143,6 +162,8 @@ pub mod prelude {
         PrefixMatcher,
         RadixTree,
         SinglePredicate,
+        // Config types
+        StringMatchSpec,
         StringMatcher,
         SuffixMatcher,
     };
@@ -162,7 +183,10 @@ pub const MAX_DEPTH: usize = 32;
 // Errors
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Errors from matcher validation.
+/// Errors from matcher construction and validation.
+///
+/// These errors are caught at config load time, not evaluation time.
+/// Fix the configuration and reconstruct the matcher.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MatcherError {
     /// Matcher nesting exceeds [`MAX_DEPTH`].
@@ -172,6 +196,32 @@ pub enum MatcherError {
         /// Maximum allowed depth.
         max: usize,
     },
+    /// A regex or string pattern is invalid.
+    InvalidPattern {
+        /// The pattern that failed to compile.
+        pattern: String,
+        /// The underlying error message.
+        source: String,
+    },
+    /// Configuration deserialization or construction failed.
+    InvalidConfig {
+        /// The underlying error message.
+        source: String,
+    },
+    /// A type URL was not found in the registry.
+    UnknownTypeUrl {
+        /// The unregistered type URL.
+        type_url: String,
+        /// Which registry was searched (`"input"`, `"matcher"`, or `"action"`).
+        registry: &'static str,
+    },
+    /// Input data type is incompatible with matcher's supported types.
+    IncompatibleTypes {
+        /// The data type produced by the input.
+        input_type: String,
+        /// The data types accepted by the matcher.
+        matcher_types: Vec<String>,
+    },
 }
 
 impl std::fmt::Display for MatcherError {
@@ -180,7 +230,30 @@ impl std::fmt::Display for MatcherError {
             Self::DepthExceeded { depth, max } => {
                 write!(
                     f,
-                    "matcher depth {depth} exceeds maximum allowed depth {max}"
+                    "matcher nesting depth is {depth}, but maximum allowed is {max} \
+                     — reduce nesting or flatten your matcher tree"
+                )
+            }
+            Self::InvalidPattern { pattern, source } => {
+                write!(f, "invalid pattern \"{pattern}\": {source}")
+            }
+            Self::InvalidConfig { source } => {
+                write!(f, "invalid config: {source}")
+            }
+            Self::UnknownTypeUrl { type_url, registry } => {
+                write!(
+                    f,
+                    "unknown {registry} type URL \"{type_url}\" \
+                     — register it with RegistryBuilder::{registry}()"
+                )
+            }
+            Self::IncompatibleTypes {
+                input_type,
+                matcher_types,
+            } => {
+                write!(
+                    f,
+                    "input produces \"{input_type}\" data but matcher supports {matcher_types:?}"
                 )
             }
         }

@@ -1,0 +1,4 @@
+# Benchmark artifacts (machine-specific, reproducible via `just bench`)
+*.duckdb
+*.duckdb.wal
+raw/*.json

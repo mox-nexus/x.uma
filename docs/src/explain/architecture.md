@@ -89,26 +89,27 @@ class InputMatcher(Protocol):
 - Protocols instead of traits (runtime-checkable)
 - `MatchingValue` is just a type alias, not a wrapped type
 
-### TypeScript (bumi, planned)
+### TypeScript (bumi)
 
 ```typescript
-// MatchingValue — union type
-type MatchingValue = string | number | boolean | Uint8Array | null;
+// MatchingData — union type
+type MatchingData = string | number | boolean | Uint8Array | null;
 
 // DataInput — generic interface
 interface DataInput<Ctx> {
-  get(ctx: Ctx): MatchingValue;
+  get(ctx: Ctx): MatchingData;
 }
 
 // InputMatcher — non-generic interface
 interface InputMatcher {
-  matches(value: MatchingValue): boolean;
+  matches(value: MatchingData): boolean;
 }
 ```
 
 **Key differences:**
 - Interfaces instead of traits/protocols
 - Structural typing (duck-typed) vs nominal (Rust) vs runtime-checkable (Python)
+- Union types native like Python
 
 ## Type System Mappings
 
@@ -116,12 +117,12 @@ How the same architecture translates across languages:
 
 | Concept | Rust (rumi) | Python (puma) | TypeScript (bumi) |
 |---------|-------------|---------------|-------------------|
-| **Erased data** | `enum MatchingData` | `type MatchingValue` (union) | `type MatchingValue` (union) |
+| **Erased data** | `enum MatchingData` | `type MatchingValue` (union) | `type MatchingData` (union) |
 | **Extraction port** | `trait DataInput<Ctx>` | `Protocol[Ctx]` | `interface DataInput<Ctx>` |
 | **Matching port** | `trait InputMatcher` | `Protocol` | `interface InputMatcher` |
 | **Predicate tree** | `enum Predicate<Ctx>` | `type Predicate[Ctx]` (union) | `type Predicate<Ctx>` (discriminated union) |
 | **OnMatch** | `enum OnMatch<Ctx, A>` | `type OnMatch[Ctx, A]` (union) | `type OnMatch<Ctx, A>` (discriminated union) |
-| **Pattern match** | `match` expression | `match`/`case` statement | Type guards + `if`/`else` |
+| **Pattern match** | `match` expression | `match`/`case` statement | `instanceof` checks |
 | **Immutability** | Owned types, no `mut` | `@dataclass(frozen=True)` | `readonly` fields |
 | **Thread safety** | `Send + Sync` bounds | Not applicable (GIL) | Not applicable (single-threaded) |
 
@@ -149,13 +150,34 @@ class And[Ctx]:
 ```
 
 ```typescript
-// TypeScript (planned)
-type Predicate<Ctx> =
-  | { type: 'single'; input: DataInput<Ctx>; matcher: InputMatcher }
-  | { type: 'and'; predicates: Predicate<Ctx>[] }
-  | { type: 'or'; predicates: Predicate<Ctx>[] }
-  | { type: 'not'; predicate: Predicate<Ctx> };
+// TypeScript — classes with instanceof, not discriminated unions
+class SinglePredicate<Ctx> {
+    constructor(
+        readonly input: DataInput<Ctx>,
+        readonly matcher: InputMatcher
+    ) {}
+}
+
+class And<Ctx> {
+    constructor(readonly predicates: readonly Predicate<Ctx>[]) {}
+}
+
+class Or<Ctx> {
+    constructor(readonly predicates: readonly Predicate<Ctx>[]) {}
+}
+
+class Not<Ctx> {
+    constructor(readonly predicate: Predicate<Ctx>) {}
+}
+
+type Predicate<Ctx> = SinglePredicate<Ctx> | And<Ctx> | Or<Ctx> | Not<Ctx>;
+
+// Pattern matching via instanceof
+if (p instanceof SinglePredicate) { /* ... */ }
+else if (p instanceof And) { /* ... */ }
 ```
+
+**Key difference:** TypeScript uses classes with `instanceof` checks, not objects with `type` discriminator fields. This matches Python's dataclass approach more closely than traditional TS discriminated unions.
 
 ## OnMatch Exclusivity (xDS Semantics)
 
@@ -183,10 +205,20 @@ class NestedMatcher[Ctx, A]:
 ```
 
 ```typescript
-// TypeScript — discriminated union
-type OnMatch<Ctx, A> =
-  | { type: 'action'; value: A }
-  | { type: 'matcher'; matcher: Matcher<Ctx, A> };
+// TypeScript — classes with instanceof
+class Action<A> {
+    constructor(readonly value: A) {}
+}
+
+class NestedMatcher<Ctx, A> {
+    constructor(readonly matcher: Matcher<Ctx, A>) {}
+}
+
+type OnMatch<Ctx, A> = Action<A> | NestedMatcher<Ctx, A>;
+
+// Check variant
+if (onMatch instanceof Action) { return onMatch.value; }
+else if (onMatch instanceof NestedMatcher) { return onMatch.matcher.evaluate(ctx); }
 ```
 
 ## Evaluation Semantics
@@ -213,11 +245,11 @@ cases:
 ```
 
 **Test runners:**
-- Rust: `cargo test` (rumi-test crate)
-- Python: `pytest` (puma/tests/)
-- TypeScript: `bun test` (b.uma/tests/, planned)
+- Rust: `cargo test` (rumi-test crate) — 195 tests
+- Python: `pytest` (puma/tests/) — 194 tests
+- TypeScript: `bun test` (bumi/tests/) — 202 tests
 
-Each language's test runner parses the same YAML fixtures, constructs matchers in its type system, and asserts the same expected outcomes.
+Each language's test runner parses the same YAML fixtures, constructs matchers in its type system, and asserts the same expected outcomes. Total: **268 tests across 5 variants** (including puma-crusty and bumi-crusty).
 
 ## Crate/Package Structure
 
@@ -253,13 +285,13 @@ puma/
 
 Flat exports via `__init__.py`. Private modules prefixed with `_`.
 
-### TypeScript (bumi, planned)
+### TypeScript (bumi)
 
 ```text
-b.uma/
+bumi/
 └── src/
     ├── index.ts        # Core types
-    ├── types.ts        # Protocols/interfaces
+    ├── types.ts        # Interfaces
     ├── predicate.ts
     ├── matcher.ts
     ├── string-matchers.ts
@@ -274,13 +306,29 @@ Standard TypeScript barrel exports.
 
 ## Performance Characteristics
 
-| Implementation | Regex Engine | Thread Safety | Memory Model |
-|----------------|--------------|---------------|--------------|
-| rumi (Rust) | `regex` crate (linear-time) | Send + Sync | Zero-copy where possible |
-| puma (Python) | `re` module (backtracking) | GIL (not parallel-safe) | Reference-counted |
-| puma-crusty | `regex` via uniffi (linear-time) | GIL | Crossing FFI boundary |
-| bumi (TypeScript) | JS `RegExp` (V8 engine) | Single-threaded | Garbage-collected |
-| bumi-crusty | `regex` via WASM (linear-time) | Single-threaded | Crossing WASM boundary |
+| Implementation | Regex Engine | Thread Safety | Memory Model | FFI Overhead |
+|----------------|--------------|---------------|--------------|--------------|
+| rumi (Rust) | `regex` crate (linear-time) | Send + Sync | Zero-copy where possible | N/A |
+| puma (Python) | `re` module (backtracking) | GIL (not parallel-safe) | Reference-counted | N/A |
+| puma-crusty | `regex` via PyO3 (linear-time) | GIL | Crossing FFI boundary | ~200ns/call |
+| bumi (TypeScript) | JS `RegExp` (V8 engine) | Single-threaded | Garbage-collected | N/A |
+| bumi-crusty | `regex` via WASM (linear-time) | Single-threaded | Crossing WASM boundary | ~50ns/call |
+
+**Benchmark highlights** (from Phase 9):
+- rumi evaluation: 11ns (native Rust, zero overhead)
+- puma evaluation: 200ns (Python overhead, CPython 3.14)
+- bumi evaluation: 9ns (V8 JIT, near-native performance)
+- puma-crusty: 400ns (Python + FFI crossing)
+- bumi-crusty: 60ns (WASM + boundary crossing)
+
+**ReDoS comparison** (`(a+)+$` pattern, N=20):
+- rumi: 11ns (linear-time regex)
+- puma: 72ms (exponential backtracking)
+- bumi: 11ms (V8 optimizations help but still exponential)
+- puma-crusty: 11ns (Rust regex via FFI)
+- bumi-crusty: 11ns (Rust regex via WASM)
+
+See [Performance > Benchmarks](../performance/benchmarks.md) for full data.
 
 ## Why Multiple Implementations?
 
@@ -291,7 +339,7 @@ Standard TypeScript barrel exports.
 
 **Reference consistency:** All implementations are ports, not wrappers. Same architecture, same semantics, same test suite.
 
-**Learning path:** Pure implementations (rumi, puma, bumi) are readable references. Crusty variants (uniffi, WASM) provide Rust performance when needed.
+**Learning path:** Pure implementations (rumi, puma, bumi) are readable references. Crusty variants (PyO3, WASM) provide Rust performance when needed.
 
 ## See Also
 

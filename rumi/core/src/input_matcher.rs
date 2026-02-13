@@ -34,6 +34,11 @@ use std::fmt::Debug;
 /// assert!(matcher.matches(&MatchingData::String("hello".to_string())));
 /// assert!(!matcher.matches(&MatchingData::String("world".to_string())));
 /// ```
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` does not implement `InputMatcher`",
+    label = "this type cannot match against MatchingData",
+    note = "InputMatcher is domain-agnostic — use built-in matchers (ExactMatcher, PrefixMatcher, StringMatcher, etc.) or implement the `matches(&self, &MatchingData) -> bool` method"
+)]
 pub trait InputMatcher: Send + Sync + Debug {
     /// Check if the given value matches.
     ///
@@ -49,6 +54,7 @@ pub trait InputMatcher: Send + Sync + Debug {
 }
 
 // Blanket implementation for boxed InputMatchers
+#[diagnostic::do_not_recommend]
 impl InputMatcher for Box<dyn InputMatcher> {
     fn matches(&self, value: &MatchingData) -> bool {
         (**self).matches(value)
@@ -411,6 +417,95 @@ impl InputMatcher for StringMatcher {
                 }
             }
             Self::Regex(re) => re.is_match(input),
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IntoInputMatcher impls (feature = "registry")
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(feature = "registry")]
+mod into_input_matcher {
+    use super::{BoolMatcher, InputMatcher, StringMatcher};
+    use crate::registry::IntoInputMatcher;
+    use crate::MatcherError;
+    use serde::Deserialize;
+
+    // ── BoolMatcher ──────────────────────────────────────────────────────────
+
+    /// Configuration for constructing a [`BoolMatcher`] via the registry.
+    #[derive(Debug, Clone, Deserialize)]
+    pub struct BoolMatcherConfig {
+        /// The boolean value to match against.
+        pub expected: bool,
+    }
+
+    impl IntoInputMatcher for BoolMatcher {
+        type Config = BoolMatcherConfig;
+
+        fn from_config(config: Self::Config) -> Result<Box<dyn InputMatcher>, MatcherError> {
+            Ok(Box::new(BoolMatcher::new(config.expected)))
+        }
+    }
+
+    // ── StringMatcher ────────────────────────────────────────────────────────
+
+    /// How to match the pattern in a [`StringMatcherConfig`].
+    #[derive(Debug, Clone, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum StringMatchType {
+        /// Exact string equality.
+        Exact,
+        /// String prefix match.
+        Prefix,
+        /// String suffix match.
+        Suffix,
+        /// Substring contains match.
+        Contains,
+        /// Regular expression match.
+        Regex,
+    }
+
+    /// Configuration for constructing a [`StringMatcher`] via the registry.
+    ///
+    /// JSON example:
+    /// ```json
+    /// { "value": "/api", "match_type": "prefix", "ignore_case": true }
+    /// ```
+    #[derive(Debug, Clone, Deserialize)]
+    pub struct StringMatcherConfig {
+        /// The pattern to match against.
+        pub value: String,
+        /// How to match the pattern.
+        pub match_type: StringMatchType,
+        /// Case-insensitive matching (default: false).
+        #[serde(default)]
+        pub ignore_case: bool,
+    }
+
+    impl IntoInputMatcher for StringMatcher {
+        type Config = StringMatcherConfig;
+
+        fn from_config(config: Self::Config) -> Result<Box<dyn InputMatcher>, MatcherError> {
+            let matcher = match config.match_type {
+                StringMatchType::Exact => StringMatcher::exact(config.value, config.ignore_case),
+                StringMatchType::Prefix => StringMatcher::prefix(config.value, config.ignore_case),
+                StringMatchType::Suffix => StringMatcher::suffix(config.value, config.ignore_case),
+                StringMatchType::Contains => {
+                    StringMatcher::contains(config.value, config.ignore_case)
+                }
+                StringMatchType::Regex => if config.ignore_case {
+                    StringMatcher::regex_ignore_case(&config.value)
+                } else {
+                    StringMatcher::regex(&config.value)
+                }
+                .map_err(|e| MatcherError::InvalidPattern {
+                    pattern: config.value.clone(),
+                    source: e.to_string(),
+                })?,
+            };
+            Ok(Box::new(matcher))
         }
     }
 }

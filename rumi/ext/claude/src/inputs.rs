@@ -74,6 +74,84 @@ impl DataInput<HookContext> for GitBranchInput {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Registry support (feature = "registry")
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Configuration for [`ArgumentInput`].
+#[cfg(feature = "registry")]
+#[derive(serde::Deserialize)]
+pub struct ArgumentInputConfig {
+    /// The argument name to extract.
+    pub name: String,
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HookContext> for EventInput {
+    type Config = rumi::UnitConfig;
+
+    fn from_config(
+        _: rumi::UnitConfig,
+    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+        Ok(Box::new(EventInput))
+    }
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HookContext> for ToolNameInput {
+    type Config = rumi::UnitConfig;
+
+    fn from_config(
+        _: rumi::UnitConfig,
+    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+        Ok(Box::new(ToolNameInput))
+    }
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HookContext> for ArgumentInput {
+    type Config = ArgumentInputConfig;
+
+    fn from_config(
+        config: Self::Config,
+    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+        Ok(Box::new(ArgumentInput::new(config.name)))
+    }
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HookContext> for SessionIdInput {
+    type Config = rumi::UnitConfig;
+
+    fn from_config(
+        _: rumi::UnitConfig,
+    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+        Ok(Box::new(SessionIdInput))
+    }
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HookContext> for CwdInput {
+    type Config = rumi::UnitConfig;
+
+    fn from_config(
+        _: rumi::UnitConfig,
+    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+        Ok(Box::new(CwdInput))
+    }
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HookContext> for GitBranchInput {
+    type Config = rumi::UnitConfig;
+
+    fn from_config(
+        _: rumi::UnitConfig,
+    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+        Ok(Box::new(GitBranchInput))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

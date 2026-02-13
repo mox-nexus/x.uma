@@ -6,11 +6,14 @@ Development phases and current status.
 
 **x.uma is alpha software.** The API is under active development and will change.
 
-Two implementations exist:
-- **rumi** (Rust) — reference implementation, production-hardened constraints
-- **puma** (Python) — pure Python port, zero dependencies, 194 tests passing
+Five implementations exist:
+- **rumi** (Rust) — reference implementation, 195 tests
+- **puma** (Python) — pure Python, zero dependencies, 194 tests
+- **bumi** (TypeScript) — pure TypeScript, zero runtime deps, 202 tests
+- **puma-crusty** (Python + Rust) — PyO3 bindings, 37 tests
+- **bumi-crusty** (TypeScript + WASM) — wasm-bindgen bindings, 36 tests
 
-Both pass the same conformance test suite (`spec/tests/`). TypeScript (bumi) is next.
+All pass the same conformance test suite (`spec/tests/`). Total: 268 tests across 5 variants.
 
 ## Phase Overview
 
@@ -26,9 +29,34 @@ Both pass the same conformance test suite (`spec/tests/`). TypeScript (bumi) is 
 | 5.1 | puma arch-guild hardening | ✅ Done |
 | 6 | bumi (Bun/TypeScript + HTTP) | ✅ Done |
 | 6.1 | bumi arch-guild hardening | ✅ Done |
-| 7 | rumi/crusts/python (uniffi→puma-crusty) | Planned |
-| 8 | rumi/crusts/wasm (wasm-pack→@x.uma/bumi-crusty) | Planned |
-| 9 | Benchmarks (all variants) | Planned |
+| 7 | puma-crusty: PyO3 Python bindings | ✅ Done |
+| 7.5 | rumi-claude: trace + HookMatch compiler | ✅ Done |
+| 8 | bumi-crusty: wasm-bindgen TypeScript bindings | ✅ Done |
+| 9 | Cross-language benchmarks (all 5 variants) | 🚧 In Progress |
+| 10 | Semantic matching (cosine similarity) | Planned |
+| 11 | RE2 migration: `google-re2` for puma, `re2js` for bumi | Planned |
+
+## Phase 11: RE2 Linear-Time Regex Migration
+
+**Status:** Planned
+
+Replace backtracking regex engines in puma and bumi with linear-time RE2 implementations.
+
+**Motivation:** Phase 9 benchmarks proved ReDoS is catastrophic — Python `re` at N=20 takes 72ms, JS `RegExp` takes 11ms, while Rust `regex` (RE2 semantics) takes 11ns. The crusty bindings solve this but add FFI overhead. RE2 packages give linear-time regex natively without crossing a language boundary.
+
+**puma:** [`google-re2`](https://pypi.org/project/google-re2/) — official Google C++ wrapper
+- Drop-in for `RegexMatcher` internals (swap `re.search` → `re2.search`)
+- Requires C++ toolchain to build (wheel available for common platforms)
+- Trade-off: adds a native dependency to previously zero-dep puma
+
+**bumi:** [`re2js`](https://github.com/le0pard/re2js) — pure JavaScript port of RE2
+- Zero native deps, zero WASM — pure JS with linear-time guarantee
+- Drop-in for `RegexMatcher` internals (swap `RegExp.test` → `re2js` equivalent)
+- Best of both worlds: bumi's 9ns JIT speed + linear-time safety
+
+**Limitations (both):** No backreferences, no lookahead assertions. Same as Rust `regex` crate. The vast majority of matcher patterns don't need these.
+
+**Crusty still matters:** RE2 only fixes the regex leaf node. Crusty replaces the entire evaluation pipeline (tree walk, predicate composition, field matching) in Rust. For complex configs with 100+ rules, crusty's compiled pipeline wins. RE2 + crusty is the best of all worlds.
 
 ## Phase 5: puma (Pure Python)
 
@@ -83,16 +111,15 @@ Pure Python implementation of the xDS Unified Matcher API. Zero dependencies. Py
 
 ## Phase 6: bumi (Bun/TypeScript)
 
-**Status:** Next
+**Status:** Complete (v0.1.0)
 
-Pure TypeScript implementation using Bun runtime.
+Pure TypeScript implementation using Bun runtime. Zero runtime dependencies. 202 tests passing.
 
-**Planned:**
-- Modern TypeScript with discriminated unions
-- Bun-native testing (`bun test`)
-- Zero runtime dependencies (no axios, no lodash)
-- Same conformance test suite
-- HTTP domain with Gateway API compiler
+**Architecture:**
+- Classes with `readonly` props for immutability
+- `instanceof` checks for union discrimination
+- Biome for lint/format, `bun test` for testing
+- `Object.create(null)` for params/headers (prototype pollution protection)
 
 **Type System Mapping (Rust → TypeScript):**
 
@@ -104,50 +131,56 @@ Pure TypeScript implementation using Bun runtime.
 | `enum Predicate<Ctx>` | `type Predicate<Ctx> = Single<Ctx> \| And<Ctx> \| Or<Ctx> \| Not<Ctx>` | Discriminated union |
 | `enum OnMatch<Ctx, A>` | `type OnMatch<Ctx, A> = Action<A> \| NestedMatcher<Ctx, A>` | Discriminated union |
 
-## Phase 7: puma-crusty (Rust Bindings → Python)
+## Phase 7: puma-crusty (PyO3 Python Bindings)
 
-**Status:** Planned
+**Status:** Complete
 
-Rust-backed Python package providing the same puma API with Rust performance + safety.
+Rust-backed Python package via PyO3, providing opaque compiled `HookMatcher` for Claude Code hooks.
 
-**Approach:**
-- uniffi bindings from `rumi/crusts/python/`
-- maturin for wheel building
-- Same API as pure puma (drop-in replacement)
-- Linear-time regex (ReDoS-safe)
+**Architecture:**
+- PyO3 0.25+ for Python 3.14 support
+- `#[pyclass(frozen)]` for immutable compiled matchers
+- Opaque engine pattern: config in → compile in Rust → evaluate in Rust → simple types out
+- `maturin develop` for local builds, `maturin build` for wheels
+- Linear-time regex (Rust `regex` crate — ReDoS immune)
 
-**Trade-off:** Adds compiled Rust binary dependency. Pure puma remains zero-dependency option.
+**Key APIs:**
+- `HookMatcher.compile(rules, action, fallback)` → compiled matcher
+- `matcher.evaluate(**context)` → action string or None
+- `matcher.trace(**context)` → detailed trace for debugging
 
-## Phase 8: bumi-crusty (Rust Bindings → WASM)
+## Phase 8: bumi-crusty (wasm-bindgen TypeScript Bindings)
 
-**Status:** Planned
+**Status:** Complete
 
-Rust-backed TypeScript package via WASM.
+Rust-backed TypeScript package via wasm-bindgen + wasm-pack.
 
-**Approach:**
-- wasm-bindgen from `rumi/crusts/wasm/`
-- wasm-pack for bundling
-- Same API as pure bumi (drop-in replacement)
-- Linear-time regex (ReDoS-safe)
+**Architecture:**
+- Config types use plain JS objects (discriminated unions), not opaque Rust structs
+- `StringMatch` is a zero-size namespace struct with static factory methods
+- `serde-wasm-bindgen` for trace output serialization (Rust → JS with camelCase)
+- Same security hardening as puma-crusty (fail-closed, input limits, validate after compile)
 
-## Phase 9: Benchmarks
+## Phase 9: Cross-Language Benchmarks
 
-**Status:** Planned
+**Status:** In Progress
 
-Cross-language performance comparison.
+Performance comparison across all 5 x.uma variants using language-native tools.
 
-**Variants to benchmark:**
-- rumi (Rust native)
-- puma (pure Python)
-- puma-crusty (Python → Rust via uniffi)
-- bumi (pure TypeScript)
-- bumi-crusty (TypeScript → Rust via WASM)
+**Tooling:**
 
-**Metrics:**
-- Matcher compilation time
-- Evaluation throughput (matches/sec)
-- Memory usage
-- Startup overhead (FFI/WASM)
+| Language | Tool |
+|----------|------|
+| Rust | divan (`#[divan::bench]` attribute API) |
+| Python | pytest-benchmark |
+| TypeScript | mitata |
+
+**Benchmark Categories:**
+- **Compile latency** — config → matcher construction
+- **Evaluate throughput** — matcher + context → action (hot path)
+- **FFI overhead** — pure vs crusty head-to-head comparison
+- **ReDoS demonstration** — `(a+)+$` pattern, linear (Rust) vs exponential (Python/TS)
+- **Scaling** — 1 to 200 rules, miss-heavy workloads, trace overhead
 
 ## Historical: Phase 4 (HTTP Domain)
 

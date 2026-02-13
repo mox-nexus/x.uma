@@ -76,17 +76,3 @@ fn test_semantics() {
 fn test_invariants() {
     run_fixtures_in_dir(&fixtures_dir().join("04_invariants"));
 }
-
-#[test]
-fn test_all_fixtures() {
-    // Run all fixture directories
-    let base = fixtures_dir();
-    for entry in fs::read_dir(&base).expect("read fixtures dir") {
-        let entry = entry.expect("dir entry");
-        let path = entry.path();
-
-        if path.is_dir() && !path.file_name().unwrap().to_str().unwrap().starts_with('.') {
-            run_fixtures_in_dir(&path);
-        }
-    }
-}

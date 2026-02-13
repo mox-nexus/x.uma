@@ -3,10 +3,18 @@
 //! Translates user-friendly hook match configuration into efficient
 //! runtime matchers operating on [`HookContext`].
 
-use crate::config::{ArgumentMatch, CompileError, HookMatch, StringMatch};
+use crate::config::{ArgumentMatch, HookMatch, StringMatch};
 use crate::context::{HookContext, HookEvent};
 use crate::inputs::{ArgumentInput, CwdInput, EventInput, GitBranchInput, ToolNameInput};
 use rumi::prelude::*;
+
+/// A catch-all predicate that matches any `HookContext`.
+fn catch_all() -> Predicate<HookContext> {
+    Predicate::Single(SinglePredicate::new(
+        Box::new(EventInput),
+        Box::new(PrefixMatcher::new("")), // matches any event string
+    ))
+}
 
 /// Extension trait for compiling `HookMatch` to rumi `Matcher`.
 pub trait HookMatchExt {
@@ -17,33 +25,30 @@ pub trait HookMatchExt {
     ///
     /// # Errors
     ///
-    /// Returns [`CompileError`] if any regex pattern is invalid.
+    /// Returns [`MatcherError`] if any regex pattern is invalid.
     fn compile<A: Clone + Send + Sync + 'static>(
         &self,
         action: A,
-    ) -> Result<Matcher<HookContext, A>, CompileError>;
+    ) -> Result<Matcher<HookContext, A>, MatcherError>;
 
     /// Compile this `HookMatch` into a `Predicate` (without action).
     ///
     /// # Errors
     ///
-    /// Returns [`CompileError`] if any regex pattern is invalid.
-    fn to_predicate(&self) -> Result<Predicate<HookContext>, CompileError>;
+    /// Returns [`MatcherError`] if any regex pattern is invalid.
+    fn to_predicate(&self) -> Result<Predicate<HookContext>, MatcherError>;
 }
 
 impl HookMatchExt for HookMatch {
     fn compile<A: Clone + Send + Sync + 'static>(
         &self,
         action: A,
-    ) -> Result<Matcher<HookContext, A>, CompileError> {
+    ) -> Result<Matcher<HookContext, A>, MatcherError> {
         let predicate = self.to_predicate()?;
-        Ok(Matcher::new(
-            vec![FieldMatcher::new(predicate, OnMatch::Action(action))],
-            None,
-        ))
+        Ok(Matcher::from_predicate(predicate, action, None))
     }
 
-    fn to_predicate(&self) -> Result<Predicate<HookContext>, CompileError> {
+    fn to_predicate(&self) -> Result<Predicate<HookContext>, MatcherError> {
         let mut predicates: Vec<Predicate<HookContext>> = Vec::new();
 
         // Event matching (exact only — event names are a known enum)
@@ -53,10 +58,7 @@ impl HookMatchExt for HookMatch {
 
         // Tool name matching
         if let Some(tool_match) = &self.tool_name {
-            predicates.push(compile_string_predicate(
-                Box::new(ToolNameInput),
-                tool_match,
-            )?);
+            predicates.push(tool_match.to_predicate(Box::new(ToolNameInput))?);
         }
 
         // Argument matching (all ANDed)
@@ -68,30 +70,15 @@ impl HookMatchExt for HookMatch {
 
         // CWD matching
         if let Some(cwd_match) = &self.cwd {
-            predicates.push(compile_string_predicate(Box::new(CwdInput), cwd_match)?);
+            predicates.push(cwd_match.to_predicate(Box::new(CwdInput))?);
         }
 
         // Git branch matching
         if let Some(branch_match) = &self.git_branch {
-            predicates.push(compile_string_predicate(
-                Box::new(GitBranchInput),
-                branch_match,
-            )?);
+            predicates.push(branch_match.to_predicate(Box::new(GitBranchInput))?);
         }
 
-        // Empty match = match everything (same as rumi-http)
-        if predicates.is_empty() {
-            return Ok(Predicate::Single(SinglePredicate::new(
-                Box::new(EventInput),
-                Box::new(PrefixMatcher::new("")), // matches any event string
-            )));
-        }
-
-        if predicates.len() == 1 {
-            Ok(predicates.pop().unwrap())
-        } else {
-            Ok(Predicate::And(predicates))
-        }
+        Ok(Predicate::from_all(predicates, catch_all()))
     }
 }
 
@@ -103,22 +90,13 @@ fn compile_event_match(event: HookEvent) -> Predicate<HookContext> {
     ))
 }
 
-/// Compile a `StringMatch` + `DataInput` into a predicate.
-fn compile_string_predicate(
-    input: Box<dyn DataInput<HookContext>>,
-    string_match: &StringMatch,
-) -> Result<Predicate<HookContext>, CompileError> {
-    let matcher = string_match.to_input_matcher()?;
-    Ok(Predicate::Single(SinglePredicate::new(input, matcher)))
-}
-
 /// Compile an argument match to a predicate.
 fn compile_argument_match(
     arg_match: &ArgumentMatch,
-) -> Result<Predicate<HookContext>, CompileError> {
-    let input = Box::new(ArgumentInput::new(&arg_match.name));
-    let matcher = arg_match.value.to_input_matcher()?;
-    Ok(Predicate::Single(SinglePredicate::new(input, matcher)))
+) -> Result<Predicate<HookContext>, MatcherError> {
+    arg_match
+        .value
+        .to_predicate(Box::new(ArgumentInput::new(&arg_match.name)))
 }
 
 /// Compile multiple `HookMatch` entries into a single `Matcher`.
@@ -127,47 +105,19 @@ fn compile_argument_match(
 ///
 /// # Errors
 ///
-/// Returns [`CompileError`] if any regex pattern is invalid.
+/// Returns [`MatcherError`] if any regex pattern is invalid.
 pub fn compile_hook_matches<A: Clone + Send + Sync + 'static>(
     matches: &[HookMatch],
     action: A,
     on_no_match: Option<A>,
-) -> Result<Matcher<HookContext, A>, CompileError> {
-    if matches.is_empty() {
-        // Empty matches = match everything
-        return Ok(Matcher::new(
-            vec![FieldMatcher::new(
-                Predicate::Single(SinglePredicate::new(
-                    Box::new(EventInput),
-                    Box::new(PrefixMatcher::new("")),
-                )),
-                OnMatch::Action(action),
-            )],
-            on_no_match.map(OnMatch::Action),
-        ));
-    }
-
-    if matches.len() == 1 {
-        let predicate = matches[0].to_predicate()?;
-        return Ok(Matcher::new(
-            vec![FieldMatcher::new(predicate, OnMatch::Action(action))],
-            on_no_match.map(OnMatch::Action),
-        ));
-    }
-
-    // Multiple matches: OR them together
+) -> Result<Matcher<HookContext, A>, MatcherError> {
     let predicates: Vec<Predicate<HookContext>> = matches
         .iter()
         .map(HookMatchExt::to_predicate)
         .collect::<Result<_, _>>()?;
 
-    Ok(Matcher::new(
-        vec![FieldMatcher::new(
-            Predicate::Or(predicates),
-            OnMatch::Action(action),
-        )],
-        on_no_match.map(OnMatch::Action),
-    ))
+    let or_pred = Predicate::from_any(predicates, catch_all());
+    Ok(Matcher::from_predicate(or_pred, action, on_no_match))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -22,12 +22,7 @@ pub trait HttpRouteMatchExt {
 
 impl HttpRouteMatchExt for HttpRouteMatch {
     fn compile<A: Clone + Send + Sync + 'static>(&self, action: A) -> Matcher<HttpMessage, A> {
-        let predicate = self.to_predicate();
-
-        Matcher::new(
-            vec![FieldMatcher::new(predicate, OnMatch::Action(action))],
-            None,
-        )
+        Matcher::from_predicate(self.to_predicate(), action, None)
     }
 
     fn to_predicate(&self) -> Predicate<HttpMessage> {
@@ -60,21 +55,16 @@ impl HttpRouteMatchExt for HttpRouteMatch {
             }
         }
 
-        // If no conditions, match everything
-        if predicates.is_empty() {
-            return Predicate::Single(SinglePredicate::new(
-                Box::new(PathInput),
-                Box::new(PrefixMatcher::new("")), // Match any path
-            ));
-        }
-
-        // Single predicate or AND them together
-        if predicates.len() == 1 {
-            predicates.pop().unwrap()
-        } else {
-            Predicate::And(predicates)
-        }
+        Predicate::from_all(predicates, catch_all())
     }
+}
+
+/// A catch-all predicate that matches any HTTP request (empty prefix = match all paths).
+fn catch_all() -> Predicate<HttpMessage> {
+    Predicate::Single(SinglePredicate::new(
+        Box::new(PathInput),
+        Box::new(PrefixMatcher::new("")),
+    ))
 }
 
 /// Compile a path match to a predicate.
@@ -139,40 +129,15 @@ pub fn compile_route_matches<A: Clone + Send + Sync + 'static>(
     action: A,
     on_no_match: Option<A>,
 ) -> Matcher<HttpMessage, A> {
-    if matches.is_empty() {
-        // Empty matches = match everything
-        return Matcher::new(
-            vec![FieldMatcher::new(
-                Predicate::Single(SinglePredicate::new(
-                    Box::new(PathInput),
-                    Box::new(PrefixMatcher::new("")),
-                )),
-                OnMatch::Action(action),
-            )],
-            on_no_match.map(OnMatch::Action),
-        );
-    }
-
-    if matches.len() == 1 {
-        let predicate = matches[0].to_predicate();
-        return Matcher::new(
-            vec![FieldMatcher::new(predicate, OnMatch::Action(action))],
-            on_no_match.map(OnMatch::Action),
-        );
-    }
-
-    // Multiple matches: OR them together
     let predicates: Vec<Predicate<HttpMessage>> = matches
         .iter()
         .map(HttpRouteMatchExt::to_predicate)
         .collect();
 
-    Matcher::new(
-        vec![FieldMatcher::new(
-            Predicate::Or(predicates),
-            OnMatch::Action(action),
-        )],
-        on_no_match.map(OnMatch::Action),
+    Matcher::from_predicate(
+        Predicate::from_any(predicates, catch_all()),
+        action,
+        on_no_match,
     )
 }
 

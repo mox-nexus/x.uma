@@ -1,0 +1,11 @@
+{
+  "name": "bumi-crusty-tests",
+  "private": true,
+  "scripts": {
+    "build": "wasm-pack build --target nodejs",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "mitata": "^1.0.34"
+  }
+}

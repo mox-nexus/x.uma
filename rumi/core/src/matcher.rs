@@ -3,7 +3,9 @@
 //! The `Matcher` is the entry point for evaluation. It contains a list of
 //! field matchers and evaluates them in order, returning the first match.
 
-use crate::{EvalStep, EvalTrace, FieldMatcher, MatcherError, OnMatch, OnMatchTrace, MAX_DEPTH};
+use crate::{
+    EvalStep, EvalTrace, FieldMatcher, MatcherError, OnMatch, OnMatchTrace, Predicate, MAX_DEPTH,
+};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
@@ -68,6 +70,28 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
             on_no_match,
             _phantom: PhantomData,
         }
+    }
+
+    /// Create a matcher from a single predicate with action and optional fallback.
+    ///
+    /// This is the common pattern for domain compilers: a predicate tree
+    /// (built with [`Predicate::from_all`] / [`Predicate::from_any`])
+    /// paired with a single action and optional fallback.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let matcher = Matcher::from_predicate(
+    ///     Predicate::from_any(rule_predicates, catch_all),
+    ///     "allow",
+    ///     Some("deny"),
+    /// );
+    /// ```
+    pub fn from_predicate(predicate: Predicate<Ctx>, action: A, on_no_match: Option<A>) -> Self {
+        Self::new(
+            vec![FieldMatcher::new(predicate, OnMatch::Action(action))],
+            on_no_match.map(OnMatch::Action),
+        )
     }
 
     /// Create an empty matcher (no field matchers, no fallback).
@@ -499,6 +523,52 @@ mod tests {
 
         assert_eq!(current.depth(), crate::MAX_DEPTH);
         assert!(current.validate().is_ok());
+    }
+
+    // ========== from_predicate Tests ==========
+
+    #[test]
+    fn from_predicate_with_action_and_fallback() {
+        let pred = Predicate::Single(SinglePredicate::new(
+            Box::new(ValueInput),
+            Box::new(ExactMatcher::new("hello")),
+        ));
+        let matcher = Matcher::from_predicate(pred, "hit".to_string(), Some("miss".to_string()));
+
+        assert_eq!(
+            matcher.evaluate(&TestCtx {
+                value: "hello".into()
+            }),
+            Some("hit".to_string())
+        );
+        assert_eq!(
+            matcher.evaluate(&TestCtx {
+                value: "other".into()
+            }),
+            Some("miss".to_string())
+        );
+    }
+
+    #[test]
+    fn from_predicate_no_fallback() {
+        let pred = Predicate::Single(SinglePredicate::new(
+            Box::new(ValueInput),
+            Box::new(ExactMatcher::new("hello")),
+        ));
+        let matcher: Matcher<TestCtx, String> = Matcher::from_predicate(pred, "hit".into(), None);
+
+        assert_eq!(
+            matcher.evaluate(&TestCtx {
+                value: "hello".into()
+            }),
+            Some("hit".to_string())
+        );
+        assert_eq!(
+            matcher.evaluate(&TestCtx {
+                value: "other".into()
+            }),
+            None
+        );
     }
 
     // ========== Trace Tests ==========

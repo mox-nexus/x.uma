@@ -188,6 +188,41 @@ impl<Ctx> Predicate<Ctx> {
         }
     }
 
+    /// Compose predicates with AND semantics, optimizing for common cases.
+    ///
+    /// - Empty → `catch_all` (no conditions = match everything)
+    /// - Single → unwrapped (no wrapping overhead)
+    /// - Multiple → `And(predicates)`
+    ///
+    /// This eliminates the repeated `if empty / if 1 / else And` pattern
+    /// in every domain compiler.
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)] // unwrap guarded by len() == 1
+    pub fn from_all(predicates: Vec<Self>, catch_all: Self) -> Self {
+        match predicates.len() {
+            0 => catch_all,
+            1 => predicates.into_iter().next().unwrap(),
+            _ => Self::And(predicates),
+        }
+    }
+
+    /// Compose predicates with OR semantics, optimizing for common cases.
+    ///
+    /// - Empty → `catch_all` (no conditions = match everything)
+    /// - Single → unwrapped (no wrapping overhead)
+    /// - Multiple → `Or(predicates)`
+    ///
+    /// Symmetric with [`from_all`](Self::from_all).
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)] // unwrap guarded by len() == 1
+    pub fn from_any(predicates: Vec<Self>, catch_all: Self) -> Self {
+        match predicates.len() {
+            0 => catch_all,
+            1 => predicates.into_iter().next().unwrap(),
+            _ => Self::Or(predicates),
+        }
+    }
+
     /// Returns `true` if this is a `Single` predicate.
     #[must_use]
     pub fn is_single(&self) -> bool {
@@ -399,6 +434,64 @@ mod tests {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<SinglePredicate<TestContext>>();
         assert_send_sync::<Predicate<TestContext>>();
+    }
+
+    // ========== Smart Constructor Tests ==========
+
+    fn make_single(expected: &str) -> Predicate<TestContext> {
+        Predicate::Single(SinglePredicate::new(
+            Box::new(ValueInput),
+            Box::new(ExactMatcher::new(expected)),
+        ))
+    }
+
+    fn catch_all() -> Predicate<TestContext> {
+        Predicate::Single(SinglePredicate::new(
+            Box::new(ValueInput),
+            Box::new(crate::PrefixMatcher::new("")),
+        ))
+    }
+
+    #[test]
+    fn from_all_empty_returns_catch_all() {
+        let ctx = TestContext {
+            value: "anything".into(),
+        };
+        let pred = Predicate::from_all(vec![], catch_all());
+        assert!(pred.evaluate(&ctx)); // catch-all matches everything
+    }
+
+    #[test]
+    fn from_all_single_unwraps() {
+        let pred = Predicate::from_all(vec![make_single("hello")], catch_all());
+        assert!(pred.is_single()); // no And wrapper
+    }
+
+    #[test]
+    fn from_all_multiple_wraps_and() {
+        let pred = Predicate::from_all(vec![make_single("a"), make_single("b")], catch_all());
+        assert!(pred.is_and());
+    }
+
+    #[test]
+    fn from_any_empty_returns_catch_all() {
+        let ctx = TestContext {
+            value: "anything".into(),
+        };
+        let pred = Predicate::from_any(vec![], catch_all());
+        assert!(pred.evaluate(&ctx));
+    }
+
+    #[test]
+    fn from_any_single_unwraps() {
+        let pred = Predicate::from_any(vec![make_single("hello")], catch_all());
+        assert!(pred.is_single());
+    }
+
+    #[test]
+    fn from_any_multiple_wraps_or() {
+        let pred = Predicate::from_any(vec![make_single("a"), make_single("b")], catch_all());
+        assert!(pred.is_or());
     }
 
     // ========== Trace Tests ==========

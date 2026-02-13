@@ -4,54 +4,12 @@
 //! The [compiler](crate::compiler) translates them into runtime `Matcher` trees.
 
 use crate::context::HookEvent;
-use rumi::prelude::*;
-use std::fmt;
 
 /// How to match a string value.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum StringMatch {
-    /// Exact equality.
-    Exact(String),
-    /// Starts with prefix.
-    Prefix(String),
-    /// Ends with suffix.
-    Suffix(String),
-    /// Contains substring.
-    Contains(String),
-    /// Matches regular expression (Rust `regex` crate syntax).
-    Regex(String),
-}
-
-impl StringMatch {
-    /// Compile this match config into a runtime `InputMatcher`.
-    ///
-    /// # Errors
-    ///
-    /// Returns `CompileError` if the pattern is an invalid regular expression.
-    pub fn to_input_matcher(&self) -> Result<Box<dyn InputMatcher>, CompileError> {
-        match self {
-            Self::Exact(v) => Ok(Box::new(ExactMatcher::new(v.as_str()))),
-            Self::Prefix(v) => Ok(Box::new(PrefixMatcher::new(v.as_str()))),
-            Self::Suffix(v) => Ok(Box::new(SuffixMatcher::new(v.as_str()))),
-            Self::Contains(v) => Ok(Box::new(ContainsMatcher::new(v.as_str()))),
-            Self::Regex(v) => StringMatcher::regex(v)
-                .map(|sm| Box::new(sm) as Box<dyn InputMatcher>)
-                .map_err(|e| CompileError(format!("invalid regex `{v}`: {e}"))),
-        }
-    }
-}
-
-impl fmt::Display for StringMatch {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Exact(v) => write!(f, "Exact(\"{v}\")"),
-            Self::Prefix(v) => write!(f, "Prefix(\"{v}\")"),
-            Self::Suffix(v) => write!(f, "Suffix(\"{v}\")"),
-            Self::Contains(v) => write!(f, "Contains(\"{v}\")"),
-            Self::Regex(v) => write!(f, "Regex(\"{v}\")"),
-        }
-    }
-}
+///
+/// This is a re-export of [`rumi::StringMatchSpec`] for backward compatibility.
+/// Domain-agnostic string matching specification that compiles to runtime matchers.
+pub use rumi::StringMatchSpec as StringMatch;
 
 /// User-friendly configuration for matching Claude Code hook events.
 ///
@@ -100,21 +58,10 @@ pub struct ArgumentMatch {
     pub value: StringMatch,
 }
 
-/// Error when compiling a `HookMatch` into a `Matcher`.
-#[derive(Debug)]
-pub struct CompileError(pub(crate) String);
-
-impl fmt::Display for CompileError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "hook match compile error: {}", self.0)
-    }
-}
-
-impl std::error::Error for CompileError {}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rumi::prelude::*;
 
     #[test]
     fn string_match_exact_compiles() {
@@ -160,7 +107,7 @@ mod tests {
     fn string_match_invalid_regex_returns_error() {
         let m = StringMatch::Regex("[invalid".into());
         let err = m.to_input_matcher().unwrap_err();
-        assert!(err.to_string().contains("invalid regex"));
+        assert!(err.to_string().contains("invalid pattern"));
     }
 
     #[test]

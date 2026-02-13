@@ -98,6 +98,92 @@ impl DataInput<HttpMessage> for AuthorityInput {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Registry support (feature = "registry")
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Configuration for [`HeaderInput`].
+#[cfg(feature = "registry")]
+#[derive(serde::Deserialize)]
+pub struct HeaderInputConfig {
+    /// The header name to extract (case-insensitive).
+    pub name: String,
+}
+
+/// Configuration for [`QueryParamInput`].
+#[cfg(feature = "registry")]
+#[derive(serde::Deserialize)]
+pub struct QueryParamInputConfig {
+    /// The query parameter name to extract.
+    pub name: String,
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HttpMessage> for PathInput {
+    type Config = rumi::UnitConfig;
+
+    fn from_config(
+        _: rumi::UnitConfig,
+    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
+        Ok(Box::new(PathInput))
+    }
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HttpMessage> for MethodInput {
+    type Config = rumi::UnitConfig;
+
+    fn from_config(
+        _: rumi::UnitConfig,
+    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
+        Ok(Box::new(MethodInput))
+    }
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HttpMessage> for HeaderInput {
+    type Config = HeaderInputConfig;
+
+    fn from_config(
+        config: Self::Config,
+    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
+        Ok(Box::new(HeaderInput::new(config.name)))
+    }
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HttpMessage> for QueryParamInput {
+    type Config = QueryParamInputConfig;
+
+    fn from_config(
+        config: Self::Config,
+    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
+        Ok(Box::new(QueryParamInput::new(config.name)))
+    }
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HttpMessage> for SchemeInput {
+    type Config = rumi::UnitConfig;
+
+    fn from_config(
+        _: rumi::UnitConfig,
+    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
+        Ok(Box::new(SchemeInput))
+    }
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HttpMessage> for AuthorityInput {
+    type Config = rumi::UnitConfig;
+
+    fn from_config(
+        _: rumi::UnitConfig,
+    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
+        Ok(Box::new(AuthorityInput))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

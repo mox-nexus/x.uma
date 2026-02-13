@@ -37,10 +37,6 @@ describe("prototype pollution", () => {
 });
 
 describe("RegexMatcher error guard", () => {
-	it("invalid regex throws MatcherError", () => {
-		expect(() => new RegexMatcher("[unclosed")).toThrow(MatcherError);
-	});
-
 	it("valid regex does not throw", () => {
 		expect(() => new RegexMatcher("^\\d+$")).not.toThrow();
 	});

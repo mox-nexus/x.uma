@@ -73,6 +73,40 @@ class Not[Ctx]:
 type Predicate[Ctx] = SinglePredicate[Ctx] | And[Ctx] | Or[Ctx] | Not[Ctx]
 
 
+def and_predicate[Ctx](
+    predicates: list[Predicate[Ctx]], catch_all: Predicate[Ctx]
+) -> Predicate[Ctx]:
+    """Compose predicates with AND semantics, optimizing for common cases.
+
+    - Empty -> catch_all (no conditions = match everything)
+    - Single -> unwrapped (no wrapping overhead)
+    - Multiple -> And(predicates)
+    """
+    if not predicates:
+        return catch_all
+    if len(predicates) == 1:
+        return predicates[0]
+    return And(tuple(predicates))
+
+
+def or_predicate[Ctx](
+    predicates: list[Predicate[Ctx]], catch_all: Predicate[Ctx]
+) -> Predicate[Ctx]:
+    """Compose predicates with OR semantics, optimizing for common cases.
+
+    - Empty -> catch_all (no conditions = match everything)
+    - Single -> unwrapped (no wrapping overhead)
+    - Multiple -> Or(predicates)
+
+    Symmetric with and_predicate.
+    """
+    if not predicates:
+        return catch_all
+    if len(predicates) == 1:
+        return predicates[0]
+    return Or(tuple(predicates))
+
+
 def predicate_depth(p: Predicate[Any]) -> int:
     """Calculate the nesting depth of a predicate tree."""
     match p:

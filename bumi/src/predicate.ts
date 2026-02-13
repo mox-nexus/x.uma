@@ -49,6 +49,40 @@ export function evaluatePredicate<Ctx>(p: Predicate<Ctx>, ctx: Ctx): boolean {
 	return p.evaluate(ctx);
 }
 
+/**
+ * Compose predicates with AND semantics, optimizing for common cases.
+ *
+ * - Empty → catchAll (no conditions = match everything)
+ * - Single → unwrapped (no wrapping overhead)
+ * - Multiple → And(predicates)
+ */
+export function andPredicate<Ctx>(
+	predicates: readonly Predicate<Ctx>[],
+	catchAll: Predicate<Ctx>,
+): Predicate<Ctx> {
+	if (predicates.length === 0) return catchAll;
+	if (predicates.length === 1) return predicates[0]!;
+	return new And(predicates);
+}
+
+/**
+ * Compose predicates with OR semantics, optimizing for common cases.
+ *
+ * - Empty → catchAll (no conditions = match everything)
+ * - Single → unwrapped (no wrapping overhead)
+ * - Multiple → Or(predicates)
+ *
+ * Symmetric with andPredicate.
+ */
+export function orPredicate<Ctx>(
+	predicates: readonly Predicate<Ctx>[],
+	catchAll: Predicate<Ctx>,
+): Predicate<Ctx> {
+	if (predicates.length === 0) return catchAll;
+	if (predicates.length === 1) return predicates[0]!;
+	return new Or(predicates);
+}
+
 /** Calculate nesting depth of a predicate tree. */
 export function predicateDepth<Ctx>(p: Predicate<Ctx>): number {
 	if (p instanceof SinglePredicate) return 1;

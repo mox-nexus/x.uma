@@ -121,6 +121,23 @@ class Matcher[Ctx, A]:
         return 1 + max(max_predicate, max_nested, no_match_depth)
 
 
+def matcher_from_predicate[Ctx, A](
+    predicate: Predicate[Ctx],
+    action: A,
+    on_no_match: A | None = None,
+) -> Matcher[Ctx, A]:
+    """Create a Matcher from a single predicate, action, and optional fallback.
+
+    This is the standard way to wrap a predicate tree into a ready-to-evaluate
+    Matcher. Eliminates repeated Matcher(matcher_list=(...), on_no_match=...) boilerplate.
+    """
+    on_no_match_om = Action(on_no_match) if on_no_match is not None else None
+    return Matcher(
+        matcher_list=(FieldMatcher(predicate, Action(action)),),
+        on_no_match=on_no_match_om,
+    )
+
+
 def _evaluate_on_match[A](on_match: OnMatch[Any, A], ctx: Any) -> A | None:
     """Evaluate an OnMatch variant."""
     match on_match:

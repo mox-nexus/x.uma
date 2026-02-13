@@ -9,13 +9,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
-from puma._matcher import Action, FieldMatcher, Matcher
-from puma._predicate import And, Or, Predicate, SinglePredicate
+from puma._matcher import Matcher, matcher_from_predicate
+from puma._predicate import Predicate, SinglePredicate, and_predicate, or_predicate
 from puma._string_matchers import ExactMatcher, PrefixMatcher, RegexMatcher
 from puma.http._inputs import HeaderInput, MethodInput, PathInput, QueryParamInput
 
 if TYPE_CHECKING:
     from puma.http._request import HttpRequest
+
+
+def _catch_all() -> Predicate[HttpRequest]:
+    """A catch-all predicate that matches any HTTP request."""
+    return SinglePredicate(PathInput(), PrefixMatcher(""))
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,10 +64,7 @@ class HttpRouteMatch:
 
     def compile[A](self, action: A) -> Matcher[HttpRequest, A]:
         """Compile this route match into a Matcher with the given action."""
-        predicate = self.to_predicate()
-        return Matcher(
-            matcher_list=(FieldMatcher(predicate, Action(action)),),
-        )
+        return matcher_from_predicate(self.to_predicate(), action)
 
     def to_predicate(self) -> Predicate[HttpRequest]:
         """Convert this route match to a predicate tree."""
@@ -80,16 +82,7 @@ class HttpRouteMatch:
         for query_match in self.query_params:
             predicates.append(_compile_query_param_match(query_match))
 
-        # No conditions = match everything
-        if not predicates:
-            return SinglePredicate(PathInput(), PrefixMatcher(""))
-
-        # Single condition = no wrapping needed
-        if len(predicates) == 1:
-            return predicates[0]
-
-        # Multiple conditions = AND
-        return And(tuple(predicates))
+        return and_predicate(predicates, _catch_all())
 
 
 def compile_route_matches[A](
@@ -101,33 +94,11 @@ def compile_route_matches[A](
 
     Multiple matches are ORed together per Gateway API semantics.
     """
-    on_no_match_om = Action(on_no_match) if on_no_match is not None else None
-
-    # Empty matches = match everything
-    if not matches:
-        return Matcher(
-            matcher_list=(
-                FieldMatcher(
-                    SinglePredicate(PathInput(), PrefixMatcher("")),
-                    Action(action),
-                ),
-            ),
-            on_no_match=on_no_match_om,
-        )
-
-    # Single match
-    if len(matches) == 1:
-        predicate = matches[0].to_predicate()
-        return Matcher(
-            matcher_list=(FieldMatcher(predicate, Action(action)),),
-            on_no_match=on_no_match_om,
-        )
-
-    # Multiple matches: OR them
-    predicates = tuple(m.to_predicate() for m in matches)
-    return Matcher(
-        matcher_list=(FieldMatcher(Or(predicates), Action(action)),),
-        on_no_match=on_no_match_om,
+    predicates = [m.to_predicate() for m in matches]
+    return matcher_from_predicate(
+        or_predicate(predicates, _catch_all()),
+        action,
+        on_no_match,
     )
 
 

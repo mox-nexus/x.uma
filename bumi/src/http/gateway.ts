@@ -5,8 +5,8 @@
  * Pure TypeScript types mirroring the Gateway API spec (no k8s dependency).
  */
 
-import { Action, FieldMatcher, Matcher, MatcherError } from "../matcher.ts";
-import { And, Or, SinglePredicate } from "../predicate.ts";
+import { type Matcher, MatcherError, matcherFromPredicate } from "../matcher.ts";
+import { SinglePredicate, andPredicate, orPredicate } from "../predicate.ts";
 import type { Predicate } from "../predicate.ts";
 import { ExactMatcher, PrefixMatcher, RegexMatcher } from "../string-matchers.ts";
 import { HeaderInput, MethodInput, PathInput, QueryParamInput } from "./inputs.ts";
@@ -42,8 +42,7 @@ export function compileRouteMatch<A>(
 	routeMatch: HttpRouteMatch,
 	action: A,
 ): Matcher<HttpRequest, A> {
-	const predicate = routeMatchToPredicate(routeMatch);
-	return new Matcher([new FieldMatcher(predicate, new Action(action))]);
+	return matcherFromPredicate(routeMatchToPredicate(routeMatch), action);
 }
 
 /**
@@ -57,27 +56,13 @@ export function compileRouteMatches<A>(
 	action: A,
 	onNoMatch?: A,
 ): Matcher<HttpRequest, A> {
-	const onNoMatchOm = onNoMatch !== undefined ? new Action(onNoMatch) : null;
-
-	if (matches.length === 0) {
-		return new Matcher(
-			[
-				new FieldMatcher(
-					new SinglePredicate(new PathInput(), new PrefixMatcher("")),
-					new Action(action),
-				),
-			],
-			onNoMatchOm,
-		);
-	}
-
-	if (matches.length === 1) {
-		const predicate = routeMatchToPredicate(matches[0]!);
-		return new Matcher([new FieldMatcher(predicate, new Action(action))], onNoMatchOm);
-	}
-
 	const predicates = matches.map((m) => routeMatchToPredicate(m));
-	return new Matcher([new FieldMatcher(new Or(predicates), new Action(action))], onNoMatchOm);
+	return matcherFromPredicate(orPredicate(predicates, catchAll()), action, onNoMatch);
+}
+
+/** A catch-all predicate that matches any HTTP request. */
+function catchAll(): Predicate<HttpRequest> {
+	return new SinglePredicate(new PathInput(), new PrefixMatcher(""));
 }
 
 function routeMatchToPredicate(rm: HttpRouteMatch): Predicate<HttpRequest> {
@@ -96,11 +81,7 @@ function routeMatchToPredicate(rm: HttpRouteMatch): Predicate<HttpRequest> {
 		predicates.push(compileQueryParamMatch(q));
 	}
 
-	if (predicates.length === 0) {
-		return new SinglePredicate(new PathInput(), new PrefixMatcher(""));
-	}
-	if (predicates.length === 1) return predicates[0]!;
-	return new And(predicates);
+	return andPredicate(predicates, catchAll());
 }
 
 function compilePathMatch(pm: HttpPathMatch): SinglePredicate<HttpRequest> {

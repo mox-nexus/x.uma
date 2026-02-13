@@ -7,8 +7,12 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[features]
+default = []
+registry = ["rumi/registry"]
+
 [dependencies]
-rumi.workspace = true
+rumi = { workspace = true, features = ["serde"] }
 serde.workspace = true
 
 [dev-dependencies]

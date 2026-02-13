@@ -10,6 +10,7 @@ authors.workspace = true
 [features]
 default = []
 fixtures = ["serde", "serde_yaml"]
+registry = ["rumi/registry", "serde"]
 
 [dependencies]
 rumi.workspace = true
@@ -18,4 +19,5 @@ serde_yaml = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde.workspace = true
+serde_json.workspace = true
 serde_yaml.workspace = true
