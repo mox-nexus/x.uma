@@ -80,6 +80,39 @@ pub mod prelude {
     pub use rumi::prelude::*;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Registry support (feature = "registry")
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Configuration for [`StringInput`].
+#[cfg(feature = "registry")]
+#[derive(serde::Deserialize)]
+pub struct StringInputConfig {
+    /// The key to extract from the test context.
+    pub key: String,
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<TestContext> for StringInput {
+    type Config = StringInputConfig;
+
+    fn from_config(
+        config: Self::Config,
+    ) -> Result<Box<dyn rumi::DataInput<TestContext>>, rumi::MatcherError> {
+        Ok(Box::new(StringInput::new(config.key)))
+    }
+}
+
+/// Register all rumi-test `DataInput` types with the given builder.
+///
+/// Type URLs:
+/// - `xuma.test.v1.StringInput` → [`StringInput`]
+#[cfg(feature = "registry")]
+#[must_use]
+pub fn register(builder: rumi::RegistryBuilder<TestContext>) -> rumi::RegistryBuilder<TestContext> {
+    builder.input::<StringInput>("xuma.test.v1.StringInput")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
