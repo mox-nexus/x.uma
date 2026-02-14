@@ -10,10 +10,12 @@ authors.workspace = true
 [features]
 default = []
 registry = ["rumi/registry", "serde"]
+proto = ["registry", "dep:rumi-proto"]
 
 [dependencies]
 rumi.workspace = true
 serde = { workspace = true, optional = true }
+rumi-proto = { path = "../../proto", optional = true }
 
 # ext_proc types (ProcessingRequest, ProcessingResponse, etc.)
 envoy-grpc-ext-proc = "0.1"
@@ -26,4 +28,5 @@ k8s-openapi = { version = "0.20", features = ["v1_28"] }
 
 [dev-dependencies]
 serde.workspace = true
+serde_json.workspace = true
 serde_yaml.workspace = true

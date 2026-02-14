@@ -45,8 +45,8 @@ pub use config::*;
 pub use context::*;
 pub use inputs::*;
 
-// Registry config types
-#[cfg(feature = "registry")]
+// Registry config types (hand-written, only without proto)
+#[cfg(all(feature = "registry", not(feature = "proto")))]
 pub use inputs::ArgumentInputConfig;
 
 /// Register all rumi-claude types for [`HookContext`] with the given builder.
@@ -143,5 +143,133 @@ mod tests {
         );
 
         assert_eq!(matcher.evaluate(&ctx), Some("block"));
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Proto registry integration tests
+// Verifies: proto config → register() → load_matcher → evaluate on HookContext
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(all(test, feature = "proto"))]
+mod proto_tests {
+    use super::*;
+    use rumi::MatcherConfig;
+
+    #[test]
+    fn register_builds_with_proto_configs() {
+        let registry = register(rumi::RegistryBuilder::new()).build();
+
+        assert!(registry.contains_input("xuma.claude.v1.EventInput"));
+        assert!(registry.contains_input("xuma.claude.v1.ToolNameInput"));
+        assert!(registry.contains_input("xuma.claude.v1.ArgumentInput"));
+        assert!(registry.contains_input("xuma.claude.v1.SessionIdInput"));
+        assert!(registry.contains_input("xuma.claude.v1.CwdInput"));
+        assert!(registry.contains_input("xuma.claude.v1.GitBranchInput"));
+        assert!(registry.contains_matcher("xuma.core.v1.StringMatcher"));
+    }
+
+    #[test]
+    fn load_matcher_with_proto_tool_name_input() {
+        let registry = register(rumi::RegistryBuilder::new()).build();
+
+        // ToolNameInput is an empty proto — no config fields
+        let json = serde_json::json!({
+            "matchers": [{
+                "predicate": {
+                    "type": "single",
+                    "input": {
+                        "type_url": "xuma.claude.v1.ToolNameInput",
+                        "config": {}
+                    },
+                    "value_match": { "Exact": "Bash" }
+                },
+                "on_match": { "type": "action", "action": "is_bash" }
+            }],
+            "on_no_match": { "type": "action", "action": "not_bash" }
+        });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let matcher = registry.load_matcher(config).unwrap();
+
+        let ctx = HookContext::pre_tool_use("Bash");
+        assert_eq!(matcher.evaluate(&ctx), Some("is_bash".to_string()));
+
+        let ctx = HookContext::pre_tool_use("Write");
+        assert_eq!(matcher.evaluate(&ctx), Some("not_bash".to_string()));
+    }
+
+    #[test]
+    fn load_matcher_with_proto_argument_input() {
+        let registry = register(rumi::RegistryBuilder::new()).build();
+
+        // ToolArgInput config has "name" field
+        let json = serde_json::json!({
+            "matchers": [{
+                "predicate": {
+                    "type": "and",
+                    "predicates": [
+                        {
+                            "type": "single",
+                            "input": {
+                                "type_url": "xuma.claude.v1.ToolNameInput",
+                                "config": {}
+                            },
+                            "value_match": { "Exact": "Bash" }
+                        },
+                        {
+                            "type": "single",
+                            "input": {
+                                "type_url": "xuma.claude.v1.ArgumentInput",
+                                "config": { "name": "command" }
+                            },
+                            "value_match": { "Contains": "rm -rf" }
+                        }
+                    ]
+                },
+                "on_match": { "type": "action", "action": "block" }
+            }],
+            "on_no_match": { "type": "action", "action": "allow" }
+        });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let matcher = registry.load_matcher(config).unwrap();
+
+        let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "rm -rf /");
+        assert_eq!(matcher.evaluate(&ctx), Some("block".to_string()));
+
+        let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "ls -la");
+        assert_eq!(matcher.evaluate(&ctx), Some("allow".to_string()));
+
+        let ctx = HookContext::pre_tool_use("Write");
+        assert_eq!(matcher.evaluate(&ctx), Some("allow".to_string()));
+    }
+
+    #[test]
+    fn load_matcher_with_proto_event_input() {
+        let registry = register(rumi::RegistryBuilder::new()).build();
+
+        let json = serde_json::json!({
+            "matchers": [{
+                "predicate": {
+                    "type": "single",
+                    "input": {
+                        "type_url": "xuma.claude.v1.EventInput",
+                        "config": {}
+                    },
+                    "value_match": { "Exact": "PreToolUse" }
+                },
+                "on_match": { "type": "action", "action": "pre_tool" }
+            }]
+        });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let matcher = registry.load_matcher(config).unwrap();
+
+        let ctx = HookContext::pre_tool_use("Bash");
+        assert_eq!(matcher.evaluate(&ctx), Some("pre_tool".to_string()));
+
+        let ctx = HookContext::post_tool_use("Bash");
+        assert_eq!(matcher.evaluate(&ctx), None);
     }
 }

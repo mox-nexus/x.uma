@@ -82,17 +82,18 @@ pub mod prelude {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Registry support (feature = "registry")
+// Hand-written config types — used when proto feature is not enabled.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Configuration for [`StringInput`].
-#[cfg(feature = "registry")]
+#[cfg(all(feature = "registry", not(feature = "proto")))]
 #[derive(serde::Deserialize)]
 pub struct StringInputConfig {
     /// The key to extract from the test context.
     pub key: String,
 }
 
-#[cfg(feature = "registry")]
+#[cfg(all(feature = "registry", not(feature = "proto")))]
 impl rumi::IntoDataInput<TestContext> for StringInput {
     type Config = StringInputConfig;
 
@@ -100,6 +101,30 @@ impl rumi::IntoDataInput<TestContext> for StringInput {
         config: Self::Config,
     ) -> Result<Box<dyn rumi::DataInput<TestContext>>, rumi::MatcherError> {
         Ok(Box::new(StringInput::new(config.key)))
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Proto config types (feature = "proto")
+// Uses proto-generated types as Config, enabling xDS control plane integration.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(feature = "proto")]
+mod proto_configs {
+    use super::*;
+    use rumi_proto::xuma::test::v1 as proto;
+
+    /// Proto `StringInput.value` maps to domain `StringInput.key`.
+    /// The proto field is named "value" (the extracted string value),
+    /// while the domain field is named "key" (the lookup key in test context).
+    impl rumi::IntoDataInput<TestContext> for StringInput {
+        type Config = proto::StringInput;
+
+        fn from_config(
+            config: proto::StringInput,
+        ) -> Result<Box<dyn rumi::DataInput<TestContext>>, rumi::MatcherError> {
+            Ok(Box::new(StringInput::new(config.value)))
+        }
     }
 }
 
@@ -158,5 +183,101 @@ mod tests {
         );
 
         assert_eq!(matcher.evaluate(&ctx), Some("allowed"));
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Proto registry integration tests
+// Verifies the full pipeline: proto config → registry → DataInput → evaluate
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(all(test, feature = "proto"))]
+mod proto_tests {
+    use super::*;
+    use rumi::MatcherConfig;
+
+    #[test]
+    fn register_builds_with_proto_configs() {
+        let registry = register(rumi::RegistryBuilder::new()).build();
+
+        // Core matchers + 1 test input
+        assert!(registry.contains_input("xuma.test.v1.StringInput"));
+        assert!(registry.contains_matcher("xuma.core.v1.StringMatcher"));
+        assert!(registry.contains_matcher("xuma.core.v1.BoolMatcher"));
+    }
+
+    #[test]
+    fn load_matcher_with_proto_string_input() {
+        let registry = register(rumi::RegistryBuilder::new()).build();
+
+        // Proto StringInput config uses "value" field (maps to lookup key)
+        let json = serde_json::json!({
+            "matchers": [{
+                "predicate": {
+                    "type": "single",
+                    "input": {
+                        "type_url": "xuma.test.v1.StringInput",
+                        "config": { "value": "role" }
+                    },
+                    "value_match": { "Exact": "admin" }
+                },
+                "on_match": { "type": "action", "action": "allow" }
+            }],
+            "on_no_match": { "type": "action", "action": "deny" }
+        });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let matcher = registry.load_matcher(config).unwrap();
+
+        let ctx = TestContext::new().with("role", "admin");
+        assert_eq!(matcher.evaluate(&ctx), Some("allow".to_string()));
+
+        let ctx = TestContext::new().with("role", "viewer");
+        assert_eq!(matcher.evaluate(&ctx), Some("deny".to_string()));
+    }
+
+    #[test]
+    fn load_matcher_with_and_predicate() {
+        let registry = register(rumi::RegistryBuilder::new()).build();
+
+        let json = serde_json::json!({
+            "matchers": [{
+                "predicate": {
+                    "type": "and",
+                    "predicates": [
+                        {
+                            "type": "single",
+                            "input": {
+                                "type_url": "xuma.test.v1.StringInput",
+                                "config": { "value": "role" }
+                            },
+                            "value_match": { "Exact": "admin" }
+                        },
+                        {
+                            "type": "single",
+                            "input": {
+                                "type_url": "xuma.test.v1.StringInput",
+                                "config": { "value": "org" }
+                            },
+                            "value_match": { "Prefix": "acme" }
+                        }
+                    ]
+                },
+                "on_match": { "type": "action", "action": "admin_acme" }
+            }]
+        });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let matcher = registry.load_matcher(config).unwrap();
+
+        let ctx = TestContext::new()
+            .with("role", "admin")
+            .with("org", "acme-corp");
+        assert_eq!(matcher.evaluate(&ctx), Some("admin_acme".to_string()));
+
+        let ctx = TestContext::new()
+            .with("role", "admin")
+            .with("org", "other");
+        assert_eq!(matcher.evaluate(&ctx), None);
     }
 }

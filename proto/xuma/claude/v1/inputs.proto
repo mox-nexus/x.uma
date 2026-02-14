@@ -25,3 +25,6 @@ message SessionIdInput {}
 
 // Extracts the current working directory.
 message CwdInput {}
+
+// Extracts the git branch name (if in a git repo).
+message GitBranchInput {}

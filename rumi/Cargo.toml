@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["core", "ext/test", "ext/http", "ext/claude", "crusts/python", "crusts/wasm"]
+members = ["core", "proto", "ext/test", "ext/http", "ext/claude", "crusts/python", "crusts/wasm"]
 
-# Crusts use FFI-specific build tools (maturin / wasm-pack), not cargo test
+# Proto, crusts use specialized build tools — test individually, not via cargo test
 default-members = ["core", "ext/test", "ext/http", "ext/claude"]
 
 [workspace.package]

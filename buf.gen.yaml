@@ -7,13 +7,13 @@ managed:
 plugins:
   # Rust (prost)
   - remote: buf.build/community/neoeinstein-prost
-    out: rumi/src/gen
+    out: rumi/proto/src/gen
     opt:
       - file_descriptor_set
 
   # Rust (prost-serde for JSON)
   - remote: buf.build/community/neoeinstein-prost-serde
-    out: rumi/src/gen
+    out: rumi/proto/src/gen
 
   # Python (betterproto)
   - remote: buf.build/community/danielgtaylor-betterproto
