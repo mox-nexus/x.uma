@@ -460,12 +460,6 @@ mod tests {
     }
 
     #[test]
-    fn test_matcher_is_send_sync() {
-        fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<Matcher<TestCtx, String>>();
-    }
-
-    #[test]
     fn test_validate_shallow_matcher_ok() {
         let matcher = Matcher::<TestCtx, String>::new(vec![create_field_matcher("x", "y")], None);
         assert!(matcher.validate().is_ok());

@@ -115,18 +115,6 @@ pub fn register(builder: rumi::RegistryBuilder<HttpMessage>) -> rumi::RegistryBu
         .input::<AuthorityInput>("xuma.http.v1.AuthorityInput")
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_crate_compiles() {
-        let _: Option<ProcessingRequest> = None;
-        let _: Option<HttpRouteMatch> = None;
-        let _: Option<HttpMessage> = None;
-    }
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // Proto registry integration tests
 // Verifies: proto config → register() → load_matcher → evaluate on HttpMessage

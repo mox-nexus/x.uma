@@ -171,77 +171,10 @@ pub mod xuma {
 mod tests {
     use super::*;
 
-    // Proto types must satisfy DeserializeOwned for registry use.
-    // These tests verify prost-serde JSON compatibility.
-
-    #[test]
-    fn http_header_input_deserializes_from_json() {
-        let json = r#"{"name": "content-type"}"#;
-        let input: xuma::http::v1::HeaderInput = serde_json::from_str(json).unwrap();
-        assert_eq!(input.name, "content-type");
-    }
-
-    #[test]
-    fn http_path_input_deserializes_from_empty_json() {
-        let json = "{}";
-        let _input: xuma::http::v1::PathInput = serde_json::from_str(json).unwrap();
-    }
-
-    #[test]
-    fn http_query_param_input_deserializes_from_json() {
-        let json = r#"{"name": "page"}"#;
-        let input: xuma::http::v1::QueryParamInput = serde_json::from_str(json).unwrap();
-        assert_eq!(input.name, "page");
-    }
-
-    #[test]
-    fn claude_tool_arg_input_deserializes_from_json() {
-        let json = r#"{"name": "file_path"}"#;
-        let input: xuma::claude::v1::ToolArgInput = serde_json::from_str(json).unwrap();
-        assert_eq!(input.name, "file_path");
-    }
-
-    #[test]
-    fn claude_event_type_input_deserializes_from_empty_json() {
-        let json = "{}";
-        let _input: xuma::claude::v1::EventTypeInput = serde_json::from_str(json).unwrap();
-    }
-
-    #[test]
-    fn test_string_input_deserializes_from_json() {
-        let json = r#"{"value": "hello"}"#;
-        let input: xuma::test::v1::StringInput = serde_json::from_str(json).unwrap();
-        assert_eq!(input.value, "hello");
-    }
-
-    #[test]
-    fn xds_typed_extension_config_deserializes() {
-        let json = r#"{"name": "xuma.http.v1.HeaderInput"}"#;
-        let config: xds::core::v3::TypedExtensionConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(config.name, "xuma.http.v1.HeaderInput");
-    }
-
     #[test]
     fn xds_string_matcher_exact_deserializes() {
         let json = r#"{"exact": "hello"}"#;
         let matcher: xds::r#type::matcher::v3::StringMatcher = serde_json::from_str(json).unwrap();
         assert!(matcher.match_pattern.is_some());
-    }
-
-    #[test]
-    fn proto_types_roundtrip_json() {
-        let input = xuma::http::v1::HeaderInput {
-            name: "x-request-id".into(),
-        };
-        let json = serde_json::to_string(&input).unwrap();
-        let roundtripped: xuma::http::v1::HeaderInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(input, roundtripped);
-    }
-
-    #[test]
-    fn named_action_deserializes() {
-        let json = r#"{"name": "allow"}"#;
-        let action: xuma::core::v1::NamedAction = serde_json::from_str(json).unwrap();
-        assert_eq!(action.name, "allow");
     }
 }

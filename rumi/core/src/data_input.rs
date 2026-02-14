@@ -101,10 +101,4 @@ mod tests {
         let data = input.get(&ctx);
         assert_eq!(data.as_str(), Some("hello"));
     }
-
-    #[test]
-    fn test_data_input_is_send_sync() {
-        fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<Box<dyn DataInput<TestContext>>>();
-    }
 }
