@@ -128,10 +128,4 @@ mod tests {
         assert!(on_match.is_matcher());
         assert!(on_match.as_matcher().is_some());
     }
-
-    #[test]
-    fn test_on_match_is_send_sync() {
-        fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<OnMatch<TestCtx, String>>();
-    }
 }

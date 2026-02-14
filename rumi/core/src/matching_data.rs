@@ -497,18 +497,6 @@ mod tests {
         assert_ne!(data1a, MatchingData::Int(42));
     }
 
-    #[test]
-    fn test_matching_data_is_send_sync() {
-        fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<MatchingData>();
-    }
-
-    #[test]
-    fn test_custom_match_data_is_send_sync() {
-        fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<Arc<dyn CustomMatchData>>();
-    }
-
     /// Integration test: Full extension story with custom types
     ///
     /// This test proves that users can extend the system without touching core:

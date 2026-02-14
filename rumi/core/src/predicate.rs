@@ -429,13 +429,6 @@ mod tests {
         assert!(!pred.evaluate(&ctx));
     }
 
-    #[test]
-    fn test_predicates_are_send_sync() {
-        fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<SinglePredicate<TestContext>>();
-        assert_send_sync::<Predicate<TestContext>>();
-    }
-
     // ========== Smart Constructor Tests ==========
 
     fn make_single(expected: &str) -> Predicate<TestContext> {

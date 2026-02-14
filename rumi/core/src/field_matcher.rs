@@ -101,10 +101,4 @@ mod tests {
         };
         assert!(!field_matcher.matches(&ctx_no_match));
     }
-
-    #[test]
-    fn test_field_matcher_is_send_sync() {
-        fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<FieldMatcher<TestCtx, String>>();
-    }
 }

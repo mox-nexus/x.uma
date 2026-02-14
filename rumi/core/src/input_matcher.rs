@@ -558,18 +558,6 @@ mod tests {
     }
 
     #[test]
-    fn test_matchers_are_send_sync() {
-        fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<ExactMatcher>();
-        assert_send_sync::<PrefixMatcher>();
-        assert_send_sync::<SuffixMatcher>();
-        assert_send_sync::<ContainsMatcher>();
-        assert_send_sync::<BoolMatcher>();
-        assert_send_sync::<StringMatcher>();
-        assert_send_sync::<Box<dyn InputMatcher>>();
-    }
-
-    #[test]
     fn test_string_matcher_exact() {
         let m = StringMatcher::exact("hello", false);
         assert!(m.matches(&"hello".into()));

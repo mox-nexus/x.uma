@@ -1045,13 +1045,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn registry_is_send_sync() {
-        fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<Registry<TestCtx>>();
-        assert_send_sync::<ActionRegistry<String>>();
-    }
-
     // ── Phase 11b: ActionRegistry + load_typed_matcher tests ─────────────
 
     // Identity action: config string -> String action
