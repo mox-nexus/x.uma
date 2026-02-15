@@ -122,9 +122,21 @@ x.uma/
 | 10 | TypedExtensionConfig Registry (`IntoDataInput`, `RegistryBuilder`) | ✅ Done |
 | 11 | Test audit (removed 18 ineffective tests → 216 total) | ✅ Done |
 | 12 | Proto Alignment: buf codegen, `rumi-proto`, `AnyResolver`, xDS Matcher loading | ✅ Done |
-| 13 | puma-core: Pure Python with serde + config types | 🚧 In Progress |
+| 13 | Config/Registry across all implementations | 🚧 In Progress |
 | — | Semantic matching (cosine similarity via `CustomMatchData`) | Planned |
 | — | RE2 migration: `google-re2` for puma, `re2js` for bumi | Planned |
+
+## Current Work
+
+**Phase 13: Config/Registry Across All Implementations**
+
+Bringing config-driven matcher construction to all 5 implementations. Same JSON config → working matchers everywhere.
+
+- **Plan**: `scratch/phase-13-plan.md` (sub-phases 13.0–13.5, guild findings, design decisions)
+- **Progress**: `scratch/phase-13-progress.md` (status tracker, dependency graph, completion criteria)
+- **Guild report**: `scratch/arch-guild-reports/phase-13/`
+
+Implementation order: rumi core hardening (13.0) → config fixtures (13.1) → puma/bumi/crusty ports (13.2–13.5 parallel).
 
 ## Tooling
 

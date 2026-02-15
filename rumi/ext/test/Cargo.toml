@@ -9,13 +9,14 @@ authors.workspace = true
 
 [features]
 default = []
-fixtures = ["serde", "serde_yaml"]
+fixtures = ["serde", "serde_yaml", "serde_json"]
 registry = ["rumi/registry", "serde"]
 proto = ["registry", "dep:rumi-proto"]
 
 [dependencies]
 rumi.workspace = true
 serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 serde_yaml = { workspace = true, optional = true }
 rumi-proto = { path = "../../proto", optional = true }
 

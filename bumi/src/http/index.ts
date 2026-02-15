@@ -7,3 +7,4 @@ export type {
 	HttpQueryParamMatch,
 	HttpRouteMatch,
 } from "./gateway.ts";
+export { register } from "./registry.ts";

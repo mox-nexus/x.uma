@@ -1,3 +1,4 @@
+import type { RegistryBuilder } from "./registry.ts";
 import type { MatchingData } from "./types.ts";
 
 /**
@@ -11,4 +12,18 @@ export class DictInput {
 	get(ctx: Record<string, string>): MatchingData {
 		return ctx[this.key] ?? null;
 	}
+}
+
+/** Register the test domain DataInput with the registry builder. */
+export function register(
+	builder: RegistryBuilder<Record<string, string>>,
+): RegistryBuilder<Record<string, string>> {
+	builder.input("xuma.test.v1.StringInput", (config) => {
+		const key = config.key;
+		if (typeof key !== "string") {
+			throw new Error("StringInput config requires 'key' (string)");
+		}
+		return new DictInput(key);
+	});
+	return builder;
 }

@@ -46,7 +46,8 @@ use crate::{
         ValueMatchConfig,
     },
     DataInput, FieldMatcher, InputMatcher, Matcher, MatcherError, OnMatch, Predicate,
-    SinglePredicate,
+    SinglePredicate, MAX_FIELD_MATCHERS, MAX_PATTERN_LENGTH, MAX_PREDICATES_PER_COMPOUND,
+    MAX_REGEX_PATTERN_LENGTH,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -342,6 +343,14 @@ impl<A: Clone + Send + Sync + 'static> ActionRegistry<A> {
         self.factories.contains_key(type_url)
     }
 
+    /// Returns the registered action type URLs.
+    #[must_use]
+    pub fn type_urls(&self) -> Vec<&str> {
+        let mut urls: Vec<&str> = self.factories.keys().map(String::as_str).collect();
+        urls.sort_unstable();
+        urls
+    }
+
     fn resolve(&self, config: &crate::config::TypedConfig) -> Result<A, MatcherError> {
         let factory =
             self.factories
@@ -349,6 +358,7 @@ impl<A: Clone + Send + Sync + 'static> ActionRegistry<A> {
                 .ok_or_else(|| MatcherError::UnknownTypeUrl {
                     type_url: config.type_url.clone(),
                     registry: "action",
+                    available: self.factories.keys().cloned().collect(),
                 })?;
         factory(&config.config)
     }
@@ -386,6 +396,12 @@ impl<Ctx: 'static> Registry<Ctx> {
     where
         A: Clone + Send + Sync + 'static,
     {
+        if config.matchers.len() > MAX_FIELD_MATCHERS {
+            return Err(MatcherError::TooManyFieldMatchers {
+                count: config.matchers.len(),
+                max: MAX_FIELD_MATCHERS,
+            });
+        }
         let matchers = config
             .matchers
             .into_iter()
@@ -425,6 +441,12 @@ impl<Ctx: 'static> Registry<Ctx> {
     where
         A: Clone + Send + Sync + 'static,
     {
+        if config.matchers.len() > MAX_FIELD_MATCHERS {
+            return Err(MatcherError::TooManyFieldMatchers {
+                count: config.matchers.len(),
+                max: MAX_FIELD_MATCHERS,
+            });
+        }
         let matchers = config
             .matchers
             .into_iter()
@@ -469,6 +491,22 @@ impl<Ctx: 'static> Registry<Ctx> {
         self.matcher_factories.contains_key(type_url)
     }
 
+    /// Returns all registered input type URLs (sorted).
+    #[must_use]
+    pub fn input_type_urls(&self) -> Vec<&str> {
+        let mut urls: Vec<&str> = self.input_factories.keys().map(String::as_str).collect();
+        urls.sort_unstable();
+        urls
+    }
+
+    /// Returns all registered matcher type URLs (sorted).
+    #[must_use]
+    pub fn matcher_type_urls(&self) -> Vec<&str> {
+        let mut urls: Vec<&str> = self.matcher_factories.keys().map(String::as_str).collect();
+        urls.sort_unstable();
+        urls
+    }
+
     fn load_field_matcher<A>(
         &self,
         config: FieldMatcherConfig<A>,
@@ -488,6 +526,12 @@ impl<Ctx: 'static> Registry<Ctx> {
                 Ok(Predicate::Single(sp))
             }
             PredicateConfig::And { predicates } => {
+                if predicates.len() > MAX_PREDICATES_PER_COMPOUND {
+                    return Err(MatcherError::TooManyPredicates {
+                        count: predicates.len(),
+                        max: MAX_PREDICATES_PER_COMPOUND,
+                    });
+                }
                 let ps = predicates
                     .into_iter()
                     .map(|p| self.load_predicate(p))
@@ -495,6 +539,12 @@ impl<Ctx: 'static> Registry<Ctx> {
                 Ok(Predicate::And(ps))
             }
             PredicateConfig::Or { predicates } => {
+                if predicates.len() > MAX_PREDICATES_PER_COMPOUND {
+                    return Err(MatcherError::TooManyPredicates {
+                        count: predicates.len(),
+                        max: MAX_PREDICATES_PER_COMPOUND,
+                    });
+                }
                 let ps = predicates
                     .into_iter()
                     .map(|p| self.load_predicate(p))
@@ -520,18 +570,24 @@ impl<Ctx: 'static> Registry<Ctx> {
             .ok_or_else(|| MatcherError::UnknownTypeUrl {
                 type_url: config.input.type_url.clone(),
                 registry: "input",
+                available: self.input_factories.keys().cloned().collect(),
             })?;
         let input = input_factory(&config.input.config)?;
 
         // Resolve matcher: built-in StringMatchSpec or custom via factory
         let matcher = match config.matcher {
-            ValueMatchConfig::BuiltIn(spec) => spec.to_input_matcher()?,
+            ValueMatchConfig::BuiltIn(ref spec) => {
+                // Enforce pattern length limits before compilation
+                Self::check_pattern_length(spec)?;
+                spec.to_input_matcher()?
+            }
             ValueMatchConfig::Custom(tc) => {
                 let matcher_factory =
                     self.matcher_factories.get(&tc.type_url).ok_or_else(|| {
                         MatcherError::UnknownTypeUrl {
                             type_url: tc.type_url.clone(),
                             registry: "matcher",
+                            available: self.matcher_factories.keys().cloned().collect(),
                         }
                     })?;
                 matcher_factory(&tc.config)?
@@ -549,6 +605,33 @@ impl<Ctx: 'static> Registry<Ctx> {
         }
 
         Ok(SinglePredicate::new(input, matcher))
+    }
+
+    /// Enforce pattern length limits on built-in string match specs.
+    fn check_pattern_length(spec: &crate::StringMatchSpec) -> Result<(), MatcherError> {
+        use crate::StringMatchSpec;
+        match spec {
+            StringMatchSpec::Regex(pattern) => {
+                if pattern.len() > MAX_REGEX_PATTERN_LENGTH {
+                    return Err(MatcherError::PatternTooLong {
+                        len: pattern.len(),
+                        max: MAX_REGEX_PATTERN_LENGTH,
+                    });
+                }
+            }
+            StringMatchSpec::Exact(v)
+            | StringMatchSpec::Prefix(v)
+            | StringMatchSpec::Suffix(v)
+            | StringMatchSpec::Contains(v) => {
+                if v.len() > MAX_PATTERN_LENGTH {
+                    return Err(MatcherError::PatternTooLong {
+                        len: v.len(),
+                        max: MAX_PATTERN_LENGTH,
+                    });
+                }
+            }
+        }
+        Ok(())
     }
 
     fn load_on_match<A>(&self, config: OnMatchConfig<A>) -> Result<OnMatch<Ctx, A>, MatcherError>
@@ -811,9 +894,44 @@ mod tests {
             MatcherError::UnknownTypeUrl {
                 ref type_url,
                 registry,
+                ref available,
             } => {
                 assert_eq!(type_url, "unknown.Input");
                 assert_eq!(registry, "input");
+                assert!(available.is_empty());
+            }
+            _ => panic!("expected UnknownTypeUrl, got {err:?}"),
+        }
+    }
+
+    #[test]
+    fn unknown_input_lists_available() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+
+        let json = serde_json::json!({
+            "matchers": [{
+                "predicate": {
+                    "type": "single",
+                    "input": { "type_url": "unknown.Input", "config": {} },
+                    "value_match": { "Exact": "x" }
+                },
+                "on_match": { "type": "action", "action": "x" }
+            }]
+        });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let err = registry.load_matcher(config).unwrap_err();
+        match err {
+            MatcherError::UnknownTypeUrl { ref available, .. } => {
+                assert_eq!(available, &["test.ValueInput"]);
+                // Verify the display message includes the registered URL
+                let msg = err.to_string();
+                assert!(
+                    msg.contains("test.ValueInput"),
+                    "error should list available URLs: {msg}"
+                );
             }
             _ => panic!("expected UnknownTypeUrl, got {err:?}"),
         }
@@ -842,6 +960,7 @@ mod tests {
             MatcherError::UnknownTypeUrl {
                 ref type_url,
                 registry,
+                ..
             } => {
                 assert_eq!(type_url, "unknown.Matcher");
                 assert_eq!(registry, "matcher");
@@ -1158,6 +1277,7 @@ mod tests {
             MatcherError::UnknownTypeUrl {
                 ref type_url,
                 registry,
+                ..
             } => {
                 assert_eq!(type_url, "unknown.Action");
                 assert_eq!(registry, "action");
@@ -1216,5 +1336,222 @@ mod tests {
             Some("nested_typed".to_string())
         );
         assert_eq!(matcher.evaluate(&TestCtx { value: "x".into() }), None);
+    }
+
+    // ── Phase 13.0: Width limits, introspection, pattern limits ─────────
+
+    #[test]
+    fn introspection_input_type_urls() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("b.Input")
+            .input::<ValueInput>("a.Input")
+            .build();
+
+        // Sorted alphabetically
+        assert_eq!(registry.input_type_urls(), vec!["a.Input", "b.Input"]);
+    }
+
+    #[test]
+    fn introspection_matcher_type_urls() {
+        let registry = register_core_matchers(RegistryBuilder::<TestCtx>::new()).build();
+
+        let urls = registry.matcher_type_urls();
+        assert_eq!(urls.len(), 2);
+        assert!(urls.contains(&"xuma.core.v1.BoolMatcher"));
+        assert!(urls.contains(&"xuma.core.v1.StringMatcher"));
+    }
+
+    #[test]
+    fn too_many_field_matchers() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+
+        // Build a config with MAX_FIELD_MATCHERS + 1 field matchers
+        let fm = serde_json::json!({
+            "predicate": {
+                "type": "single",
+                "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
+                "value_match": { "Exact": "x" }
+            },
+            "on_match": { "type": "action", "action": "x" }
+        });
+        let matchers: Vec<_> = (0..=crate::MAX_FIELD_MATCHERS)
+            .map(|_| fm.clone())
+            .collect();
+        let json = serde_json::json!({ "matchers": matchers });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let err = registry.load_matcher(config).unwrap_err();
+        match err {
+            MatcherError::TooManyFieldMatchers { count, max } => {
+                assert_eq!(count, crate::MAX_FIELD_MATCHERS + 1);
+                assert_eq!(max, crate::MAX_FIELD_MATCHERS);
+            }
+            _ => panic!("expected TooManyFieldMatchers, got {err:?}"),
+        }
+    }
+
+    #[test]
+    fn too_many_predicates_and() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+
+        let single = serde_json::json!({
+            "type": "single",
+            "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
+            "value_match": { "Exact": "x" }
+        });
+        let predicates: Vec<_> = (0..=crate::MAX_PREDICATES_PER_COMPOUND)
+            .map(|_| single.clone())
+            .collect();
+
+        let json = serde_json::json!({
+            "matchers": [{
+                "predicate": { "type": "and", "predicates": predicates },
+                "on_match": { "type": "action", "action": "x" }
+            }]
+        });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let err = registry.load_matcher(config).unwrap_err();
+        assert!(
+            matches!(err, MatcherError::TooManyPredicates { .. }),
+            "expected TooManyPredicates, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn too_many_predicates_or() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+
+        let single = serde_json::json!({
+            "type": "single",
+            "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
+            "value_match": { "Exact": "x" }
+        });
+        let predicates: Vec<_> = (0..=crate::MAX_PREDICATES_PER_COMPOUND)
+            .map(|_| single.clone())
+            .collect();
+
+        let json = serde_json::json!({
+            "matchers": [{
+                "predicate": { "type": "or", "predicates": predicates },
+                "on_match": { "type": "action", "action": "x" }
+            }]
+        });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let err = registry.load_matcher(config).unwrap_err();
+        assert!(
+            matches!(err, MatcherError::TooManyPredicates { .. }),
+            "expected TooManyPredicates, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn pattern_too_long_exact() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+
+        let long_pattern = "x".repeat(crate::MAX_PATTERN_LENGTH + 1);
+        let json = serde_json::json!({
+            "matchers": [{
+                "predicate": {
+                    "type": "single",
+                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
+                    "value_match": { "Exact": long_pattern }
+                },
+                "on_match": { "type": "action", "action": "x" }
+            }]
+        });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let err = registry.load_matcher(config).unwrap_err();
+        match err {
+            MatcherError::PatternTooLong { len, max } => {
+                assert_eq!(len, crate::MAX_PATTERN_LENGTH + 1);
+                assert_eq!(max, crate::MAX_PATTERN_LENGTH);
+            }
+            _ => panic!("expected PatternTooLong, got {err:?}"),
+        }
+    }
+
+    #[test]
+    fn regex_pattern_too_long() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+
+        let long_regex = "a".repeat(crate::MAX_REGEX_PATTERN_LENGTH + 1);
+        let json = serde_json::json!({
+            "matchers": [{
+                "predicate": {
+                    "type": "single",
+                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
+                    "value_match": { "Regex": long_regex }
+                },
+                "on_match": { "type": "action", "action": "x" }
+            }]
+        });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let err = registry.load_matcher(config).unwrap_err();
+        match err {
+            MatcherError::PatternTooLong { len, max } => {
+                assert_eq!(len, crate::MAX_REGEX_PATTERN_LENGTH + 1);
+                assert_eq!(max, crate::MAX_REGEX_PATTERN_LENGTH);
+            }
+            _ => panic!("expected PatternTooLong, got {err:?}"),
+        }
+    }
+
+    #[test]
+    fn pattern_at_limit_succeeds() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+
+        // Exactly at the limit should succeed
+        let pattern = "x".repeat(crate::MAX_PATTERN_LENGTH);
+        let json = serde_json::json!({
+            "matchers": [{
+                "predicate": {
+                    "type": "single",
+                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
+                    "value_match": { "Exact": pattern }
+                },
+                "on_match": { "type": "action", "action": "x" }
+            }]
+        });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        assert!(registry.load_matcher(config).is_ok());
+    }
+
+    #[test]
+    fn field_matchers_at_limit_succeeds() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+
+        let fm = serde_json::json!({
+            "predicate": {
+                "type": "single",
+                "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
+                "value_match": { "Exact": "x" }
+            },
+            "on_match": { "type": "action", "action": "x" }
+        });
+        // Exactly at the limit
+        let matchers: Vec<_> = (0..crate::MAX_FIELD_MATCHERS).map(|_| fm.clone()).collect();
+        let json = serde_json::json!({ "matchers": matchers });
+
+        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        assert!(registry.load_matcher(config).is_ok());
     }
 }

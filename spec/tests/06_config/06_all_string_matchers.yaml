@@ -1,0 +1,101 @@
+name: "exact_via_config"
+description: "Exact string match via config loading"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "v" } }
+        value_match: { Exact: "hello" }
+      on_match: { type: action, action: "hit" }
+
+cases:
+  - name: "exact_hit"
+    context: { v: "hello" }
+    expect: "hit"
+  - name: "exact_miss"
+    context: { v: "Hello" }
+    expect: null
+
+---
+name: "prefix_via_config"
+description: "Prefix string match via config loading"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "v" } }
+        value_match: { Prefix: "/api" }
+      on_match: { type: action, action: "hit" }
+
+cases:
+  - name: "prefix_hit"
+    context: { v: "/api/users" }
+    expect: "hit"
+  - name: "prefix_exact"
+    context: { v: "/api" }
+    expect: "hit"
+  - name: "prefix_miss"
+    context: { v: "/other" }
+    expect: null
+
+---
+name: "suffix_via_config"
+description: "Suffix string match via config loading"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "v" } }
+        value_match: { Suffix: ".rs" }
+      on_match: { type: action, action: "hit" }
+
+cases:
+  - name: "suffix_hit"
+    context: { v: "main.rs" }
+    expect: "hit"
+  - name: "suffix_miss"
+    context: { v: "main.py" }
+    expect: null
+
+---
+name: "contains_via_config"
+description: "Contains string match via config loading"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "v" } }
+        value_match: { Contains: "error" }
+      on_match: { type: action, action: "hit" }
+
+cases:
+  - name: "contains_hit"
+    context: { v: "an error occurred" }
+    expect: "hit"
+  - name: "contains_miss"
+    context: { v: "all good" }
+    expect: null
+
+---
+name: "regex_via_config"
+description: "Regex string match via config loading"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "v" } }
+        value_match: { Regex: "^user-\\d+$" }
+      on_match: { type: action, action: "hit" }
+
+cases:
+  - name: "regex_hit"
+    context: { v: "user-123" }
+    expect: "hit"
+  - name: "regex_miss"
+    context: { v: "user-abc" }
+    expect: null

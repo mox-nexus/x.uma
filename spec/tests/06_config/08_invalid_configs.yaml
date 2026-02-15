@@ -1,0 +1,67 @@
+name: "both_value_and_custom_match"
+description: "Setting both value_match AND custom_match is an error (oneof violation)"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "x" } }
+        value_match: { Exact: "a" }
+        custom_match: { type_url: "xuma.core.v1.StringMatcher", config: {} }
+      on_match: { type: action, action: "x" }
+
+expect_error: true
+
+---
+name: "neither_value_nor_custom_match"
+description: "Setting neither value_match nor custom_match is an error"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "x" } }
+      on_match: { type: action, action: "x" }
+
+expect_error: true
+
+---
+name: "unknown_input_type_url"
+description: "Unregistered input type_url produces an error"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "unknown.NoSuchInput", config: {} }
+        value_match: { Exact: "x" }
+      on_match: { type: action, action: "x" }
+
+expect_error: true
+
+---
+name: "unknown_matcher_type_url"
+description: "Unregistered custom_match type_url produces an error"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "x" } }
+        custom_match: { type_url: "unknown.NoSuchMatcher", config: {} }
+      on_match: { type: action, action: "x" }
+
+expect_error: true
+
+---
+name: "unknown_predicate_type"
+description: "Unknown predicate type discriminant produces an error"
+
+config:
+  matchers:
+    - predicate:
+        type: xor
+        predicates: []
+      on_match: { type: action, action: "x" }
+
+expect_error: true

@@ -1,0 +1,46 @@
+name: "nested_matcher"
+description: "OnMatch::Matcher nesting: outer match delegates to inner matcher"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "tier" } }
+        value_match: { Exact: "premium" }
+      on_match:
+        type: matcher
+        matcher:
+          matchers:
+            - predicate:
+                type: single
+                input: { type_url: "xuma.test.v1.StringInput", config: { key: "region" } }
+                value_match: { Exact: "us-east" }
+              on_match: { type: action, action: "premium_us_east" }
+            - predicate:
+                type: single
+                input: { type_url: "xuma.test.v1.StringInput", config: { key: "region" } }
+                value_match: { Exact: "eu-west" }
+              on_match: { type: action, action: "premium_eu_west" }
+          on_no_match: { type: action, action: "premium_default" }
+  on_no_match: { type: action, action: "free_tier" }
+
+cases:
+  - name: "premium_us_east"
+    context: { tier: "premium", region: "us-east" }
+    expect: "premium_us_east"
+
+  - name: "premium_eu_west"
+    context: { tier: "premium", region: "eu-west" }
+    expect: "premium_eu_west"
+
+  - name: "premium_unknown_region"
+    context: { tier: "premium", region: "ap-south" }
+    expect: "premium_default"
+
+  - name: "free_tier"
+    context: { tier: "free", region: "us-east" }
+    expect: "free_tier"
+
+  - name: "missing_tier"
+    context: { region: "us-east" }
+    expect: "free_tier"

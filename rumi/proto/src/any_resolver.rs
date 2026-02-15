@@ -115,6 +115,7 @@ impl AnyResolver {
             .ok_or_else(|| MatcherError::UnknownTypeUrl {
                 type_url: type_url.to_owned(),
                 registry: "any_resolver",
+                available: self.decoders.keys().cloned().collect(),
             })?;
 
         let json_value = decoder(&any.value)?;

@@ -68,7 +68,7 @@ class HttpRouteMatch:
 
     def to_predicate(self) -> Predicate[HttpRequest]:
         """Convert this route match to a predicate tree."""
-        predicates: list[SinglePredicate[HttpRequest]] = []
+        predicates: list[Predicate[HttpRequest]] = []
 
         if self.path is not None:
             predicates.append(_compile_path_match(self.path))

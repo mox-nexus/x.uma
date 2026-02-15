@@ -1,0 +1,24 @@
+name: "simple_exact"
+description: "Single field matcher with exact string match via config loading"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "name" } }
+        value_match: { Exact: "alice" }
+      on_match: { type: action, action: "matched" }
+  on_no_match: { type: action, action: "default" }
+
+cases:
+  - name: "exact_hit"
+    context: { name: "alice" }
+    expect: "matched"
+
+  - name: "exact_miss"
+    context: { name: "bob" }
+    expect: "default"
+
+  - name: "missing_key_falls_through"
+    context: { other: "alice" }
+    expect: "default"

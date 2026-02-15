@@ -22,6 +22,8 @@ use rumi::prelude::*;
 use std::collections::HashMap;
 
 #[cfg(feature = "fixtures")]
+pub mod config_fixture;
+#[cfg(feature = "fixtures")]
 pub mod fixture;
 
 /// Test context: a simple string-to-string map.

@@ -1,0 +1,45 @@
+name: "on_no_match_fallback"
+description: "on_no_match provides fallback action when no field matcher matches"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "status" } }
+        value_match: { Exact: "active" }
+      on_match: { type: action, action: "allow" }
+  on_no_match: { type: action, action: "deny" }
+
+cases:
+  - name: "match_returns_action"
+    context: { status: "active" }
+    expect: "allow"
+
+  - name: "no_match_returns_fallback"
+    context: { status: "suspended" }
+    expect: "deny"
+
+  - name: "missing_key_returns_fallback"
+    context: {}
+    expect: "deny"
+
+---
+name: "no_fallback"
+description: "Without on_no_match, no-match returns null"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "status" } }
+        value_match: { Exact: "active" }
+      on_match: { type: action, action: "allow" }
+
+cases:
+  - name: "match_returns_action"
+    context: { status: "active" }
+    expect: "allow"
+
+  - name: "no_match_returns_null"
+    context: { status: "suspended" }
+    expect: null

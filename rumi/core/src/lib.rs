@@ -179,6 +179,28 @@ pub mod prelude {
 /// Validate at config load time via [`Matcher::validate`].
 pub const MAX_DEPTH: usize = 32;
 
+/// Maximum number of field matchers in a single [`Matcher`].
+///
+/// Prevents width-based denial-of-service: a config with millions of field matchers at depth 1
+/// bypasses [`MAX_DEPTH`] but still causes excessive resource consumption.
+pub const MAX_FIELD_MATCHERS: usize = 256;
+
+/// Maximum number of predicates in a single `And` or `Or` compound predicate.
+///
+/// Same width-based denial-of-service protection as [`MAX_FIELD_MATCHERS`], applied to
+/// compound predicate children.
+pub const MAX_PREDICATES_PER_COMPOUND: usize = 256;
+
+/// Maximum length for non-regex string match patterns (exact, prefix, suffix, contains).
+pub const MAX_PATTERN_LENGTH: usize = 8192;
+
+/// Maximum length for regex patterns.
+///
+/// Regex compilation is expensive even with the linear-time Rust `regex` crate.
+/// Shorter limit than [`MAX_PATTERN_LENGTH`] because regex complexity scales
+/// faster than literal matching.
+pub const MAX_REGEX_PATTERN_LENGTH: usize = 4096;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Errors
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -212,8 +234,10 @@ pub enum MatcherError {
     UnknownTypeUrl {
         /// The unregistered type URL.
         type_url: String,
-        /// Which registry was searched (`"input"`, `"matcher"`, or `"action"`).
+        /// Which registry was searched (`"input"`, `"matcher"`, `"action"`, or `"any_resolver"`).
         registry: &'static str,
+        /// Type URLs that ARE registered (for self-correcting error messages).
+        available: Vec<String>,
     },
     /// Input data type is incompatible with matcher's supported types.
     IncompatibleTypes {
@@ -221,6 +245,27 @@ pub enum MatcherError {
         input_type: String,
         /// The data types accepted by the matcher.
         matcher_types: Vec<String>,
+    },
+    /// Too many field matchers in a single `Matcher`.
+    TooManyFieldMatchers {
+        /// Actual count of field matchers.
+        count: usize,
+        /// Maximum allowed.
+        max: usize,
+    },
+    /// Too many predicates in a compound `And` or `Or`.
+    TooManyPredicates {
+        /// Actual count of predicates.
+        count: usize,
+        /// Maximum allowed.
+        max: usize,
+    },
+    /// A string match pattern exceeds the maximum allowed length.
+    PatternTooLong {
+        /// Actual length of the pattern.
+        len: usize,
+        /// Maximum allowed length.
+        max: usize,
     },
 }
 
@@ -240,12 +285,17 @@ impl std::fmt::Display for MatcherError {
             Self::InvalidConfig { source } => {
                 write!(f, "invalid config: {source}")
             }
-            Self::UnknownTypeUrl { type_url, registry } => {
-                write!(
-                    f,
-                    "unknown {registry} type URL \"{type_url}\" \
-                     — register it with RegistryBuilder::{registry}()"
-                )
+            Self::UnknownTypeUrl {
+                type_url,
+                registry,
+                available,
+            } => {
+                write!(f, "unknown {registry} type URL \"{type_url}\"")?;
+                if available.is_empty() {
+                    write!(f, " — no {registry} types are registered")
+                } else {
+                    write!(f, " — registered: {}", available.join(", "))
+                }
             }
             Self::IncompatibleTypes {
                 input_type,
@@ -255,6 +305,21 @@ impl std::fmt::Display for MatcherError {
                     f,
                     "input produces \"{input_type}\" data but matcher supports {matcher_types:?}"
                 )
+            }
+            Self::TooManyFieldMatchers { count, max } => {
+                write!(
+                    f,
+                    "matcher has {count} field matchers, but maximum allowed is {max}"
+                )
+            }
+            Self::TooManyPredicates { count, max } => {
+                write!(
+                    f,
+                    "compound predicate has {count} children, but maximum allowed is {max}"
+                )
+            }
+            Self::PatternTooLong { len, max } => {
+                write!(f, "pattern length is {len}, but maximum allowed is {max}")
             }
         }
     }

@@ -10,9 +10,10 @@ For real domains, implement DataInput for your own context type.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from puma._registry import RegistryBuilder
     from puma._types import MatchingData
 
 
@@ -34,3 +35,22 @@ class DictInput:
 
     def get(self, ctx: dict[str, str], /) -> MatchingData:
         return ctx.get(self.key)
+
+
+def register(
+    builder: RegistryBuilder[dict[str, str]],
+) -> RegistryBuilder[dict[str, str]]:
+    """Register the test-domain DictInput type.
+
+    Type URL: xuma.test.v1.StringInput (matches rumi-test convention).
+    Config field: { "key": "field_name" }
+    """
+    return builder.input("xuma.test.v1.StringInput", _dict_input_factory)
+
+
+def _dict_input_factory(config: dict[str, Any]) -> DictInput:
+    key = config.get("key")
+    if not isinstance(key, str):
+        msg = "DictInput requires a 'key' field (string)"
+        raise ValueError(msg)
+    return DictInput(key=key)

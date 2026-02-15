@@ -1,0 +1,89 @@
+name: "and_predicate"
+description: "Compound AND predicate: all conditions must match"
+
+config:
+  matchers:
+    - predicate:
+        type: and
+        predicates:
+          - type: single
+            input: { type_url: "xuma.test.v1.StringInput", config: { key: "role" } }
+            value_match: { Exact: "admin" }
+          - type: single
+            input: { type_url: "xuma.test.v1.StringInput", config: { key: "org" } }
+            value_match: { Prefix: "acme" }
+      on_match: { type: action, action: "admin_acme" }
+
+cases:
+  - name: "both_match"
+    context: { role: "admin", org: "acme-corp" }
+    expect: "admin_acme"
+
+  - name: "first_fails"
+    context: { role: "viewer", org: "acme-corp" }
+    expect: null
+
+  - name: "second_fails"
+    context: { role: "admin", org: "other" }
+    expect: null
+
+  - name: "both_fail"
+    context: { role: "viewer", org: "other" }
+    expect: null
+
+---
+name: "or_predicate"
+description: "Compound OR predicate: any condition must match"
+
+config:
+  matchers:
+    - predicate:
+        type: or
+        predicates:
+          - type: single
+            input: { type_url: "xuma.test.v1.StringInput", config: { key: "role" } }
+            value_match: { Exact: "admin" }
+          - type: single
+            input: { type_url: "xuma.test.v1.StringInput", config: { key: "role" } }
+            value_match: { Exact: "superadmin" }
+      on_match: { type: action, action: "elevated" }
+
+cases:
+  - name: "first_matches"
+    context: { role: "admin" }
+    expect: "elevated"
+
+  - name: "second_matches"
+    context: { role: "superadmin" }
+    expect: "elevated"
+
+  - name: "neither_matches"
+    context: { role: "viewer" }
+    expect: null
+
+---
+name: "not_predicate"
+description: "NOT predicate: inverts the inner condition"
+
+config:
+  matchers:
+    - predicate:
+        type: not
+        predicate:
+          type: single
+          input: { type_url: "xuma.test.v1.StringInput", config: { key: "env" } }
+          value_match: { Exact: "production" }
+      on_match: { type: action, action: "non_prod" }
+
+cases:
+  - name: "not_production"
+    context: { env: "staging" }
+    expect: "non_prod"
+
+  - name: "is_production"
+    context: { env: "production" }
+    expect: null
+
+  - name: "missing_key_not_matches"
+    context: { other: "x" }
+    expect: "non_prod"

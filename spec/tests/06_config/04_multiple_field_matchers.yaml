@@ -1,0 +1,37 @@
+name: "first_match_wins"
+description: "Multiple field matchers: first match wins, later matchers are not evaluated"
+
+config:
+  matchers:
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "path" } }
+        value_match: { Exact: "/health" }
+      on_match: { type: action, action: "health_check" }
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "path" } }
+        value_match: { Prefix: "/api" }
+      on_match: { type: action, action: "api_backend" }
+    - predicate:
+        type: single
+        input: { type_url: "xuma.test.v1.StringInput", config: { key: "path" } }
+        value_match: { Prefix: "/" }
+      on_match: { type: action, action: "default_backend" }
+
+cases:
+  - name: "first_rule_wins"
+    context: { path: "/health" }
+    expect: "health_check"
+
+  - name: "second_rule"
+    context: { path: "/api/users" }
+    expect: "api_backend"
+
+  - name: "third_rule_catchall"
+    context: { path: "/about" }
+    expect: "default_backend"
+
+  - name: "no_match_no_fallback"
+    context: { other: "x" }
+    expect: null
