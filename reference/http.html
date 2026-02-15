@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-6b1472f2.js";
+            window.path_to_searchindex_js = "../searchindex-86c44684.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-9ddb2f6c.js"></script>
+        <script src="../toc-eb7188b1.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,146 +181,40 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="http-domain-reference"><a class="header" href="#http-domain-reference">HTTP Domain Reference</a></h1>
-<p>HTTP request matching across rumi (Rust) and puma (Python).</p>
+<p>HTTP request matching across all three x.uma implementations.</p>
 <h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
-<p>Both implementations provide the same HTTP matching capabilities with Gateway API-style config and DataInput implementations for HTTP contexts.</p>
-<p><strong>For Python users:</strong> See <a href="python.html">Python API Reference</a> for the <code>puma.http</code> module.</p>
-<p><strong>This page focuses on Rust (rumi-http).</strong></p>
-<h2 id="architecture-rumi-http"><a class="header" href="#architecture-rumi-http">Architecture (rumi-http)</a></h2>
-<pre><code>Gateway API HttpRouteMatch (config)
-        ↓ compile()
-rumi Matcher&lt;HttpMessage, A&gt;
-        ↓ evaluate()
-ext_proc ProcessingRequest (runtime)
-</code></pre>
-<p><strong>Two layers:</strong></p>
-<ul>
-<li><strong>User API</strong>: Gateway API <code>HttpRouteMatch</code> — human-friendly config</li>
-<li><strong>Data Plane API</strong>: Envoy <code>ProcessingRequest</code> — wire protocol (indexed as <code>HttpMessage</code>)</li>
-</ul>
-<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rumi_http::prelude::*;
-
-// Config time: compile Gateway API match to rumi matcher
-let route_match = HttpRouteMatch {
-    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-    method: Some("GET".into()),
-    ..Default::default()
-};
-let matcher = route_match.compile("api_backend");
-
-// Runtime: evaluate against HttpMessage (indexed view over ProcessingRequest)
-let result = matcher.evaluate(&amp;http_message);
-assert_eq!(result, Some("api_backend"));
-<span class="boring">}</span></code></pre>
-<h2 id="datainputs-for-httpmessage"><a class="header" href="#datainputs-for-httpmessage">DataInputs for HttpMessage</a></h2>
+<p>All three implementations provide identical HTTP matching capabilities: Gateway API-style config types, a compiler that turns config into matchers, and DataInputs for HTTP contexts.</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Input</th><th>Extracts</th><th>Example</th></tr>
+<tr><th>Implementation</th><th>Package</th><th>Context Type</th><th>Compiler</th></tr>
 </thead>
 <tbody>
-<tr><td><code>PathInput</code></td><td><code>:path</code> pseudo-header (without query)</td><td><code>/api/users</code></td></tr>
-<tr><td><code>MethodInput</code></td><td><code>:method</code> pseudo-header</td><td><code>GET</code></td></tr>
-<tr><td><code>HeaderInput::new("x-api-key")</code></td><td>Named header</td><td><code>Bearer ...</code></td></tr>
-<tr><td><code>QueryParamInput::new("page")</code></td><td>Query parameter</td><td><code>1</code></td></tr>
-<tr><td><code>SchemeInput</code></td><td><code>:scheme</code> pseudo-header</td><td><code>https</code></td></tr>
-<tr><td><code>AuthorityInput</code></td><td><code>:authority</code> pseudo-header</td><td><code>api.example.com</code></td></tr>
+<tr><td><strong>rumi</strong> (Rust)</td><td><code>rumi-http</code></td><td><code>HttpMessage</code></td><td><code>compile_route_matches()</code></td></tr>
+<tr><td><strong>puma</strong> (Python)</td><td><code>puma.http</code></td><td><code>HttpRequest</code></td><td><code>compile_route_matches()</code></td></tr>
+<tr><td><strong>bumi</strong> (TypeScript)</td><td><code>bumi/http</code></td><td><code>HttpRequest</code></td><td><code>compileRouteMatches()</code></td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="gateway-api-match-types"><a class="header" href="#gateway-api-match-types">Gateway API Match Types</a></h2>
-<h3 id="path-matching"><a class="header" href="#path-matching">Path Matching</a></h3>
+<h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
+<p>Every implementation follows the same two-layer pattern:</p>
+<pre><code>Config layer:    HttpRouteMatch (human-friendly)
+                        |
+                   compile()
+                        |
+Engine layer:    Matcher&lt;HttpContext, A&gt;
+                        |
+                   evaluate()
+                        |
+Result:          A | null
+</code></pre>
+<p><strong>Rust has an extra layer</strong> for data plane use: the config layer produces <code>Matcher&lt;HttpMessage, A&gt;</code>, where <code>HttpMessage</code> is an indexed view over Envoy’s <code>ext_proc ProcessingRequest</code>. Python and TypeScript use a simpler <code>HttpRequest</code> context.</p>
+<h2 id="quick-start"><a class="header" href="#quick-start">Quick Start</a></h2>
+<p>All three languages use the same Gateway API config types:</p>
+<p><strong>Rust:</strong></p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>// Exact match
-HttpPathMatch::Exact { value: "/api/v1/users".into() }
-
-// Prefix match
-HttpPathMatch::PathPrefix { value: "/api".into() }
-
-// Regex match
-HttpPathMatch::RegularExpression { value: r"^/api/v\d+/.*".into() }
-<span class="boring">}</span></code></pre>
-<h3 id="header-matching"><a class="header" href="#header-matching">Header Matching</a></h3>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Exact header value
-HttpHeaderMatch::Exact {
-    name: "content-type".into(),
-    value: "application/json".into()
-}
-
-// Regex header value
-HttpHeaderMatch::RegularExpression {
-    name: "authorization".into(),
-    value: r"^Bearer .+".into()
-}
-<span class="boring">}</span></code></pre>
-<h3 id="query-parameter-matching"><a class="header" href="#query-parameter-matching">Query Parameter Matching</a></h3>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Exact param value
-HttpQueryParamMatch::Exact {
-    name: "version".into(),
-    value: "2".into()
-}
-
-// Regex param value
-HttpQueryParamMatch::RegularExpression {
-    name: "id".into(),
-    value: r"^\d+$".into()
-}
-<span class="boring">}</span></code></pre>
-<h2 id="match-semantics"><a class="header" href="#match-semantics">Match Semantics</a></h2>
-<p>Per Gateway API spec:</p>
-<ul>
-<li><strong>Within a match</strong>: All conditions are ANDed</li>
-<li><strong>Multiple matches</strong>: ORed together</li>
-</ul>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// This matches: GET /api/* with x-version header
-let route_match = HttpRouteMatch {
-    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-    method: Some("GET".into()),
-    headers: Some(vec![
-        HttpHeaderMatch::Exact {
-            name: "x-version".into(),
-            value: "2".into()
-        }
-    ]),
-    ..Default::default()
-};
-<span class="boring">}</span></code></pre>
-<h2 id="compiling-multiple-matches"><a class="header" href="#compiling-multiple-matches">Compiling Multiple Matches</a></h2>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rumi_http::compile_route_matches;
-
-let matches = vec![
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/health".into() }),
-        ..Default::default()
-    },
-];
-
-// Multiple matches are ORed
-let matcher = compile_route_matches(&amp;matches, "backend", None);
-<span class="boring">}</span></code></pre>
-<h2 id="python-equivalent"><a class="header" href="#python-equivalent">Python Equivalent</a></h2>
-<p>See <a href="python.html">Python API Reference</a> for the Python implementation.</p>
-<p>Quick comparison:</p>
-<p><strong>Rust (rumi-http):</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rumi_http::{HttpRouteMatch, HttpPathMatch, compile_route_matches};
+</span>use rumi_http::prelude::*;
 
 let route = HttpRouteMatch {
     path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
@@ -329,40 +223,240 @@ let route = HttpRouteMatch {
 };
 let matcher = route.compile("api_backend");
 <span class="boring">}</span></code></pre>
-<p><strong>Python (puma.http):</strong></p>
-<pre><code class="language-python">from puma.http import HttpRouteMatch, HttpPathMatch, compile_route_matches
+<p><strong>Python:</strong></p>
+<pre><code class="language-python">from puma.http import HttpRouteMatch, compile_route_match
 
 route = HttpRouteMatch(
     path=HttpPathMatch(type="PathPrefix", value="/api"),
     method="GET",
 )
-matcher = route.compile("api_backend")
+matcher = compile_route_match(route, "api_backend")
 </code></pre>
-<p>Both produce functionally identical matchers that pass the same conformance tests.</p>
-<h2 id="dependencies-rust"><a class="header" href="#dependencies-rust">Dependencies (Rust)</a></h2>
+<p><strong>TypeScript:</strong></p>
+<pre><code class="language-typescript">import { compileRouteMatch } from "bumi/http";
+
+const matcher = compileRouteMatch(
+    { path: { type: "PathPrefix", value: "/api" }, method: "GET" },
+    "api_backend",
+);
+</code></pre>
+<h2 id="datainputs"><a class="header" href="#datainputs">DataInputs</a></h2>
+<p>Each implementation provides the same set of field extractors:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Crate</th><th>Purpose</th></tr>
+<tr><th>Input</th><th>Extracts</th><th>Returns <code>null</code> when</th></tr>
 </thead>
 <tbody>
-<tr><td><code>k8s-gateway-api</code></td><td>Gateway API types</td></tr>
-<tr><td><code>envoy-grpc-ext-proc</code></td><td>ext_proc ProcessingRequest types</td></tr>
+<tr><td><code>PathInput</code></td><td>URL path (without query string)</td><td>Path missing</td></tr>
+<tr><td><code>MethodInput</code></td><td>HTTP method</td><td>Method missing</td></tr>
+<tr><td><code>HeaderInput(name)</code></td><td>Header value by name (case-insensitive)</td><td>Header not present</td></tr>
+<tr><td><code>QueryParamInput(name)</code></td><td>Query parameter value by name</td><td>Parameter not present</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Rust-only</strong> (for Envoy <code>ext_proc</code>):</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Input</th><th>Extracts</th></tr>
+</thead>
+<tbody>
+<tr><td><code>SchemeInput</code></td><td><code>:scheme</code> pseudo-header</td></tr>
+<tr><td><code>AuthorityInput</code></td><td><code>:authority</code> pseudo-header</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="gateway-api-config-types"><a class="header" href="#gateway-api-config-types">Gateway API Config Types</a></h2>
+<p>These types mirror the <a href="https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.HTTPRouteMatch">Gateway API HTTPRouteMatch spec</a>. All conditions within a single <code>HttpRouteMatch</code> are ANDed. Multiple <code>HttpRouteMatch</code> entries are ORed.</p>
+<h3 id="httppathmatch"><a class="header" href="#httppathmatch"><code>HttpPathMatch</code></a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Match Logic</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Exact</code></td><td>Path equals value exactly</td></tr>
+<tr><td><code>PathPrefix</code></td><td>Path starts with value</td></tr>
+<tr><td><code>RegularExpression</code></td><td>Path matches regex pattern</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="httpheadermatch"><a class="header" href="#httpheadermatch"><code>HttpHeaderMatch</code></a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Match Logic</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Exact</code></td><td>Header value equals string exactly</td></tr>
+<tr><td><code>RegularExpression</code></td><td>Header value matches regex pattern</td></tr>
+</tbody>
+</table>
+</div>
+<p>Header name lookup is always case-insensitive.</p>
+<h3 id="httpqueryparammatch"><a class="header" href="#httpqueryparammatch"><code>HttpQueryParamMatch</code></a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Match Logic</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Exact</code></td><td>Query param value equals string exactly</td></tr>
+<tr><td><code>RegularExpression</code></td><td>Query param value matches regex pattern</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="httproutematch"><a class="header" href="#httproutematch"><code>HttpRouteMatch</code></a></h3>
+<p>Combines path, method, headers, and query parameters. All specified conditions must match (AND semantics).</p>
+<p><strong>Rust:</strong></p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>HttpRouteMatch {
+    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+    method: Some("GET".into()),
+    headers: Some(vec![
+        HttpHeaderMatch::Exact {
+            name: "x-version".into(),
+            value: "2".into(),
+        },
+    ]),
+    query_params: None,
+}
+<span class="boring">}</span></code></pre>
+<p><strong>Python:</strong></p>
+<pre><code class="language-python">HttpRouteMatch(
+    path=HttpPathMatch(type="PathPrefix", value="/api"),
+    method="GET",
+    headers=[HttpHeaderMatch(type="Exact", name="x-version", value="2")],
+)
+</code></pre>
+<p><strong>TypeScript:</strong></p>
+<pre><code class="language-typescript">{
+    path: { type: "PathPrefix", value: "/api" },
+    method: "GET",
+    headers: [{ type: "Exact", name: "x-version", value: "2" }],
+}
+</code></pre>
+<h2 id="compiler-functions"><a class="header" href="#compiler-functions">Compiler Functions</a></h2>
+<h3 id="single-route"><a class="header" href="#single-route">Single Route</a></h3>
+<p>Compile one <code>HttpRouteMatch</code> into a <code>Matcher</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Language</th><th>Function</th><th>Signature</th></tr>
+</thead>
+<tbody>
+<tr><td>Rust</td><td><code>route_match.compile(action)</code></td><td><code>HttpRouteMatch → Matcher&lt;HttpMessage, A&gt;</code></td></tr>
+<tr><td>Python</td><td><code>compile_route_match(route, action)</code></td><td><code>HttpRouteMatch → Matcher[HttpRequest, A]</code></td></tr>
+<tr><td>TypeScript</td><td><code>compileRouteMatch(route, action)</code></td><td><code>HttpRouteMatch → Matcher&lt;HttpRequest, A&gt;</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="multiple-routes"><a class="header" href="#multiple-routes">Multiple Routes</a></h3>
+<p>Compile multiple <code>HttpRouteMatch</code> entries into a single <code>Matcher</code> with OR semantics:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Language</th><th>Function</th></tr>
+</thead>
+<tbody>
+<tr><td>Rust</td><td><code>compile_route_matches(&amp;matches, action, fallback)</code></td></tr>
+<tr><td>Python</td><td><code>compile_route_matches(matches, action, on_no_match)</code></td></tr>
+<tr><td>TypeScript</td><td><code>compileRouteMatches(matches, action, onNoMatch)</code></td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>Empty matches array</strong> creates a catch-all matcher (matches everything).</p>
+<p><strong>Example (TypeScript):</strong></p>
+<pre><code class="language-typescript">import { compileRouteMatches, type HttpRouteMatch } from "bumi/http";
+
+const apiRoute: HttpRouteMatch = {
+    path: { type: "PathPrefix", value: "/api" },
+    method: "GET",
+};
+
+const adminRoute: HttpRouteMatch = {
+    headers: [{ type: "Exact", name: "x-admin", value: "true" }],
+};
+
+const matcher = compileRouteMatches(
+    [apiRoute, adminRoute],
+    "allowed",
+    "denied",
+);
+</code></pre>
+<h2 id="context-types"><a class="header" href="#context-types">Context Types</a></h2>
+<h3 id="httprequest-python-typescript"><a class="header" href="#httprequest-python-typescript"><code>HttpRequest</code> (Python, TypeScript)</a></h3>
+<p>Simplified HTTP request for application-level matching.</p>
+<pre><code class="language-python"># Python
+from puma.http import HttpRequest
+
+req = HttpRequest(
+    method="GET",
+    raw_path="/api/users?role=admin",
+    headers={"content-type": "application/json"},
+)
+
+req.path              # "/api/users" (parsed from raw_path)
+req.query_params      # {"role": "admin"} (parsed from raw_path)
+req.header("Content-Type")  # "application/json" (case-insensitive)
+</code></pre>
+<pre><code class="language-typescript">// TypeScript
+import { HttpRequest } from "bumi/http";
+
+const req = new HttpRequest(
+    "GET",
+    "/api/users?role=admin",
+    { "Content-Type": "application/json" },
+);
+
+req.path;                    // "/api/users"
+req.queryParam("role");      // "admin"
+req.header("content-type");  // "application/json" (case-insensitive)
+</code></pre>
+<h3 id="httpmessage-rust-only"><a class="header" href="#httpmessage-rust-only"><code>HttpMessage</code> (Rust only)</a></h3>
+<p>Indexed view over Envoy <code>ProcessingRequest</code> for data plane matching. Provides O(1) header and query parameter lookups via <code>HashMap</code>.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use rumi_http::{HttpMessage, SimpleHttpRequest};
+
+// For testing: SimpleHttpRequest builder
+let req = SimpleHttpRequest::builder()
+    .method("GET")
+    .path("/api/users")
+    .header("content-type", "application/json")
+    .build();
+
+let message = HttpMessage::from(&amp;req);
+<span class="boring">}</span></code></pre>
+<h2 id="dependencies"><a class="header" href="#dependencies">Dependencies</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Implementation</th><th>Runtime Dependencies</th></tr>
+</thead>
+<tbody>
+<tr><td>rumi-http</td><td><code>k8s-gateway-api</code>, <code>envoy-grpc-ext-proc</code></td></tr>
+<tr><td>puma.http</td><td>None (zero dependencies)</td></tr>
+<tr><td>bumi/http</td><td>None (zero runtime dependencies)</td></tr>
 </tbody>
 </table>
 </div>
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>
-<li><a href="python.html">Python API Reference</a> — puma.http module</li>
+<li><a href="rust.html">Rust API Reference</a> — rumi core types</li>
+<li><a href="python.html">Python API Reference</a> — puma core + HTTP types</li>
+<li><a href="typescript.html">TypeScript API Reference</a> — bumi core + HTTP types</li>
+<li><a href="../tutorials/http-router.html">Build an HTTP Router</a> — Step-by-step tutorial</li>
 <li><a href="https://gateway-api.sigs.k8s.io/reference/spec/#gateway.networking.k8s.io/v1.HTTPRouteMatch">Gateway API HTTPRoute Spec</a></li>
-<li><a href="https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_proc_filter">Envoy ext_proc Documentation</a></li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../reference/python.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../reference/typescript.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -376,7 +470,7 @@ matcher = route.compile("api_backend")
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../reference/python.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../reference/typescript.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

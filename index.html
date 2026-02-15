@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "searchindex-6b1472f2.js";
+            window.path_to_searchindex_js = "searchindex-86c44684.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-9ddb2f6c.js"></script>
+        <script src="toc-eb7188b1.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -193,17 +193,17 @@
 <tr><th>Package</th><th>Language</th><th>Status</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>rumi</strong></td><td>Rust</td><td>Production-ready core</td></tr>
-<tr><td><strong>puma</strong></td><td>Python 3.12+</td><td>Alpha (v0.1.0)</td></tr>
-<tr><td><strong>bumi</strong></td><td>TypeScript/Bun</td><td>Planned</td></tr>
-<tr><td><strong>puma-crusty</strong></td><td>Python (Rust bindings)</td><td>Planned</td></tr>
-<tr><td><strong>bumi-crusty</strong></td><td>TypeScript (WASM bindings)</td><td>Planned</td></tr>
+<tr><td><strong>rumi</strong></td><td>Rust</td><td>Production-ready core (195 tests)</td></tr>
+<tr><td><strong>puma</strong></td><td>Python 3.12+</td><td>Alpha v0.1.0 (194 tests)</td></tr>
+<tr><td><strong>bumi</strong></td><td>TypeScript/Bun</td><td>Alpha v0.1.0 (202 tests)</td></tr>
+<tr><td><strong>puma-crusty</strong></td><td>Python (PyO3 bindings)</td><td>Alpha (37 tests)</td></tr>
+<tr><td><strong>bumi-crusty</strong></td><td>TypeScript (wasm-bindgen)</td><td>Alpha (36 tests)</td></tr>
 </tbody>
 </table>
 </div>
-<p>All implementations pass the same conformance test suite.</p>
+<p>All implementations pass the same conformance test suite. <strong>Total: 268 tests</strong> across 5 variants.</p>
 <h2 id="quick-example"><a class="header" href="#quick-example">Quick Example</a></h2>
-<p>The same pattern in Rust and Python.</p>
+<p>The same pattern in Rust, Python, and TypeScript.</p>
 <h3 id="rust"><a class="header" href="#rust">Rust</a></h3>
 <pre><code class="language-rust ignore">use rumi::prelude::*;
 use rumi_http::{HttpMessage, PathInput, PrefixMatcher};
@@ -244,6 +244,24 @@ matcher = Matcher(
 request = HttpRequest(method="GET", raw_path="/api/users")
 action = matcher.evaluate(request)  # "api_handler"
 </code></pre>
+<h3 id="typescript"><a class="header" href="#typescript">TypeScript</a></h3>
+<pre><code class="language-typescript">import { Matcher, FieldMatcher, SinglePredicate, Action } from "bumi";
+import { PrefixMatcher } from "bumi";
+import { HttpRequest, PathInput } from "bumi/http";
+
+const matcher = new Matcher([
+    new FieldMatcher(
+        new SinglePredicate(
+            new PathInput(),
+            new PrefixMatcher("/api")
+        ),
+        new Action("api_handler")
+    ),
+], new Action("default"));
+
+const request = new HttpRequest("GET", "/api/users");
+const action = matcher.evaluate(request); // "api_handler"
+</code></pre>
 <h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
 <p>x.uma follows hexagonal architecture (ports and adapters). The core is domain-agnostic. Domains plug in at the edges.</p>
 <pre><code class="language-text">┌─────────────────────────────────┐
@@ -272,6 +290,8 @@ action = matcher.evaluate(request)  # "api_handler"
 <p><strong>Type-safe composition.</strong> Predicates compose with AND/OR/NOT. Matchers nest. Actions are exclusive (action XOR nested matcher, never both).</p>
 <p><strong>Battle-tested semantics.</strong> Built on the same xDS protocol Envoy uses at Google scale. First-match-wins, nested matcher failure propagation, depth limits — all enforced by design.</p>
 <p><strong>Multi-language.</strong> Same API across Rust, Python, and TypeScript. Write matchers once, run anywhere.</p>
+<p><strong>Performance.</strong> Sub-microsecond evaluation. Linear-time regex (Rust implementations). Zero-copy where possible.</p>
+<p><strong>Security.</strong> ReDoS protection via linear-time regex. Depth limits (max 32 levels). Fail-closed validation.</p>
 <h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
 <div class="table-wrapper">
 <table>
@@ -279,12 +299,34 @@ action = matcher.evaluate(request)  # "api_handler"
 <tr><th>Section</th><th>What you’ll learn</th></tr>
 </thead>
 <tbody>
-<tr><td><a href="learn/quick-start.html">Quick Start</a></td><td>Get running in 5 minutes (Rust and Python)</td></tr>
-<tr><td><a href="learn/concepts.html">Concepts</a></td><td>Core abstractions and terminology</td></tr>
+<tr><td><strong>Getting Started</strong></td><td></td></tr>
+<tr><td><a href="getting-started/choose.html">Choose Your Implementation</a></td><td>Which variant fits your use case</td></tr>
+<tr><td><a href="getting-started/rust.html">Rust Quick Start</a></td><td>Get rumi running in 5 minutes</td></tr>
+<tr><td><a href="getting-started/python.html">Python Quick Start</a></td><td>Get puma running in 5 minutes</td></tr>
+<tr><td><a href="getting-started/typescript.html">TypeScript Quick Start</a></td><td>Get bumi running in 5 minutes</td></tr>
+<tr><td><strong>Tutorials</strong></td><td></td></tr>
+<tr><td><a href="tutorials/http-router.html">Build an HTTP Router</a></td><td>Step-by-step routing example</td></tr>
+<tr><td><strong>Core Concepts</strong></td><td></td></tr>
+<tr><td><a href="concepts/pipeline.html">The Matching Pipeline</a></td><td>How evaluation works</td></tr>
+<tr><td><a href="concepts/type-erasure.html">Type Erasure and Ports</a></td><td>Why DataInput/InputMatcher split exists</td></tr>
+<tr><td><a href="concepts/predicates.html">Predicate Composition</a></td><td>AND/OR/NOT logic trees</td></tr>
+<tr><td><a href="concepts/semantics.html">First-Match-Wins Semantics</a></td><td>Evaluation order and fallback</td></tr>
+<tr><td><strong>Performance &amp; Security</strong></td><td></td></tr>
+<tr><td><a href="performance/guide.html">Performance Guide</a></td><td>Optimization techniques</td></tr>
+<tr><td><a href="performance/benchmarks.html">Benchmark Results</a></td><td>Cross-language numbers</td></tr>
+<tr><td><a href="performance/security.html">Security Model</a></td><td>Threat model and mitigations</td></tr>
+<tr><td><a href="performance/redos.html">ReDoS Protection</a></td><td>Linear-time regex guarantees</td></tr>
+<tr><td><strong>Understanding x.uma</strong></td><td></td></tr>
 <tr><td><a href="explain/architecture.html">Architecture</a></td><td>Why it’s built this way</td></tr>
+<tr><td><a href="explain/why-aces.html">Why ACES</a></td><td>Design philosophy deep dive</td></tr>
+<tr><td><a href="explain/when-to-use.html">When to Use x.uma</a></td><td>x.uma vs OPA vs Cedar vs Zanzibar</td></tr>
+<tr><td><a href="explain/policy-landscape.html">Policy Landscape</a></td><td>Where x.uma fits in the ecosystem</td></tr>
+<tr><td><strong>Reference</strong></td><td></td></tr>
 <tr><td><a href="reference/proto.html">Proto API</a></td><td>xDS protocol definitions</td></tr>
 <tr><td><a href="reference/rust.html">Rust API</a></td><td>rumi API reference</td></tr>
 <tr><td><a href="reference/python.html">Python API</a></td><td>puma API reference</td></tr>
+<tr><td><a href="reference/typescript.html">TypeScript API</a></td><td>bumi API reference</td></tr>
+<tr><td><a href="reference/http.html">HTTP Domain</a></td><td>HTTP matching across languages</td></tr>
 </tbody>
 </table>
 </div>
@@ -296,10 +338,13 @@ action = matcher.evaluate(request)  # "api_handler"
 <tr><th>Phase</th><th>Focus</th><th>Status</th></tr>
 </thead>
 <tbody>
-<tr><td>5</td><td>Python (puma)</td><td>✅ Done (v0.1.0)</td></tr>
-<tr><td>6</td><td>TypeScript (bumi)</td><td>Next</td></tr>
-<tr><td>7</td><td>Python Rust bindings (puma-crusty)</td><td>Planned</td></tr>
-<tr><td>8</td><td>TypeScript WASM bindings (bumi-crusty)</td><td>Planned</td></tr>
+<tr><td>5</td><td>puma (Python)</td><td>✅ Done (v0.1.0)</td></tr>
+<tr><td>6</td><td>bumi (TypeScript)</td><td>✅ Done (v0.1.0)</td></tr>
+<tr><td>7</td><td>puma-crusty (PyO3 bindings)</td><td>✅ Done</td></tr>
+<tr><td>8</td><td>bumi-crusty (WASM bindings)</td><td>✅ Done</td></tr>
+<tr><td>9</td><td>Cross-language benchmarks</td><td>🚧 In Progress</td></tr>
+<tr><td>10</td><td>Semantic matching (cosine similarity)</td><td>Planned</td></tr>
+<tr><td>11</td><td>RE2 migration (linear-time regex natively)</td><td>Planned</td></tr>
 </tbody>
 </table>
 </div>
@@ -310,7 +355,7 @@ action = matcher.evaluate(request)  # "api_handler"
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
 
-                            <a rel="next prefetch" href="learn/quick-start.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="getting-started/choose.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -321,7 +366,7 @@ action = matcher.evaluate(request)  # "api_handler"
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
 
-                    <a rel="next prefetch" href="learn/quick-start.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="getting-started/choose.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

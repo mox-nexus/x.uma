@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-6b1472f2.js";
+            window.path_to_searchindex_js = "../searchindex-86c44684.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-9ddb2f6c.js"></script>
+        <script src="../toc-eb7188b1.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -254,24 +254,25 @@ class InputMatcher(Protocol):
 <li>Protocols instead of traits (runtime-checkable)</li>
 <li><code>MatchingValue</code> is just a type alias, not a wrapped type</li>
 </ul>
-<h3 id="typescript-bumi-planned"><a class="header" href="#typescript-bumi-planned">TypeScript (bumi, planned)</a></h3>
-<pre><code class="language-typescript">// MatchingValue — union type
-type MatchingValue = string | number | boolean | Uint8Array | null;
+<h3 id="typescript-bumi"><a class="header" href="#typescript-bumi">TypeScript (bumi)</a></h3>
+<pre><code class="language-typescript">// MatchingData — union type
+type MatchingData = string | number | boolean | Uint8Array | null;
 
 // DataInput — generic interface
 interface DataInput&lt;Ctx&gt; {
-  get(ctx: Ctx): MatchingValue;
+  get(ctx: Ctx): MatchingData;
 }
 
 // InputMatcher — non-generic interface
 interface InputMatcher {
-  matches(value: MatchingValue): boolean;
+  matches(value: MatchingData): boolean;
 }
 </code></pre>
 <p><strong>Key differences:</strong></p>
 <ul>
 <li>Interfaces instead of traits/protocols</li>
 <li>Structural typing (duck-typed) vs nominal (Rust) vs runtime-checkable (Python)</li>
+<li>Union types native like Python</li>
 </ul>
 <h2 id="type-system-mappings"><a class="header" href="#type-system-mappings">Type System Mappings</a></h2>
 <p>How the same architecture translates across languages:</p>
@@ -281,12 +282,12 @@ interface InputMatcher {
 <tr><th>Concept</th><th>Rust (rumi)</th><th>Python (puma)</th><th>TypeScript (bumi)</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>Erased data</strong></td><td><code>enum MatchingData</code></td><td><code>type MatchingValue</code> (union)</td><td><code>type MatchingValue</code> (union)</td></tr>
+<tr><td><strong>Erased data</strong></td><td><code>enum MatchingData</code></td><td><code>type MatchingValue</code> (union)</td><td><code>type MatchingData</code> (union)</td></tr>
 <tr><td><strong>Extraction port</strong></td><td><code>trait DataInput&lt;Ctx&gt;</code></td><td><code>Protocol[Ctx]</code></td><td><code>interface DataInput&lt;Ctx&gt;</code></td></tr>
 <tr><td><strong>Matching port</strong></td><td><code>trait InputMatcher</code></td><td><code>Protocol</code></td><td><code>interface InputMatcher</code></td></tr>
 <tr><td><strong>Predicate tree</strong></td><td><code>enum Predicate&lt;Ctx&gt;</code></td><td><code>type Predicate[Ctx]</code> (union)</td><td><code>type Predicate&lt;Ctx&gt;</code> (discriminated union)</td></tr>
 <tr><td><strong>OnMatch</strong></td><td><code>enum OnMatch&lt;Ctx, A&gt;</code></td><td><code>type OnMatch[Ctx, A]</code> (union)</td><td><code>type OnMatch&lt;Ctx, A&gt;</code> (discriminated union)</td></tr>
-<tr><td><strong>Pattern match</strong></td><td><code>match</code> expression</td><td><code>match</code>/<code>case</code> statement</td><td>Type guards + <code>if</code>/<code>else</code></td></tr>
+<tr><td><strong>Pattern match</strong></td><td><code>match</code> expression</td><td><code>match</code>/<code>case</code> statement</td><td><code>instanceof</code> checks</td></tr>
 <tr><td><strong>Immutability</strong></td><td>Owned types, no <code>mut</code></td><td><code>@dataclass(frozen=True)</code></td><td><code>readonly</code> fields</td></tr>
 <tr><td><strong>Thread safety</strong></td><td><code>Send + Sync</code> bounds</td><td>Not applicable (GIL)</td><td>Not applicable (single-threaded)</td></tr>
 </tbody>
@@ -311,13 +312,33 @@ type Predicate[Ctx] = SinglePredicate[Ctx] | And[Ctx] | Or[Ctx] | Not[Ctx]
 class And[Ctx]:
     predicates: tuple[Predicate[Ctx], ...]
 </code></pre>
-<pre><code class="language-typescript">// TypeScript (planned)
-type Predicate&lt;Ctx&gt; =
-  | { type: 'single'; input: DataInput&lt;Ctx&gt;; matcher: InputMatcher }
-  | { type: 'and'; predicates: Predicate&lt;Ctx&gt;[] }
-  | { type: 'or'; predicates: Predicate&lt;Ctx&gt;[] }
-  | { type: 'not'; predicate: Predicate&lt;Ctx&gt; };
+<pre><code class="language-typescript">// TypeScript — classes with instanceof, not discriminated unions
+class SinglePredicate&lt;Ctx&gt; {
+    constructor(
+        readonly input: DataInput&lt;Ctx&gt;,
+        readonly matcher: InputMatcher
+    ) {}
+}
+
+class And&lt;Ctx&gt; {
+    constructor(readonly predicates: readonly Predicate&lt;Ctx&gt;[]) {}
+}
+
+class Or&lt;Ctx&gt; {
+    constructor(readonly predicates: readonly Predicate&lt;Ctx&gt;[]) {}
+}
+
+class Not&lt;Ctx&gt; {
+    constructor(readonly predicate: Predicate&lt;Ctx&gt;) {}
+}
+
+type Predicate&lt;Ctx&gt; = SinglePredicate&lt;Ctx&gt; | And&lt;Ctx&gt; | Or&lt;Ctx&gt; | Not&lt;Ctx&gt;;
+
+// Pattern matching via instanceof
+if (p instanceof SinglePredicate) { /* ... */ }
+else if (p instanceof And) { /* ... */ }
 </code></pre>
+<p><strong>Key difference:</strong> TypeScript uses classes with <code>instanceof</code> checks, not objects with <code>type</code> discriminator fields. This matches Python’s dataclass approach more closely than traditional TS discriminated unions.</p>
 <h2 id="onmatch-exclusivity-xds-semantics"><a class="header" href="#onmatch-exclusivity-xds-semantics">OnMatch Exclusivity (xDS Semantics)</a></h2>
 <p>All three enforce the xDS invariant: action XOR nested matcher, never both.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -339,10 +360,20 @@ class Action[A]:
 class NestedMatcher[Ctx, A]:
     matcher: Matcher[Ctx, A]
 </code></pre>
-<pre><code class="language-typescript">// TypeScript — discriminated union
-type OnMatch&lt;Ctx, A&gt; =
-  | { type: 'action'; value: A }
-  | { type: 'matcher'; matcher: Matcher&lt;Ctx, A&gt; };
+<pre><code class="language-typescript">// TypeScript — classes with instanceof
+class Action&lt;A&gt; {
+    constructor(readonly value: A) {}
+}
+
+class NestedMatcher&lt;Ctx, A&gt; {
+    constructor(readonly matcher: Matcher&lt;Ctx, A&gt;) {}
+}
+
+type OnMatch&lt;Ctx, A&gt; = Action&lt;A&gt; | NestedMatcher&lt;Ctx, A&gt;;
+
+// Check variant
+if (onMatch instanceof Action) { return onMatch.value; }
+else if (onMatch instanceof NestedMatcher) { return onMatch.matcher.evaluate(ctx); }
 </code></pre>
 <h2 id="evaluation-semantics"><a class="header" href="#evaluation-semantics">Evaluation Semantics</a></h2>
 <p>First-match-wins is identical across all implementations:</p>
@@ -364,11 +395,11 @@ cases:
 </code></pre>
 <p><strong>Test runners:</strong></p>
 <ul>
-<li>Rust: <code>cargo test</code> (rumi-test crate)</li>
-<li>Python: <code>pytest</code> (puma/tests/)</li>
-<li>TypeScript: <code>bun test</code> (b.uma/tests/, planned)</li>
+<li>Rust: <code>cargo test</code> (rumi-test crate) — 195 tests</li>
+<li>Python: <code>pytest</code> (puma/tests/) — 194 tests</li>
+<li>TypeScript: <code>bun test</code> (bumi/tests/) — 202 tests</li>
 </ul>
-<p>Each language’s test runner parses the same YAML fixtures, constructs matchers in its type system, and asserts the same expected outcomes.</p>
+<p>Each language’s test runner parses the same YAML fixtures, constructs matchers in its type system, and asserts the same expected outcomes. Total: <strong>268 tests across 5 variants</strong> (including puma-crusty and bumi-crusty).</p>
 <h2 id="cratepackage-structure"><a class="header" href="#cratepackage-structure">Crate/Package Structure</a></h2>
 <h3 id="rust-rumi-1"><a class="header" href="#rust-rumi-1">Rust (rumi)</a></h3>
 <pre><code class="language-text">rumi/
@@ -394,11 +425,11 @@ cases:
         └── _gateway.py # Gateway API compiler
 </code></pre>
 <p>Flat exports via <code>__init__.py</code>. Private modules prefixed with <code>_</code>.</p>
-<h3 id="typescript-bumi-planned-1"><a class="header" href="#typescript-bumi-planned-1">TypeScript (bumi, planned)</a></h3>
-<pre><code class="language-text">b.uma/
+<h3 id="typescript-bumi-1"><a class="header" href="#typescript-bumi-1">TypeScript (bumi)</a></h3>
+<pre><code class="language-text">bumi/
 └── src/
     ├── index.ts        # Core types
-    ├── types.ts        # Protocols/interfaces
+    ├── types.ts        # Interfaces
     ├── predicate.ts
     ├── matcher.ts
     ├── string-matchers.ts
@@ -413,17 +444,34 @@ cases:
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Implementation</th><th>Regex Engine</th><th>Thread Safety</th><th>Memory Model</th></tr>
+<tr><th>Implementation</th><th>Regex Engine</th><th>Thread Safety</th><th>Memory Model</th><th>FFI Overhead</th></tr>
 </thead>
 <tbody>
-<tr><td>rumi (Rust)</td><td><code>regex</code> crate (linear-time)</td><td>Send + Sync</td><td>Zero-copy where possible</td></tr>
-<tr><td>puma (Python)</td><td><code>re</code> module (backtracking)</td><td>GIL (not parallel-safe)</td><td>Reference-counted</td></tr>
-<tr><td>puma-crusty</td><td><code>regex</code> via uniffi (linear-time)</td><td>GIL</td><td>Crossing FFI boundary</td></tr>
-<tr><td>bumi (TypeScript)</td><td>JS <code>RegExp</code> (V8 engine)</td><td>Single-threaded</td><td>Garbage-collected</td></tr>
-<tr><td>bumi-crusty</td><td><code>regex</code> via WASM (linear-time)</td><td>Single-threaded</td><td>Crossing WASM boundary</td></tr>
+<tr><td>rumi (Rust)</td><td><code>regex</code> crate (linear-time)</td><td>Send + Sync</td><td>Zero-copy where possible</td><td>N/A</td></tr>
+<tr><td>puma (Python)</td><td><code>re</code> module (backtracking)</td><td>GIL (not parallel-safe)</td><td>Reference-counted</td><td>N/A</td></tr>
+<tr><td>puma-crusty</td><td><code>regex</code> via PyO3 (linear-time)</td><td>GIL</td><td>Crossing FFI boundary</td><td>~200ns/call</td></tr>
+<tr><td>bumi (TypeScript)</td><td>JS <code>RegExp</code> (V8 engine)</td><td>Single-threaded</td><td>Garbage-collected</td><td>N/A</td></tr>
+<tr><td>bumi-crusty</td><td><code>regex</code> via WASM (linear-time)</td><td>Single-threaded</td><td>Crossing WASM boundary</td><td>~50ns/call</td></tr>
 </tbody>
 </table>
 </div>
+<p><strong>Benchmark highlights</strong> (from Phase 9):</p>
+<ul>
+<li>rumi evaluation: 11ns (native Rust, zero overhead)</li>
+<li>puma evaluation: 200ns (Python overhead, CPython 3.14)</li>
+<li>bumi evaluation: 9ns (V8 JIT, near-native performance)</li>
+<li>puma-crusty: 400ns (Python + FFI crossing)</li>
+<li>bumi-crusty: 60ns (WASM + boundary crossing)</li>
+</ul>
+<p><strong>ReDoS comparison</strong> (<code>(a+)+$</code> pattern, N=20):</p>
+<ul>
+<li>rumi: 11ns (linear-time regex)</li>
+<li>puma: 72ms (exponential backtracking)</li>
+<li>bumi: 11ms (V8 optimizations help but still exponential)</li>
+<li>puma-crusty: 11ns (Rust regex via FFI)</li>
+<li>bumi-crusty: 11ns (Rust regex via WASM)</li>
+</ul>
+<p>See <a href="../performance/benchmarks.html">Performance &gt; Benchmarks</a> for full data.</p>
 <h2 id="why-multiple-implementations"><a class="header" href="#why-multiple-implementations">Why Multiple Implementations?</a></h2>
 <p><strong>Ecosystem reach:</strong> Deploy matchers where your code lives.</p>
 <ul>
@@ -432,7 +480,7 @@ cases:
 <li>TypeScript: Edge workers (Cloudflare, Deno), serverless</li>
 </ul>
 <p><strong>Reference consistency:</strong> All implementations are ports, not wrappers. Same architecture, same semantics, same test suite.</p>
-<p><strong>Learning path:</strong> Pure implementations (rumi, puma, bumi) are readable references. Crusty variants (uniffi, WASM) provide Rust performance when needed.</p>
+<p><strong>Learning path:</strong> Pure implementations (rumi, puma, bumi) are readable references. Crusty variants (PyO3, WASM) provide Rust performance when needed.</p>
 <h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
 <ul>
 <li><a href="../development/roadmap.html">Roadmap</a> — Implementation status</li>
@@ -444,7 +492,7 @@ cases:
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../guides/adding-domain.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../performance/redos.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -458,7 +506,7 @@ cases:
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../guides/adding-domain.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../performance/redos.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
