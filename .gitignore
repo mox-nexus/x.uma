@@ -56,6 +56,11 @@ pkg/
 # Generated
 *.generated.*
 
+# buf-generated proto code (regenerate with `just gen`)
+rumi/proto/src/gen/
+puma/proto/src/gen/
+bumi/proto/src/gen/
+
 # Scratch (working notes, not committed)
 scratch/
 

@@ -1,0 +1,4 @@
+# Collapse buf-generated code in GitHub PR diffs
+rumi/proto/src/gen/** linguist-generated=true
+puma/proto/src/gen/** linguist-generated=true
+bumi/proto/src/gen/** linguist-generated=true
