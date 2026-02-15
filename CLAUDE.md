@@ -90,9 +90,13 @@ x.uma/
 │   └── xuma/                   # x.uma extensions (namespace: xuma.*)
 ├── spec/
 │   └── tests/                  # conformance test fixtures (YAML)
-├── rumi/                       # Rust workspace (core + extensions + crusts)
+├── rumi/                       # Rust workspace (core + extensions + crusts + proto)
+│   └── proto/src/gen/          # buf-generated Rust types (prost + prost-serde)
 ├── puma/                       # Pure Python implementation (package: puma)
-├── bumi/                       # Pure Bun/TypeScript implementation (package: bumi)
+│   └── proto/src/gen/          # buf-generated Python types (betterproto)
+├── bumi/                       # Pure TypeScript implementation (package: bumi)
+│   └── proto/src/gen/          # buf-generated TypeScript types (ts-proto)
+├── buf.gen.yaml                # Polyglot codegen config (all 3 languages)
 ├── docs/                       # mdBook documentation
 └── justfile                    # polyglot task orchestration
 ```
@@ -114,9 +118,13 @@ x.uma/
 | 7 | puma-crusty: PyO3 Python bindings | ✅ Done |
 | 7.5 | rumi-claude: trace + HookMatch compiler | ✅ Done |
 | 8 | bumi-crusty: wasm-bindgen TypeScript bindings | ✅ Done |
-| 9 | Cross-language benchmarks (all 5 variants) | 🚧 In Progress |
-| 10 | Semantic matching (cosine similarity via `CustomMatchData`) | Planned |
-| 11 | RE2 migration: `google-re2` for puma, `re2js` for bumi | Planned |
+| 9 | Cross-language benchmarks (all 5 variants) | ✅ Done |
+| 10 | TypedExtensionConfig Registry (`IntoDataInput`, `RegistryBuilder`) | ✅ Done |
+| 11 | Test audit (removed 18 ineffective tests → 216 total) | ✅ Done |
+| 12 | Proto Alignment: buf codegen, `rumi-proto`, `AnyResolver`, xDS Matcher loading | ✅ Done |
+| 13 | puma-core: Pure Python with serde + config types | 🚧 In Progress |
+| — | Semantic matching (cosine similarity via `CustomMatchData`) | Planned |
+| — | RE2 migration: `google-re2` for puma, `re2js` for bumi | Planned |
 
 ## Tooling
 
@@ -249,17 +257,24 @@ Workspace with core + extension crates:
 ```
 rumi/
 ├── Cargo.toml          # Workspace manifest
-├── rumi/               # Core engine (package: rumi)
+├── core/               # Core engine (package: rumi)
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs
 │       ├── matcher.rs, predicate.rs, ...
+├── proto/              # Proto-generated types + conversion (package: rumi-proto)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs              # Module tree for generated types
+│       ├── any_resolver.rs     # google.protobuf.Any → TypedConfig bridge
+│       ├── convert.rs          # Proto Matcher → MatcherConfig conversion
+│       └── gen/                # buf-generated prost + prost-serde code
 ├── ext/
 │   ├── test/           # rumi-test (conformance)
 │   ├── http/           # rumi-http (HTTP matching)
 │   └── claude/         # rumi-claude (Claude Code hooks)
 └── crusts/             # Language bindings (🦀 crustacean → crusty)
-    ├── python/         # uniffi → puma-crusty wheel (maturin)
+    ├── python/         # PyO3 → puma-crusty wheel (maturin)
     └── wasm/           # wasm-bindgen → bumi-crusty (wasm-pack)
 ```
 
