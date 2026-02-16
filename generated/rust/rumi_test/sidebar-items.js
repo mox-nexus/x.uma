@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["prelude"],"struct":["StringInput","TestContext"]};
+window.SIDEBAR_ITEMS = {"fn":["register"],"mod":["config_fixture","fixture","prelude"],"struct":["StringInput","StringInputConfig","TestContext"]};
