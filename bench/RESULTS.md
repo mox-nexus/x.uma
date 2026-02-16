@@ -217,6 +217,89 @@ When should you use each variant?
 
 The WASM boundary is currently too expensive for general use. This may improve in future runtimes, but today it's a specialized tool for threat scenarios.
 
+## Config-Path Benchmarks (Phase 14)
+
+Phase 13 added config-driven matcher construction: JSON config → Registry → Matcher. Phase 9 benchmarked the *compiler path* (manual `Matcher::new()` construction). These benchmarks answer: **what does the config loading layer cost?**
+
+### Config Loading Cost
+
+How expensive is `load_matcher(config)` vs manual construction?
+
+| Variant | Config Load (simple) | Manual Construction | Ratio |
+|---------|---------------------|--------------------:|------:|
+| rumi | 1.27 µs | 45 ns | config 28x slower |
+| bumi | 720 ns | 38 ns | config 19x slower |
+| puma | 8.3 µs | 2.3 µs | config 3.6x slower |
+
+**Config loading is dominated by JSON parsing** (`serde_json::from_str` / `JSON.parse`) and type URL HashMap lookup. In absolute terms:
+- rumi parses JSON and builds a matcher in ~1.3 microseconds
+- bumi does it in ~720 nanoseconds (V8 JIT optimizes JSON.parse heavily)
+- puma does it in ~8.3 microseconds (Python dict construction overhead)
+
+This is a **one-time setup cost**. Matchers are built once and evaluated millions of times.
+
+### Evaluation Parity
+
+Once built via config, does evaluation match compiler-path speed?
+
+| Variant | Config Path Evaluate | Compiler Path Evaluate | Ratio |
+|---------|---------------------|----------------------:|------:|
+| rumi | 54 ns | 53 ns | **1.0x** |
+| bumi | 10.6 ns | 10.7 ns | **1.0x** |
+| puma | 250 ns | 264 ns | **0.95x** |
+
+**Identical performance.** The resulting `Matcher` is the same type regardless of how it was constructed. Config path has zero evaluation overhead.
+
+### Registry Construction
+
+Building the registry (type URL registration) is also a one-time cost:
+
+| Variant | Registry Build |
+|---------|---------------|
+| rumi | 115 ns |
+| bumi | 121 ns |
+| puma | 670 ns |
+
+Negligible. HashMap construction with 1-2 entries.
+
+### FFI Config Overhead: puma-crusty
+
+How does config loading compare through the PyO3 FFI boundary?
+
+| Scenario | puma (pure Python) | puma-crusty (Rust FFI) | Ratio |
+|----------|-------------------|----------------------:|------:|
+| config_load_simple | 8.3 µs | 15.1 µs | puma 1.8x faster |
+| config_load_compound | 12.5 µs | 23.5 µs | puma 1.9x faster |
+| config_evaluate_simple | 312 ns | 2.7 µs | puma 8.7x faster |
+
+For config loading, crusty is ~2x slower than pure puma because it does JSON parsing on the Python side *and* on the Rust side (the JSON string crosses the FFI boundary, then Rust re-parses it with `serde_json`). For evaluation, crusty's FFI overhead (PyO3 dict → Rust HashMap conversion) adds ~2.4µs per call.
+
+**Verdict**: For config-loaded matchers, use puma unless you need ReDoS protection. The FFI crossing overhead is amplified by the double JSON parsing.
+
+### FFI Config Overhead: bumi-crusty
+
+How does config loading compare through the WASM FFI boundary?
+
+| Scenario | bumi (pure TS) | bumi-crusty (WASM) | Ratio |
+|----------|---------------|-------------------:|------:|
+| config_load_simple | 738 ns | 2.5 µs | bumi 3.3x faster |
+| config_load_compound | 1.2 µs | 4.5 µs | bumi 3.7x faster |
+| config_evaluate_simple | 11.6 ns | 699 ns | bumi 60x faster |
+
+Same pattern as Phase 9: WASM boundary overhead dominates. Config loading is ~3.5x slower through WASM (same double-parse issue). Evaluation is 60x slower due to JS↔WASM object serialization.
+
+### Config Path Summary
+
+| Metric | Key Finding |
+|--------|-------------|
+| **Config load vs manual** | 4-28x slower (dominated by JSON parsing) |
+| **Evaluation parity** | Identical (1.0x) — same Matcher type regardless of construction path |
+| **Registry build** | Negligible (100-700ns) |
+| **FFI config (puma-crusty)** | ~2x slower than pure puma for loading |
+| **FFI config (bumi-crusty)** | ~3.5x slower than pure bumi for loading |
+
+The config path is a **setup cost**, not a runtime cost. For applications that build matchers at startup and evaluate thousands of requests, the config loading time is amortized to zero.
+
 ## Phase 11: The RE2 Alternative
 
 The roadmap includes Phase 11: migrate puma to `google-re2` (Python bindings to C++ RE2) and bumi to `re2js` (pure JS port of RE2).
