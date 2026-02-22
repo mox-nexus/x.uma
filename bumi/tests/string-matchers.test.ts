@@ -137,4 +137,8 @@ describe("RegexMatcher", () => {
 	it("includes pattern in error message", () => {
 		expect(() => new RegexMatcher("[unclosed")).toThrow(/\[unclosed/);
 	});
+
+	it("rejects backreferences (RE2 linear-time guarantee)", () => {
+		expect(() => new RegexMatcher("(a)\\1")).toThrow(MatcherError);
+	});
 });

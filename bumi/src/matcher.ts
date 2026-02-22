@@ -3,7 +3,7 @@ import { type Predicate, evaluatePredicate, predicateDepth } from "./predicate.t
 /** Maximum nesting depth for matcher trees. Validated at construction. */
 export const MAX_DEPTH = 32;
 
-/** Thrown when a matcher tree exceeds MAX_DEPTH. */
+/** Thrown for matcher construction errors (depth exceeded, invalid regex pattern). */
 export class MatcherError extends Error {
 	constructor(message: string) {
 		super(message);

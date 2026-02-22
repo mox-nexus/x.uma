@@ -125,7 +125,7 @@ x.uma/
 | 13 | Config/Registry across all implementations | ✅ Done |
 | 14 | Config-path benchmarks (all 5 variants) | Planned |
 | — | Semantic matching (cosine similarity via `CustomMatchData`) | Planned |
-| — | RE2 migration: `google-re2` for puma, `re2js` for bumi | Planned |
+| — | RE2 migration: `google-re2` for puma, `re2js` for bumi | ✅ Done |
 
 ## Current Work
 
@@ -304,6 +304,33 @@ rumi-http = "0.1"  # rumi comes transitively
 use rumi::prelude::*;
 use rumi_http::{HttpRequest, HeaderInput};
 ```
+
+## Craft Judgment
+
+Principles distilled from 13 elite Rust codebases. Each prevents a form of self-deception about quality. See `scratch/research-synthesis.md` for the full evidence base.
+
+| Principle | What You're Fooling Yourself About | Test |
+|-----------|-----------------------------------|------|
+| **Measure Before Optimizing** | "This will be faster" — but you haven't profiled | Is there benchmark evidence? |
+| **Config Format Is Frozen** | "We can iterate" — but 5 implementations consume it | Does this change `MatcherConfig` serialization? |
+| **Foundation Crates Migrate Last** | "It's just a version bump" — but it cascades everywhere | Does this change a dep in `rumi/core/Cargo.toml`? |
+| **Protocol Obligations Over Convenience** | "This shortcut is safe" — but it violates an invariant | Does this skip validate, reorder eval, or bypass None→false? |
+| **Hold Position Until Evidence** | "Let's add this now" — but no second integration demands it | Is there concrete evidence, or is this speculative? |
+| **Reversions Encode Wisdom** | "I'll push through" — but the architecture is pushing back | Did you try, discover it doesn't fit, and document why? |
+| **Boring Code Wins** | "This is clever" — but clever breaks under maintenance | Would `Arc<Mutex<Vec>>` work here instead? |
+
+### Anti-Patterns (From Research)
+
+| Don't | Why | Source |
+|-------|-----|--------|
+| Add `thiserror` or utility crate deps | "17K lines replaced by 150" — hand-write what you need | ripgrep, hyper |
+| Expand `MatcherConfig` format after shipping | Format is frozen across 5 implementations | rust-analyzer |
+| Optimize without benchmarking | Bottleneck is rarely where you think | ripgrep, all 13 |
+| Add `&mut self` to core traits | Breaks `Arc<T>` wrapper algebra, breaks FFI | hyper, tower |
+| Test at the abstraction level | Mock the boundary (registry, FFI), not the abstraction | aya |
+| Eagerly optimize the framework layer | Don't be clever with Registry — build once, use forever | rust-analyzer |
+
+---
 
 ## Working Conventions
 

@@ -1,14 +1,8 @@
-"""ReDoS safety demonstration for puma (Pure Python).
+"""Linear-time regex demonstration for puma.
 
-Python's `re` module uses a backtracking NFA engine — vulnerable to
-catastrophic backtracking on pathological patterns like `(a+)+$`.
-
-Pattern: `(a+)+$` against `"a" * N + "X"`
-- Python `re`: O(2^N) — hangs at N=25+
-- Rust `regex`: O(N) — microseconds even at N=100
-
-SAFETY: Benchmarks capped at N=20. Do NOT increase without understanding
-that N=25 can take seconds and N=30 may hang indefinitely.
+puma uses ``google-re2`` — guaranteed linear-time matching.
+The pathological pattern ``(a+)+$`` against ``"a" * N + "X"`` runs in
+microseconds at any N, unlike backtracking engines which exhibit O(2^N).
 
 Run: cd puma && uv run pytest tests/bench/test_bench_redos.py --benchmark-only
 """
@@ -70,9 +64,22 @@ def test_bench_redos_regex_n15(benchmark):
 
 
 def test_bench_redos_regex_n20(benchmark):
-    """N=20 is the SAFE MAXIMUM for Python's backtracking re engine."""
     matcher = RegexMatcher(REDOS_PATTERN)
     value = _pathological_input(20)
+    benchmark(matcher.matches, value)
+
+
+def test_bench_redos_regex_n50(benchmark):
+    """N=50 — safe with RE2's linear-time guarantee."""
+    matcher = RegexMatcher(REDOS_PATTERN)
+    value = _pathological_input(50)
+    benchmark(matcher.matches, value)
+
+
+def test_bench_redos_regex_n100(benchmark):
+    """N=100 — safe with RE2's linear-time guarantee."""
+    matcher = RegexMatcher(REDOS_PATTERN)
+    value = _pathological_input(100)
     benchmark(matcher.matches, value)
 
 
@@ -97,7 +104,6 @@ def test_bench_redos_pipeline_n10(benchmark):
 
 
 def test_bench_redos_pipeline_n20(benchmark):
-    """Full pipeline at N=20 — shows ReDoS cost compounds with pipeline overhead."""
     m = Matcher(
         matcher_list=(
             FieldMatcher(

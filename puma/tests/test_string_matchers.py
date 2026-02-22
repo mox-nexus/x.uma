@@ -5,6 +5,7 @@ import pytest
 from puma import (
     ContainsMatcher,
     ExactMatcher,
+    MatcherError,
     PrefixMatcher,
     RegexMatcher,
     SuffixMatcher,
@@ -132,7 +133,10 @@ class TestRegexMatcher:
         assert m.matches(None) is False
 
     def test_invalid_regex_raises(self) -> None:
-        import re
-
-        with pytest.raises(re.error):
+        with pytest.raises(MatcherError):
             RegexMatcher(r"[invalid")
+
+    def test_backreference_rejected_by_re2(self) -> None:
+        """RE2 rejects backreferences — this is what the migration prevents."""
+        with pytest.raises(MatcherError):
+            RegexMatcher(r"(a)\1")

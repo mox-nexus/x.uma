@@ -3,21 +3,19 @@
 Each matcher is a frozen dataclass — immutable after construction.
 All matchers return False for non-string or None input values.
 
-ReDoS Warning
--------------
-RegexMatcher uses Python's ``re`` module, which employs a backtracking NFA
-engine vulnerable to catastrophic backtracking (ReDoS). The Rust reference
-implementation (rumi) uses the ``regex`` crate which guarantees linear-time
-matching. For environments processing untrusted or adversarial regex patterns,
-use ``puma-crusty`` (Phase 7) which provides Rust-backed linear-time regex
-via uniffi bindings.
+Regex uses ``google-re2`` for guaranteed linear-time matching. RE2 does not
+support backreferences or lookahead/lookbehind because they require
+backtracking — patterns using them are rejected at compile time.
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+
+import re2
+
+from puma._matcher import MatcherError
 
 if TYPE_CHECKING:
     from puma._types import MatchingData
@@ -126,26 +124,27 @@ class ContainsMatcher:
 class RegexMatcher:
     """Regular expression match.
 
-    The pattern is compiled at construction time. Uses re.search (not
-    re.fullmatch) to match anywhere in the string, consistent with
-    rumi's behavior.
+    The pattern is compiled at construction time via ``google-re2``, providing
+    guaranteed linear-time matching. Uses search (not fullmatch) to match
+    anywhere in the string, consistent with rumi's behavior.
 
-    .. warning:: ReDoS
-
-        Uses Python's ``re`` module which is vulnerable to catastrophic
-        backtracking (ReDoS) on pathological patterns like ``(a+)+$``.
-        The Rust reference (rumi) uses the ``regex`` crate with linear-time
-        guarantees. For adversarial input, use ``puma-crusty`` (Rust-backed).
+    RE2 does not support backreferences or lookahead/lookbehind because they
+    require backtracking. Patterns using them are rejected at compile time.
 
     Raises:
-        re.error: If the pattern is not valid regex syntax.
+        MatcherError: If the pattern is not valid RE2 syntax.
     """
 
     pattern: str
-    _compiled: re.Pattern[str] = field(init=False, repr=False)
+    _compiled: re2.Pattern[str] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "_compiled", re.compile(self.pattern))
+        try:
+            compiled = re2.compile(self.pattern)
+        except re2.error as e:
+            msg = f'invalid regex pattern "{self.pattern}": {e}'
+            raise MatcherError(msg) from e
+        object.__setattr__(self, "_compiled", compiled)
 
     def matches(self, value: MatchingData, /) -> bool:
         if not isinstance(value, str):

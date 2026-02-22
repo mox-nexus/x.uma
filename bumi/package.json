@@ -18,6 +18,9 @@
 		"fmt:check": "biome format --check src/ tests/",
 		"bench": "bun run bench/evaluate.bench.ts && bun run bench/compile.bench.ts && bun run bench/redos.bench.ts"
 	},
+	"dependencies": {
+		"re2js": "^0.4"
+	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9",
 		"@types/bun": "^1.2",
