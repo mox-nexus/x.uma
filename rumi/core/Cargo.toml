@@ -21,7 +21,9 @@ serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
 divan = "0.1"
+rumi-test = { path = "../ext/test", features = ["registry"] }
 serde.workspace = true
+serde_json.workspace = true
 serde_yaml.workspace = true
 
 [[bench]]
@@ -35,3 +37,8 @@ harness = false
 [[bench]]
 name = "redos"
 harness = false
+
+[[bench]]
+name = "config"
+harness = false
+required-features = ["registry"]

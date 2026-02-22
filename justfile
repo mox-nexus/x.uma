@@ -86,6 +86,7 @@ docs-clean:
 # Run Rust benchmarks (divan)
 bench-rust:
     cargo bench --manifest-path rumi/Cargo.toml
+    cargo bench --manifest-path rumi/Cargo.toml --bench config --features registry
 
 # Run Python benchmarks (pytest-benchmark)
 bench-puma:
@@ -94,14 +95,15 @@ bench-puma:
 # Run TypeScript benchmarks (mitata)
 bench-bumi:
     cd bumi && bun run bench
+    cd bumi && bun run bench/config.bench.ts
 
 # Run puma-crusty vs puma comparison benchmarks
 bench-crusty-puma:
-    cd rumi/crusts/python && maturin develop && uv run pytest tests/test_bench_crusty.py --benchmark-only --benchmark-disable-gc
+    cd rumi/crusts/python && maturin develop && uv run pytest tests/test_bench_crusty.py tests/test_bench_config.py --benchmark-only --benchmark-disable-gc
 
 # Run bumi-crusty vs bumi comparison benchmarks
 bench-crusty-bumi:
-    cd rumi/crusts/wasm && wasm-pack build --target nodejs && bun run bench/crusty.bench.ts
+    cd rumi/crusts/wasm && wasm-pack build --target nodejs && bun run bench/crusty.bench.ts && bun run bench/config.bench.ts
 
 # Run all benchmarks
 bench-all: bench-rust bench-puma bench-bumi bench-crusty-puma bench-crusty-bumi
