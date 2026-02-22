@@ -25,7 +25,6 @@ from puma import (
     ExactMatcher,
     FieldMatcher,
     Matcher,
-    PrefixMatcher,
     RegistryBuilder,
     SinglePredicate,
     parse_matcher_config,

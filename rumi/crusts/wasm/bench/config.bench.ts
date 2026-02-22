@@ -23,7 +23,6 @@ import {
 	ExactMatcher,
 	FieldMatcher,
 	Matcher,
-	PrefixMatcher,
 	RegistryBuilder,
 	SinglePredicate,
 	parseMatcherConfig,

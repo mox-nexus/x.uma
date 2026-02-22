@@ -149,6 +149,9 @@ fn compiler_evaluate_simple(bencher: divan::Bencher) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Head-to-head: config load vs manual construction (same logical matcher)
+// NOTE: config_construct_simple duplicates config_load_simple intentionally —
+// both appear in the same divan output to compare config vs compiler
+// construction side-by-side in benchmark results.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[divan::bench]

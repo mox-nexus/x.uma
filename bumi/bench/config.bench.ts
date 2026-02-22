@@ -14,7 +14,6 @@ import {
 	ExactMatcher,
 	FieldMatcher,
 	Matcher,
-	PrefixMatcher,
 	RegistryBuilder,
 	SinglePredicate,
 	parseMatcherConfig,
@@ -163,6 +162,9 @@ summary(() => {
 });
 
 // ── Head-to-head: config load vs manual construction ────────────────────────
+// NOTE: config_construct_simple duplicates config_load_simple intentionally —
+// both appear in the same mitata summary group to compare config vs compiler
+// construction side-by-side in benchmark output.
 
 summary(() => {
 	const registry = buildRegistry();

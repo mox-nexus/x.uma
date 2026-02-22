@@ -15,7 +15,6 @@ from puma import (
     ExactMatcher,
     FieldMatcher,
     Matcher,
-    PrefixMatcher,
     RegistryBuilder,
     SinglePredicate,
     parse_matcher_config,
@@ -199,6 +198,9 @@ def test_bench_compiler_evaluate_simple(benchmark):
 
 
 # ── Head-to-head: config load vs manual construction ─────────────────────────
+# NOTE: config_construct_simple duplicates config_load_simple intentionally —
+# both appear in the same pytest-benchmark group to compare config vs compiler
+# construction side-by-side in benchmark output.
 
 
 def test_bench_config_construct_simple(benchmark):
