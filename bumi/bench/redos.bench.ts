@@ -1,15 +1,9 @@
 /**
- * ReDoS safety demonstration for bumi (Pure TypeScript).
+ * Linear-time regex demonstration for bumi.
  *
- * JavaScript's RegExp engine uses backtracking — vulnerable to
- * catastrophic backtracking on pathological patterns like `(a+)+$`.
- *
- * Pattern: `(a+)+$` against `"a" * N + "X"`
- * - JS RegExp: O(2^N) — hangs at N=25+
- * - Rust `regex`: O(N) — microseconds even at N=100
- *
- * SAFETY: Benchmarks capped at N=20. Do NOT increase without understanding
- * that N=25 can take seconds and N=30 may hang indefinitely.
+ * bumi uses re2js — guaranteed linear-time matching.
+ * The pathological pattern `(a+)+$` against `"a" * N + "X"` runs in
+ * microseconds at any N, unlike backtracking engines which exhibit O(2^N).
  *
  * Run: cd bumi && bun run bench/redos.bench.ts
  */
@@ -41,7 +35,7 @@ function pathologicalInput(n: number): string {
 // ── Raw regex matcher (ReDoS pattern) ────────────────────────────────────────
 
 summary(() => {
-	for (const n of [5, 10, 15, 20]) {
+	for (const n of [5, 10, 15, 20, 50, 100]) {
 		const matcher = new RegexMatcher(REDOS_PATTERN);
 		const value = pathologicalInput(n);
 		bench(`redos_regex_n${n}`, () => matcher.matches(value));

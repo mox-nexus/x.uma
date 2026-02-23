@@ -1,3 +1,5 @@
+import { RE2JS } from "re2js";
+
 import { MatcherError } from "./matcher.ts";
 import type { MatchingData } from "./types.ts";
 
@@ -74,18 +76,19 @@ export class ContainsMatcher {
 }
 
 /**
- * Regular expression match. Uses RegExp.test() which searches anywhere
- * in the string (equivalent to Python's re.search, Rust's regex find).
+ * Regular expression match using RE2 for guaranteed linear-time matching.
+ * Uses RE2JS.compile().matcher().find() which searches anywhere in the string
+ * (equivalent to Python's re.search, Rust's regex find).
  *
- * WARNING: JavaScript's RegExp engine uses backtracking and is vulnerable
- * to ReDoS. Use crusty-bumi (Rust WASM bindings) for linear-time regex.
+ * RE2 does not support backreferences or lookahead/lookbehind because they
+ * require backtracking. Patterns using them are rejected at compile time.
  */
 export class RegexMatcher {
-	private readonly compiled: RegExp;
+	private readonly compiled: RE2JS;
 
 	constructor(readonly pattern: string) {
 		try {
-			this.compiled = new RegExp(pattern);
+			this.compiled = RE2JS.compile(pattern);
 		} catch (e) {
 			throw new MatcherError(
 				`invalid regex pattern "${pattern}": ${e instanceof Error ? e.message : String(e)}`,
@@ -95,6 +98,6 @@ export class RegexMatcher {
 
 	matches(value: MatchingData): boolean {
 		if (typeof value !== "string") return false;
-		return this.compiled.test(value);
+		return this.compiled.matcher(value).find();
 	}
 }

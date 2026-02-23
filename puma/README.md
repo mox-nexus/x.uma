@@ -2,7 +2,7 @@
 
 **Alpha (v0.1.0)** — Part of the [x.uma](https://github.com/mox-labs/x.uma) research project.
 
-puma is a pure Python implementation of the xDS Unified Matcher API. Match structured data (HTTP requests, events, messages) against rule trees with first-match-wins semantics. Zero dependencies. Python 3.12+.
+puma is a pure Python implementation of the xDS Unified Matcher API. Match structured data (HTTP requests, events, messages) against rule trees with first-match-wins semantics. Python 3.12+.
 
 ## Installation
 
@@ -242,22 +242,14 @@ puma implements xDS Unified Matcher semantics:
 
 6. **Depth validation** — Matcher trees exceeding `MAX_DEPTH` (32 levels) are rejected at construction with `MatcherError`.
 
-## Security: ReDoS
+## Security
 
-puma uses Python's `re` module for `RegexMatcher`. The `re` module employs a **backtracking NFA engine** vulnerable to catastrophic backtracking (ReDoS).
-
-**Trusted input**: puma is safe when regex patterns come from trusted configuration (your route definitions, known fixtures).
-
-**Adversarial input**: If regex patterns originate from untrusted sources (user-submitted config, external APIs), an attacker can craft pathological patterns like `(a+)+$` that cause exponential CPU consumption.
-
-**Mitigation**: For adversarial environments, use **puma-crusty** (Phase 7) — the Rust-backed Python package providing the same API with linear-time regex via uniffi bindings to rumi's `regex` crate.
-
-See [SECURITY.md](SECURITY.md) for details.
+`RegexMatcher` uses `google-re2` (linear-time, ReDoS-safe). See [SECURITY.md](SECURITY.md) for regex restrictions, error types, and depth limits.
 
 ## Requirements
 
 - Python 3.12+ (uses PEP 695 type parameter syntax)
-- Zero runtime dependencies
+- `google-re2`
 
 ## Status
 

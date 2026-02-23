@@ -2,6 +2,24 @@
 
 Mandatory invariants from the 13-agent architecture review. These are **non-negotiable** and must be enforced by hooks and pre-commit checks.
 
+## Numbered Invariants
+
+Indexed list of x.uma's protocol obligations. Inspired by rust-analyzer's 26 labeled Architecture Invariants. Reference these by number in code comments (`// INV-3`) and reviews.
+
+| # | Invariant | Enforcement |
+|---|-----------|-------------|
+| INV-1 | `DataInput::get() → None` → predicate evaluates to `false` | Conformance tests |
+| INV-2 | First-match-wins in `Matcher::evaluate()` | Conformance tests |
+| INV-3 | `EvalTrace.result` always equals `evaluate()` result | Unit test assertion |
+| INV-4 | `OnMatch` is exclusive — Action XOR Matcher, never both | Rust enum (type-level) |
+| INV-5 | `Registry` is immutable after `build()` | `&self` methods only |
+| INV-6 | `MAX_DEPTH=32` enforced at `validate()` time | `MatcherError::DepthExceeded` |
+| INV-7 | `evaluate_with_trace()` evaluates ALL children (no short-circuit) | Unit tests compare trace coverage |
+
+When adding code that touches the evaluation or config-loading pipeline, verify that all 7 invariants hold. When writing `// INV:` comments in code, use the number.
+
+---
+
 ## The Constraints
 
 | # | Constraint | Source | Rationale |
