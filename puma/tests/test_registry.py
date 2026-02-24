@@ -5,7 +5,7 @@ Validates the builder → frozen registry → load_matcher pipeline.
 
 import pytest
 
-from puma import (
+from xuma import (
     InvalidConfigError,
     PatternTooLongError,
     Registry,
@@ -15,13 +15,13 @@ from puma import (
     UnknownTypeUrlError,
     parse_matcher_config,
 )
-from puma._registry import (
+from xuma._registry import (
     MAX_FIELD_MATCHERS,
     MAX_PATTERN_LENGTH,
     MAX_PREDICATES_PER_COMPOUND,
     MAX_REGEX_PATTERN_LENGTH,
 )
-from puma.testing import DictInput, register
+from xuma.testing import DictInput, register
 
 
 class TestRegistryBuilder:

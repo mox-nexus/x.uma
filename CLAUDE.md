@@ -123,23 +123,17 @@ x.uma/
 | 11 | Test audit (removed 18 ineffective tests → 216 total) | ✅ Done |
 | 12 | Proto Alignment: buf codegen, `rumi-proto`, `AnyResolver`, xDS Matcher loading | ✅ Done |
 | 13 | Config/Registry across all implementations | ✅ Done |
-| 14 | Config-path benchmarks (all 5 variants) | Planned |
+| 14 | Config-path benchmarks (all 5 variants) | ✅ Done |
+| 15 | Crate restructure + publish prep (0.0.2) | ✅ Done |
 | — | Semantic matching (cosine similarity via `CustomMatchData`) | Planned |
 | — | RE2 migration: `google-re2` for puma, `re2js` for bumi | ✅ Done |
 
 ## Current Work
 
-**Phase 14: Config-Path Benchmarks**
+**Post-Phase 15: Publish Prep Complete**
 
-Phase 9 benchmarked the compiler path (HookMatcher). Phase 13 added config-driven matchers (HttpMatcher, TestMatcher) across all 5 implementations. Phase 14 benchmarks this new config/registry path.
-
-- **Plan**: `scratch/phase-14-plan.md`
-- **Progress**: `scratch/phase-14-progress.md`
-
-Key questions:
-1. Config loading cost: `from_config(json)` vs `compile(rules)` — how much does JSON parsing + registry lookup add?
-2. Evaluation parity: once compiled, does the registry path evaluate at the same speed?
-3. FFI overhead: pure puma/bumi config path vs crusty config path
+rumi-claude folded into `rumi` core as `claude` feature. Metadata updated, version 0.0.2.
+Awaiting name resolution before actual publish (crates.io, PyPI, npm).
 
 ## Tooling
 
@@ -277,7 +271,8 @@ rumi/
 │   └── src/
 │       ├── lib.rs
 │       ├── matcher.rs, predicate.rs, ...
-├── proto/              # Proto-generated types + conversion (package: rumi-proto)
+│       └── claude/     # Claude Code hooks (feature = "claude")
+├── proto/              # Proto-generated types + conversion (package: rumi-proto, publish=false)
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs              # Module tree for generated types
@@ -285,23 +280,24 @@ rumi/
 │       ├── convert.rs          # Proto Matcher → MatcherConfig conversion
 │       └── gen/                # buf-generated prost + prost-serde code
 ├── ext/
-│   ├── test/           # rumi-test (conformance)
-│   ├── http/           # rumi-http (HTTP matching)
-│   └── claude/         # rumi-claude (Claude Code hooks)
-└── crusts/             # Language bindings (🦀 crustacean → crusty)
+│   ├── test/           # rumi-test (conformance, publish=false)
+│   └── http/           # rumi-http (HTTP matching)
+└── crusts/             # Language bindings (🦀 crustacean → crusty, publish=false)
     ├── python/         # PyO3 → puma-crusty wheel (maturin)
     └── wasm/           # wasm-bindgen → bumi-crusty (wasm-pack)
 ```
 
-**Extension pattern:** Users depend on an extension crate, get core transitively:
+**Extension pattern:** Claude is a feature, HTTP is a separate crate:
 
 ```toml
 [dependencies]
-rumi-http = "0.1"  # rumi comes transitively
+rumi = { version = "0.0.2", features = ["claude"] }
+rumi-http = "0.0.2"
 ```
 
 ```rust
 use rumi::prelude::*;
+use rumi::claude::{HookContext, HookMatchExt};
 use rumi_http::{HttpRequest, HeaderInput};
 ```
 

@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 
-from puma import (
+from xuma import (
     Action,
     And,
     ContainsMatcher,
@@ -28,7 +28,7 @@ from puma import (
     SinglePredicate,
     SuffixMatcher,
 )
-from puma.http import (
+from xuma.http import (
     HttpHeaderMatch,
     HttpPathMatch,
     HttpQueryParamMatch,
@@ -36,7 +36,7 @@ from puma.http import (
     HttpRouteMatch,
     compile_route_matches,
 )
-from puma.testing import DictInput
+from xuma.testing import DictInput
 
 SPEC_DIR = Path(__file__).resolve().parent.parent.parent / "spec" / "tests"
 

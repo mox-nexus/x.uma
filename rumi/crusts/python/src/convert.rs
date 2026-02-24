@@ -6,7 +6,7 @@
 use crate::config::{PyHookMatch, PyStringMatch};
 use pyo3::exceptions::PyValueError;
 use pyo3::PyResult;
-use rumi_claude::{ArgumentMatch, HookEvent, HookMatch, StringMatch};
+use rumi::claude::{ArgumentMatch, HookEvent, HookMatch, StringMatch};
 
 /// Maximum length for any string pattern (8 KB).
 const MAX_PATTERN_LENGTH: usize = 8192;

@@ -3,10 +3,10 @@
 //! Translates user-friendly hook match configuration into efficient
 //! runtime matchers operating on [`HookContext`].
 
-use crate::config::{ArgumentMatch, HookMatch, StringMatch};
-use crate::context::{HookContext, HookEvent};
-use crate::inputs::{ArgumentInput, CwdInput, EventInput, GitBranchInput, ToolNameInput};
-use rumi::prelude::*;
+use super::config::{ArgumentMatch, HookMatch, StringMatch};
+use super::context::{HookContext, HookEvent};
+use super::inputs::{ArgumentInput, CwdInput, EventInput, GitBranchInput, ToolNameInput};
+use crate::prelude::*;
 
 /// A catch-all predicate that matches any `HookContext`.
 fn catch_all() -> Predicate<HookContext> {

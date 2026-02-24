@@ -80,10 +80,10 @@ just proto          # gen + lint + breaking
 rumi/
 ├── Cargo.toml       # Workspace root
 ├── core/            # Core engine (package: rumi)
+│   └── src/claude/  # Claude Code hooks (feature = "claude")
 └── ext/             # Domain extensions
-    ├── test/        # rumi-test (conformance)
-    ├── http/        # rumi-http
-    └── claude/      # rumi-claude
+    ├── test/        # rumi-test (conformance, publish=false)
+    └── http/        # rumi-http
 ```
 
 ### Commands
@@ -115,9 +115,9 @@ just clean-rust     # remove target/
 ### Build Order
 
 ```
-rumi (core, no deps)
+rumi (core, includes claude feature)
     ↓
-rumi-test, rumi-http, rumi-claude (depend on rumi)
+rumi-test, rumi-http (depend on rumi)
 ```
 
 ### Publish Order
@@ -127,8 +127,8 @@ rumi-test, rumi-http, rumi-claude (depend on rumi)
 just publish-dry-run
 
 # Then publish in order:
-# 1. rumi (core)
-# 2. rumi-test, rumi-http, rumi-claude (extensions)
+# 1. rumi (core, includes claude feature)
+# 2. rumi-http (separate crate, heavy deps)
 ```
 
 ---
@@ -164,10 +164,11 @@ maturin build --release
 ### Build
 
 ```bash
-cd rumi
-wasm-pack build --target web    # For browser
-wasm-pack build --target nodejs # For Node.js
+cd rumi/crusts/wasm
+wasm-pack build --target web    # ESM with async init(), works in browser + Bun
 ```
+
+**Note:** Always use `--target web`. The `--target nodejs` generates `require('fs')` calls that break browsers. The `web` target uses `fetch()` in browsers and works with Bun's ESM loader.
 
 ### Output
 

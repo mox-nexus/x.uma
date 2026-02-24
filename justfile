@@ -103,7 +103,7 @@ bench-crusty-puma:
 
 # Run bumi-crusty vs bumi comparison benchmarks
 bench-crusty-bumi:
-    cd rumi/crusts/wasm && wasm-pack build --target nodejs && bun run bench/crusty.bench.ts && bun run bench/config.bench.ts
+    cd rumi/crusts/wasm && wasm-pack build --target web && bun run bench/crusty.bench.ts && bun run bench/config.bench.ts
 
 # Run all benchmarks
 bench-all: bench-rust bench-puma bench-bumi bench-crusty-puma bench-crusty-bumi
@@ -155,6 +155,26 @@ bumi-fmt-check:
 bumi-check: bumi-lint bumi-fmt-check bumi-typecheck bumi-test
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Playground
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Install playground dependencies
+playground-install:
+    cd playground && bun install
+
+# Run playground dev server
+playground-dev:
+    cd playground && bun run dev
+
+# Build playground for production
+playground-build:
+    cd playground && bun run build
+
+# Preview production playground build
+playground-preview:
+    cd playground && bun run preview
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Conformance Testing
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -181,9 +201,7 @@ clean:
 # Dry-run publish
 publish-dry:
     cargo publish --manifest-path rumi/core/Cargo.toml --dry-run
-    cargo publish --manifest-path rumi/ext/test/Cargo.toml --dry-run
     cargo publish --manifest-path rumi/ext/http/Cargo.toml --dry-run
-    cargo publish --manifest-path rumi/ext/claude/Cargo.toml --dry-run
 
 # Security audit
 audit:

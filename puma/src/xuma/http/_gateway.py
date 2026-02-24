@@ -1,6 +1,6 @@
 """Gateway API compiler — HttpRouteMatch -> Matcher[HttpRequest, A].
 
-Translates Gateway API-style route configuration into puma Matcher trees.
+Translates Gateway API-style route configuration into xuma Matcher trees.
 Pure Python types mirroring the Gateway API spec (no k8s dependency).
 """
 
@@ -9,13 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
-from puma._matcher import Matcher, matcher_from_predicate
-from puma._predicate import Predicate, SinglePredicate, and_predicate, or_predicate
-from puma._string_matchers import ExactMatcher, PrefixMatcher, RegexMatcher
-from puma.http._inputs import HeaderInput, MethodInput, PathInput, QueryParamInput
+from xuma._matcher import Matcher, matcher_from_predicate
+from xuma._predicate import Predicate, SinglePredicate, and_predicate, or_predicate
+from xuma._string_matchers import ExactMatcher, PrefixMatcher, RegexMatcher
+from xuma.http._inputs import HeaderInput, MethodInput, PathInput, QueryParamInput
 
 if TYPE_CHECKING:
-    from puma.http._request import HttpRequest
+    from xuma.http._request import HttpRequest
 
 
 def _catch_all() -> Predicate[HttpRequest]:

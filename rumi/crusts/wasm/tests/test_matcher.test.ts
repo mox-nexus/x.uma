@@ -8,9 +8,13 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 // @ts-expect-error — generated WASM package has no TS project reference
-import { TestMatcher } from "../pkg/bumi_crusty.js";
+import init, { TestMatcher } from "../pkg/bumi_crusty.js";
+
+beforeAll(async () => {
+  await init();
+});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Basic matching: single input

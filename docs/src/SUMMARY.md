@@ -6,16 +6,9 @@
 
 # Getting Started
 
-- [Choose Your Implementation](getting-started/choose.md)
-- [Rust Quick Start](getting-started/rust.md)
-- [Python Quick Start](getting-started/python.md)
-- [TypeScript Quick Start](getting-started/typescript.md)
-
----
-
-# Tutorials
-
-- [Build an HTTP Router](tutorials/http-router.md)
+- [Rust](getting-started/rust.md)
+- [Python](getting-started/python.md)
+- [TypeScript](getting-started/typescript.md)
 
 ---
 
@@ -28,40 +21,45 @@
 
 ---
 
-# How-To Guides
+# Tutorials
 
-- [Adding a Domain](guides/adding-domain.md)
+- [Build an HTTP Router](tutorials/http-router.md)
 
 ---
 
-# Performance & Security
+# Domain Guides
 
-- [Performance Guide](performance/guide.md)
-- [Benchmark Results](performance/benchmarks.md)
-- [Security Model](performance/security.md)
-- [ReDoS Protection](performance/redos.md)
+- [HTTP Matching](domains/http.md)
+- [Claude Code Hooks](domains/claude.md)
+
+---
+
+# How-To Guides
+
+- [Adding a Domain Adapter](guides/adding-domain.md)
 
 ---
 
 # Understanding x.uma
 
 - [Architecture](explain/architecture.md)
-- [Why ACES](explain/why-aces.md)
 - [When to Use x.uma](explain/when-to-use.md)
-- [Policy Landscape](explain/policy-landscape.md)
+- [xDS Semantics](explain/xds-semantics.md)
 
 ---
 
 # Reference
 
-- [Proto API](reference/proto.md)
+- [CLI (rumi)](reference/cli.md)
+- [Config Format](reference/config.md)
 - [Rust API](reference/rust.md)
 - [Python API](reference/python.md)
 - [TypeScript API](reference/typescript.md)
-- [HTTP Domain](reference/http.md)
+- [Proto API](reference/proto.md)
 
 ---
 
-# Development
+# Performance
 
-- [Roadmap](development/roadmap.md)
+- [Benchmarks](performance/benchmarks.md)
+- [Security Model](performance/security.md)

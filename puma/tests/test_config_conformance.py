@@ -15,13 +15,13 @@ from typing import Any
 import pytest
 import yaml
 
-from puma import (
+from xuma import (
     ConfigParseError,
     MatcherError,
     RegistryBuilder,
     parse_matcher_config,
 )
-from puma.testing import register
+from xuma.testing import register
 
 SPEC_DIR = Path(__file__).resolve().parent.parent.parent / "spec" / "tests"
 CONFIG_DIR = SPEC_DIR / "06_config"

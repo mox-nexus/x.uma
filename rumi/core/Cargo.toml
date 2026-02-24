@@ -1,5 +1,5 @@
 [package]
-name = "rumi"
+name = "rumi-core"
 description = "Rust implementation of xDS Unified Matcher API"
 version.workspace = true
 edition.workspace = true
@@ -9,10 +9,14 @@ authors.workspace = true
 keywords = ["xds", "matcher", "envoy", "config"]
 categories = ["config", "data-structures"]
 
+[lib]
+name = "rumi"
+
 [features]
 default = []
 serde = ["dep:serde"]
 registry = ["serde", "dep:serde_json"]
+claude = ["serde"]
 
 [dependencies]
 regex = "1"  # Linear-time regex (RE2 semantics, ReDoS-safe)

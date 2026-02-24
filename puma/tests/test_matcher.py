@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from puma import (
+from xuma import (
     MAX_DEPTH,
     Action,
     ExactMatcher,
@@ -14,7 +14,7 @@ from puma import (
     NestedMatcher,
     SinglePredicate,
 )
-from puma.testing import DictInput
+from xuma.testing import DictInput
 
 
 class TestMatcher:

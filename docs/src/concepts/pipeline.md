@@ -1,144 +1,154 @@
 # The Matching Pipeline
 
-Every matcher is a pipeline. Data flows in one end, a decision comes out the other. Understanding this flow is understanding x.uma.
+Every evaluation follows the same flow. Understanding this pipeline is understanding x.uma.
 
 ## The Flow
 
-Here's what happens when you evaluate a request:
-
 ```text
-HttpRequest
+Context (your data)
     ↓
-PathInput.get()        ← "Extract the path"
+DataInput.get()          ← extract a value from the context
     ↓
-"/api/users"          ← MatchingValue (type-erased)
+MatchingData             ← type-erased: string | int | bool | bytes | null
     ↓
-PrefixMatcher.matches() ← "Does it start with /api?"
+InputMatcher.matches()   ← compare the value
     ↓
-true                  ← boolean result
+bool                     ← did it match?
     ↓
-Predicate.evaluate()   ← "Combine with other conditions"
+Predicate.evaluate()     ← combine with other conditions (AND/OR/NOT)
     ↓
-true                  ← combined result
+bool                     ← combined result
     ↓
-Matcher.evaluate()     ← "Find the first matching rule"
+Matcher.evaluate()       ← find the first matching rule
     ↓
-"api_backend"         ← Action (your decision)
+Action                   ← your decision (or null if nothing matched)
 ```
 
-Each step is a port. Domain-specific adapters (like `PathInput`) plug in at the edges. The core (like `PrefixMatcher`) is domain-agnostic and reusable.
+Two things to notice:
 
-## HTTP Example
+1. **The pipeline splits at `MatchingData`.** Everything above is domain-specific (knows about your context type). Everything below is domain-agnostic (works with any domain).
 
-Route GET requests to `/api/*` to the API backend:
+2. **The same `InputMatcher` works everywhere.** An `ExactMatcher` doesn't care whether the string came from an HTTP path or a Claude Code tool name. It matches strings.
+
+## Concrete Example
+
+Route `GET /api/users` to the API backend:
 
 **Python:**
 ```python
-from puma import SinglePredicate, PrefixMatcher, Matcher, FieldMatcher, Action
-from puma.http import HttpRequest, PathInput
+from xuma import SinglePredicate, PrefixMatcher, Matcher, FieldMatcher, Action
+from xuma.http import HttpRequest, PathInput
 
-# Step 1: Define extraction + matching
+# DataInput: extract the path from the request
+# InputMatcher: check if the path starts with /api
 predicate = SinglePredicate(
-    input=PathInput(),
-    matcher=PrefixMatcher("/api")
+    input=PathInput(),            # domain-specific
+    matcher=PrefixMatcher("/api") # domain-agnostic
 )
 
-# Step 2: Build the matcher tree
 matcher = Matcher(
     matcher_list=(
         FieldMatcher(predicate=predicate, on_match=Action("api_backend")),
-    )
+    ),
 )
 
-# Step 3: Evaluate against requests
 request = HttpRequest(method="GET", raw_path="/api/users")
-result = matcher.evaluate(request)
-assert result == "api_backend"
+assert matcher.evaluate(request) == "api_backend"
 ```
 
 **Rust:**
-```rust
+```rust,ignore
 use rumi::prelude::*;
-use rumi_http::{HttpMessage, PathInput};
+use rumi_http::*;
 
-// Step 1: Define extraction + matching
-let predicate = SinglePredicate::new(
-    PathInput,
-    PrefixMatcher::new("/api"),
-);
+let predicate = Predicate::Single(SinglePredicate::new(
+    Box::new(SimplePathInput),         // domain-specific
+    Box::new(PrefixMatcher::new("/api")), // domain-agnostic
+));
 
-// Step 2: Build the matcher tree
-let matcher = Matcher::new(
+let matcher: Matcher<HttpRequest, &str> = Matcher::new(
     vec![FieldMatcher::new(predicate, OnMatch::Action("api_backend"))],
     None,
 );
 
-// Step 3: Evaluate against requests
-let result = matcher.evaluate(&http_message);
-assert_eq!(result, Some("api_backend"));
+let request = HttpRequest::builder().method("GET").path("/api/users").build();
+assert_eq!(matcher.evaluate(&request), Some(&"api_backend"));
 ```
+
+**TypeScript:**
+```typescript
+import { SinglePredicate, PrefixMatcher, Matcher, FieldMatcher, Action } from "xuma";
+import { HttpRequest, PathInput } from "xuma/http";
+
+const predicate = new SinglePredicate(
+  new PathInput(),             // domain-specific
+  new PrefixMatcher("/api"),   // domain-agnostic
+);
+
+const matcher = new Matcher(
+  [new FieldMatcher(predicate, new Action("api_backend"))],
+);
+
+const request = new HttpRequest("GET", "/api/users");
+console.assert(matcher.evaluate(request) === "api_backend");
+```
+
+Same structure in all three languages. Same result.
 
 ## The Same Pipeline, Different Domain
 
-The power of type erasure: the same `PrefixMatcher` works for HTTP paths and CloudEvent types.
-
-**CloudEvent example (custom domain):**
+The power of this split: the same `PrefixMatcher` works for HTTP paths and custom event types.
 
 ```python
 from dataclasses import dataclass
-from puma import SinglePredicate, PrefixMatcher, Matcher, FieldMatcher, Action, DataInput, MatchingData
+from xuma import SinglePredicate, PrefixMatcher, Matcher, FieldMatcher, Action, MatchingData
 
-# Define your context type
-@dataclass
+# Custom context
+@dataclass(frozen=True)
 class CloudEvent:
     type: str
     source: str
-    data: dict
 
-# Define your extraction adapter
-@dataclass
+# Custom DataInput — extract the event type
+@dataclass(frozen=True)
 class EventTypeInput:
     def get(self, ctx: CloudEvent) -> MatchingData:
         return ctx.type
 
-# Use the SAME PrefixMatcher
+# Use the SAME PrefixMatcher — it doesn't know about CloudEvent
 predicate = SinglePredicate(
     input=EventTypeInput(),
-    matcher=PrefixMatcher("com.example.")  # Same matcher, different domain!
+    matcher=PrefixMatcher("com.example."),
 )
 
 matcher = Matcher(
     matcher_list=(
-        FieldMatcher(predicate=predicate, on_match=Action("route_to_handler")),
-    )
+        FieldMatcher(predicate=predicate, on_match=Action("handle_event")),
+    ),
 )
 
-# Evaluate against events
-event = CloudEvent(type="com.example.user.created", source="api", data={})
-result = matcher.evaluate(event)
-assert result == "route_to_handler"
+event = CloudEvent(type="com.example.user.created", source="api")
+assert matcher.evaluate(event) == "handle_event"
 ```
 
-The `PrefixMatcher` doesn't know or care whether it's matching HTTP paths or event types. It operates on `MatchingData` (the type-erased value), not the original context type.
-
-**This is the core insight:** domain adapters (`PathInput`, `EventTypeInput`) are context-specific. Core matchers (`PrefixMatcher`, `ExactMatcher`) are domain-agnostic. The pipeline connects them.
+`PrefixMatcher` operates on `MatchingData` (the erased string), not on `CloudEvent` or `HttpRequest`. Domain adapters (`PathInput`, `EventTypeInput`) are context-specific. Matchers are universal.
 
 ## Pipeline Stages
 
 | Stage | Role | Generic? | Examples |
 |-------|------|----------|----------|
-| **Context** | Your domain data | Yes (`Ctx`) | `HttpRequest`, `CloudEvent`, `GrpcRequest` |
-| **DataInput** | Extract data | Yes (`Ctx`) | `PathInput`, `EventTypeInput`, `HeaderInput` |
-| **MatchingValue** | Type-erased data | No | `str`, `int`, `bool`, `bytes`, `None` |
+| **Context** | Your domain data | Yes (`Ctx`) | `HttpRequest`, `HookContext`, your type |
+| **DataInput** | Extract a value | Yes (`Ctx`) | `PathInput`, `ToolNameInput`, your input |
+| **MatchingData** | Type-erased value | No | `string`, `int`, `bool`, `bytes`, `null` |
 | **InputMatcher** | Match the value | No | `ExactMatcher`, `PrefixMatcher`, `RegexMatcher` |
-| **Predicate** | Boolean composition | Yes (`Ctx`) | `SinglePredicate`, `And`, `Or`, `Not` |
-| **Matcher** | First-match-wins tree | Yes (`Ctx`, `A`) | Routes to actions |
-| **Action** | Your decision | Yes (`A`) | `"api_backend"`, `42`, custom types |
+| **Predicate** | Boolean logic | Yes (`Ctx`) | `SinglePredicate`, `And`, `Or`, `Not` |
+| **Matcher** | First-match-wins | Yes (`Ctx`, `A`) | Routes to actions |
+| **Action** | Your decision | Yes (`A`) | Strings, enums, structs — anything |
 
-The middle stage (`MatchingValue` → `InputMatcher` → `bool`) is where domain-agnostic magic happens. Same matchers, different domains.
+The boundary at `MatchingData` is what makes the engine domain-agnostic. Cross it once, and every matcher works for every domain.
 
-## Next Steps
+## Next
 
-- [Type Erasure and Ports](type-erasure.md) — Why InputMatcher is non-generic
-- [Predicate Composition](predicates.md) — Combining conditions with AND/OR/NOT
-- [First-Match-Wins Semantics](semantics.md) — Evaluation order and nested matchers
+- [Type Erasure and Ports](type-erasure.md) — why `InputMatcher` is non-generic
+- [Predicate Composition](predicates.md) — combining conditions with AND/OR/NOT
+- [First-Match-Wins Semantics](semantics.md) — evaluation order and nested matchers

@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from puma._types import MatchingData
-    from puma.http._request import HttpRequest
+    from xuma._types import MatchingData
+    from xuma.http._request import HttpRequest
 
 
 @dataclass(frozen=True, slots=True)

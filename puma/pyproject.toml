@@ -1,10 +1,14 @@
 [project]
-name = "puma"
-version = "0.1.0"
+name = "xuma"
+version = "0.0.2"
 description = "Pure Python implementation of xDS Unified Matcher API"
 requires-python = ">=3.12"
 license = "MIT"
+readme = "README.md"
 dependencies = ["google-re2>=1.1"]
+
+[project.urls]
+Repository = "https://github.com/mox-nexus/x.uma"
 
 [dependency-groups]
 dev = [
@@ -20,7 +24,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/puma"]
+packages = ["src/xuma"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

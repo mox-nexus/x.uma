@@ -1,20 +1,22 @@
 [workspace]
 resolver = "2"
-members = ["core", "proto", "ext/test", "ext/http", "ext/claude", "crusts/python", "crusts/wasm"]
+members = ["core", "proto", "ext/test", "ext/http", "cli", "crusts/python", "crusts/wasm"]
 
 # Proto, crusts use specialized build tools — test individually, not via cargo test
-default-members = ["core", "ext/test", "ext/http", "ext/claude"]
+default-members = ["core", "ext/test", "ext/http", "cli"]
 
 [workspace.package]
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/mox-labs/x.uma"
+repository = "https://github.com/mox-nexus/x.uma"
 authors = ["Yashodeep Vyas"]
 
 [workspace.dependencies]
 # Internal
-rumi = { path = "core" }
+rumi-core = { path = "core", version = "0.0.2" }
+rumi-http = { path = "ext/http", version = "0.0.2", default-features = false }
+rumi-test = { path = "ext/test", version = "0.0.2" }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

@@ -1,348 +1,170 @@
 # Architecture
 
-Why x.uma is built the way it is, and how the same architecture maps across Rust, Python, and TypeScript.
+x.uma makes one bet: the boundary between "what data do I have?" and "how do I match it?" is the most valuable seam in a matcher engine.
 
-## Design Philosophy: ACES
+## The Bet
 
-**A**daptable · **C**omposable · **E**xtensible · **S**ustainable
+Every matcher engine faces a choice. Couple the matching logic to the domain, and you get performance and simplicity — but you rebuild the engine for every new domain. Decouple them, and you get reuse — but you pay in abstraction tax and runtime indirection.
+
+x.uma's answer: erase the type at the **data level**, not the matcher level. One `ExactMatcher` works for HTTP paths, Claude Code tool names, gRPC service identifiers, and types that don't exist yet.
 
 ```text
-┌─────────────────────────────────────┐
-│         Domain Adapters             │
-│   xuma.http  xuma.claude  xuma.grpc │
-└───────────────┬─────────────────────┘
-                │
-┌───────────────▼─────────────────────┐
-│              PORTS                  │
-│     DataInput       ActionPort      │
-│   (extract data)  (emit result)     │
-└───────────────┬─────────────────────┘
-                │
-┌───────────────▼─────────────────────┐
-│              CORE                   │
-│           Matcher Engine            │
-│     Matcher · Predicate · Tree      │
-│       (pure, domain-agnostic)       │
-└─────────────────────────────────────┘
+Context (your data)
+    ↓
+DataInput.get()          ← knows your type, returns erased data
+    ↓
+MatchingData             ← string | int | bool | bytes | null
+    ↓
+InputMatcher.matches()   ← doesn't know your type, doesn't need to
+    ↓
+bool
 ```
 
-This architecture applies to **all implementations** — rumi (Rust), puma (Python), bumi (TypeScript). The ports and hexagonal design are language-agnostic.
+The split happens at `MatchingData`. Above it, domain-specific code that knows about `HttpRequest` or `HookContext`. Below it, domain-agnostic matchers that work with primitives. This is the seam.
 
-## The Extension Seam
+## Why This Works
 
-`TypedExtensionConfig` from xDS is the architectural seam:
+The insight comes from Envoy, where it runs at Google scale. Envoy's xDS Unified Matcher API uses the same split — domain-specific inputs feed type-erased data into generic matchers. x.uma implements these semantics in Rust, Python, and TypeScript.
 
-```protobuf
-message TypedExtensionConfig {
-  string name = 1;                       // adapter identifier
-  google.protobuf.Any typed_config = 2;  // adapter config
-}
+What the seam buys:
+
+**Write a matcher once, use it everywhere.** `PrefixMatcher("/api")` matches HTTP paths, event source URIs, file paths — anything that produces a string through `MatchingData`. Five string matchers (`Exact`, `Prefix`, `Suffix`, `Contains`, `Regex`) cover most matching needs across all domains.
+
+**Add a domain without touching core.** HTTP matching, Claude Code hooks, and the test domain all plug in by implementing `DataInput` — a single method that extracts a value from the context. The core engine never changes.
+
+**Share config across languages.** The same JSON/YAML config produces the same matcher tree in Rust, Python, and TypeScript. `MatchingData` is the same name, same semantics, in all three.
+
+## The Shape
+
+```text
+┌─────────────────────────────────────────┐
+│           Domain Adapters               │
+│   xuma.http    xuma.claude    xuma.test │
+│   (DataInput implementations)           │
+└──────────────────┬──────────────────────┘
+                   │  get() → MatchingData
+                   ↓
+┌──────────────────▼──────────────────────┐
+│           Core Engine                   │
+│   Matcher · Predicate · InputMatcher    │
+│   (domain-agnostic, immutable)          │
+└─────────────────────────────────────────┘
 ```
 
-Every `input` and `action` is a port. Adapters are concrete registered types.
+Two ports define the boundary:
 
-## Why Type Erasure at Data Level
+| Port | Direction | Generic? | You implement |
+|------|-----------|----------|---------------|
+| **DataInput** | Domain → Core | Yes (knows `Ctx`) | One per field you want to match |
+| **InputMatcher** | Core → bool | No (knows `MatchingData`) | Rarely — five ship with x.uma |
 
-Key insight from the spike phase: erase types at the **data level**, not the predicate level.
+Domain adapters implement `DataInput`. The core ships `InputMatcher` implementations. `SinglePredicate` wires one to the other.
 
-### Rust (rumi)
+## ACES
+
+The architecture follows four properties:
+
+**Adaptable.** New domains plug in without modifying core. HTTP matching didn't require changes to the predicate engine. Claude Code hooks didn't require changes to HTTP matching. Each domain is independent.
+
+**Composable.** Predicates compose with AND, OR, NOT. Matchers nest up to 32 levels deep. A matcher's action can be another matcher, creating trees of arbitrary complexity from simple building blocks.
+
+**Extensible.** `TypedExtensionConfig` from the xDS protobuf spec is the extension seam. Every input and action is identified by a type URL (`xuma.http.v1.PathInput`, `xuma.claude.v1.ToolNameInput`). New types register without modifying existing ones.
+
+**Sustainable.** Core is stable. Growth happens at the edges. Adding a domain means adding `DataInput` implementations and a compiler — not touching `Matcher`, `Predicate`, or `InputMatcher`. The architecture sustains extension without rewrites.
+
+## What Core Owns
+
+The core engine (`rumi` in Rust, `xuma` in Python/TypeScript) provides:
+
+- **Matcher** — first-match-wins evaluation over a list of field matchers
+- **Predicate** — Boolean tree (Single, And, Or, Not) with short-circuit evaluation
+- **SinglePredicate** — pairs a `DataInput` with an `InputMatcher`
+- **MatchingData** — the type-erased bridge (`string | int | bool | bytes | null`)
+- **InputMatcher** — five string matchers plus `BoolMatcher`
+- **OnMatch** — action XOR nested matcher (illegal states unrepresentable)
+- **Depth/width limits** — MAX_DEPTH=32, MAX_FIELD_MATCHERS=256
+- **Registry** — immutable type registry for config-driven construction
+- **Trace** — step-by-step evaluation debugging
+
+Core does not own domain knowledge. It does not know what an HTTP request is, what a Claude Code hook event is, or what your custom context type contains. It matches erased values.
+
+## What Domains Own
+
+Each domain provides:
+
+- **Context type** — `HttpRequest`, `HookContext`, your type
+- **DataInput implementations** — extractors for each matchable field
+- **Compiler** — transforms domain-specific config into matcher trees
+- **Registry function** — registers domain inputs with the type registry
+
+The compiler is the user-facing API. Instead of manually constructing predicate trees, you write:
 
 ```rust
-// MatchingData — the erased type
-pub enum MatchingData { None, String(String), Int(i64), Bool(bool), Bytes(Vec<u8>) }
+// HTTP: Gateway API config → matcher
+let matcher = compile_route_matches(&routes, "allowed", "denied");
 
-// DataInput — domain-specific, returns erased type
-pub trait DataInput<Ctx>: Send + Sync + Debug {
-    fn get(&self, ctx: &Ctx) -> MatchingData;
-}
-
-// InputMatcher — domain-agnostic, NON-GENERIC
-pub trait InputMatcher: Send + Sync + Debug {
-    fn matches(&self, value: &MatchingData) -> bool;
-}
+// Claude: hook rules → matcher
+let matcher = rule.compile("block")?;
 ```
 
-**Why this works:**
-- `InputMatcher` is non-generic → same `ExactMatcher` works everywhere
-- No GATs or complex lifetimes
-- Battle-tested at Google scale (Envoy uses this approach)
+Compilers are syntactic sugar over the core engine. They produce the same `Matcher<Ctx, A>` you'd build by hand.
 
-### Python (puma)
+## Matcher Engine, Not Policy Engine
 
-Python gets type erasure for free via union types:
+x.uma is a matcher engine. It finds the first matching rule and returns an action. It does not interpret that action.
+
+The generic `A` in `Matcher<Ctx, A>` is the boundary. `A` can be a string, an enum, a struct — anything. Core never inspects it. Whether `"allow"` means permit and `"deny"` means block is your concern, not the engine's.
+
+Policy (allow/deny, rate limits, routing decisions) lives **above** the matcher. This is the Istio pattern — the data plane matches, the control plane decides. x.uma is the data plane.
+
+This means x.uma doesn't compete with OPA or Cedar. It complements them. Use x.uma for fast, structured matching. Use a policy engine for policy logic that operates on the match result.
+
+## Two Construction Paths
+
+Matchers can be built two ways:
+
+**Compiler path** — domain-specific DSL produces matchers directly. Ergonomic, type-safe, no serialization overhead.
 
 ```python
-# MatchingValue — union type replaces Rust's enum
-type MatchingValue = str | int | bool | bytes | None
+from xuma.http import HttpRouteMatch, compile_route_matches
 
-# DataInput — protocol with contravariant Ctx
-class DataInput(Protocol[Ctx]):
-    def get(self, ctx: Ctx, /) -> MatchingValue: ...
-
-# InputMatcher — protocol, non-generic
-class InputMatcher(Protocol):
-    def matches(self, value: MatchingValue, /) -> bool: ...
+routes = [HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/api"), method="GET")]
+matcher = compile_route_matches(routes, "api", "not_found")
 ```
 
-**Key differences:**
-- No enum needed — union types are native
-- Protocols instead of traits (runtime-checkable)
-- `MatchingValue` is just a type alias, not a wrapped type
+**Config path** — JSON/YAML config loaded through the registry. Portable across languages, storable, versionable.
 
-### TypeScript (bumi)
-
-```typescript
-// MatchingData — union type
-type MatchingData = string | number | boolean | Uint8Array | null;
-
-// DataInput — generic interface
-interface DataInput<Ctx> {
-  get(ctx: Ctx): MatchingData;
-}
-
-// InputMatcher — non-generic interface
-interface InputMatcher {
-  matches(value: MatchingData): boolean;
+```json
+{
+  "matcher_list": [{
+    "predicate": {
+      "single": {
+        "input": { "type_url": "xuma.test.v1.StringInput", "config": { "key": "method" } },
+        "matcher": { "type_url": "xuma.core.v1.StringMatcher", "config": { "exact": "GET" } }
+      }
+    },
+    "on_match": { "action": "route-get" }
+  }],
+  "on_no_match": { "action": "fallback" }
 }
 ```
 
-**Key differences:**
-- Interfaces instead of traits/protocols
-- Structural typing (duck-typed) vs nominal (Rust) vs runtime-checkable (Python)
-- Union types native like Python
+Both paths produce the same `Matcher`. The compiler path is for programmatic construction. The config path is for declarative, cross-language use.
 
-## Type System Mappings
+## Five Implementations, One Spec
 
-How the same architecture translates across languages:
+| Implementation | Language | Type |
+|----------------|----------|------|
+| **rumi** | Rust | Reference implementation |
+| **xuma** (Python) | Python | Pure Python |
+| **xuma** (TypeScript) | TypeScript | Pure TypeScript |
+| **puma-crusty** | Python | Rust core via PyO3 |
+| **bumi-crusty** | TypeScript | Rust core via WASM |
 
-| Concept | Rust (rumi) | Python (puma) | TypeScript (bumi) |
-|---------|-------------|---------------|-------------------|
-| **Erased data** | `enum MatchingData` | `type MatchingValue` (union) | `type MatchingData` (union) |
-| **Extraction port** | `trait DataInput<Ctx>` | `Protocol[Ctx]` | `interface DataInput<Ctx>` |
-| **Matching port** | `trait InputMatcher` | `Protocol` | `interface InputMatcher` |
-| **Predicate tree** | `enum Predicate<Ctx>` | `type Predicate[Ctx]` (union) | `type Predicate<Ctx>` (discriminated union) |
-| **OnMatch** | `enum OnMatch<Ctx, A>` | `type OnMatch[Ctx, A]` (union) | `type OnMatch<Ctx, A>` (discriminated union) |
-| **Pattern match** | `match` expression | `match`/`case` statement | `instanceof` checks |
-| **Immutability** | Owned types, no `mut` | `@dataclass(frozen=True)` | `readonly` fields |
-| **Thread safety** | `Send + Sync` bounds | Not applicable (GIL) | Not applicable (single-threaded) |
+All five pass the same conformance test suite. Same config format, same evaluation semantics, same results. Choose based on your runtime and performance needs.
 
-## Predicate Composition
+## Next
 
-All three languages express the same Boolean logic:
-
-```rust
-// Rust
-pub enum Predicate<Ctx> {
-    Single(SinglePredicate<Ctx>),
-    And { predicates: Vec<Predicate<Ctx>> },
-    Or { predicates: Vec<Predicate<Ctx>> },
-    Not { predicate: Box<Predicate<Ctx>> },
-}
-```
-
-```python
-# Python
-type Predicate[Ctx] = SinglePredicate[Ctx] | And[Ctx] | Or[Ctx] | Not[Ctx]
-
-@dataclass(frozen=True)
-class And[Ctx]:
-    predicates: tuple[Predicate[Ctx], ...]
-```
-
-```typescript
-// TypeScript — classes with instanceof, not discriminated unions
-class SinglePredicate<Ctx> {
-    constructor(
-        readonly input: DataInput<Ctx>,
-        readonly matcher: InputMatcher
-    ) {}
-}
-
-class And<Ctx> {
-    constructor(readonly predicates: readonly Predicate<Ctx>[]) {}
-}
-
-class Or<Ctx> {
-    constructor(readonly predicates: readonly Predicate<Ctx>[]) {}
-}
-
-class Not<Ctx> {
-    constructor(readonly predicate: Predicate<Ctx>) {}
-}
-
-type Predicate<Ctx> = SinglePredicate<Ctx> | And<Ctx> | Or<Ctx> | Not<Ctx>;
-
-// Pattern matching via instanceof
-if (p instanceof SinglePredicate) { /* ... */ }
-else if (p instanceof And) { /* ... */ }
-```
-
-**Key difference:** TypeScript uses classes with `instanceof` checks, not objects with `type` discriminator fields. This matches Python's dataclass approach more closely than traditional TS discriminated unions.
-
-## OnMatch Exclusivity (xDS Semantics)
-
-All three enforce the xDS invariant: action XOR nested matcher, never both.
-
-```rust
-// Rust — illegal states unrepresentable
-pub enum OnMatch<Ctx, A> {
-    Action(A),
-    Matcher(Box<Matcher<Ctx, A>>),
-}
-```
-
-```python
-# Python — union type enforces exclusivity
-type OnMatch[Ctx, A] = Action[A] | NestedMatcher[Ctx, A]
-
-@dataclass(frozen=True)
-class Action[A]:
-    value: A
-
-@dataclass(frozen=True)
-class NestedMatcher[Ctx, A]:
-    matcher: Matcher[Ctx, A]
-```
-
-```typescript
-// TypeScript — classes with instanceof
-class Action<A> {
-    constructor(readonly value: A) {}
-}
-
-class NestedMatcher<Ctx, A> {
-    constructor(readonly matcher: Matcher<Ctx, A>) {}
-}
-
-type OnMatch<Ctx, A> = Action<A> | NestedMatcher<Ctx, A>;
-
-// Check variant
-if (onMatch instanceof Action) { return onMatch.value; }
-else if (onMatch instanceof NestedMatcher) { return onMatch.matcher.evaluate(ctx); }
-```
-
-## Evaluation Semantics
-
-First-match-wins is identical across all implementations:
-
-1. Evaluate `field_matchers` in order
-2. Return action from first matching predicate
-3. If nested matcher returns `None`/`null`, continue to next field
-4. If no matches, consult `on_no_match` fallback
-5. If no fallback, return `None`/`null`
-
-## Cross-Language Conformance
-
-All implementations pass the same YAML conformance test suite (`spec/tests/`):
-
-```yaml
-# spec/tests/predicate/single/exact.yaml
-name: "Single predicate with exact match"
-cases:
-  - input: "hello"
-    matcher: { exact: "hello" }
-    expected: { matches: true }
-```
-
-**Test runners:**
-- Rust: `cargo test` (rumi-test crate) — 195 tests
-- Python: `pytest` (puma/tests/) — 194 tests
-- TypeScript: `bun test` (bumi/tests/) — 202 tests
-
-Each language's test runner parses the same YAML fixtures, constructs matchers in its type system, and asserts the same expected outcomes. Total: **268 tests across 5 variants** (including puma-crusty and bumi-crusty).
-
-## Crate/Package Structure
-
-### Rust (rumi)
-
-```text
-rumi/
-├── rumi/               # Core engine (package: rumi)
-└── ext/                # Domain extensions
-    ├── test/           # rumi-test (conformance)
-    ├── http/           # rumi-http
-    └── claude/         # rumi-claude (Claude Code hooks)
-```
-
-Dependencies point inward. Core knows nothing about domains.
-
-### Python (puma)
-
-```text
-puma/
-└── src/puma/
-    ├── __init__.py     # Core types (flat exports)
-    ├── _types.py       # Protocols
-    ├── _predicate.py   # Predicates
-    ├── _matcher.py     # Matcher tree
-    ├── _string_matchers.py
-    └── http/
-        ├── __init__.py # HTTP domain (flat exports)
-        ├── _request.py
-        ├── _inputs.py
-        └── _gateway.py # Gateway API compiler
-```
-
-Flat exports via `__init__.py`. Private modules prefixed with `_`.
-
-### TypeScript (bumi)
-
-```text
-bumi/
-└── src/
-    ├── index.ts        # Core types
-    ├── types.ts        # Interfaces
-    ├── predicate.ts
-    ├── matcher.ts
-    ├── string-matchers.ts
-    └── http/
-        ├── index.ts    # HTTP domain
-        ├── request.ts
-        ├── inputs.ts
-        └── gateway.ts  # Gateway API compiler
-```
-
-Standard TypeScript barrel exports.
-
-## Performance Characteristics
-
-| Implementation | Regex Engine | Thread Safety | Memory Model | FFI Overhead |
-|----------------|--------------|---------------|--------------|--------------|
-| rumi (Rust) | `regex` crate (linear-time) | Send + Sync | Zero-copy where possible | N/A |
-| puma (Python) | `re` module (backtracking) | GIL (not parallel-safe) | Reference-counted | N/A |
-| puma-crusty | `regex` via PyO3 (linear-time) | GIL | Crossing FFI boundary | ~200ns/call |
-| bumi (TypeScript) | JS `RegExp` (V8 engine) | Single-threaded | Garbage-collected | N/A |
-| bumi-crusty | `regex` via WASM (linear-time) | Single-threaded | Crossing WASM boundary | ~50ns/call |
-
-**Benchmark highlights** (from Phase 9):
-- rumi evaluation: 11ns (native Rust, zero overhead)
-- puma evaluation: 200ns (Python overhead, CPython 3.14)
-- bumi evaluation: 9ns (V8 JIT, near-native performance)
-- puma-crusty: 400ns (Python + FFI crossing)
-- bumi-crusty: 60ns (WASM + boundary crossing)
-
-**ReDoS comparison** (`(a+)+$` pattern, N=20):
-- rumi: 11ns (linear-time regex)
-- puma: 72ms (exponential backtracking)
-- bumi: 11ms (V8 optimizations help but still exponential)
-- puma-crusty: 11ns (Rust regex via FFI)
-- bumi-crusty: 11ns (Rust regex via WASM)
-
-See [Performance > Benchmarks](../performance/benchmarks.md) for full data.
-
-## Why Multiple Implementations?
-
-**Ecosystem reach:** Deploy matchers where your code lives.
-- Rust: Envoy ext_proc, high-performance services
-- Python: Data pipelines, ML inference, scripting
-- TypeScript: Edge workers (Cloudflare, Deno), serverless
-
-**Reference consistency:** All implementations are ports, not wrappers. Same architecture, same semantics, same test suite.
-
-**Learning path:** Pure implementations (rumi, puma, bumi) are readable references. Crusty variants (PyO3, WASM) provide Rust performance when needed.
-
-## See Also
-
-- [Roadmap](../development/roadmap.md) — Implementation status
-- [Adding a Domain](../guides/adding-domain.md) — Extend with custom contexts
-- [Why ACES](why-aces.md) — Design philosophy deep dive
+- [The Matching Pipeline](../concepts/pipeline.md) — how data flows through evaluation
+- [Type Erasure and Ports](../concepts/type-erasure.md) — the technical details of the seam
+- [When to Use x.uma](when-to-use.md) — where x.uma fits and where it doesn't

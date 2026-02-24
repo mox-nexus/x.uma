@@ -7,8 +7,8 @@ use std::collections::HashMap;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use rumi::claude::{compile_hook_matches, HookContext, HookEvent};
 use rumi::prelude::*;
-use rumi_claude::{compile_hook_matches, HookContext, HookEvent};
 
 use crate::config::PyHookMatch;
 use crate::convert;
@@ -66,7 +66,7 @@ impl HookMatcher {
             .map(convert::convert_hook_match)
             .collect::<PyResult<_>>()?;
 
-        // Compile via rumi-claude compiler
+        // Compile via rumi::claude compiler
         let matcher = compile_hook_matches(&rust_rules, action, fallback)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 

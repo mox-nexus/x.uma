@@ -3,8 +3,8 @@
 //! The key insight: don't expose the Rust type tree across FFI.
 //! Config in → compile in Rust → evaluate in Rust → simple types out.
 
+use rumi::claude::{compile_hook_matches, HookContext, HookEvent};
 use rumi::prelude::*;
-use rumi_claude::{compile_hook_matches, HookContext, HookEvent};
 use wasm_bindgen::prelude::*;
 
 use crate::convert;
@@ -64,7 +64,7 @@ impl HookMatcher {
             rust_rules.push(convert::convert_hook_match_from_js(&rule)?);
         }
 
-        // Compile via rumi-claude compiler
+        // Compile via rumi::claude compiler
         let matcher = compile_hook_matches(&rust_rules, action, fallback)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 

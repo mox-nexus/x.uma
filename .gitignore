@@ -73,3 +73,10 @@ test_soundness
 test_variance
 docs/book/
 docs/src/generated/
+
+# Playground
+playground/build/
+playground/.svelte-kit/
+
+# Bun workspace
+bun.lock

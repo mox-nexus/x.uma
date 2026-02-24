@@ -1,6 +1,7 @@
 [package]
 name = "rumi-test"
 description = "Test domain for rumi conformance testing"
+publish = false
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,11 +11,11 @@ authors.workspace = true
 [features]
 default = []
 fixtures = ["serde", "serde_yaml", "serde_json"]
-registry = ["rumi/registry", "serde"]
+registry = ["rumi-core/registry", "serde"]
 proto = ["registry", "dep:rumi-proto"]
 
 [dependencies]
-rumi.workspace = true
+rumi-core.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde_yaml = { workspace = true, optional = true }

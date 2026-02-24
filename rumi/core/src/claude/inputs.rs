@@ -1,7 +1,7 @@
 //! `DataInput` implementations for extracting data from `HookContext`.
 
-use crate::context::HookContext;
-use rumi::prelude::*;
+use super::context::HookContext;
+use crate::prelude::*;
 
 /// Extracts the hook event type as a string.
 #[derive(Debug, Clone)]
@@ -76,151 +76,79 @@ impl DataInput<HookContext> for GitBranchInput {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Registry support (feature = "registry")
-// Hand-written config types — used when proto feature is not enabled.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Configuration for [`ArgumentInput`].
-#[cfg(all(feature = "registry", not(feature = "proto")))]
+#[cfg(feature = "registry")]
 #[derive(serde::Deserialize)]
 pub struct ArgumentInputConfig {
     /// The argument name to extract.
     pub name: String,
 }
 
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HookContext> for EventInput {
-    type Config = rumi::UnitConfig;
+#[cfg(feature = "registry")]
+impl crate::IntoDataInput<HookContext> for EventInput {
+    type Config = crate::UnitConfig;
 
     fn from_config(
-        _: rumi::UnitConfig,
-    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+        _: crate::UnitConfig,
+    ) -> Result<Box<dyn crate::DataInput<HookContext>>, crate::MatcherError> {
         Ok(Box::new(EventInput))
     }
 }
 
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HookContext> for ToolNameInput {
-    type Config = rumi::UnitConfig;
+#[cfg(feature = "registry")]
+impl crate::IntoDataInput<HookContext> for ToolNameInput {
+    type Config = crate::UnitConfig;
 
     fn from_config(
-        _: rumi::UnitConfig,
-    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+        _: crate::UnitConfig,
+    ) -> Result<Box<dyn crate::DataInput<HookContext>>, crate::MatcherError> {
         Ok(Box::new(ToolNameInput))
     }
 }
 
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HookContext> for ArgumentInput {
+#[cfg(feature = "registry")]
+impl crate::IntoDataInput<HookContext> for ArgumentInput {
     type Config = ArgumentInputConfig;
 
     fn from_config(
         config: Self::Config,
-    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+    ) -> Result<Box<dyn crate::DataInput<HookContext>>, crate::MatcherError> {
         Ok(Box::new(ArgumentInput::new(config.name)))
     }
 }
 
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HookContext> for SessionIdInput {
-    type Config = rumi::UnitConfig;
+#[cfg(feature = "registry")]
+impl crate::IntoDataInput<HookContext> for SessionIdInput {
+    type Config = crate::UnitConfig;
 
     fn from_config(
-        _: rumi::UnitConfig,
-    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+        _: crate::UnitConfig,
+    ) -> Result<Box<dyn crate::DataInput<HookContext>>, crate::MatcherError> {
         Ok(Box::new(SessionIdInput))
     }
 }
 
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HookContext> for CwdInput {
-    type Config = rumi::UnitConfig;
+#[cfg(feature = "registry")]
+impl crate::IntoDataInput<HookContext> for CwdInput {
+    type Config = crate::UnitConfig;
 
     fn from_config(
-        _: rumi::UnitConfig,
-    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+        _: crate::UnitConfig,
+    ) -> Result<Box<dyn crate::DataInput<HookContext>>, crate::MatcherError> {
         Ok(Box::new(CwdInput))
     }
 }
 
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HookContext> for GitBranchInput {
-    type Config = rumi::UnitConfig;
+#[cfg(feature = "registry")]
+impl crate::IntoDataInput<HookContext> for GitBranchInput {
+    type Config = crate::UnitConfig;
 
     fn from_config(
-        _: rumi::UnitConfig,
-    ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
+        _: crate::UnitConfig,
+    ) -> Result<Box<dyn crate::DataInput<HookContext>>, crate::MatcherError> {
         Ok(Box::new(GitBranchInput))
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Proto config types (feature = "proto")
-// Uses proto-generated types as Config, enabling xDS control plane integration.
-// ═══════════════════════════════════════════════════════════════════════════════
-
-#[cfg(feature = "proto")]
-mod proto_configs {
-    use super::*;
-    use rumi_proto::xuma::claude::v1 as proto;
-
-    impl rumi::IntoDataInput<HookContext> for EventInput {
-        type Config = proto::EventTypeInput;
-
-        fn from_config(
-            _: proto::EventTypeInput,
-        ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
-            Ok(Box::new(EventInput))
-        }
-    }
-
-    impl rumi::IntoDataInput<HookContext> for ToolNameInput {
-        type Config = proto::ToolNameInput;
-
-        fn from_config(
-            _: proto::ToolNameInput,
-        ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
-            Ok(Box::new(ToolNameInput))
-        }
-    }
-
-    impl rumi::IntoDataInput<HookContext> for ArgumentInput {
-        type Config = proto::ToolArgInput;
-
-        fn from_config(
-            config: proto::ToolArgInput,
-        ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
-            Ok(Box::new(ArgumentInput::new(config.name)))
-        }
-    }
-
-    impl rumi::IntoDataInput<HookContext> for SessionIdInput {
-        type Config = proto::SessionIdInput;
-
-        fn from_config(
-            _: proto::SessionIdInput,
-        ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
-            Ok(Box::new(SessionIdInput))
-        }
-    }
-
-    impl rumi::IntoDataInput<HookContext> for CwdInput {
-        type Config = proto::CwdInput;
-
-        fn from_config(
-            _: proto::CwdInput,
-        ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
-            Ok(Box::new(CwdInput))
-        }
-    }
-
-    impl rumi::IntoDataInput<HookContext> for GitBranchInput {
-        type Config = proto::GitBranchInput;
-
-        fn from_config(
-            _: proto::GitBranchInput,
-        ) -> Result<Box<dyn rumi::DataInput<HookContext>>, rumi::MatcherError> {
-            Ok(Box::new(GitBranchInput))
-        }
     }
 }
 

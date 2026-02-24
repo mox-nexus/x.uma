@@ -19,8 +19,8 @@ import pytest
 
 from puma_crusty import HookMatch, HookMatcher, StringMatch
 
-# Also import puma (pure Python) for comparison
-from puma import (
+# Also import xuma (pure Python) for comparison
+from xuma import (
     Action,
     ContainsMatcher,
     DataInput,
@@ -110,7 +110,7 @@ def test_bench_puma_compile_complex(benchmark):
     """Puma: construct equivalent complex matcher tree."""
 
     def go():
-        from puma import And
+        from xuma import And
 
         return Matcher(
             matcher_list=(
@@ -249,7 +249,7 @@ def crusty_complex():
 
 @pytest.fixture
 def puma_complex():
-    from puma import And
+    from xuma import And
 
     return Matcher(
         matcher_list=(

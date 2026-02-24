@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from puma import (
+from xuma import (
     Action,
     ExactMatcher,
     FieldMatcher,
@@ -19,7 +19,7 @@ from puma import (
     SinglePredicate,
     parse_matcher_config,
 )
-from puma.testing import DictInput, register
+from xuma.testing import DictInput, register
 
 # ── Shared JSON configs (identical across all implementations) ────────────────
 

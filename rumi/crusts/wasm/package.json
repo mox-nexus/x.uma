@@ -2,7 +2,7 @@
   "name": "bumi-crusty-tests",
   "private": true,
   "scripts": {
-    "build": "wasm-pack build --target nodejs",
+    "build": "wasm-pack build --target web",
     "test": "bun test"
   },
   "devDependencies": {

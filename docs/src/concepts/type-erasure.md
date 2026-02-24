@@ -1,219 +1,132 @@
 # Type Erasure and Ports
 
-Why does the same `ExactMatcher` work for HTTP headers and event types? Type erasure at the data level.
+Why does the same `ExactMatcher` work for HTTP headers and custom event types? Because type erasure happens at the data level, not the matcher level.
 
 ## The Problem
 
-If `InputMatcher` were generic over the context type, you couldn't share matchers across domains:
+If `InputMatcher` were generic over the context type, every domain would need its own matcher implementations:
 
 ```python
 # If InputMatcher were generic (DON'T DO THIS)
 class InputMatcher[Ctx]:
     def matches(self, ctx: Ctx) -> bool: ...
 
-# Now you need different matchers for each domain
+# You'd need separate matchers for each domain
 http_matcher = ExactMatcher[HttpRequest]("/api")
-event_matcher = ExactMatcher[CloudEvent]("com.example.user")
-
-# Can't put them in the same list!
-matchers = [http_matcher, event_matcher]  # Type error!
+event_matcher = ExactMatcher[CloudEvent]("com.example")
+# Can't put them in the same registry. No code reuse.
 ```
-
-Every domain would need its own matcher implementations. No code reuse. That's not scalable.
 
 ## The Solution
 
-Erase the type at the **data level**, not the matcher level. Extract the value first, then match against the type-erased value.
+Erase the type at the **data level**. Extract the value first, then match the erased value:
 
 ```python
-# InputMatcher is non-generic
-class InputMatcher:
-    def matches(self, value: MatchingData) -> bool: ...
-
-# DataInput is generic and domain-specific
+# DataInput is generic — knows about the context
 class DataInput[Ctx]:
     def get(self, ctx: Ctx) -> MatchingData: ...
+
+# InputMatcher is NOT generic — knows only about MatchingData
+class InputMatcher:
+    def matches(self, value: MatchingData) -> bool: ...
 ```
 
-Now one `ExactMatcher` works for all domains:
+Now one `ExactMatcher` works everywhere:
 
 ```python
-# Same matcher works for HTTP paths
-path_predicate = SinglePredicate(
-    input=PathInput(),           # Extracts str from HttpRequest
-    matcher=ExactMatcher("/api") # Matches the str
-)
+# HTTP path matching
+path_pred = SinglePredicate(input=PathInput(), matcher=ExactMatcher("/api"))
 
-# And for event types
-event_predicate = SinglePredicate(
-    input=EventTypeInput(),      # Extracts str from CloudEvent
-    matcher=ExactMatcher("/api") # SAME matcher!
-)
+# Event type matching — SAME ExactMatcher
+event_pred = SinglePredicate(input=EventTypeInput(), matcher=ExactMatcher("/api"))
 ```
 
-## MatchingValue: The Erased Type
+## MatchingData: The Bridge
 
-`MatchingValue` is the bridge between domain-specific and domain-agnostic code.
-
-**Python:**
-```python
-type MatchingValue = str | int | bool | bytes | None
-```
+`MatchingData` is the boundary between domain-specific and domain-agnostic code. Same name in all three implementations:
 
 **Rust:**
-```rust
+```rust,ignore
 pub enum MatchingData {
     None,
     String(String),
     Int(i64),
     Bool(bool),
     Bytes(Vec<u8>),
-}
-```
-
-**TypeScript:**
-```typescript
-type MatchingData = string | number | boolean | Uint8Array | null;
-```
-
-Same concept, idiomatic types for each language. Rust uses an enum. Python and TypeScript use union types.
-
-## Example: Sharing Matchers Across Domains
-
-The same `ExactMatcher` matches HTTP headers and CloudEvent attributes:
-
-```python
-from puma import SinglePredicate, ExactMatcher
-from puma.http import HttpRequest, HeaderInput
-from dataclasses import dataclass
-
-# HTTP domain
-http_predicate = SinglePredicate(
-    input=HeaderInput("content-type"),
-    matcher=ExactMatcher("application/json")  # Match header value
-)
-
-http_request = HttpRequest(headers={"content-type": "application/json"})
-assert http_predicate.evaluate(http_request) == True
-
-# CloudEvent domain
-@dataclass
-class CloudEvent:
-    content_type: str
-    data: dict
-
-@dataclass
-class ContentTypeInput:
-    def get(self, ctx: CloudEvent):
-        return ctx.content_type
-
-event_predicate = SinglePredicate(
-    input=ContentTypeInput(),
-    matcher=ExactMatcher("application/json")  # SAME matcher!
-)
-
-event = CloudEvent(content_type="application/json", data={})
-assert event_predicate.evaluate(event) == True
-```
-
-One `ExactMatcher` implementation. Two domains. This is type erasure in action.
-
-## Port Architecture
-
-Type erasure creates two ports:
-
-```text
-┌─────────────────────────────────────────┐
-│         Domain-Specific Layer           │
-│  (knows about Ctx: HttpRequest, etc.)   │
-│                                         │
-│  PathInput, HeaderInput, EventTypeInput │
-└──────────────┬──────────────────────────┘
-               │ get() returns MatchingValue
-               ↓
-┌──────────────▼──────────────────────────┐
-│         Domain-Agnostic Layer           │
-│  (knows only about MatchingValue)       │
-│                                         │
-│  ExactMatcher, PrefixMatcher, Regex...  │
-└─────────────────────────────────────────┘
-```
-
-**Extraction port (`DataInput`):** Converts `Ctx` → `MatchingValue`. Domain-specific.
-
-**Matching port (`InputMatcher`):** Converts `MatchingValue` → `bool`. Domain-agnostic.
-
-The boundary is `MatchingValue`. Cross it once, and matchers work everywhere.
-
-## Cross-Language Comparison
-
-All three implementations use type erasure. The syntax differs, but the pattern is identical.
-
-**Rust:**
-```rust
-// Type-erased data
-pub enum MatchingData {
-    String(String),
-    Int(i64),
-    // ...
-}
-
-// Domain-specific extraction (generic)
-pub trait DataInput<Ctx>: Send + Sync {
-    fn get(&self, ctx: &Ctx) -> MatchingData;
-}
-
-// Domain-agnostic matching (non-generic)
-pub trait InputMatcher: Send + Sync {
-    fn matches(&self, value: &MatchingData) -> bool;
+    Custom(Box<dyn CustomMatchData>),
 }
 ```
 
 **Python:**
 ```python
-# Type-erased data
-type MatchingValue = str | int | bool | bytes | None
-
-# Domain-specific extraction (generic)
-class DataInput[Ctx](Protocol):
-    def get(self, ctx: Ctx) -> MatchingValue: ...
-
-# Domain-agnostic matching (non-generic)
-class InputMatcher(Protocol):
-    def matches(self, value: MatchingValue) -> bool: ...
+type MatchingData = str | int | bool | bytes | None
 ```
 
 **TypeScript:**
 ```typescript
-// Type-erased data
 type MatchingData = string | number | boolean | Uint8Array | null;
-
-// Domain-specific extraction (generic)
-interface DataInput<Ctx> {
-  get(ctx: Ctx): MatchingData;
-}
-
-// Domain-agnostic matching (non-generic)
-interface InputMatcher {
-  matches(value: MatchingData): boolean;
-}
 ```
 
-Same structure. Same insight. Type erasure at the data level enables matcher reuse.
+Rust uses an enum. Python and TypeScript use union types. Same concept, idiomatic syntax.
 
-## Performance Note
+## The Two Ports
 
-Type erasure uses dynamic dispatch (`Box<dyn InputMatcher>` in Rust, protocol conformance in Python, vtable lookup in TypeScript). This has a small runtime cost.
+Type erasure creates two ports — the seams where domain-specific and domain-agnostic code meet:
 
-**Benchmark (simple exact match):**
-- TypeScript (JIT-optimized): 9.3 ns/op
-- Rust (vtable dispatch): 33 ns/op
-- Python (protocol check): ~100 ns/op
+```text
+┌─────────────────────────────────────────┐
+│         Domain-Specific Layer           │
+│   PathInput, HeaderInput, ToolNameInput │
+│   (knows about Ctx)                     │
+└──────────────┬──────────────────────────┘
+               │ get() returns MatchingData
+               ↓
+┌──────────────▼──────────────────────────┐
+│         Domain-Agnostic Layer           │
+│   ExactMatcher, PrefixMatcher, Regex... │
+│   (knows only about MatchingData)       │
+└─────────────────────────────────────────┘
+```
 
-For simple operations, TypeScript's JIT can beat Rust's vtable dispatch. For complex operations (regex, deep trees), Rust's compiled code dominates. The point: dynamic dispatch is fast enough. The flexibility is worth the cost.
+**Extraction port (`DataInput`)** — converts `Ctx` into `MatchingData`. Domain-specific. You write one per field you want to match.
 
-## Next Steps
+**Matching port (`InputMatcher`)** — converts `MatchingData` into `bool`. Domain-agnostic. x.uma ships five: `ExactMatcher`, `PrefixMatcher`, `SuffixMatcher`, `ContainsMatcher`, `RegexMatcher`.
 
-- [The Matching Pipeline](pipeline.md) — How data flows through the system
-- [Predicate Composition](predicates.md) — Building complex conditions
-- [Adding a Domain](../guides/adding-domain.md) — Create your own DataInput types
+## Cross-Language Comparison
+
+The same architecture in all three languages:
+
+| Concept | Rust | Python | TypeScript |
+|---------|------|--------|------------|
+| Erased data | `enum MatchingData` | `type MatchingData` (union) | `type MatchingData` (union) |
+| Extraction port | `trait DataInput<Ctx>` | `Protocol[Ctx]` | `interface DataInput<Ctx>` |
+| Matching port | `trait InputMatcher` | `Protocol` | `interface InputMatcher` |
+| Predicate tree | `enum Predicate<Ctx>` | `type Predicate[Ctx]` (union) | `type Predicate<Ctx>` (union) |
+| Pattern match | `match` expression | `match`/`case` | `instanceof` checks |
+| Immutability | Owned types | `@dataclass(frozen=True)` | `readonly` fields |
+
+## The None Convention
+
+When a `DataInput` returns `None`/`null` (data not present), the predicate evaluates to `false` without calling the matcher. This is enforced across all implementations.
+
+```python
+from xuma import SinglePredicate, ExactMatcher
+from xuma.http import HttpRequest, HeaderInput
+
+predicate = SinglePredicate(
+    input=HeaderInput("x-api-key"),
+    matcher=ExactMatcher("secret"),
+)
+
+# Header not present → DataInput returns None → predicate returns False
+request = HttpRequest(headers={})
+assert predicate.evaluate(request) == False
+```
+
+The matcher never sees `None`. Missing data is handled upstream. This is a security guarantee: missing data never accidentally matches.
+
+## Next
+
+- [The Matching Pipeline](pipeline.md) — how data flows through the full evaluation
+- [Predicate Composition](predicates.md) — combining predicates with AND/OR/NOT
+- [Adding a Domain Adapter](../guides/adding-domain.md) — create your own `DataInput` types

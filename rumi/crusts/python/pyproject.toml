@@ -20,5 +20,5 @@ module-name = "puma_crusty"
 dev = [
     "pytest>=8.0",
     "pytest-benchmark>=5.0",
-    "puma @ file:///${PROJECT_ROOT}/../../../puma",
+    "xuma @ file:///${PROJECT_ROOT}/../../../puma",
 ]

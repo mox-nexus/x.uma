@@ -1,7 +1,7 @@
 """Tests for puma-crusty HookMatcher.
 
 Covers:
-- Conformance: same input → same result as Rust rumi-claude
+- Conformance: same input → same result as Rust rumi::claude
 - Security: fail-closed, input limits, invalid regex
 - Trace: debugging visibility
 """
@@ -12,12 +12,12 @@ from puma_crusty import HookMatcher, HookMatch, StringMatch
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Conformance: must produce identical results to rumi-claude Rust tests
+# Conformance: must produce identical results to rumi::claude Rust tests
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestConformance:
-    """Mirror rumi-claude compiler::tests scenarios through FFI."""
+    """Mirror rumi::claude compiler::tests scenarios through FFI."""
 
     def test_event_match(self):
         matcher = HookMatcher.compile(

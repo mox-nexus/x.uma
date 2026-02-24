@@ -1,7 +1,7 @@
-"""Core protocols and type aliases for puma.
+"""Core protocols and type aliases for xuma.
 
 The type system mirrors rumi's architecture:
-- MatchingData is the type-erased data union (same name across rumi/puma/bumi)
+- MatchingData is the type-erased data union (same name across all implementations)
 - DataInput is the domain-specific extraction port
 - InputMatcher is the domain-agnostic matching port
 """

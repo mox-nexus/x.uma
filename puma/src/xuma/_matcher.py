@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from puma._predicate import Predicate, predicate_depth
+from xuma._predicate import Predicate, predicate_depth
 
 MAX_DEPTH = 32
 

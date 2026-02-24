@@ -1,389 +1,220 @@
 # Build an HTTP Router
 
-Route HTTP requests to handlers in under 50 lines. Start simple, add complexity progressively.
+This tutorial builds an HTTP route matcher step by step. You'll start with a single route and finish with a multi-route matcher that handles paths, methods, headers, and query parameters.
 
-## Step 1: Three Path Prefixes
+Examples are in Python. The same patterns apply to TypeScript and Rust — see the [Getting Started](../getting-started/python.md) guides for language-specific syntax.
 
-Route requests based on path prefix:
-- `/api/*` → `"api_backend"`
-- `/admin/*` → `"admin_backend"`
-- `/health` → `"health_check"`
+## Step 1: Match a Single Path
 
-**Python:**
+Route requests starting with `/api` to the API backend:
+
 ```python
-from puma.http import HttpRouteMatch, HttpPathMatch, compile_route_matches, HttpRequest
+from xuma import Matcher, FieldMatcher, SinglePredicate, Action, PrefixMatcher
+from xuma.http import HttpRequest, PathInput
 
-# Define routes with Gateway API syntax
-routes = [
-    HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/api")),
-    HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/admin")),
-    HttpRouteMatch(path=HttpPathMatch(type="Exact", value="/health")),
-]
-
-# Compile to a matcher (returns action or None)
-matcher = compile_route_matches(routes, action="matched", on_no_match="not_found")
-
-# Evaluate requests
-assert matcher.evaluate(HttpRequest(raw_path="/api/users")) == "matched"
-assert matcher.evaluate(HttpRequest(raw_path="/admin/config")) == "matched"
-assert matcher.evaluate(HttpRequest(raw_path="/health")) == "matched"
-assert matcher.evaluate(HttpRequest(raw_path="/other")) == "not_found"
-```
-
-**Rust:**
-```rust
-use rumi_http::{HttpRouteMatch, HttpPathMatch, compile_route_matches, HttpMessage};
-
-let routes = vec![
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/admin".into() }),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::Exact { value: "/health".into() }),
-        ..Default::default()
-    },
-];
-
-let matcher = compile_route_matches(&routes, "matched", Some("not_found"));
-
-assert_eq!(matcher.evaluate(&http_message), Some("matched"));
-```
-
-Gateway API `HttpRouteMatch` is the config layer. The compiler builds the matcher tree for you.
-
-## Step 2: Add Method Matching
-
-Route GET and POST differently:
-- `GET /api/*` → `"api_read"`
-- `POST /api/*` → `"api_write"`
-
-**Python:**
-```python
-from puma.http import HttpRouteMatch, HttpPathMatch, HttpRequest
-
-routes = [
-    HttpRouteMatch(
-        path=HttpPathMatch(type="PathPrefix", value="/api"),
-        method="GET"
-    ),
-    HttpRouteMatch(
-        path=HttpPathMatch(type="PathPrefix", value="/api"),
-        method="POST"
-    ),
-]
-
-# Different actions per route
-matchers = [route.compile(action) for route, action in zip(routes, ["api_read", "api_write"])]
-
-# Combine into one matcher with on_no_match
-from puma import Matcher, FieldMatcher, Or, NestedMatcher, Action
-
-combined = Matcher(
-    matcher_list=tuple(
-        FieldMatcher(
-            predicate=route.to_predicate(),
-            on_match=Action(action)
-        )
-        for route, action in zip(routes, ["api_read", "api_write"])
-    ),
-    on_no_match=Action("method_not_allowed")
-)
-
-# Test
-assert combined.evaluate(HttpRequest(method="GET", raw_path="/api/users")) == "api_read"
-assert combined.evaluate(HttpRequest(method="POST", raw_path="/api/users")) == "api_write"
-assert combined.evaluate(HttpRequest(method="DELETE", raw_path="/api/users")) == "method_not_allowed"
-```
-
-Within a single `HttpRouteMatch`, all conditions are ANDed (path AND method). Multiple `HttpRouteMatch` entries are ORed.
-
-**Rust:**
-```rust
-use rumi_http::{HttpRouteMatch, HttpPathMatch, HttpMessage};
-
-let routes = vec![
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-        method: Some("GET".into()),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-        method: Some("POST".into()),
-        ..Default::default()
-    },
-];
-
-// Build separate matchers or use compile_route_matches with action types
-```
-
-## Step 3: Add Header Conditions
-
-Require authentication for POST requests:
-- `POST /api/*` with `Authorization: Bearer *` → `"api_authenticated"`
-- `POST /api/*` without auth → `"unauthorized"`
-
-**Python:**
-```python
-from puma.http import HttpRouteMatch, HttpPathMatch, HttpHeaderMatch, HttpRequest
-
-auth_route = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/api"),
-    method="POST",
-    headers=[
-        HttpHeaderMatch(type="RegularExpression", name="authorization", value=r"^Bearer .+$")
-    ]
-)
-
-noauth_route = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/api"),
-    method="POST"
-)
-
-# Order matters: more specific (auth required) comes first
-routes = [auth_route, noauth_route]
-actions = ["api_authenticated", "unauthorized"]
-
-matcher = Matcher(
-    matcher_list=tuple(
-        FieldMatcher(predicate=route.to_predicate(), on_match=Action(action))
-        for route, action in zip(routes, actions)
-    ),
-    on_no_match=Action("not_found")
-)
-
-# Test
-request = HttpRequest(
-    method="POST",
-    raw_path="/api/users",
-    headers={"authorization": "Bearer token123"}
-)
-assert matcher.evaluate(request) == "api_authenticated"
-
-request = HttpRequest(method="POST", raw_path="/api/users", headers={})
-assert matcher.evaluate(request) == "unauthorized"
-```
-
-First-match-wins semantics: the auth route matches first if the header is present. If it doesn't match, evaluation continues to the noauth route.
-
-**Rust:**
-```rust
-use rumi_http::{HttpRouteMatch, HttpPathMatch, HttpHeaderMatch};
-
-let auth_route = HttpRouteMatch {
-    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-    method: Some("POST".into()),
-    headers: Some(vec![
-        HttpHeaderMatch::RegularExpression {
-            name: "authorization".into(),
-            value: r"^Bearer .+$".into(),
-        }
-    ]),
-    ..Default::default()
-};
-```
-
-## Step 4: Add Query Parameter Matching
-
-Route based on query parameters:
-- `/search?version=2` → `"search_v2"`
-- `/search?version=1` → `"search_v1"`
-- `/search` (no version) → `"search_latest"`
-
-**Python:**
-```python
-from puma.http import HttpRouteMatch, HttpPathMatch, HttpQueryParamMatch, HttpRequest
-
-routes = [
-    HttpRouteMatch(
-        path=HttpPathMatch(type="Exact", value="/search"),
-        query_params=[
-            HttpQueryParamMatch(type="Exact", name="version", value="2")
-        ]
-    ),
-    HttpRouteMatch(
-        path=HttpPathMatch(type="Exact", value="/search"),
-        query_params=[
-            HttpQueryParamMatch(type="Exact", name="version", value="1")
-        ]
-    ),
-    HttpRouteMatch(
-        path=HttpPathMatch(type="Exact", value="/search")
-    ),
-]
-
-actions = ["search_v2", "search_v1", "search_latest"]
-
-matcher = Matcher(
-    matcher_list=tuple(
-        FieldMatcher(predicate=route.to_predicate(), on_match=Action(action))
-        for route, action in zip(routes, actions)
-    )
-)
-
-# Test
-assert matcher.evaluate(HttpRequest(raw_path="/search?version=2")) == "search_v2"
-assert matcher.evaluate(HttpRequest(raw_path="/search?version=1")) == "search_v1"
-assert matcher.evaluate(HttpRequest(raw_path="/search")) == "search_latest"
-assert matcher.evaluate(HttpRequest(raw_path="/search?other=param")) == "search_latest"
-```
-
-Query parameters are parsed from `raw_path` automatically. Order matters: version-specific routes come before the no-version route.
-
-**Rust:**
-```rust
-use rumi_http::{HttpRouteMatch, HttpPathMatch, HttpQueryParamMatch};
-
-let v2_route = HttpRouteMatch {
-    path: Some(HttpPathMatch::Exact { value: "/search".into() }),
-    query_params: Some(vec![
-        HttpQueryParamMatch::Exact {
-            name: "version".into(),
-            value: "2".into(),
-        }
-    ]),
-    ..Default::default()
-};
-```
-
-## Step 5: Multiple Routes with Fallback
-
-Combine everything into a production-ready router:
-
-**Python:**
-```python
-from puma.http import (
-    HttpRouteMatch, HttpPathMatch, HttpHeaderMatch, HttpQueryParamMatch,
-    compile_route_matches, HttpRequest
-)
-
-# Define routes
-api_auth = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/api"),
-    method="POST",
-    headers=[HttpHeaderMatch(type="RegularExpression", name="authorization", value=r"^Bearer .+$")]
-)
-
-api_get = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/api"),
-    method="GET"
-)
-
-admin = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/admin"),
-    headers=[HttpHeaderMatch(type="Exact", name="x-admin-key", value="secret")]
-)
-
-health = HttpRouteMatch(
-    path=HttpPathMatch(type="Exact", value="/health")
-)
-
-# Build matcher
-routes = [api_auth, api_get, admin, health]
-actions = ["api_write", "api_read", "admin_panel", "health_check"]
-
-matcher = Matcher(
-    matcher_list=tuple(
-        FieldMatcher(predicate=route.to_predicate(), on_match=Action(action))
-        for route, action in zip(routes, actions)
-    ),
-    on_no_match=Action("not_found")
-)
-
-# Test all cases
-assert matcher.evaluate(
-    HttpRequest(method="POST", raw_path="/api/users", headers={"authorization": "Bearer token"})
-) == "api_write"
-
-assert matcher.evaluate(
-    HttpRequest(method="GET", raw_path="/api/users")
-) == "api_read"
-
-assert matcher.evaluate(
-    HttpRequest(raw_path="/admin", headers={"x-admin-key": "secret"})
-) == "admin_panel"
-
-assert matcher.evaluate(HttpRequest(raw_path="/health")) == "health_check"
-
-assert matcher.evaluate(HttpRequest(raw_path="/unknown")) == "not_found"
-```
-
-This is a complete HTTP router in 30 lines of config. No framework. No DSL. Pure Gateway API.
-
-**Rust equivalent:**
-```rust
-use rumi::prelude::*;
-use rumi_http::{HttpRouteMatch, HttpPathMatch, HttpHeaderMatch, HttpMessage};
-
-let routes = vec![
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-        method: Some("POST".into()),
-        headers: Some(vec![HttpHeaderMatch::RegularExpression {
-            name: "authorization".into(),
-            value: r"^Bearer .+$".into(),
-        }]),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-        method: Some("GET".into()),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/admin".into() }),
-        headers: Some(vec![HttpHeaderMatch::Exact {
-            name: "x-admin-key".into(),
-            value: "secret".into(),
-        }]),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::Exact { value: "/health".into() }),
-        ..Default::default()
-    },
-];
-
-// Build matcher per route with different actions
-// Or use custom action enum to distinguish routes
-```
-
-## What's Next
-
-This tutorial showed the Gateway API compiler pattern. You can also build matchers manually for finer control:
-
-**Manual matcher construction:**
-```python
-from puma import Matcher, FieldMatcher, SinglePredicate, PrefixMatcher, Action
-from puma.http import PathInput
-
-# Bypass the compiler, build the tree directly
 matcher = Matcher(
     matcher_list=(
         FieldMatcher(
             predicate=SinglePredicate(PathInput(), PrefixMatcher("/api")),
-            on_match=Action("api_backend")
+            on_match=Action("api_backend"),
         ),
-    )
+    ),
+    on_no_match=Action("not_found"),
 )
+
+assert matcher.evaluate(HttpRequest(raw_path="/api/users")) == "api_backend"
+assert matcher.evaluate(HttpRequest(raw_path="/other")) == "not_found"
 ```
 
-Manual construction is more verbose but gives you full control over the matcher tree structure.
+`PrefixMatcher("/api")` matches any path starting with `/api`. The `on_no_match` fallback catches everything else.
 
-**Learn more:**
-- [The Matching Pipeline](../concepts/pipeline.md) — How data flows through the matcher
-- [Type Erasure and Ports](../concepts/type-erasure.md) — Why matchers are reusable
-- [Predicate Composition](../concepts/predicates.md) — AND, OR, NOT in detail
-- [First-Match-Wins Semantics](../concepts/semantics.md) — Evaluation order and fallbacks
-- [Adding a Domain](../guides/adding-domain.md) — Create matchers for CloudEvents, gRPC, etc.
+## Step 2: Add Method Matching
 
-**Performance:**
-- Matchers are immutable and thread-safe — share them across threads
-- Regex compilation happens at construction time — no per-request overhead
-- First-match-wins means early rules short-circuit evaluation
-- For production workloads, consider `puma-crusty` (Rust-backed) for 10x+ speedup
+Only allow GET requests to the API:
+
+```python
+from xuma import And, ExactMatcher
+from xuma.http import MethodInput
+
+predicate = And((
+    SinglePredicate(PathInput(), PrefixMatcher("/api")),
+    SinglePredicate(MethodInput(), ExactMatcher("GET")),
+))
+
+matcher = Matcher(
+    matcher_list=(
+        FieldMatcher(predicate=predicate, on_match=Action("api_get")),
+    ),
+    on_no_match=Action("not_found"),
+)
+
+assert matcher.evaluate(HttpRequest(method="GET", raw_path="/api/users")) == "api_get"
+assert matcher.evaluate(HttpRequest(method="POST", raw_path="/api/users")) == "not_found"
+```
+
+`And` combines conditions. All must be true. Short-circuits on the first false.
+
+## Step 3: Multiple Routes
+
+Add a health check endpoint:
+
+```python
+matcher = Matcher(
+    matcher_list=(
+        FieldMatcher(
+            predicate=And((
+                SinglePredicate(PathInput(), PrefixMatcher("/api")),
+                SinglePredicate(MethodInput(), ExactMatcher("GET")),
+            )),
+            on_match=Action("api_get"),
+        ),
+        FieldMatcher(
+            predicate=SinglePredicate(PathInput(), ExactMatcher("/health")),
+            on_match=Action("health"),
+        ),
+    ),
+    on_no_match=Action("not_found"),
+)
+
+assert matcher.evaluate(HttpRequest(method="GET", raw_path="/api/users")) == "api_get"
+assert matcher.evaluate(HttpRequest(raw_path="/health")) == "health"
+assert matcher.evaluate(HttpRequest(method="POST", raw_path="/api/users")) == "not_found"
+```
+
+Field matchers evaluate in order. First match wins. `/health` uses `ExactMatcher` — only the exact path matches, not `/health/check`.
+
+## Step 4: Header Conditions
+
+Require an authorization header for the API:
+
+```python
+from xuma.http import HeaderInput
+
+api_predicate = And((
+    SinglePredicate(PathInput(), PrefixMatcher("/api")),
+    SinglePredicate(MethodInput(), ExactMatcher("GET")),
+    SinglePredicate(HeaderInput("authorization"), PrefixMatcher("Bearer ")),
+))
+
+matcher = Matcher(
+    matcher_list=(
+        FieldMatcher(predicate=api_predicate, on_match=Action("api_authenticated")),
+        FieldMatcher(
+            predicate=SinglePredicate(PathInput(), ExactMatcher("/health")),
+            on_match=Action("health"),
+        ),
+    ),
+    on_no_match=Action("unauthorized"),
+)
+
+# With valid auth header
+request = HttpRequest(
+    method="GET",
+    raw_path="/api/users",
+    headers={"authorization": "Bearer token123"},
+)
+assert matcher.evaluate(request) == "api_authenticated"
+
+# Without auth header — HeaderInput returns None → predicate is false
+request = HttpRequest(method="GET", raw_path="/api/users")
+assert matcher.evaluate(request) == "unauthorized"
+```
+
+When the `authorization` header is missing, `HeaderInput` returns `None`. The None-to-false rule makes the predicate false without calling the matcher. Missing data never accidentally matches.
+
+## Step 5: Use the Compiler
+
+The Gateway API compiler builds the same matcher from declarative config:
+
+```python
+from xuma.http import (
+    HttpRouteMatch, HttpPathMatch, HttpHeaderMatch,
+    compile_route_matches, HttpRequest,
+)
+
+routes = [
+    HttpRouteMatch(
+        path=HttpPathMatch(type="PathPrefix", value="/api"),
+        method="GET",
+        headers=[
+            HttpHeaderMatch(type="RegularExpression", name="authorization", value="^Bearer .+$"),
+        ],
+    ),
+    HttpRouteMatch(
+        path=HttpPathMatch(type="Exact", value="/health"),
+    ),
+]
+
+matcher = compile_route_matches(routes, "allowed", on_no_match="denied")
+
+# Authenticated API request
+request = HttpRequest(
+    method="GET",
+    raw_path="/api/users",
+    headers={"authorization": "Bearer token123"},
+)
+assert matcher.evaluate(request) == "allowed"
+
+# Health check (no auth needed)
+assert matcher.evaluate(HttpRequest(raw_path="/health")) == "allowed"
+
+# Unauthenticated API request
+assert matcher.evaluate(HttpRequest(method="GET", raw_path="/api/users")) == "denied"
+```
+
+The compiler:
+- ANDs conditions within each `HttpRouteMatch`
+- ORs multiple `HttpRouteMatch` entries
+- Returns the first matching route's action
+
+This is equivalent to the manual construction in Steps 1-4, with less boilerplate.
+
+## Step 6: Custom Action Types
+
+Use structured actions instead of strings:
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class RouteAction:
+    backend: str
+    timeout_ms: int = 5000
+
+routes = [
+    HttpRouteMatch(
+        path=HttpPathMatch(type="PathPrefix", value="/api"),
+        method="GET",
+    ),
+]
+
+matcher = compile_route_matches(
+    routes,
+    RouteAction(backend="api-service", timeout_ms=10000),
+    on_no_match=RouteAction(backend="default", timeout_ms=1000),
+)
+
+result = matcher.evaluate(HttpRequest(method="GET", raw_path="/api/users"))
+assert result.backend == "api-service"
+assert result.timeout_ms == 10000
+```
+
+The generic `A` in `Matcher[HttpRequest, A]` accepts any type. Strings, dataclasses, enums — the engine doesn't interpret actions, it returns them.
+
+## What You Built
+
+A route matcher that:
+
+1. Evaluates rules in order (first match wins)
+2. Combines path, method, and header conditions with AND
+3. Handles missing data safely (None-to-false)
+4. Supports both manual construction and declarative config
+5. Works with any action type
+
+The same matcher can be built in TypeScript or Rust with identical semantics.
+
+## Next
+
+- [HTTP Matching](../domains/http.md) — full HTTP domain reference
+- [First-Match-Wins Semantics](../concepts/semantics.md) — evaluation rules in depth
+- [Predicate Composition](../concepts/predicates.md) — AND, OR, NOT

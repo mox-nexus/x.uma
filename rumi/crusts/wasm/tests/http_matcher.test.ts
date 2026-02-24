@@ -5,9 +5,13 @@
  * Mirrors puma-crusty's test_http_matcher.py tests.
  */
 
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 // @ts-expect-error — generated WASM package has no TS project reference
-import { HttpMatcher } from "../pkg/bumi_crusty.js";
+import init, { HttpMatcher } from "../pkg/bumi_crusty.js";
+
+beforeAll(async () => {
+  await init();
+});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Basic matching: single input types

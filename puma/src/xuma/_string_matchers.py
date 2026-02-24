@@ -15,10 +15,10 @@ from typing import TYPE_CHECKING
 
 import re2
 
-from puma._matcher import MatcherError
+from xuma._matcher import MatcherError
 
 if TYPE_CHECKING:
-    from puma._types import MatchingData
+    from xuma._types import MatchingData
 
 
 @dataclass(frozen=True, slots=True)

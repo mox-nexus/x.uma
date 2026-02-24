@@ -1,185 +1,68 @@
 # x.uma
 
-> Cross-Platform Unified Matcher API
+> One matcher engine. Five implementations. Same semantics everywhere.
 
-**Alpha status** — API is under active development and will change.
+x.uma implements the [xDS Unified Matcher API](https://www.envoyproxy.io/docs/envoy/latest/api-v3/xds/type/matcher/v3/matcher.proto) — the same matching protocol Envoy uses at Google scale — across Rust, Python, and TypeScript.
 
-x.uma implements the [xDS Unified Matcher API](https://github.com/cncf/xds) across multiple languages. Match structured data (HTTP requests, events, messages) against rule trees with first-match-wins semantics.
+Write matching rules once. Evaluate them in any language. Get the same answer every time.
+
+```
+Context → DataInput → MatchingData → InputMatcher → bool
+           domain-      erased         domain-
+           specific                    agnostic
+```
+
+An `ExactMatcher` doesn't know whether it's matching HTTP paths, Claude Code hook events, or your custom domain. It matches *data*. The domain-specific part — extracting that data from your context — is a separate port. This is the key architectural insight, borrowed from Envoy and proven at Google scale.
 
 ## Implementations
 
-| Package | Language | Status |
-|---------|----------|--------|
-| **rumi** | Rust | Production-ready core (195 tests) |
-| **puma** | Python 3.12+ | Alpha v0.1.0 (194 tests) |
-| **bumi** | TypeScript/Bun | Alpha v0.1.0 (202 tests) |
-| **puma-crusty** | Python (PyO3 bindings) | Alpha (37 tests) |
-| **bumi-crusty** | TypeScript (wasm-bindgen) | Alpha (36 tests) |
+| Package | Language | What it is |
+|---------|----------|------------|
+| **rumi** | Rust | Core engine (reference implementation) |
+| **xuma** | Python 3.12+ | Pure Python, zero native deps beyond RE2 |
+| **xuma** | TypeScript/Bun | Pure TypeScript, zero native deps beyond RE2 |
+| **puma-crusty** | Python | Rust bindings via PyO3 |
+| **bumi-crusty** | TypeScript | Rust bindings via WASM |
 
-All implementations pass the same conformance test suite. **Total: 268 tests** across 5 variants.
+All five pass the same conformance test suite (~958 tests total). They implement identical semantics with different performance characteristics.
 
-## Quick Example
+## Pick Your Language
 
-The same pattern in Rust, Python, and TypeScript.
+Already know which language you need? Start here:
 
-### Rust
+- **[Rust](getting-started/rust.md)** — `rumi` + `rumi-http` in your `Cargo.toml`
+- **[Python](getting-started/python.md)** — `uv add xuma`, build a matcher in 10 lines
+- **[TypeScript](getting-started/typescript.md)** — `bun add xuma`, same API shape as Python
 
-```rust,ignore
-use rumi::prelude::*;
-use rumi_http::{HttpMessage, PathInput, PrefixMatcher};
+Each quick start gets you from install to working HTTP route matcher in under 5 minutes.
 
-let matcher = Matcher::new(
-    vec![
-        FieldMatcher::new(
-            Predicate::Single(SinglePredicate::new(
-                Box::new(PathInput),
-                Box::new(PrefixMatcher::new("/api")),
-            )),
-            OnMatch::Action("api_handler"),
-        ),
-    ],
-    Some(OnMatch::Action("default")),
-);
+## Understand First
 
-// ProcessingRequest -> HttpMessage -> evaluate
-let action = matcher.evaluate(&http_message);
-```
+Not sure whether x.uma fits your problem? Read these:
 
-### Python
+- **[When to Use x.uma](explain/when-to-use.md)** — x.uma vs OPA vs Cedar vs Zanzibar. Honest comparison with decision framework.
+- **[Architecture](explain/architecture.md)** — Hexagonal architecture, ACES design philosophy, why five implementations.
 
-```python
-from puma import Matcher, FieldMatcher, SinglePredicate, Action
-from puma import PrefixMatcher
-from puma.http import HttpRequest, PathInput
+## Domains
 
-matcher = Matcher(
-    matcher_list=(
-        FieldMatcher(
-            predicate=SinglePredicate(
-                input=PathInput(),
-                matcher=PrefixMatcher("/api")
-            ),
-            on_match=Action("api_handler")
-        ),
-    ),
-    on_no_match=Action("default")
-)
+x.uma ships with two domain adapters. Adding your own is [straightforward](guides/adding-domain.md).
 
-request = HttpRequest(method="GET", raw_path="/api/users")
-action = matcher.evaluate(request)  # "api_handler"
-```
+**[HTTP Matching](domains/http.md)** — Path, method, header, and query parameter matching. Gateway API config types. Compiles `HttpRouteMatch` into a `Matcher` in one call.
 
-### TypeScript
+**[Claude Code Hooks](domains/claude.md)** — Match Claude Code hook events by event type, tool name, arguments, session, working directory, or git branch. Compiles `HookMatch` into a `Matcher` for multi-rule OR semantics.
 
-```typescript
-import { Matcher, FieldMatcher, SinglePredicate, Action } from "bumi";
-import { PrefixMatcher } from "bumi";
-import { HttpRequest, PathInput } from "bumi/http";
+## What It Guarantees
 
-const matcher = new Matcher([
-    new FieldMatcher(
-        new SinglePredicate(
-            new PathInput(),
-            new PrefixMatcher("/api")
-        ),
-        new Action("api_handler")
-    ),
-], new Action("default"));
-
-const request = new HttpRequest("GET", "/api/users");
-const action = matcher.evaluate(request); // "api_handler"
-```
-
-## Architecture
-
-x.uma follows hexagonal architecture (ports and adapters). The core is domain-agnostic. Domains plug in at the edges.
-
-```text
-┌─────────────────────────────────┐
-│       Domain Adapters           │
-│   HTTP  CloudEvent  Custom      │
-└───────────────┬─────────────────┘
-                │
-┌───────────────▼─────────────────┐
-│           PORTS                 │
-│  DataInput[Ctx] → MatchingValue │
-│  InputMatcher → bool            │
-└───────────────┬─────────────────┘
-                │
-┌───────────────▼─────────────────┐
-│           CORE                  │
-│  Matcher, Predicate, Actions    │
-│    (domain-agnostic)            │
-└─────────────────────────────────┘
-```
-
-**DataInput** extracts values from your context (HTTP request, event, custom type).
-
-**InputMatcher** matches the extracted value (exact, prefix, regex, etc).
-
-**Matcher** composes predicates with first-match-wins semantics.
-
-The same `ExactMatcher` works for HTTP headers, event types, or your custom domain. This is the key design insight from Envoy's matcher architecture.
-
-## Why x.uma?
-
-**Domain-agnostic core.** The same matcher logic works for HTTP routing, event filtering, access control, or your custom domain. Add a new domain by implementing `DataInput` for your context type.
-
-**Type-safe composition.** Predicates compose with AND/OR/NOT. Matchers nest. Actions are exclusive (action XOR nested matcher, never both).
-
-**Battle-tested semantics.** Built on the same xDS protocol Envoy uses at Google scale. First-match-wins, nested matcher failure propagation, depth limits — all enforced by design.
-
-**Multi-language.** Same API across Rust, Python, and TypeScript. Write matchers once, run anywhere.
-
-**Performance.** Sub-microsecond evaluation. Linear-time regex (Rust implementations). Zero-copy where possible.
-
-**Security.** ReDoS protection via linear-time regex. Depth limits (max 32 levels). Fail-closed validation.
-
-## Documentation
-
-| Section | What you'll learn |
-|---------|-------------------|
-| **Getting Started** | |
-| [Choose Your Implementation](getting-started/choose.md) | Which variant fits your use case |
-| [Rust Quick Start](getting-started/rust.md) | Get rumi running in 5 minutes |
-| [Python Quick Start](getting-started/python.md) | Get puma running in 5 minutes |
-| [TypeScript Quick Start](getting-started/typescript.md) | Get bumi running in 5 minutes |
-| **Tutorials** | |
-| [Build an HTTP Router](tutorials/http-router.md) | Step-by-step routing example |
-| **Core Concepts** | |
-| [The Matching Pipeline](concepts/pipeline.md) | How evaluation works |
-| [Type Erasure and Ports](concepts/type-erasure.md) | Why DataInput/InputMatcher split exists |
-| [Predicate Composition](concepts/predicates.md) | AND/OR/NOT logic trees |
-| [First-Match-Wins Semantics](concepts/semantics.md) | Evaluation order and fallback |
-| **Performance & Security** | |
-| [Performance Guide](performance/guide.md) | Optimization techniques |
-| [Benchmark Results](performance/benchmarks.md) | Cross-language numbers |
-| [Security Model](performance/security.md) | Threat model and mitigations |
-| [ReDoS Protection](performance/redos.md) | Linear-time regex guarantees |
-| **Understanding x.uma** | |
-| [Architecture](explain/architecture.md) | Why it's built this way |
-| [Why ACES](explain/why-aces.md) | Design philosophy deep dive |
-| [When to Use x.uma](explain/when-to-use.md) | x.uma vs OPA vs Cedar vs Zanzibar |
-| [Policy Landscape](explain/policy-landscape.md) | Where x.uma fits in the ecosystem |
-| **Reference** | |
-| [Proto API](reference/proto.md) | xDS protocol definitions |
-| [Rust API](reference/rust.md) | rumi API reference |
-| [Python API](reference/python.md) | puma API reference |
-| [TypeScript API](reference/typescript.md) | bumi API reference |
-| [HTTP Domain](reference/http.md) | HTTP matching across languages |
+| Guarantee | How |
+|-----------|-----|
+| **No ReDoS** | Rust `regex` crate (linear time). Python uses `google-re2`. TypeScript uses `re2js`. |
+| **Bounded depth** | Max 32 levels of nesting, validated at config load |
+| **Fail-closed** | Missing data means predicate returns `false`. Never matches by accident. |
+| **Thread-safe** | All types are `Send + Sync` (Rust) / immutable (Python, TypeScript) |
+| **Config validated at construction** | Invalid configs rejected before evaluation. Parse, don't validate. |
 
 ## Status
 
-x.uma is alpha software. The API is under active development and will change.
+**Version 0.0.2** — Alpha. API is stabilizing but may change before 1.0.
 
-| Phase | Focus | Status |
-|-------|-------|--------|
-| 5 | puma (Python) | ✅ Done (v0.1.0) |
-| 6 | bumi (TypeScript) | ✅ Done (v0.1.0) |
-| 7 | puma-crusty (PyO3 bindings) | ✅ Done |
-| 8 | bumi-crusty (WASM bindings) | ✅ Done |
-| 9 | Cross-language benchmarks | 🚧 In Progress |
-| 10 | Semantic matching (cosine similarity) | Planned |
-| 11 | RE2 migration (linear-time regex natively) | Planned |
-
-See [Roadmap](development/roadmap.md) for details.
+Phases 0-18 complete. Core engine, HTTP domain, Claude domain, config/registry layer, RE2 migration, CLI, cross-language benchmarks — all shipped. Name resolution pending before crates.io/PyPI/npm publish.

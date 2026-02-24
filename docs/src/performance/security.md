@@ -1,291 +1,100 @@
 # Security Model
 
-x.uma is a trust boundary. Here's what it guarantees.
-
-A matcher processes untrusted input (HTTP requests, gRPC messages, arbitrary data) and makes routing or policy decisions. A single malicious input should never crash the process, hang a worker thread, or consume unbounded resources.
-
-This page documents the security guarantees and failure modes of the x.uma matcher engine.
+x.uma's security model prevents four classes of attack against matcher engines. Every guarantee is enforced at construction time, not evaluation time.
 
 ## Threat Model
 
-x.uma assumes:
-- **Untrusted input data** — HTTP paths, headers, query params come from the network
-- **Trusted config** — matcher rules come from deployment config (not user input)
-- **Optional: untrusted patterns** — in some deployments, regex patterns may come from user config
-
-The matcher must remain safe under all input conditions. Adversarial input may cause a match to fail, but it must never cause unbounded resource consumption or undefined behavior.
-
-## Depth Limits
-
-**Guarantee**: Nested matchers cannot exceed 32 levels.
-
-**Implementation**: `MAX_DEPTH = 32` enforced at config validation time (not runtime).
-
-### Why Depth Limits Matter
-
-xDS matchers support recursion — an `OnMatch` can contain a nested `Matcher`, which can contain more nested matchers:
-
-```protobuf
-Matcher {
-  matcher_tree {
-    on_match {
-      matcher {  // level 1
-        on_match {
-          matcher {  // level 2
-            ...
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-Without limits, an attacker could craft a config with 10,000 nested levels. In recursive implementations, this causes stack overflow. In iterative implementations, it causes O(n) validation cost per request.
-
-### Enforcement
-
-All variants validate depth at **config load time**:
-
-```rust
-// rumi (Rust)
-impl Matcher {
-    pub fn validate(&self) -> Result<(), MatcherError> {
-        self.validate_depth(0, MAX_DEPTH)
-    }
-}
-```
-
-```python
-# puma (Python)
-def validate_depth(matcher: Matcher, current: int = 0) -> None:
-    if current > MAX_DEPTH:
-        raise ValueError(f"Matcher depth {current} exceeds MAX_DEPTH={MAX_DEPTH}")
-```
-
-A config that exceeds depth limits is **rejected at construction**. Runtime evaluation never sees invalid configs.
+Matcher configs can come from untrusted sources — user-provided routing rules, dynamically loaded policy files, configs from external systems. The engine must be safe even when the config is adversarial.
 
 ## ReDoS Protection
 
-**Guarantee**: Varies by implementation.
+**Threat:** Regular expression Denial of Service. A crafted regex pattern causes exponential backtracking, consuming CPU indefinitely.
 
-Regular Expression Denial of Service (ReDoS) exploits backtracking regex engines with adversarial input. A pattern like `(a+)+$` against input `"a" * N + "X"` causes exponential backtracking.
+**Mitigation:** All implementations use RE2-class linear-time regex engines:
 
-### Protection by Variant
+| Implementation | Regex Engine | Guarantee |
+|----------------|-------------|-----------|
+| rumi (Rust) | `regex` crate (DFA) | Linear time, proven |
+| xuma (Python) | `google-re2` (C++ RE2 binding) | Linear time, Google RE2 |
+| xuma (TypeScript) | `re2js` (pure JS RE2 port) | Linear time, RE2 semantics |
+| puma-crusty | Rust `regex` via PyO3 | Same as rumi |
+| bumi-crusty | Rust `regex` via WASM | Same as rumi |
 
-| Variant | Regex Engine | Complexity | ReDoS Risk |
-|---------|-------------|------------|-----------|
-| **rumi** | Rust `regex` crate | O(n) linear | **None** — guaranteed safe |
-| **puma** | Python `re` module | O(2^n) backtracking | **High** — vulnerable |
-| **bumi** | JavaScript `RegExp` | O(2^n) backtracking | **High** — vulnerable |
-| **puma-crusty** | Rust `regex` via FFI | O(n) linear | **None** — guaranteed safe |
-| **bumi-crusty** | Rust `regex` via WASM | O(n) linear | **None** — guaranteed safe |
+No implementation uses a backtracking regex engine. Patterns that would cause catastrophic backtracking in PCRE/Python `re`/JavaScript `RegExp` are either rejected or matched in linear time.
 
-### When It Matters
+**Pattern length limit:** Regex patterns are capped at 4,096 characters (`MAX_REGEX_PATTERN_LENGTH`). Non-regex patterns are capped at 8,192 characters (`MAX_PATTERN_LENGTH`).
 
-**Trusted patterns** (you control the regex):
-- puma and bumi are safe — you won't write exponential patterns
-- No ReDoS risk because attacker can't control the pattern
+## Depth Limit
 
-**Untrusted patterns** (regex comes from user config or external source):
-- puma and bumi are **unsafe** — attacker can craft malicious patterns
-- Must use rumi, puma-crusty, or bumi-crusty for guaranteed linear time
+**Threat:** Stack overflow from deeply nested matchers. A config with 1,000 levels of nested matchers could exhaust the call stack during evaluation.
 
-### Example Attack
+**Mitigation:** Maximum nesting depth of 32 levels (`MAX_DEPTH`), validated at construction time. If a config exceeds this limit, `MatcherError::DepthExceeded` is returned and no matcher is constructed.
 
-Pattern: `(a+)+$`
-Input: `"aaaaaaaaaaaaaaaaaaaaX"` (N=20)
+32 levels is generous — real-world matchers rarely exceed 5 levels. The limit catches misconfigured or adversarial configs.
 
-| Variant | Time | Behavior |
-|---------|------|----------|
-| rumi | 11 ns | Returns false |
-| puma | 72 ms | Returns false after 6.5M backtracking attempts |
-| bumi | 11 ms | Returns false after 1M backtracking attempts |
-| puma-crusty | 11 ns | Returns false |
-| bumi-crusty | 11 ns | Returns false |
+## Width Limits
 
-At N=25, puma and bumi hang indefinitely. The worker thread never returns.
+**Threat:** Resource exhaustion from extremely wide matchers. A config with millions of field matchers at depth 1 bypasses depth limits but still causes excessive memory and CPU usage.
 
-See [ReDoS Protection](redos.md) for full technical deep dive.
+**Mitigation:** Three width limits, all validated at construction time:
 
-## Fail-Closed Defaults
+| Limit | Value | Protects |
+|-------|-------|----------|
+| `MAX_FIELD_MATCHERS` | 256 per `Matcher` | Memory from wide matcher lists |
+| `MAX_PREDICATES_PER_COMPOUND` | 256 per AND/OR | CPU from wide predicate trees |
+| `MAX_PATTERN_LENGTH` | 8,192 chars | Memory from large string patterns |
 
-**Guarantee**: No match never accidentally becomes a match.
+## None-to-False
 
-The matcher uses **fail-closed semantics**:
-- If a predicate evaluates to false, the match fails
-- If input data is missing, the predicate evaluates to false
-- If no rule matches, the matcher returns `None` (no action)
+**Threat:** Missing data accidentally matching a rule. If a header doesn't exist, it should not match `ExactMatcher("secret")`.
 
-There is no way for missing data or failed predicates to "leak through" and trigger an unintended action.
+**Mitigation:** When `DataInput.get()` returns `None`/`null`, the predicate evaluates to `false`. The `InputMatcher` is never called. This is enforced in all five implementations.
 
-### The None → false Invariant
+This is a security invariant, not a convenience feature. It ensures fail-closed behavior: missing data means no match.
 
-When a `DataInput` returns `None` (missing data), the predicate evaluates to `false`:
+## Immutability
 
-```rust
-// rumi
-impl SinglePredicate {
-    fn evaluate(&self, ctx: &Ctx) -> bool {
-        let value = self.input.get(ctx);
-        if let MatchingData::None = value {
-            return false;  // missing data = no match
-        }
-        self.matcher.matches(&value)
-    }
-}
-```
+**Threat:** Race conditions from concurrent access. Matchers shared across threads could produce inconsistent results if modified during evaluation.
 
-This prevents bugs where a missing header or query param causes a "default match" that bypasses security rules.
+**Mitigation:**
 
-**Example**: A rule matches requests with `x-admin: true`. If the header is missing:
-- Predicate evaluates to `false`
-- Rule does not match
-- Request is not treated as admin
+- **Rust:** All core types are `Send + Sync`. Matchers are immutable after construction and safe to share via `Arc<Matcher>`.
+- **Python:** All types use `@dataclass(frozen=True)`. Fields cannot be reassigned after construction.
+- **TypeScript:** All types use `readonly` fields.
+- **Registry:** Immutable after `.build()`. The builder produces the registry, then the builder is consumed. No runtime registration.
 
-The attacker cannot trigger admin behavior by omitting the header.
+## Construction-Time Validation
 
-## Input Validation
+All validation happens when the matcher is built, not when it's evaluated. If a `Matcher` object exists, it's guaranteed to be:
 
-**Guarantee**: Configs are validated at construction, not at runtime.
+- Within depth limits
+- Within width limits
+- Free of invalid regex patterns
+- Free of unknown type URLs (config path)
+- Structurally sound (OnMatch exclusivity enforced by the type system)
 
-All variants validate matcher configs when they're built:
+This follows the "parse, don't validate" principle. The construction boundary is the trust boundary.
 
-```rust
-// rumi
-let matcher = Matcher::try_from(proto_config)?;  // fails fast on invalid config
-```
+## Error Messages
 
-```python
-# puma
-matcher = Matcher.from_proto(proto_config)  # raises ValueError on invalid config
-validate_depth(matcher)  # enforces MAX_DEPTH
-```
+`MatcherError` variants include actionable context:
 
-Invalid configs are rejected before the matcher is ever used. Runtime evaluation assumes the config is valid and never checks invariants that should have been validated at construction.
+- `UnknownTypeUrl` lists all registered type URLs
+- `DepthExceeded` shows actual vs maximum depth
+- `PatternTooLong` shows actual vs maximum length
+- `InvalidPattern` includes the regex compilation error
 
-This follows the **parse, don't validate** principle: once a `Matcher` object exists, it's known to be valid.
+Self-correcting error messages help operators fix configs without guessing.
 
-## Type Safety
+## What Is NOT Protected
 
-**Guarantee**: Matchers are type-safe at the domain level.
+- **Semantic correctness:** x.uma doesn't verify that your rules do what you intend. First-match-wins means rule order matters — a too-broad rule early in the list can shadow specific rules.
+- **Action interpretation:** The engine returns actions without interpreting them. Whether `"allow"` means permit is your responsibility.
+- **Context injection:** x.uma trusts the context you provide. If your `DataInput` produces unsafe values from user input, the engine cannot protect you.
+- **Side effects:** Evaluation is pure (no I/O, no state mutation). But the code that acts on the result is outside x.uma's scope.
 
-A `Matcher<HttpMessage, A>` only accepts `HttpMessage` contexts. You cannot pass a `GrpcMessage` to an HTTP matcher. The type system prevents misuse.
+## Next
 
-```rust
-// rumi
-let http_matcher: Matcher<HttpMessage, Action> = ...;
-let http_req = HttpMessage::from(...);
-http_matcher.evaluate(&http_req);  // OK
-
-let grpc_req = GrpcMessage::from(...);
-http_matcher.evaluate(&grpc_req);  // compile error: type mismatch
-```
-
-In Python and TypeScript, this is enforced at runtime via protocols:
-
-```python
-# puma
-def evaluate(self, ctx: HttpRequest) -> Action | None: ...
-```
-
-The type hint documents the expected context. Passing the wrong type raises `AttributeError` when the matcher tries to access missing fields.
-
-## Thread Safety
-
-**Guarantee**: All matcher types are thread-safe.
-
-Matchers are immutable after construction. All core types implement `Send + Sync` (Rust) or equivalent thread-safety guarantees in Python and TypeScript.
-
-Multiple threads can evaluate the same matcher concurrently without locking:
-
-```rust
-// rumi
-static MATCHER: Lazy<Matcher<HttpMessage, Action>> = Lazy::new(|| ...);
-
-// Called from multiple threads
-fn handle_request(req: HttpRequest) {
-    let result = MATCHER.evaluate(&req);  // no lock needed
-}
-```
-
-This enables zero-overhead concurrent evaluation in multi-threaded servers.
-
-## Resource Bounds
-
-**Guarantee**: Evaluation time is bounded by config size, not input size (except regex).
-
-For non-regex operations, evaluation cost is O(rules) regardless of input size:
-- Exact string match: O(1) comparison
-- Prefix match: O(1) radix tree lookup
-- First-match-wins over N rules: O(N) linear scan in worst case
-
-The only unbounded operation is regex matching, where cost is O(n) in the input length for rumi/crusty variants, and O(2^n) for puma/bumi on adversarial patterns.
-
-**Maximum evaluation time** (trusted patterns, 200 rules):
-- rumi: 3.5 microseconds
-- bumi: 2.1 microseconds
-- puma: 20 microseconds
-
-For untrusted patterns, use a variant with linear-time regex.
-
-## No Unsafe Code (Rust)
-
-**Guarantee**: rumi uses zero unsafe code in the core engine.
-
-All `Send + Sync` implementations are compiler-derived. No manual `unsafe impl`. The type system enforces thread safety without escape hatches.
-
-The only `unsafe` in the entire codebase is in FFI boundary layers (puma-crusty and bumi-crusty), where it's required to cross language boundaries. The core engine is 100% safe Rust.
-
-## Attack Scenarios
-
-### Scenario 1: Stack Overflow via Deep Nesting
-
-**Attack**: Craft a config with 10,000 nested matchers to cause stack overflow.
-
-**Mitigation**: `MAX_DEPTH = 32` enforced at config validation. Invalid config rejected before use.
-
-**Result**: Attack prevented. Config never loads.
-
-### Scenario 2: ReDoS via Malicious Pattern
-
-**Attack**: Inject pattern `(a+)+$` into user-facing config, send input `"a" * 30 + "X"` to hang the service.
-
-**Mitigation**: Use rumi, puma-crusty, or bumi-crusty for untrusted patterns. Linear-time regex prevents exponential backtracking.
-
-**Result**: Attack mitigated if using safe variant. puma/bumi vulnerable if attacker controls patterns.
-
-### Scenario 3: Bypass via Missing Header
-
-**Attack**: Omit the `x-admin` header to bypass a rule that checks `x-admin: true`.
-
-**Mitigation**: None → false invariant. Missing header causes predicate to return `false`, not `true`.
-
-**Result**: Attack prevented. Rule does not match when header is missing.
-
-### Scenario 4: Type Confusion
-
-**Attack**: Pass a `GrpcMessage` to an `HttpMatcher` to trigger undefined behavior.
-
-**Mitigation**: Type system enforces context types. Rust prevents this at compile time. Python/TypeScript fail at runtime with `AttributeError`.
-
-**Result**: Attack prevented. Type mismatch detected before evaluation.
-
-## Security Checklist
-
-Before deploying a matcher in production:
-
-- [ ] Depth limit validated — confirm `MAX_DEPTH` enforcement
-- [ ] ReDoS risk assessed — untrusted patterns require rumi/crusty variants
-- [ ] Fail-closed defaults confirmed — missing data evaluates to false
-- [ ] Config validated at load time — invalid configs rejected
-- [ ] Type safety verified — context types match matcher expectations
-- [ ] Thread safety confirmed — concurrent evaluation is safe
-
-For untrusted input scenarios, prefer rumi for maximum safety.
-
-## Related Pages
-
-- [ReDoS Protection](redos.md) — Deep dive into regex denial-of-service
-- [Benchmark Results](benchmarks.md) — Performance data including ReDoS scenarios
-- [Performance Guide](guide.md) — Which variant to use for your threat model
+- [Benchmarks](benchmarks.md) — concrete performance numbers
+- [xDS Semantics](../explain/xds-semantics.md) — the protocol behind the guarantees
+- [Architecture](../explain/architecture.md) — how safety is built into the design

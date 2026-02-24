@@ -1,4 +1,4 @@
-"""HTTP domain registration for the puma registry.
+"""HTTP domain registration for the xuma registry.
 
 Registers all HTTP-domain DataInput types so they can be constructed
 from config via type_url lookup.
@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from puma.http._inputs import HeaderInput, MethodInput, PathInput, QueryParamInput
+from xuma.http._inputs import HeaderInput, MethodInput, PathInput, QueryParamInput
 
 if TYPE_CHECKING:
-    from puma._registry import RegistryBuilder
-    from puma.http._request import HttpRequest
+    from xuma._registry import RegistryBuilder
+    from xuma.http._request import HttpRequest
 
 
 def register(

@@ -6,17 +6,19 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+keywords = ["xds", "matcher", "http", "envoy", "gateway"]
+categories = ["config", "web-programming"]
 
 [features]
 default = ["ext-proc"]
 ext-proc = ["dep:envoy-grpc-ext-proc", "dep:k8s-gateway-api", "dep:k8s-openapi"]
-registry = ["rumi/registry", "serde"]
+registry = ["rumi-core/registry", "serde"]
 proto = ["registry", "ext-proc", "dep:rumi-proto"]
 
 [dependencies]
-rumi.workspace = true
+rumi-core.workspace = true
 serde = { workspace = true, optional = true }
-rumi-proto = { path = "../../proto", optional = true }
+rumi-proto = { path = "../../proto", version = "0.0.2", optional = true }
 
 # ext_proc types (ProcessingRequest, ProcessingResponse, etc.)
 envoy-grpc-ext-proc = { version = "0.1", optional = true }

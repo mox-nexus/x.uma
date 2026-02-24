@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from puma._types import DataInput, InputMatcher
+    from xuma._types import DataInput, InputMatcher
 
 
 @dataclass(frozen=True, slots=True)

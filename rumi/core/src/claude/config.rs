@@ -1,15 +1,15 @@
 //! User-facing configuration types for Claude Code hook matching.
 //!
 //! These types provide a declarative API for specifying match rules.
-//! The [compiler](crate::compiler) translates them into runtime `Matcher` trees.
+//! The [compiler](super::compiler) translates them into runtime `Matcher` trees.
 
-use crate::context::HookEvent;
+use super::context::HookEvent;
 
 /// How to match a string value.
 ///
-/// This is a re-export of [`rumi::StringMatchSpec`] for backward compatibility.
+/// This is a re-export of [`crate::StringMatchSpec`] for backward compatibility.
 /// Domain-agnostic string matching specification that compiles to runtime matchers.
-pub use rumi::StringMatchSpec as StringMatch;
+pub use crate::StringMatchSpec as StringMatch;
 
 /// User-friendly configuration for matching Claude Code hook events.
 ///
@@ -19,7 +19,7 @@ pub use rumi::StringMatchSpec as StringMatch;
 /// # Example
 ///
 /// ```ignore
-/// use rumi_claude::prelude::*;
+/// use rumi::claude::prelude::*;
 ///
 /// let rule = HookMatch {
 ///     event: Some(HookEvent::PreToolUse),
@@ -61,7 +61,7 @@ pub struct ArgumentMatch {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rumi::prelude::*;
+    use crate::prelude::*;
 
     #[test]
     fn string_match_exact_compiles() {

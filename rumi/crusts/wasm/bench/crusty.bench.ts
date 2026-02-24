@@ -8,14 +8,15 @@
  *
  * Run:
  *   cd rumi/crusts/wasm
- *   wasm-pack build --target nodejs
+ *   wasm-pack build --target web
  *   bun run bench/crusty.bench.ts
  */
 
 import { bench, run, summary } from "mitata";
 
 // bumi-crusty (WASM Rust bindings)
-import { HookMatcher, StringMatch } from "../pkg/bumi_crusty.js";
+import init, { HookMatcher, StringMatch } from "../pkg/bumi_crusty.js";
+await init();
 
 // bumi (pure TypeScript) — build equivalent matchers manually
 import {

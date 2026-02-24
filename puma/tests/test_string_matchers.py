@@ -2,7 +2,7 @@
 
 import pytest
 
-from puma import (
+from xuma import (
     ContainsMatcher,
     ExactMatcher,
     MatcherError,

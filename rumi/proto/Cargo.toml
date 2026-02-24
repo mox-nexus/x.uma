@@ -1,6 +1,7 @@
 [package]
 name = "rumi-proto"
 description = "Proto-generated types for x.uma — xDS + xuma extensions"
+publish = false
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,7 +13,7 @@ prost = "0.13"
 pbjson = "0.7"
 serde = { workspace = true }
 serde_json = { workspace = true }
-rumi = { workspace = true, features = ["registry"] }
+rumi-core = { workspace = true, features = ["registry"] }
 
 # Alias pbjson-types as prost_types so generated code using ::prost_types::Any
 # gets serde::Serialize/Deserialize impls (needed for prost-serde compat)

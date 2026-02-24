@@ -8,14 +8,15 @@
  *
  * Run:
  *   cd rumi/crusts/wasm
- *   wasm-pack build --target nodejs
+ *   wasm-pack build --target web
  *   bun run bench/config.bench.ts
  */
 
 import { bench, run, summary } from "mitata";
 
 // bumi-crusty (WASM Rust bindings)
-import { HttpMatcher, TestMatcher } from "../pkg/bumi_crusty.js";
+import init, { HttpMatcher, TestMatcher } from "../pkg/bumi_crusty.js";
+await init();
 
 // bumi (pure TypeScript)
 import {

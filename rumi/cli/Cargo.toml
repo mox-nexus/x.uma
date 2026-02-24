@@ -1,0 +1,21 @@
+[package]
+name = "rumi-cli"
+description = "CLI for the rumi matcher engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["xds", "matcher", "envoy", "cli"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "rumi"
+path = "src/main.rs"
+
+[dependencies]
+rumi-core = { workspace = true, features = ["registry", "claude"] }
+rumi-http = { workspace = true, default-features = false, features = ["registry"] }
+rumi-test = { workspace = true, features = ["registry"] }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }

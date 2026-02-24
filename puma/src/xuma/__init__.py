@@ -1,16 +1,16 @@
-"""puma — Pure Python implementation of xDS Unified Matcher API.
+"""xuma — Pure Python implementation of xDS Unified Matcher API.
 
 All public types are exported from this module for flat imports:
 
-    from puma import Matcher, FieldMatcher, SinglePredicate, ExactMatcher
+    from xuma import Matcher, FieldMatcher, SinglePredicate, ExactMatcher
 """
 
-__version__ = "0.1.0"
+__version__ = "0.0.2"
 
 # Protocols
 # Matcher tree
-# Config types — see puma._config for details
-from puma._config import (
+# Config types — see xuma._config for details
+from xuma._config import (
     ActionConfig,
     AndPredicateConfig,
     BuiltInMatch,
@@ -28,7 +28,7 @@ from puma._config import (
     ValueMatchConfig,
     parse_matcher_config,
 )
-from puma._matcher import (
+from xuma._matcher import (
     MAX_DEPTH,
     Action,
     FieldMatcher,
@@ -40,7 +40,7 @@ from puma._matcher import (
 )
 
 # Predicates
-from puma._predicate import (
+from xuma._predicate import (
     And,
     Not,
     Or,
@@ -51,8 +51,8 @@ from puma._predicate import (
     predicate_depth,
 )
 
-# Registry — see puma._registry for details
-from puma._registry import (
+# Registry — see xuma._registry for details
+from xuma._registry import (
     MAX_FIELD_MATCHERS,
     MAX_PATTERN_LENGTH,
     MAX_PREDICATES_PER_COMPOUND,
@@ -68,14 +68,14 @@ from puma._registry import (
 )
 
 # Concrete matchers
-from puma._string_matchers import (
+from xuma._string_matchers import (
     ContainsMatcher,
     ExactMatcher,
     PrefixMatcher,
     RegexMatcher,
     SuffixMatcher,
 )
-from puma._types import DataInput, InputMatcher, MatchingData
+from xuma._types import DataInput, InputMatcher, MatchingData
 
 __all__ = [
     # Protocols

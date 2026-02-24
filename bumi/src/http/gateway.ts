@@ -1,7 +1,7 @@
 /**
  * Gateway API compiler — HttpRouteMatch → Matcher<HttpRequest, A>.
  *
- * Translates Gateway API-style route configuration into bumi Matcher trees.
+ * Translates Gateway API-style route configuration into xuma Matcher trees.
  * Pure TypeScript types mirroring the Gateway API spec (no k8s dependency).
  */
 

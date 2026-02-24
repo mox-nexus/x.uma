@@ -3,7 +3,7 @@
 //! All validation happens at the FFI boundary (Vector security requirement).
 //! Invalid inputs produce clear JS errors, never panics.
 
-use rumi_claude::{ArgumentMatch, HookEvent, HookMatch, StringMatch};
+use rumi::claude::{ArgumentMatch, HookEvent, HookMatch, StringMatch};
 use wasm_bindgen::prelude::*;
 
 /// Maximum length for any string pattern (8 KB).

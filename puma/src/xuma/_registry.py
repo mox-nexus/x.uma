@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-from puma._config import (
+from xuma._config import (
     ActionConfig,
     AndPredicateConfig,
     BuiltInMatch,
@@ -36,15 +36,15 @@ from puma._config import (
     OrPredicateConfig,
     SinglePredicateConfig,
 )
-from puma._matcher import (
+from xuma._matcher import (
     Action,
     FieldMatcher,
     Matcher,
     MatcherError,
     NestedMatcher,
 )
-from puma._predicate import And, Not, Or, SinglePredicate
-from puma._string_matchers import (
+from xuma._predicate import And, Not, Or, SinglePredicate
+from xuma._string_matchers import (
     ContainsMatcher,
     ExactMatcher,
     PrefixMatcher,
@@ -55,8 +55,8 @@ from puma._string_matchers import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from puma._config import OnMatchConfig, PredicateConfig, ValueMatchConfig
-    from puma._types import DataInput, InputMatcher
+    from xuma._config import OnMatchConfig, PredicateConfig, ValueMatchConfig
+    from xuma._types import DataInput, InputMatcher
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Limits (matching rumi core constants)

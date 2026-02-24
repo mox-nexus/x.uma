@@ -1,31 +1,28 @@
 # Predicate Composition
 
-Real matchers combine conditions. AND, OR, NOT — compose them freely.
+Predicates combine conditions with Boolean logic. AND, OR, NOT — compose them freely.
 
-## SinglePredicate: The Building Block
+## SinglePredicate
 
-A predicate is extraction plus matching in one step:
+The building block. Pairs a `DataInput` (extract data) with an `InputMatcher` (match data):
 
 ```python
-from puma import SinglePredicate, PrefixMatcher
-from puma.http import PathInput
+from xuma import SinglePredicate, PrefixMatcher
+from xuma.http import PathInput
 
 # "Does the path start with /api?"
-predicate = SinglePredicate(
-    input=PathInput(),
-    matcher=PrefixMatcher("/api")
-)
+predicate = SinglePredicate(input=PathInput(), matcher=PrefixMatcher("/api"))
 ```
 
-When evaluated, it extracts the path and checks if it starts with `/api`. One step.
+Evaluation: extract the path, check if it starts with `/api`, return `bool`.
 
-## AND: All Must Match
+## And
 
-Combine multiple conditions. All must be true.
+All conditions must be true. Short-circuits on the first `false`.
 
 ```python
-from puma import And, SinglePredicate, PrefixMatcher, ExactMatcher
-from puma.http import PathInput, MethodInput
+from xuma import And, SinglePredicate, PrefixMatcher, ExactMatcher
+from xuma.http import PathInput, MethodInput
 
 # "Is it GET /api/*?"
 predicate = And((
@@ -34,37 +31,33 @@ predicate = And((
 ))
 ```
 
-**Short-circuits:** Stops evaluating on the first false condition. If the path check fails, the method check never runs.
-
-**Rust equivalent:**
-```rust
-use rumi::prelude::*;
-use rumi_http::{PathInput, MethodInput};
-
-let predicate = Predicate::and(vec![
-    SinglePredicate::new(PathInput, PrefixMatcher::new("/api")),
-    SinglePredicate::new(MethodInput, ExactMatcher::new("GET")),
+**Rust:**
+```rust,ignore
+let predicate = Predicate::And(vec![
+    Predicate::Single(SinglePredicate::new(
+        Box::new(SimplePathInput), Box::new(PrefixMatcher::new("/api")),
+    )),
+    Predicate::Single(SinglePredicate::new(
+        Box::new(SimpleMethodInput), Box::new(ExactMatcher::new("GET")),
+    )),
 ]);
 ```
 
-**TypeScript equivalent:**
+**TypeScript:**
 ```typescript
-import { And, SinglePredicate, PrefixMatcher, ExactMatcher } from '@x.uma/buma';
-import { PathInput, MethodInput } from '@x.uma/buma/http';
-
 const predicate = new And([
-  new SinglePredicate(new PathInput(), new PrefixMatcher('/api')),
-  new SinglePredicate(new MethodInput(), new ExactMatcher('GET')),
+  new SinglePredicate(new PathInput(), new PrefixMatcher("/api")),
+  new SinglePredicate(new MethodInput(), new ExactMatcher("GET")),
 ]);
 ```
 
-## OR: Any Must Match
+## Or
 
-At least one condition must be true.
+At least one condition must be true. Short-circuits on the first `true`.
 
 ```python
-from puma import Or, SinglePredicate, PrefixMatcher
-from puma.http import PathInput
+from xuma import Or, SinglePredicate, PrefixMatcher
+from xuma.http import PathInput
 
 # "Does the path start with /api or /admin?"
 predicate = Or((
@@ -73,143 +66,74 @@ predicate = Or((
 ))
 ```
 
-**Short-circuits:** Stops evaluating on the first true condition. If the first prefix matches, the second check never runs.
+## Not
 
-## NOT: Invert the Result
-
-Negate any predicate.
+Negate any predicate. Useful for exclusion rules.
 
 ```python
-from puma import Not, SinglePredicate, ExactMatcher
-from puma.http import MethodInput
+from xuma import Not, SinglePredicate, ExactMatcher
+from xuma.http import MethodInput
 
 # "Is it NOT a POST request?"
-predicate = Not(
-    SinglePredicate(MethodInput(), ExactMatcher("POST"))
-)
+predicate = Not(SinglePredicate(MethodInput(), ExactMatcher("POST")))
 ```
 
-Useful for exclusion rules (match everything except X).
+## Nesting
 
-## Nesting: Combine Freely
-
-Predicates nest arbitrarily up to `MAX_DEPTH` (32 levels).
+Predicates nest arbitrarily up to `MAX_DEPTH` (32 levels):
 
 ```python
-from puma import And, Or, SinglePredicate, PrefixMatcher, ExactMatcher
-from puma.http import PathInput, MethodInput, HeaderInput
+from xuma import And, Or, SinglePredicate, PrefixMatcher, ExactMatcher
+from xuma.http import PathInput, MethodInput, HeaderInput
 
-# "(GET /api/* OR POST /api/*) AND has auth header"
+# "(GET or POST) to /api/* with an auth header"
 predicate = And((
+    SinglePredicate(PathInput(), PrefixMatcher("/api")),
     Or((
-        And((
-            SinglePredicate(MethodInput(), ExactMatcher("GET")),
-            SinglePredicate(PathInput(), PrefixMatcher("/api")),
-        )),
-        And((
-            SinglePredicate(MethodInput(), ExactMatcher("POST")),
-            SinglePredicate(PathInput(), PrefixMatcher("/api")),
-        )),
+        SinglePredicate(MethodInput(), ExactMatcher("GET")),
+        SinglePredicate(MethodInput(), ExactMatcher("POST")),
     )),
     SinglePredicate(HeaderInput("authorization"), PrefixMatcher("Bearer ")),
 ))
 ```
 
-This reads like: "Accept GET or POST to `/api/*`, but only if the request has an authorization header starting with `Bearer `."
+Trees exceeding 32 levels raise `MatcherError` at construction time. Most real matchers use 3-5 levels.
 
-**Depth validation:** Trees exceeding 32 levels raise `MatcherError` at construction time. This protects against stack overflow and enforces a reasonable complexity limit.
+## Empty And / Or
 
-## Gateway API Compiler
+Edge cases with empty predicate lists:
 
-Manual predicate construction is verbose. The HTTP domain provides a compiler that builds predicates from Gateway API config:
+- **Empty `And`** returns `true` (vacuous truth — no conditions to fail).
+- **Empty `Or`** returns `false` (no conditions to pass).
 
-```python
-from puma.http import HttpRouteMatch, HttpPathMatch, HttpHeaderMatch
+Standard Boolean algebra. Rarely constructed directly.
 
-# Human-friendly config
-route = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/api"),
-    method="GET",
-    headers=[
-        HttpHeaderMatch(type="Exact", name="content-type", value="application/json")
-    ],
-)
+## The None-to-False Rule
 
-# Compiler builds the predicate tree for you
-predicate = route.to_predicate()
-```
-
-This generates an `And` with three conditions (path, method, header). You don't write the nesting manually.
-
-**Rust equivalent:**
-```rust
-use rumi_http::{HttpRouteMatch, HttpPathMatch, HttpHeaderMatch};
-
-let route = HttpRouteMatch {
-    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-    method: Some("GET".into()),
-    headers: Some(vec![
-        HttpHeaderMatch::Exact {
-            name: "content-type".into(),
-            value: "application/json".into(),
-        }
-    ]),
-    ..Default::default()
-};
-
-let predicate = route.to_predicate();
-```
-
-## Empty AND and OR
-
-Edge cases with empty lists:
-
-**Empty AND:** Returns `true` (vacuous truth). No conditions to fail means success.
+If a `DataInput` returns `None`/`null`, the `SinglePredicate` evaluates to `false` without calling the matcher. The matcher never sees missing data.
 
 ```python
-from puma import And
-
-predicate = And(())  # Empty tuple
-assert predicate.evaluate(request) == True
-```
-
-**Empty OR:** Returns `false`. No conditions to pass means failure.
-
-```python
-from puma import Or
-
-predicate = Or(())  # Empty tuple
-assert predicate.evaluate(request) == False
-```
-
-These match standard boolean algebra. In practice, you rarely construct empty predicates directly.
-
-## The None → False Invariant
-
-If a `DataInput` returns `None`, the predicate evaluates to `False` without calling the matcher.
-
-```python
-from puma import SinglePredicate, ExactMatcher
-from puma.http import HttpRequest, HeaderInput
+from xuma import SinglePredicate, ExactMatcher
+from xuma.http import HttpRequest, HeaderInput
 
 predicate = SinglePredicate(
     input=HeaderInput("x-api-key"),
-    matcher=ExactMatcher("secret")
+    matcher=ExactMatcher("secret"),
 )
 
-# Header not present → DataInput returns None → predicate returns False
+# Header not present → None → false
 request = HttpRequest(headers={})
 assert predicate.evaluate(request) == False
 ```
 
-The matcher never sees `None`. The predicate handles it upstream. This simplifies matcher implementations (they only handle present values).
+This is a security invariant: missing data never accidentally matches.
 
-## Cross-Language Predicate Types
+## Cross-Language Types
 
-All three implementations provide the same predicate types with identical semantics.
+Same predicate types across all implementations:
 
 **Rust:**
-```rust
+```rust,ignore
 pub enum Predicate<Ctx> {
     Single(SinglePredicate<Ctx>),
     And(Vec<Predicate<Ctx>>),
@@ -225,17 +149,13 @@ type Predicate[Ctx] = SinglePredicate[Ctx] | And[Ctx] | Or[Ctx] | Not[Ctx]
 
 **TypeScript:**
 ```typescript
-type Predicate<Ctx> =
-  | SinglePredicate<Ctx>
-  | And<Ctx>
-  | Or<Ctx>
-  | Not<Ctx>;
+type Predicate<Ctx> = SinglePredicate<Ctx> | And<Ctx> | Or<Ctx> | Not<Ctx>;
 ```
 
-Same structure. Same short-circuit behavior. Same depth limits. Write once in any language, the logic transfers.
+Same structure. Same short-circuit behavior. Same depth limits.
 
-## Next Steps
+## Next
 
-- [The Matching Pipeline](pipeline.md) — Where predicates fit in the flow
-- [First-Match-Wins Semantics](semantics.md) — How matchers use predicates
-- [Build an HTTP Router](../tutorials/http-router.md) — Predicates in action
+- [The Matching Pipeline](pipeline.md) — where predicates fit in the flow
+- [First-Match-Wins Semantics](semantics.md) — how matchers use predicates to choose actions
+- [Build an HTTP Router](../tutorials/http-router.md) — predicates in practice

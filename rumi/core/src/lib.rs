@@ -63,11 +63,11 @@
 //!
 //! # Extensions
 //!
-//! Domain-specific functionality is provided by extension crates:
+//! Domain-specific functionality:
 //!
-//! - [`rumi-test`](https://docs.rs/rumi-test) — Test domain for conformance
-//! - [`rumi-http`](https://docs.rs/rumi-http) — HTTP request matching
-//! - [`rumi-claude`](https://docs.rs/rumi-claude) — Claude Code hooks
+//! - [`claude`] — Claude Code hooks (feature = `"claude"`)
+//! - [`rumi-http`](https://docs.rs/rumi-http) — HTTP request matching (separate crate)
+//! - [`rumi-test`](https://docs.rs/rumi-test) — Test domain for conformance (internal)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Modules
@@ -84,6 +84,9 @@ mod predicate;
 mod radix_tree;
 mod string_match;
 mod trace;
+
+#[cfg(feature = "claude")]
+pub mod claude;
 
 #[cfg(feature = "registry")]
 mod config;

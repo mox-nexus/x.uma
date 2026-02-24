@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from puma import (
+from xuma import (
     And,
     ExactMatcher,
     Not,
@@ -10,7 +10,7 @@ from puma import (
     SinglePredicate,
     predicate_depth,
 )
-from puma.testing import DictInput
+from xuma.testing import DictInput
 
 
 class TestSinglePredicate:

@@ -2,19 +2,23 @@
  * Tests for bumi-crusty HookMatcher.
  *
  * Mirrors puma-crusty's 37 pytest tests:
- * - Conformance: same input → same result as Rust rumi-claude
+ * - Conformance: same input → same result as Rust rumi::claude
  * - Security: fail-closed, input limits, invalid regex
  * - Trace: debugging visibility
  * - DX: StringMatch factories, bare string convenience
  * - Session semantics: preserve semantic distinctions
  */
 
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 // @ts-expect-error — generated WASM package has no TS project reference
-import { HookMatcher, StringMatch } from "../pkg/bumi_crusty.js";
+import init, { HookMatcher, StringMatch } from "../pkg/bumi_crusty.js";
+
+beforeAll(async () => {
+  await init();
+});
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Conformance: must produce identical results to rumi-claude Rust tests
+// Conformance: must produce identical results to rumi::claude Rust tests
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("Conformance", () => {
