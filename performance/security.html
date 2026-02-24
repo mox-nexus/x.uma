@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,234 +181,91 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="security-model"><a class="header" href="#security-model">Security Model</a></h1>
-<p>x.uma is a trust boundary. Here’s what it guarantees.</p>
-<p>A matcher processes untrusted input (HTTP requests, gRPC messages, arbitrary data) and makes routing or policy decisions. A single malicious input should never crash the process, hang a worker thread, or consume unbounded resources.</p>
-<p>This page documents the security guarantees and failure modes of the x.uma matcher engine.</p>
+<p>x.uma’s security model prevents four classes of attack against matcher engines. Every guarantee is enforced at construction time, not evaluation time.</p>
 <h2 id="threat-model"><a class="header" href="#threat-model">Threat Model</a></h2>
-<p>x.uma assumes:</p>
-<ul>
-<li><strong>Untrusted input data</strong> — HTTP paths, headers, query params come from the network</li>
-<li><strong>Trusted config</strong> — matcher rules come from deployment config (not user input)</li>
-<li><strong>Optional: untrusted patterns</strong> — in some deployments, regex patterns may come from user config</li>
-</ul>
-<p>The matcher must remain safe under all input conditions. Adversarial input may cause a match to fail, but it must never cause unbounded resource consumption or undefined behavior.</p>
-<h2 id="depth-limits"><a class="header" href="#depth-limits">Depth Limits</a></h2>
-<p><strong>Guarantee</strong>: Nested matchers cannot exceed 32 levels.</p>
-<p><strong>Implementation</strong>: <code>MAX_DEPTH = 32</code> enforced at config validation time (not runtime).</p>
-<h3 id="why-depth-limits-matter"><a class="header" href="#why-depth-limits-matter">Why Depth Limits Matter</a></h3>
-<p>xDS matchers support recursion — an <code>OnMatch</code> can contain a nested <code>Matcher</code>, which can contain more nested matchers:</p>
-<pre><code class="language-protobuf">Matcher {
-  matcher_tree {
-    on_match {
-      matcher {  // level 1
-        on_match {
-          matcher {  // level 2
-            ...
-          }
-        }
-      }
-    }
-  }
-}
-</code></pre>
-<p>Without limits, an attacker could craft a config with 10,000 nested levels. In recursive implementations, this causes stack overflow. In iterative implementations, it causes O(n) validation cost per request.</p>
-<h3 id="enforcement"><a class="header" href="#enforcement">Enforcement</a></h3>
-<p>All variants validate depth at <strong>config load time</strong>:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// rumi (Rust)
-impl Matcher {
-    pub fn validate(&amp;self) -&gt; Result&lt;(), MatcherError&gt; {
-        self.validate_depth(0, MAX_DEPTH)
-    }
-}
-<span class="boring">}</span></code></pre>
-<pre><code class="language-python"># puma (Python)
-def validate_depth(matcher: Matcher, current: int = 0) -&gt; None:
-    if current &gt; MAX_DEPTH:
-        raise ValueError(f"Matcher depth {current} exceeds MAX_DEPTH={MAX_DEPTH}")
-</code></pre>
-<p>A config that exceeds depth limits is <strong>rejected at construction</strong>. Runtime evaluation never sees invalid configs.</p>
+<p>Matcher configs can come from untrusted sources — user-provided routing rules, dynamically loaded policy files, configs from external systems. The engine must be safe even when the config is adversarial.</p>
 <h2 id="redos-protection"><a class="header" href="#redos-protection">ReDoS Protection</a></h2>
-<p><strong>Guarantee</strong>: Varies by implementation.</p>
-<p>Regular Expression Denial of Service (ReDoS) exploits backtracking regex engines with adversarial input. A pattern like <code>(a+)+$</code> against input <code>"a" * N + "X"</code> causes exponential backtracking.</p>
-<h3 id="protection-by-variant"><a class="header" href="#protection-by-variant">Protection by Variant</a></h3>
+<p><strong>Threat:</strong> Regular expression Denial of Service. A crafted regex pattern causes exponential backtracking, consuming CPU indefinitely.</p>
+<p><strong>Mitigation:</strong> All implementations use RE2-class linear-time regex engines:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Variant</th><th>Regex Engine</th><th>Complexity</th><th>ReDoS Risk</th></tr>
+<tr><th>Implementation</th><th>Regex Engine</th><th>Guarantee</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>rumi</strong></td><td>Rust <code>regex</code> crate</td><td>O(n) linear</td><td><strong>None</strong> — guaranteed safe</td></tr>
-<tr><td><strong>puma</strong></td><td>Python <code>re</code> module</td><td>O(2^n) backtracking</td><td><strong>High</strong> — vulnerable</td></tr>
-<tr><td><strong>bumi</strong></td><td>JavaScript <code>RegExp</code></td><td>O(2^n) backtracking</td><td><strong>High</strong> — vulnerable</td></tr>
-<tr><td><strong>puma-crusty</strong></td><td>Rust <code>regex</code> via FFI</td><td>O(n) linear</td><td><strong>None</strong> — guaranteed safe</td></tr>
-<tr><td><strong>bumi-crusty</strong></td><td>Rust <code>regex</code> via WASM</td><td>O(n) linear</td><td><strong>None</strong> — guaranteed safe</td></tr>
+<tr><td>rumi (Rust)</td><td><code>regex</code> crate (DFA)</td><td>Linear time, proven</td></tr>
+<tr><td>xuma (Python)</td><td><code>google-re2</code> (C++ RE2 binding)</td><td>Linear time, Google RE2</td></tr>
+<tr><td>xuma (TypeScript)</td><td><code>re2js</code> (pure JS RE2 port)</td><td>Linear time, RE2 semantics</td></tr>
+<tr><td>puma-crusty</td><td>Rust <code>regex</code> via PyO3</td><td>Same as rumi</td></tr>
+<tr><td>bumi-crusty</td><td>Rust <code>regex</code> via WASM</td><td>Same as rumi</td></tr>
 </tbody>
 </table>
 </div>
-<h3 id="when-it-matters"><a class="header" href="#when-it-matters">When It Matters</a></h3>
-<p><strong>Trusted patterns</strong> (you control the regex):</p>
-<ul>
-<li>puma and bumi are safe — you won’t write exponential patterns</li>
-<li>No ReDoS risk because attacker can’t control the pattern</li>
-</ul>
-<p><strong>Untrusted patterns</strong> (regex comes from user config or external source):</p>
-<ul>
-<li>puma and bumi are <strong>unsafe</strong> — attacker can craft malicious patterns</li>
-<li>Must use rumi, puma-crusty, or bumi-crusty for guaranteed linear time</li>
-</ul>
-<h3 id="example-attack"><a class="header" href="#example-attack">Example Attack</a></h3>
-<p>Pattern: <code>(a+)+$</code>
-Input: <code>"aaaaaaaaaaaaaaaaaaaaX"</code> (N=20)</p>
+<p>No implementation uses a backtracking regex engine. Patterns that would cause catastrophic backtracking in PCRE/Python <code>re</code>/JavaScript <code>RegExp</code> are either rejected or matched in linear time.</p>
+<p><strong>Pattern length limit:</strong> Regex patterns are capped at 4,096 characters (<code>MAX_REGEX_PATTERN_LENGTH</code>). Non-regex patterns are capped at 8,192 characters (<code>MAX_PATTERN_LENGTH</code>).</p>
+<h2 id="depth-limit"><a class="header" href="#depth-limit">Depth Limit</a></h2>
+<p><strong>Threat:</strong> Stack overflow from deeply nested matchers. A config with 1,000 levels of nested matchers could exhaust the call stack during evaluation.</p>
+<p><strong>Mitigation:</strong> Maximum nesting depth of 32 levels (<code>MAX_DEPTH</code>), validated at construction time. If a config exceeds this limit, <code>MatcherError::DepthExceeded</code> is returned and no matcher is constructed.</p>
+<p>32 levels is generous — real-world matchers rarely exceed 5 levels. The limit catches misconfigured or adversarial configs.</p>
+<h2 id="width-limits"><a class="header" href="#width-limits">Width Limits</a></h2>
+<p><strong>Threat:</strong> Resource exhaustion from extremely wide matchers. A config with millions of field matchers at depth 1 bypasses depth limits but still causes excessive memory and CPU usage.</p>
+<p><strong>Mitigation:</strong> Three width limits, all validated at construction time:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Variant</th><th>Time</th><th>Behavior</th></tr>
+<tr><th>Limit</th><th>Value</th><th>Protects</th></tr>
 </thead>
 <tbody>
-<tr><td>rumi</td><td>11 ns</td><td>Returns false</td></tr>
-<tr><td>puma</td><td>72 ms</td><td>Returns false after 6.5M backtracking attempts</td></tr>
-<tr><td>bumi</td><td>11 ms</td><td>Returns false after 1M backtracking attempts</td></tr>
-<tr><td>puma-crusty</td><td>11 ns</td><td>Returns false</td></tr>
-<tr><td>bumi-crusty</td><td>11 ns</td><td>Returns false</td></tr>
+<tr><td><code>MAX_FIELD_MATCHERS</code></td><td>256 per <code>Matcher</code></td><td>Memory from wide matcher lists</td></tr>
+<tr><td><code>MAX_PREDICATES_PER_COMPOUND</code></td><td>256 per AND/OR</td><td>CPU from wide predicate trees</td></tr>
+<tr><td><code>MAX_PATTERN_LENGTH</code></td><td>8,192 chars</td><td>Memory from large string patterns</td></tr>
 </tbody>
 </table>
 </div>
-<p>At N=25, puma and bumi hang indefinitely. The worker thread never returns.</p>
-<p>See <a href="redos.html">ReDoS Protection</a> for full technical deep dive.</p>
-<h2 id="fail-closed-defaults"><a class="header" href="#fail-closed-defaults">Fail-Closed Defaults</a></h2>
-<p><strong>Guarantee</strong>: No match never accidentally becomes a match.</p>
-<p>The matcher uses <strong>fail-closed semantics</strong>:</p>
+<h2 id="none-to-false"><a class="header" href="#none-to-false">None-to-False</a></h2>
+<p><strong>Threat:</strong> Missing data accidentally matching a rule. If a header doesn’t exist, it should not match <code>ExactMatcher("secret")</code>.</p>
+<p><strong>Mitigation:</strong> When <code>DataInput.get()</code> returns <code>None</code>/<code>null</code>, the predicate evaluates to <code>false</code>. The <code>InputMatcher</code> is never called. This is enforced in all five implementations.</p>
+<p>This is a security invariant, not a convenience feature. It ensures fail-closed behavior: missing data means no match.</p>
+<h2 id="immutability"><a class="header" href="#immutability">Immutability</a></h2>
+<p><strong>Threat:</strong> Race conditions from concurrent access. Matchers shared across threads could produce inconsistent results if modified during evaluation.</p>
+<p><strong>Mitigation:</strong></p>
 <ul>
-<li>If a predicate evaluates to false, the match fails</li>
-<li>If input data is missing, the predicate evaluates to false</li>
-<li>If no rule matches, the matcher returns <code>None</code> (no action)</li>
+<li><strong>Rust:</strong> All core types are <code>Send + Sync</code>. Matchers are immutable after construction and safe to share via <code>Arc&lt;Matcher&gt;</code>.</li>
+<li><strong>Python:</strong> All types use <code>@dataclass(frozen=True)</code>. Fields cannot be reassigned after construction.</li>
+<li><strong>TypeScript:</strong> All types use <code>readonly</code> fields.</li>
+<li><strong>Registry:</strong> Immutable after <code>.build()</code>. The builder produces the registry, then the builder is consumed. No runtime registration.</li>
 </ul>
-<p>There is no way for missing data or failed predicates to “leak through” and trigger an unintended action.</p>
-<h3 id="the-none--false-invariant"><a class="header" href="#the-none--false-invariant">The None → false Invariant</a></h3>
-<p>When a <code>DataInput</code> returns <code>None</code> (missing data), the predicate evaluates to <code>false</code>:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// rumi
-impl SinglePredicate {
-    fn evaluate(&amp;self, ctx: &amp;Ctx) -&gt; bool {
-        let value = self.input.get(ctx);
-        if let MatchingData::None = value {
-            return false;  // missing data = no match
-        }
-        self.matcher.matches(&amp;value)
-    }
-}
-<span class="boring">}</span></code></pre>
-<p>This prevents bugs where a missing header or query param causes a “default match” that bypasses security rules.</p>
-<p><strong>Example</strong>: A rule matches requests with <code>x-admin: true</code>. If the header is missing:</p>
+<h2 id="construction-time-validation"><a class="header" href="#construction-time-validation">Construction-Time Validation</a></h2>
+<p>All validation happens when the matcher is built, not when it’s evaluated. If a <code>Matcher</code> object exists, it’s guaranteed to be:</p>
 <ul>
-<li>Predicate evaluates to <code>false</code></li>
-<li>Rule does not match</li>
-<li>Request is not treated as admin</li>
+<li>Within depth limits</li>
+<li>Within width limits</li>
+<li>Free of invalid regex patterns</li>
+<li>Free of unknown type URLs (config path)</li>
+<li>Structurally sound (OnMatch exclusivity enforced by the type system)</li>
 </ul>
-<p>The attacker cannot trigger admin behavior by omitting the header.</p>
-<h2 id="input-validation"><a class="header" href="#input-validation">Input Validation</a></h2>
-<p><strong>Guarantee</strong>: Configs are validated at construction, not at runtime.</p>
-<p>All variants validate matcher configs when they’re built:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// rumi
-let matcher = Matcher::try_from(proto_config)?;  // fails fast on invalid config
-<span class="boring">}</span></code></pre>
-<pre><code class="language-python"># puma
-matcher = Matcher.from_proto(proto_config)  # raises ValueError on invalid config
-validate_depth(matcher)  # enforces MAX_DEPTH
-</code></pre>
-<p>Invalid configs are rejected before the matcher is ever used. Runtime evaluation assumes the config is valid and never checks invariants that should have been validated at construction.</p>
-<p>This follows the <strong>parse, don’t validate</strong> principle: once a <code>Matcher</code> object exists, it’s known to be valid.</p>
-<h2 id="type-safety"><a class="header" href="#type-safety">Type Safety</a></h2>
-<p><strong>Guarantee</strong>: Matchers are type-safe at the domain level.</p>
-<p>A <code>Matcher&lt;HttpMessage, A&gt;</code> only accepts <code>HttpMessage</code> contexts. You cannot pass a <code>GrpcMessage</code> to an HTTP matcher. The type system prevents misuse.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// rumi
-let http_matcher: Matcher&lt;HttpMessage, Action&gt; = ...;
-let http_req = HttpMessage::from(...);
-http_matcher.evaluate(&amp;http_req);  // OK
-
-let grpc_req = GrpcMessage::from(...);
-http_matcher.evaluate(&amp;grpc_req);  // compile error: type mismatch
-<span class="boring">}</span></code></pre>
-<p>In Python and TypeScript, this is enforced at runtime via protocols:</p>
-<pre><code class="language-python"># puma
-def evaluate(self, ctx: HttpRequest) -&gt; Action | None: ...
-</code></pre>
-<p>The type hint documents the expected context. Passing the wrong type raises <code>AttributeError</code> when the matcher tries to access missing fields.</p>
-<h2 id="thread-safety"><a class="header" href="#thread-safety">Thread Safety</a></h2>
-<p><strong>Guarantee</strong>: All matcher types are thread-safe.</p>
-<p>Matchers are immutable after construction. All core types implement <code>Send + Sync</code> (Rust) or equivalent thread-safety guarantees in Python and TypeScript.</p>
-<p>Multiple threads can evaluate the same matcher concurrently without locking:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// rumi
-static MATCHER: Lazy&lt;Matcher&lt;HttpMessage, Action&gt;&gt; = Lazy::new(|| ...);
-
-// Called from multiple threads
-fn handle_request(req: HttpRequest) {
-    let result = MATCHER.evaluate(&amp;req);  // no lock needed
-}
-<span class="boring">}</span></code></pre>
-<p>This enables zero-overhead concurrent evaluation in multi-threaded servers.</p>
-<h2 id="resource-bounds"><a class="header" href="#resource-bounds">Resource Bounds</a></h2>
-<p><strong>Guarantee</strong>: Evaluation time is bounded by config size, not input size (except regex).</p>
-<p>For non-regex operations, evaluation cost is O(rules) regardless of input size:</p>
+<p>This follows the “parse, don’t validate” principle. The construction boundary is the trust boundary.</p>
+<h2 id="error-messages"><a class="header" href="#error-messages">Error Messages</a></h2>
+<p><code>MatcherError</code> variants include actionable context:</p>
 <ul>
-<li>Exact string match: O(1) comparison</li>
-<li>Prefix match: O(1) radix tree lookup</li>
-<li>First-match-wins over N rules: O(N) linear scan in worst case</li>
+<li><code>UnknownTypeUrl</code> lists all registered type URLs</li>
+<li><code>DepthExceeded</code> shows actual vs maximum depth</li>
+<li><code>PatternTooLong</code> shows actual vs maximum length</li>
+<li><code>InvalidPattern</code> includes the regex compilation error</li>
 </ul>
-<p>The only unbounded operation is regex matching, where cost is O(n) in the input length for rumi/crusty variants, and O(2^n) for puma/bumi on adversarial patterns.</p>
-<p><strong>Maximum evaluation time</strong> (trusted patterns, 200 rules):</p>
+<p>Self-correcting error messages help operators fix configs without guessing.</p>
+<h2 id="what-is-not-protected"><a class="header" href="#what-is-not-protected">What Is NOT Protected</a></h2>
 <ul>
-<li>rumi: 3.5 microseconds</li>
-<li>bumi: 2.1 microseconds</li>
-<li>puma: 20 microseconds</li>
+<li><strong>Semantic correctness:</strong> x.uma doesn’t verify that your rules do what you intend. First-match-wins means rule order matters — a too-broad rule early in the list can shadow specific rules.</li>
+<li><strong>Action interpretation:</strong> The engine returns actions without interpreting them. Whether <code>"allow"</code> means permit is your responsibility.</li>
+<li><strong>Context injection:</strong> x.uma trusts the context you provide. If your <code>DataInput</code> produces unsafe values from user input, the engine cannot protect you.</li>
+<li><strong>Side effects:</strong> Evaluation is pure (no I/O, no state mutation). But the code that acts on the result is outside x.uma’s scope.</li>
 </ul>
-<p>For untrusted patterns, use a variant with linear-time regex.</p>
-<h2 id="no-unsafe-code-rust"><a class="header" href="#no-unsafe-code-rust">No Unsafe Code (Rust)</a></h2>
-<p><strong>Guarantee</strong>: rumi uses zero unsafe code in the core engine.</p>
-<p>All <code>Send + Sync</code> implementations are compiler-derived. No manual <code>unsafe impl</code>. The type system enforces thread safety without escape hatches.</p>
-<p>The only <code>unsafe</code> in the entire codebase is in FFI boundary layers (puma-crusty and bumi-crusty), where it’s required to cross language boundaries. The core engine is 100% safe Rust.</p>
-<h2 id="attack-scenarios"><a class="header" href="#attack-scenarios">Attack Scenarios</a></h2>
-<h3 id="scenario-1-stack-overflow-via-deep-nesting"><a class="header" href="#scenario-1-stack-overflow-via-deep-nesting">Scenario 1: Stack Overflow via Deep Nesting</a></h3>
-<p><strong>Attack</strong>: Craft a config with 10,000 nested matchers to cause stack overflow.</p>
-<p><strong>Mitigation</strong>: <code>MAX_DEPTH = 32</code> enforced at config validation. Invalid config rejected before use.</p>
-<p><strong>Result</strong>: Attack prevented. Config never loads.</p>
-<h3 id="scenario-2-redos-via-malicious-pattern"><a class="header" href="#scenario-2-redos-via-malicious-pattern">Scenario 2: ReDoS via Malicious Pattern</a></h3>
-<p><strong>Attack</strong>: Inject pattern <code>(a+)+$</code> into user-facing config, send input <code>"a" * 30 + "X"</code> to hang the service.</p>
-<p><strong>Mitigation</strong>: Use rumi, puma-crusty, or bumi-crusty for untrusted patterns. Linear-time regex prevents exponential backtracking.</p>
-<p><strong>Result</strong>: Attack mitigated if using safe variant. puma/bumi vulnerable if attacker controls patterns.</p>
-<h3 id="scenario-3-bypass-via-missing-header"><a class="header" href="#scenario-3-bypass-via-missing-header">Scenario 3: Bypass via Missing Header</a></h3>
-<p><strong>Attack</strong>: Omit the <code>x-admin</code> header to bypass a rule that checks <code>x-admin: true</code>.</p>
-<p><strong>Mitigation</strong>: None → false invariant. Missing header causes predicate to return <code>false</code>, not <code>true</code>.</p>
-<p><strong>Result</strong>: Attack prevented. Rule does not match when header is missing.</p>
-<h3 id="scenario-4-type-confusion"><a class="header" href="#scenario-4-type-confusion">Scenario 4: Type Confusion</a></h3>
-<p><strong>Attack</strong>: Pass a <code>GrpcMessage</code> to an <code>HttpMatcher</code> to trigger undefined behavior.</p>
-<p><strong>Mitigation</strong>: Type system enforces context types. Rust prevents this at compile time. Python/TypeScript fail at runtime with <code>AttributeError</code>.</p>
-<p><strong>Result</strong>: Attack prevented. Type mismatch detected before evaluation.</p>
-<h2 id="security-checklist"><a class="header" href="#security-checklist">Security Checklist</a></h2>
-<p>Before deploying a matcher in production:</p>
+<h2 id="next"><a class="header" href="#next">Next</a></h2>
 <ul>
-<li><input disabled="" type="checkbox"> Depth limit validated — confirm <code>MAX_DEPTH</code> enforcement</li>
-<li><input disabled="" type="checkbox"> ReDoS risk assessed — untrusted patterns require rumi/crusty variants</li>
-<li><input disabled="" type="checkbox"> Fail-closed defaults confirmed — missing data evaluates to false</li>
-<li><input disabled="" type="checkbox"> Config validated at load time — invalid configs rejected</li>
-<li><input disabled="" type="checkbox"> Type safety verified — context types match matcher expectations</li>
-<li><input disabled="" type="checkbox"> Thread safety confirmed — concurrent evaluation is safe</li>
-</ul>
-<p>For untrusted input scenarios, prefer rumi for maximum safety.</p>
-<h2 id="related-pages"><a class="header" href="#related-pages">Related Pages</a></h2>
-<ul>
-<li><a href="redos.html">ReDoS Protection</a> — Deep dive into regex denial-of-service</li>
-<li><a href="benchmarks.html">Benchmark Results</a> — Performance data including ReDoS scenarios</li>
-<li><a href="guide.html">Performance Guide</a> — Which variant to use for your threat model</li>
+<li><a href="benchmarks.html">Benchmarks</a> — concrete performance numbers</li>
+<li><a href="../explain/xds-semantics.html">xDS Semantics</a> — the protocol behind the guarantees</li>
+<li><a href="../explain/architecture.html">Architecture</a> — how safety is built into the design</li>
 </ul>
 
                     </main>
@@ -419,9 +276,6 @@ fn handle_request(req: HttpRequest) {
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../performance/redos.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
-                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -433,9 +287,6 @@ fn handle_request(req: HttpRequest) {
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../performance/redos.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
-                    </a>
             </nav>
 
         </div>

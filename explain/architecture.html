@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,322 +181,152 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>Why x.uma is built the way it is, and how the same architecture maps across Rust, Python, and TypeScript.</p>
-<h2 id="design-philosophy-aces"><a class="header" href="#design-philosophy-aces">Design Philosophy: ACES</a></h2>
-<p><strong>A</strong>daptable · <strong>C</strong>omposable · <strong>E</strong>xtensible · <strong>S</strong>ustainable</p>
-<pre><code class="language-text">┌─────────────────────────────────────┐
-│         Domain Adapters             │
-│   xuma.http  xuma.claude  xuma.grpc │
-└───────────────┬─────────────────────┘
-                │
-┌───────────────▼─────────────────────┐
-│              PORTS                  │
-│     DataInput       ActionPort      │
-│   (extract data)  (emit result)     │
-└───────────────┬─────────────────────┘
-                │
-┌───────────────▼─────────────────────┐
-│              CORE                   │
-│           Matcher Engine            │
-│     Matcher · Predicate · Tree      │
-│       (pure, domain-agnostic)       │
-└─────────────────────────────────────┘
+<p>x.uma makes one bet: the boundary between “what data do I have?” and “how do I match it?” is the most valuable seam in a matcher engine.</p>
+<h2 id="the-bet"><a class="header" href="#the-bet">The Bet</a></h2>
+<p>Every matcher engine faces a choice. Couple the matching logic to the domain, and you get performance and simplicity — but you rebuild the engine for every new domain. Decouple them, and you get reuse — but you pay in abstraction tax and runtime indirection.</p>
+<p>x.uma’s answer: erase the type at the <strong>data level</strong>, not the matcher level. One <code>ExactMatcher</code> works for HTTP paths, Claude Code tool names, gRPC service identifiers, and types that don’t exist yet.</p>
+<pre><code class="language-text">Context (your data)
+    ↓
+DataInput.get()          ← knows your type, returns erased data
+    ↓
+MatchingData             ← string | int | bool | bytes | null
+    ↓
+InputMatcher.matches()   ← doesn't know your type, doesn't need to
+    ↓
+bool
 </code></pre>
-<p>This architecture applies to <strong>all implementations</strong> — rumi (Rust), puma (Python), bumi (TypeScript). The ports and hexagonal design are language-agnostic.</p>
-<h2 id="the-extension-seam"><a class="header" href="#the-extension-seam">The Extension Seam</a></h2>
-<p><code>TypedExtensionConfig</code> from xDS is the architectural seam:</p>
-<pre><code class="language-protobuf">message TypedExtensionConfig {
-  string name = 1;                       // adapter identifier
-  google.protobuf.Any typed_config = 2;  // adapter config
-}
+<p>The split happens at <code>MatchingData</code>. Above it, domain-specific code that knows about <code>HttpRequest</code> or <code>HookContext</code>. Below it, domain-agnostic matchers that work with primitives. This is the seam.</p>
+<h2 id="why-this-works"><a class="header" href="#why-this-works">Why This Works</a></h2>
+<p>The insight comes from Envoy, where it runs at Google scale. Envoy’s xDS Unified Matcher API uses the same split — domain-specific inputs feed type-erased data into generic matchers. x.uma implements these semantics in Rust, Python, and TypeScript.</p>
+<p>What the seam buys:</p>
+<p><strong>Write a matcher once, use it everywhere.</strong> <code>PrefixMatcher("/api")</code> matches HTTP paths, event source URIs, file paths — anything that produces a string through <code>MatchingData</code>. Five string matchers (<code>Exact</code>, <code>Prefix</code>, <code>Suffix</code>, <code>Contains</code>, <code>Regex</code>) cover most matching needs across all domains.</p>
+<p><strong>Add a domain without touching core.</strong> HTTP matching, Claude Code hooks, and the test domain all plug in by implementing <code>DataInput</code> — a single method that extracts a value from the context. The core engine never changes.</p>
+<p><strong>Share config across languages.</strong> The same JSON/YAML config produces the same matcher tree in Rust, Python, and TypeScript. <code>MatchingData</code> is the same name, same semantics, in all three.</p>
+<h2 id="the-shape"><a class="header" href="#the-shape">The Shape</a></h2>
+<pre><code class="language-text">┌─────────────────────────────────────────┐
+│           Domain Adapters               │
+│   xuma.http    xuma.claude    xuma.test │
+│   (DataInput implementations)           │
+└──────────────────┬──────────────────────┘
+                   │  get() → MatchingData
+                   ↓
+┌──────────────────▼──────────────────────┐
+│           Core Engine                   │
+│   Matcher · Predicate · InputMatcher    │
+│   (domain-agnostic, immutable)          │
+└─────────────────────────────────────────┘
 </code></pre>
-<p>Every <code>input</code> and <code>action</code> is a port. Adapters are concrete registered types.</p>
-<h2 id="why-type-erasure-at-data-level"><a class="header" href="#why-type-erasure-at-data-level">Why Type Erasure at Data Level</a></h2>
-<p>Key insight from the spike phase: erase types at the <strong>data level</strong>, not the predicate level.</p>
-<h3 id="rust-rumi"><a class="header" href="#rust-rumi">Rust (rumi)</a></h3>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// MatchingData — the erased type
-pub enum MatchingData { None, String(String), Int(i64), Bool(bool), Bytes(Vec&lt;u8&gt;) }
-
-// DataInput — domain-specific, returns erased type
-pub trait DataInput&lt;Ctx&gt;: Send + Sync + Debug {
-    fn get(&amp;self, ctx: &amp;Ctx) -&gt; MatchingData;
-}
-
-// InputMatcher — domain-agnostic, NON-GENERIC
-pub trait InputMatcher: Send + Sync + Debug {
-    fn matches(&amp;self, value: &amp;MatchingData) -&gt; bool;
-}
-<span class="boring">}</span></code></pre>
-<p><strong>Why this works:</strong></p>
-<ul>
-<li><code>InputMatcher</code> is non-generic → same <code>ExactMatcher</code> works everywhere</li>
-<li>No GATs or complex lifetimes</li>
-<li>Battle-tested at Google scale (Envoy uses this approach)</li>
-</ul>
-<h3 id="python-puma"><a class="header" href="#python-puma">Python (puma)</a></h3>
-<p>Python gets type erasure for free via union types:</p>
-<pre><code class="language-python"># MatchingValue — union type replaces Rust's enum
-type MatchingValue = str | int | bool | bytes | None
-
-# DataInput — protocol with contravariant Ctx
-class DataInput(Protocol[Ctx]):
-    def get(self, ctx: Ctx, /) -&gt; MatchingValue: ...
-
-# InputMatcher — protocol, non-generic
-class InputMatcher(Protocol):
-    def matches(self, value: MatchingValue, /) -&gt; bool: ...
-</code></pre>
-<p><strong>Key differences:</strong></p>
-<ul>
-<li>No enum needed — union types are native</li>
-<li>Protocols instead of traits (runtime-checkable)</li>
-<li><code>MatchingValue</code> is just a type alias, not a wrapped type</li>
-</ul>
-<h3 id="typescript-bumi"><a class="header" href="#typescript-bumi">TypeScript (bumi)</a></h3>
-<pre><code class="language-typescript">// MatchingData — union type
-type MatchingData = string | number | boolean | Uint8Array | null;
-
-// DataInput — generic interface
-interface DataInput&lt;Ctx&gt; {
-  get(ctx: Ctx): MatchingData;
-}
-
-// InputMatcher — non-generic interface
-interface InputMatcher {
-  matches(value: MatchingData): boolean;
-}
-</code></pre>
-<p><strong>Key differences:</strong></p>
-<ul>
-<li>Interfaces instead of traits/protocols</li>
-<li>Structural typing (duck-typed) vs nominal (Rust) vs runtime-checkable (Python)</li>
-<li>Union types native like Python</li>
-</ul>
-<h2 id="type-system-mappings"><a class="header" href="#type-system-mappings">Type System Mappings</a></h2>
-<p>How the same architecture translates across languages:</p>
+<p>Two ports define the boundary:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Concept</th><th>Rust (rumi)</th><th>Python (puma)</th><th>TypeScript (bumi)</th></tr>
+<tr><th>Port</th><th>Direction</th><th>Generic?</th><th>You implement</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>Erased data</strong></td><td><code>enum MatchingData</code></td><td><code>type MatchingValue</code> (union)</td><td><code>type MatchingData</code> (union)</td></tr>
-<tr><td><strong>Extraction port</strong></td><td><code>trait DataInput&lt;Ctx&gt;</code></td><td><code>Protocol[Ctx]</code></td><td><code>interface DataInput&lt;Ctx&gt;</code></td></tr>
-<tr><td><strong>Matching port</strong></td><td><code>trait InputMatcher</code></td><td><code>Protocol</code></td><td><code>interface InputMatcher</code></td></tr>
-<tr><td><strong>Predicate tree</strong></td><td><code>enum Predicate&lt;Ctx&gt;</code></td><td><code>type Predicate[Ctx]</code> (union)</td><td><code>type Predicate&lt;Ctx&gt;</code> (discriminated union)</td></tr>
-<tr><td><strong>OnMatch</strong></td><td><code>enum OnMatch&lt;Ctx, A&gt;</code></td><td><code>type OnMatch[Ctx, A]</code> (union)</td><td><code>type OnMatch&lt;Ctx, A&gt;</code> (discriminated union)</td></tr>
-<tr><td><strong>Pattern match</strong></td><td><code>match</code> expression</td><td><code>match</code>/<code>case</code> statement</td><td><code>instanceof</code> checks</td></tr>
-<tr><td><strong>Immutability</strong></td><td>Owned types, no <code>mut</code></td><td><code>@dataclass(frozen=True)</code></td><td><code>readonly</code> fields</td></tr>
-<tr><td><strong>Thread safety</strong></td><td><code>Send + Sync</code> bounds</td><td>Not applicable (GIL)</td><td>Not applicable (single-threaded)</td></tr>
+<tr><td><strong>DataInput</strong></td><td>Domain → Core</td><td>Yes (knows <code>Ctx</code>)</td><td>One per field you want to match</td></tr>
+<tr><td><strong>InputMatcher</strong></td><td>Core → bool</td><td>No (knows <code>MatchingData</code>)</td><td>Rarely — five ship with x.uma</td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="predicate-composition"><a class="header" href="#predicate-composition">Predicate Composition</a></h2>
-<p>All three languages express the same Boolean logic:</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Rust
-pub enum Predicate&lt;Ctx&gt; {
-    Single(SinglePredicate&lt;Ctx&gt;),
-    And { predicates: Vec&lt;Predicate&lt;Ctx&gt;&gt; },
-    Or { predicates: Vec&lt;Predicate&lt;Ctx&gt;&gt; },
-    Not { predicate: Box&lt;Predicate&lt;Ctx&gt;&gt; },
-}
-<span class="boring">}</span></code></pre>
-<pre><code class="language-python"># Python
-type Predicate[Ctx] = SinglePredicate[Ctx] | And[Ctx] | Or[Ctx] | Not[Ctx]
-
-@dataclass(frozen=True)
-class And[Ctx]:
-    predicates: tuple[Predicate[Ctx], ...]
-</code></pre>
-<pre><code class="language-typescript">// TypeScript — classes with instanceof, not discriminated unions
-class SinglePredicate&lt;Ctx&gt; {
-    constructor(
-        readonly input: DataInput&lt;Ctx&gt;,
-        readonly matcher: InputMatcher
-    ) {}
-}
-
-class And&lt;Ctx&gt; {
-    constructor(readonly predicates: readonly Predicate&lt;Ctx&gt;[]) {}
-}
-
-class Or&lt;Ctx&gt; {
-    constructor(readonly predicates: readonly Predicate&lt;Ctx&gt;[]) {}
-}
-
-class Not&lt;Ctx&gt; {
-    constructor(readonly predicate: Predicate&lt;Ctx&gt;) {}
-}
-
-type Predicate&lt;Ctx&gt; = SinglePredicate&lt;Ctx&gt; | And&lt;Ctx&gt; | Or&lt;Ctx&gt; | Not&lt;Ctx&gt;;
-
-// Pattern matching via instanceof
-if (p instanceof SinglePredicate) { /* ... */ }
-else if (p instanceof And) { /* ... */ }
-</code></pre>
-<p><strong>Key difference:</strong> TypeScript uses classes with <code>instanceof</code> checks, not objects with <code>type</code> discriminator fields. This matches Python’s dataclass approach more closely than traditional TS discriminated unions.</p>
-<h2 id="onmatch-exclusivity-xds-semantics"><a class="header" href="#onmatch-exclusivity-xds-semantics">OnMatch Exclusivity (xDS Semantics)</a></h2>
-<p>All three enforce the xDS invariant: action XOR nested matcher, never both.</p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>// Rust — illegal states unrepresentable
-pub enum OnMatch&lt;Ctx, A&gt; {
-    Action(A),
-    Matcher(Box&lt;Matcher&lt;Ctx, A&gt;&gt;),
-}
-<span class="boring">}</span></code></pre>
-<pre><code class="language-python"># Python — union type enforces exclusivity
-type OnMatch[Ctx, A] = Action[A] | NestedMatcher[Ctx, A]
-
-@dataclass(frozen=True)
-class Action[A]:
-    value: A
-
-@dataclass(frozen=True)
-class NestedMatcher[Ctx, A]:
-    matcher: Matcher[Ctx, A]
-</code></pre>
-<pre><code class="language-typescript">// TypeScript — classes with instanceof
-class Action&lt;A&gt; {
-    constructor(readonly value: A) {}
-}
-
-class NestedMatcher&lt;Ctx, A&gt; {
-    constructor(readonly matcher: Matcher&lt;Ctx, A&gt;) {}
-}
-
-type OnMatch&lt;Ctx, A&gt; = Action&lt;A&gt; | NestedMatcher&lt;Ctx, A&gt;;
-
-// Check variant
-if (onMatch instanceof Action) { return onMatch.value; }
-else if (onMatch instanceof NestedMatcher) { return onMatch.matcher.evaluate(ctx); }
-</code></pre>
-<h2 id="evaluation-semantics"><a class="header" href="#evaluation-semantics">Evaluation Semantics</a></h2>
-<p>First-match-wins is identical across all implementations:</p>
-<ol>
-<li>Evaluate <code>field_matchers</code> in order</li>
-<li>Return action from first matching predicate</li>
-<li>If nested matcher returns <code>None</code>/<code>null</code>, continue to next field</li>
-<li>If no matches, consult <code>on_no_match</code> fallback</li>
-<li>If no fallback, return <code>None</code>/<code>null</code></li>
-</ol>
-<h2 id="cross-language-conformance"><a class="header" href="#cross-language-conformance">Cross-Language Conformance</a></h2>
-<p>All implementations pass the same YAML conformance test suite (<code>spec/tests/</code>):</p>
-<pre><code class="language-yaml"># spec/tests/predicate/single/exact.yaml
-name: "Single predicate with exact match"
-cases:
-  - input: "hello"
-    matcher: { exact: "hello" }
-    expected: { matches: true }
-</code></pre>
-<p><strong>Test runners:</strong></p>
+<p>Domain adapters implement <code>DataInput</code>. The core ships <code>InputMatcher</code> implementations. <code>SinglePredicate</code> wires one to the other.</p>
+<h2 id="aces"><a class="header" href="#aces">ACES</a></h2>
+<p>The architecture follows four properties:</p>
+<p><strong>Adaptable.</strong> New domains plug in without modifying core. HTTP matching didn’t require changes to the predicate engine. Claude Code hooks didn’t require changes to HTTP matching. Each domain is independent.</p>
+<p><strong>Composable.</strong> Predicates compose with AND, OR, NOT. Matchers nest up to 32 levels deep. A matcher’s action can be another matcher, creating trees of arbitrary complexity from simple building blocks.</p>
+<p><strong>Extensible.</strong> <code>TypedExtensionConfig</code> from the xDS protobuf spec is the extension seam. Every input and action is identified by a type URL (<code>xuma.http.v1.PathInput</code>, <code>xuma.claude.v1.ToolNameInput</code>). New types register without modifying existing ones.</p>
+<p><strong>Sustainable.</strong> Core is stable. Growth happens at the edges. Adding a domain means adding <code>DataInput</code> implementations and a compiler — not touching <code>Matcher</code>, <code>Predicate</code>, or <code>InputMatcher</code>. The architecture sustains extension without rewrites.</p>
+<h2 id="what-core-owns"><a class="header" href="#what-core-owns">What Core Owns</a></h2>
+<p>The core engine (<code>rumi</code> in Rust, <code>xuma</code> in Python/TypeScript) provides:</p>
 <ul>
-<li>Rust: <code>cargo test</code> (rumi-test crate) — 195 tests</li>
-<li>Python: <code>pytest</code> (puma/tests/) — 194 tests</li>
-<li>TypeScript: <code>bun test</code> (bumi/tests/) — 202 tests</li>
+<li><strong>Matcher</strong> — first-match-wins evaluation over a list of field matchers</li>
+<li><strong>Predicate</strong> — Boolean tree (Single, And, Or, Not) with short-circuit evaluation</li>
+<li><strong>SinglePredicate</strong> — pairs a <code>DataInput</code> with an <code>InputMatcher</code></li>
+<li><strong>MatchingData</strong> — the type-erased bridge (<code>string | int | bool | bytes | null</code>)</li>
+<li><strong>InputMatcher</strong> — five string matchers plus <code>BoolMatcher</code></li>
+<li><strong>OnMatch</strong> — action XOR nested matcher (illegal states unrepresentable)</li>
+<li><strong>Depth/width limits</strong> — MAX_DEPTH=32, MAX_FIELD_MATCHERS=256</li>
+<li><strong>Registry</strong> — immutable type registry for config-driven construction</li>
+<li><strong>Trace</strong> — step-by-step evaluation debugging</li>
 </ul>
-<p>Each language’s test runner parses the same YAML fixtures, constructs matchers in its type system, and asserts the same expected outcomes. Total: <strong>268 tests across 5 variants</strong> (including puma-crusty and bumi-crusty).</p>
-<h2 id="cratepackage-structure"><a class="header" href="#cratepackage-structure">Crate/Package Structure</a></h2>
-<h3 id="rust-rumi-1"><a class="header" href="#rust-rumi-1">Rust (rumi)</a></h3>
-<pre><code class="language-text">rumi/
-├── rumi/               # Core engine (package: rumi)
-└── ext/                # Domain extensions
-    ├── test/           # rumi-test (conformance)
-    ├── http/           # rumi-http
-    └── claude/         # rumi-claude (Claude Code hooks)
+<p>Core does not own domain knowledge. It does not know what an HTTP request is, what a Claude Code hook event is, or what your custom context type contains. It matches erased values.</p>
+<h2 id="what-domains-own"><a class="header" href="#what-domains-own">What Domains Own</a></h2>
+<p>Each domain provides:</p>
+<ul>
+<li><strong>Context type</strong> — <code>HttpRequest</code>, <code>HookContext</code>, your type</li>
+<li><strong>DataInput implementations</strong> — extractors for each matchable field</li>
+<li><strong>Compiler</strong> — transforms domain-specific config into matcher trees</li>
+<li><strong>Registry function</strong> — registers domain inputs with the type registry</li>
+</ul>
+<p>The compiler is the user-facing API. Instead of manually constructing predicate trees, you write:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// HTTP: Gateway API config → matcher
+let matcher = compile_route_matches(&amp;routes, "allowed", "denied");
+
+// Claude: hook rules → matcher
+let matcher = rule.compile("block")?;
+<span class="boring">}</span></code></pre>
+<p>Compilers are syntactic sugar over the core engine. They produce the same <code>Matcher&lt;Ctx, A&gt;</code> you’d build by hand.</p>
+<h2 id="matcher-engine-not-policy-engine"><a class="header" href="#matcher-engine-not-policy-engine">Matcher Engine, Not Policy Engine</a></h2>
+<p>x.uma is a matcher engine. It finds the first matching rule and returns an action. It does not interpret that action.</p>
+<p>The generic <code>A</code> in <code>Matcher&lt;Ctx, A&gt;</code> is the boundary. <code>A</code> can be a string, an enum, a struct — anything. Core never inspects it. Whether <code>"allow"</code> means permit and <code>"deny"</code> means block is your concern, not the engine’s.</p>
+<p>Policy (allow/deny, rate limits, routing decisions) lives <strong>above</strong> the matcher. This is the Istio pattern — the data plane matches, the control plane decides. x.uma is the data plane.</p>
+<p>This means x.uma doesn’t compete with OPA or Cedar. It complements them. Use x.uma for fast, structured matching. Use a policy engine for policy logic that operates on the match result.</p>
+<h2 id="two-construction-paths"><a class="header" href="#two-construction-paths">Two Construction Paths</a></h2>
+<p>Matchers can be built two ways:</p>
+<p><strong>Compiler path</strong> — domain-specific DSL produces matchers directly. Ergonomic, type-safe, no serialization overhead.</p>
+<pre><code class="language-python">from xuma.http import HttpRouteMatch, compile_route_matches
+
+routes = [HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/api"), method="GET")]
+matcher = compile_route_matches(routes, "api", "not_found")
 </code></pre>
-<p>Dependencies point inward. Core knows nothing about domains.</p>
-<h3 id="python-puma-1"><a class="header" href="#python-puma-1">Python (puma)</a></h3>
-<pre><code class="language-text">puma/
-└── src/puma/
-    ├── __init__.py     # Core types (flat exports)
-    ├── _types.py       # Protocols
-    ├── _predicate.py   # Predicates
-    ├── _matcher.py     # Matcher tree
-    ├── _string_matchers.py
-    └── http/
-        ├── __init__.py # HTTP domain (flat exports)
-        ├── _request.py
-        ├── _inputs.py
-        └── _gateway.py # Gateway API compiler
+<p><strong>Config path</strong> — JSON/YAML config loaded through the registry. Portable across languages, storable, versionable.</p>
+<pre><code class="language-json">{
+  "matcher_list": [{
+    "predicate": {
+      "single": {
+        "input": { "type_url": "xuma.test.v1.StringInput", "config": { "key": "method" } },
+        "matcher": { "type_url": "xuma.core.v1.StringMatcher", "config": { "exact": "GET" } }
+      }
+    },
+    "on_match": { "action": "route-get" }
+  }],
+  "on_no_match": { "action": "fallback" }
+}
 </code></pre>
-<p>Flat exports via <code>__init__.py</code>. Private modules prefixed with <code>_</code>.</p>
-<h3 id="typescript-bumi-1"><a class="header" href="#typescript-bumi-1">TypeScript (bumi)</a></h3>
-<pre><code class="language-text">bumi/
-└── src/
-    ├── index.ts        # Core types
-    ├── types.ts        # Interfaces
-    ├── predicate.ts
-    ├── matcher.ts
-    ├── string-matchers.ts
-    └── http/
-        ├── index.ts    # HTTP domain
-        ├── request.ts
-        ├── inputs.ts
-        └── gateway.ts  # Gateway API compiler
-</code></pre>
-<p>Standard TypeScript barrel exports.</p>
-<h2 id="performance-characteristics"><a class="header" href="#performance-characteristics">Performance Characteristics</a></h2>
+<p>Both paths produce the same <code>Matcher</code>. The compiler path is for programmatic construction. The config path is for declarative, cross-language use.</p>
+<h2 id="five-implementations-one-spec"><a class="header" href="#five-implementations-one-spec">Five Implementations, One Spec</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Implementation</th><th>Regex Engine</th><th>Thread Safety</th><th>Memory Model</th><th>FFI Overhead</th></tr>
+<tr><th>Implementation</th><th>Language</th><th>Type</th></tr>
 </thead>
 <tbody>
-<tr><td>rumi (Rust)</td><td><code>regex</code> crate (linear-time)</td><td>Send + Sync</td><td>Zero-copy where possible</td><td>N/A</td></tr>
-<tr><td>puma (Python)</td><td><code>re</code> module (backtracking)</td><td>GIL (not parallel-safe)</td><td>Reference-counted</td><td>N/A</td></tr>
-<tr><td>puma-crusty</td><td><code>regex</code> via PyO3 (linear-time)</td><td>GIL</td><td>Crossing FFI boundary</td><td>~200ns/call</td></tr>
-<tr><td>bumi (TypeScript)</td><td>JS <code>RegExp</code> (V8 engine)</td><td>Single-threaded</td><td>Garbage-collected</td><td>N/A</td></tr>
-<tr><td>bumi-crusty</td><td><code>regex</code> via WASM (linear-time)</td><td>Single-threaded</td><td>Crossing WASM boundary</td><td>~50ns/call</td></tr>
+<tr><td><strong>rumi</strong></td><td>Rust</td><td>Reference implementation</td></tr>
+<tr><td><strong>xuma</strong> (Python)</td><td>Python</td><td>Pure Python</td></tr>
+<tr><td><strong>xuma</strong> (TypeScript)</td><td>TypeScript</td><td>Pure TypeScript</td></tr>
+<tr><td><strong>puma-crusty</strong></td><td>Python</td><td>Rust core via PyO3</td></tr>
+<tr><td><strong>bumi-crusty</strong></td><td>TypeScript</td><td>Rust core via WASM</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>Benchmark highlights</strong> (from Phase 9):</p>
+<p>All five pass the same conformance test suite. Same config format, same evaluation semantics, same results. Choose based on your runtime and performance needs.</p>
+<h2 id="next"><a class="header" href="#next">Next</a></h2>
 <ul>
-<li>rumi evaluation: 11ns (native Rust, zero overhead)</li>
-<li>puma evaluation: 200ns (Python overhead, CPython 3.14)</li>
-<li>bumi evaluation: 9ns (V8 JIT, near-native performance)</li>
-<li>puma-crusty: 400ns (Python + FFI crossing)</li>
-<li>bumi-crusty: 60ns (WASM + boundary crossing)</li>
-</ul>
-<p><strong>ReDoS comparison</strong> (<code>(a+)+$</code> pattern, N=20):</p>
-<ul>
-<li>rumi: 11ns (linear-time regex)</li>
-<li>puma: 72ms (exponential backtracking)</li>
-<li>bumi: 11ms (V8 optimizations help but still exponential)</li>
-<li>puma-crusty: 11ns (Rust regex via FFI)</li>
-<li>bumi-crusty: 11ns (Rust regex via WASM)</li>
-</ul>
-<p>See <a href="../performance/benchmarks.html">Performance &gt; Benchmarks</a> for full data.</p>
-<h2 id="why-multiple-implementations"><a class="header" href="#why-multiple-implementations">Why Multiple Implementations?</a></h2>
-<p><strong>Ecosystem reach:</strong> Deploy matchers where your code lives.</p>
-<ul>
-<li>Rust: Envoy ext_proc, high-performance services</li>
-<li>Python: Data pipelines, ML inference, scripting</li>
-<li>TypeScript: Edge workers (Cloudflare, Deno), serverless</li>
-</ul>
-<p><strong>Reference consistency:</strong> All implementations are ports, not wrappers. Same architecture, same semantics, same test suite.</p>
-<p><strong>Learning path:</strong> Pure implementations (rumi, puma, bumi) are readable references. Crusty variants (PyO3, WASM) provide Rust performance when needed.</p>
-<h2 id="see-also"><a class="header" href="#see-also">See Also</a></h2>
-<ul>
-<li><a href="../development/roadmap.html">Roadmap</a> — Implementation status</li>
-<li><a href="../guides/adding-domain.html">Adding a Domain</a> — Extend with custom contexts</li>
-<li><a href="why-aces.html">Why ACES</a> — Design philosophy deep dive</li>
+<li><a href="../concepts/pipeline.html">The Matching Pipeline</a> — how data flows through evaluation</li>
+<li><a href="../concepts/type-erasure.html">Type Erasure and Ports</a> — the technical details of the seam</li>
+<li><a href="when-to-use.html">When to Use x.uma</a> — where x.uma fits and where it doesn’t</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../performance/redos.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../guides/adding-domain.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../explain/why-aces.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../explain/when-to-use.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -506,11 +336,11 @@ cases:
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../performance/redos.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../guides/adding-domain.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../explain/why-aces.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../explain/when-to-use.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

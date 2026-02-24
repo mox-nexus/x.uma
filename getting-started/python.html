@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Python Quick Start - x.uma</title>
+        <title>Python - x.uma</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,26 +181,49 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="python-quick-start"><a class="header" href="#python-quick-start">Python Quick Start</a></h1>
-<p>Build an HTTP route matcher in 10 lines.</p>
-<p>x.uma’s Python implementation (<code>puma</code>) translates Gateway API route configuration into efficient runtime matchers. Routes defined at config time become compiled trees evaluated at request time.</p>
+<p>Build an HTTP route matcher with <code>xuma</code> in 10 lines.</p>
 <h2 id="install"><a class="header" href="#install">Install</a></h2>
-<p>Add <code>puma</code> to your project:</p>
-<pre><code class="language-bash">uv add puma
+<pre><code class="language-bash">uv add xuma
 </code></pre>
-<p>If you’re not using <code>uv</code>, <code>pip</code> works too:</p>
-<pre><code class="language-bash">pip install puma
-</code></pre>
-<p><strong>Requires Python 3.12+</strong> for PEP 695 type parameter syntax (<code>class Matcher[Ctx, A]</code>).</p>
+<p>Requires Python 3.12+. The only runtime dependency is <code>google-re2</code> for linear-time regex.</p>
 <h2 id="your-first-matcher"><a class="header" href="#your-first-matcher">Your First Matcher</a></h2>
-<p>Match GET requests to <code>/api/*</code> and POST requests to <code>/admin/*</code>:</p>
-<pre><code class="language-python">from puma.http import (
+<p>Match requests by path prefix:</p>
+<pre><code class="language-python">from xuma import Matcher, FieldMatcher, SinglePredicate, Action, PrefixMatcher
+from xuma.http import HttpRequest, PathInput
+
+# Build a predicate: path starts with /api
+predicate = SinglePredicate(
+    input=PathInput(),
+    matcher=PrefixMatcher("/api"),
+)
+
+# Build the matcher tree
+matcher = Matcher(
+    matcher_list=(
+        FieldMatcher(predicate=predicate, on_match=Action("api_backend")),
+    ),
+    on_no_match=Action("default_backend"),
+)
+
+# Evaluate
+request = HttpRequest(method="GET", raw_path="/api/users")
+assert matcher.evaluate(request) == "api_backend"
+
+# No match falls through
+other = HttpRequest(method="GET", raw_path="/other")
+assert matcher.evaluate(other) == "default_backend"
+</code></pre>
+<p><code>Matcher</code> takes a tuple of <code>FieldMatcher</code>s (tried in order) and an optional fallback. First match wins.</p>
+<h2 id="the-gateway-api-compiler"><a class="header" href="#the-gateway-api-compiler">The Gateway API Compiler</a></h2>
+<p>Manual predicate construction is explicit but verbose. The HTTP domain ships a compiler that builds matchers from Gateway API config:</p>
+<pre><code class="language-python">from xuma.http import (
     HttpRouteMatch,
     HttpPathMatch,
     HttpRequest,
     compile_route_matches,
 )
 
-# Define routes using Gateway API syntax
+# Declarative config
 routes = [
     HttpRouteMatch(
         path=HttpPathMatch(type="PathPrefix", value="/api"),
@@ -212,232 +235,60 @@ routes = [
     ),
 ]
 
-# Compile routes into a matcher
+# One call compiles all routes
 matcher = compile_route_matches(
     matches=routes,
-    action="allowed",      # when any route matches
-    on_no_match="denied",  # when no routes match
+    action="allowed",
+    on_no_match="denied",
 )
 
-# Evaluate against requests
-request = HttpRequest(method="GET", raw_path="/api/users")
-result = matcher.evaluate(request)
-assert result == "allowed"
-
-request = HttpRequest(method="DELETE", raw_path="/api/users")
-result = matcher.evaluate(request)
-assert result == "denied"  # DELETE not in routes
+assert matcher.evaluate(HttpRequest(method="GET", raw_path="/api/users")) == "allowed"
+assert matcher.evaluate(HttpRequest(method="DELETE", raw_path="/api/users")) == "denied"
 </code></pre>
-<p>The <code>compile_route_matches</code> function is the high-level API. It takes a list of <code>HttpRouteMatch</code> configs and produces a <code>Matcher[HttpRequest, A]</code> that runs in microseconds.</p>
-<h2 id="how-compilation-works"><a class="header" href="#how-compilation-works">How Compilation Works</a></h2>
-<p>Gateway API route configuration is declarative. You specify what to match, not how to evaluate it:</p>
-<pre><code class="language-python">from puma.http import HttpRouteMatch, HttpPathMatch, HttpHeaderMatch
+<p>Within a single <code>HttpRouteMatch</code>, all conditions are ANDed. Multiple routes are ORed. First match wins.</p>
+<h2 id="adding-header-conditions"><a class="header" href="#adding-header-conditions">Adding Header Conditions</a></h2>
+<pre><code class="language-python">from xuma.http import HttpHeaderMatch
 
 route = HttpRouteMatch(
     path=HttpPathMatch(type="PathPrefix", value="/api"),
-    method="GET",
+    method="POST",
     headers=[
         HttpHeaderMatch(
-            type="Exact",
-            name="content-type",
-            value="application/json",
+            type="RegularExpression",
+            name="authorization",
+            value=r"^Bearer .+$",
         ),
     ],
 )
 </code></pre>
-<p>All conditions within a single <code>HttpRouteMatch</code> are ANDed together. When you pass multiple <code>HttpRouteMatch</code> entries to <code>compile_route_matches</code>, they are ORed.</p>
-<p>The compiler produces a tree of predicates:</p>
-<pre><code>Matcher
-└── FieldMatcher
-    └── Or
-        ├── And(path=/api, method=GET, header=content-type)
-        └── And(path=/admin, method=POST)
-</code></pre>
-<p>At evaluation time, the tree walks first-match-wins until a predicate succeeds.</p>
-<h2 id="under-the-hood-manual-construction"><a class="header" href="#under-the-hood-manual-construction">Under the Hood: Manual Construction</a></h2>
-<p>The Gateway API compiler is syntactic sugar. Here’s what it generates:</p>
-<pre><code class="language-python">from puma import Matcher, FieldMatcher, Action, SinglePredicate, And
-from puma import ExactMatcher, PrefixMatcher
-from puma.http import HttpRequest, PathInput, MethodInput
-
-# Manual construction of the same matcher
-matcher = Matcher(
-    matcher_list=(
-        FieldMatcher(
-            predicate=And(
-                predicates=(
-                    SinglePredicate(
-                        input=PathInput(),
-                        matcher=PrefixMatcher("/api"),
-                    ),
-                    SinglePredicate(
-                        input=MethodInput(),
-                        matcher=ExactMatcher("GET"),
-                    ),
-                )
-            ),
-            on_match=Action("allowed"),
-        ),
-        FieldMatcher(
-            predicate=SinglePredicate(
-                input=PathInput(),
-                matcher=PrefixMatcher("/admin"),
-            ),
-            on_match=Action("allowed"),
-        ),
-    ),
-    on_no_match=Action("denied"),
-)
-</code></pre>
-<p>This is verbose but explicit. You control the exact tree structure.</p>
-<p><strong>When to use manual construction:</strong></p>
-<ul>
-<li>Building matchers programmatically from non-Gateway-API configs</li>
-<li>Implementing custom <code>DataInput</code> or <code>InputMatcher</code> protocols</li>
-<li>Debugging compilation behavior</li>
-</ul>
-<p><strong>When to use the compiler:</strong></p>
-<ul>
-<li>Standard HTTP routing (99% of use cases)</li>
-<li>Gateway API configurations from Kubernetes</li>
-<li>Less code, same performance</li>
-</ul>
-<h2 id="the-httprequest-context"><a class="header" href="#the-httprequest-context">The HttpRequest Context</a></h2>
-<p><code>HttpRequest</code> is a frozen dataclass with parsed query parameters and lowercased headers:</p>
-<pre><code class="language-python">from puma.http import HttpRequest
-
-# Query string parsed from raw_path
-request = HttpRequest(
-    method="GET",
-    raw_path="/search?q=hello&amp;lang=en",
-    headers={"Content-Type": "application/json"},
-)
-
-assert request.path == "/search"
-assert request.query_param("q") == "hello"
-assert request.query_param("lang") == "en"
-
-# Headers are case-insensitive
-assert request.header("content-type") == "application/json"
-assert request.header("Content-Type") == "application/json"
-</code></pre>
-<p>The query string is parsed once at construction time (O(n) scan). Every <code>query_param()</code> lookup is O(1) dictionary access.</p>
-<p>Headers are stored lowercased to avoid repeated string operations during matching.</p>
-<h2 id="actions-beyond-strings"><a class="header" href="#actions-beyond-strings">Actions: Beyond Strings</a></h2>
-<p>The examples use <code>str</code> actions for simplicity. In production, actions are often dataclasses or enums:</p>
+<p>Regex uses <code>google-re2</code> — linear time, no ReDoS vulnerability.</p>
+<h2 id="custom-action-types"><a class="header" href="#custom-action-types">Custom Action Types</a></h2>
+<p>The action type can be any Python object:</p>
 <pre><code class="language-python">from dataclasses import dataclass
-from enum import Enum
-
-class RouteTarget(Enum):
-    API_SERVICE = "api-service"
-    ADMIN_SERVICE = "admin-service"
 
 @dataclass(frozen=True)
 class RouteAction:
-    target: RouteTarget
+    target: str
     weight: int
-    timeout_ms: int
 
 matcher = compile_route_matches(
     matches=routes,
-    action=RouteAction(
-        target=RouteTarget.API_SERVICE,
-        weight=100,
-        timeout_ms=5000,
-    ),
-    on_no_match=None,  # return None when no match
+    action=RouteAction(target="api-service", weight=100),
+    on_no_match=None,
 )
 </code></pre>
-<p>The action type can be any Python object. puma returns it by reference when a match succeeds.</p>
-<h2 id="validation-and-safety"><a class="header" href="#validation-and-safety">Validation and Safety</a></h2>
-<p>Matchers enforce safety constraints:</p>
+<h2 id="safety"><a class="header" href="#safety">Safety</a></h2>
 <ul>
-<li><strong>Depth limit</strong>: Nested matchers cannot exceed 32 levels (prevents stack overflow)</li>
-<li><strong>Immutability</strong>: All types are <code>frozen=True</code> dataclasses (no accidental mutation)</li>
-<li><strong>Type safety</strong>: Type checkers like <code>mypy</code> catch mismatches at analysis time</li>
+<li><strong>ReDoS protection</strong> — <code>google-re2</code> guarantees linear-time regex matching.</li>
+<li><strong>Immutable</strong> — all types are <code>frozen=True</code> dataclasses.</li>
+<li><strong>Depth limits</strong> — nested matchers capped at 32 levels.</li>
+<li><strong>Fail-closed</strong> — missing headers or query params return <code>None</code> from <code>DataInput</code>, which makes the predicate evaluate to <code>False</code>.</li>
 </ul>
-<p>Check depth limits with <code>validate()</code>:</p>
-<pre><code class="language-python">try:
-    matcher.validate()
-    print("Matcher is valid")
-except ValueError as e:
-    print(f"Validation failed: {e}")
-</code></pre>
-<p>The Gateway API compiler produces valid trees. Manual construction can violate depth limits if you nest <code>NestedMatcher</code> recursively.</p>
-<h2 id="performance-notes"><a class="header" href="#performance-notes">Performance Notes</a></h2>
-<p>At 200 routing rules, <code>puma</code> evaluates worst-case (last rule matches) in 20 microseconds on Apple M1 Max. That’s 50,000 requests per second per core.</p>
-<p>Python’s GIL limits parallelism, but the matcher is thread-safe:</p>
-<pre><code class="language-python">import threading
-
-def worker(matcher, request):
-    result = matcher.evaluate(request)
-    print(f"Result: {result}")
-
-threads = [
-    threading.Thread(target=worker, args=(matcher, request))
-    for _ in range(10)
-]
-
-for t in threads:
-    t.start()
-for t in threads:
-    t.join()
-</code></pre>
-<p>Each thread acquires the GIL during <code>evaluate()</code>. If you need true parallelism, consider:</p>
-<ul>
-<li><strong>Multiple processes</strong> with <code>multiprocessing</code> (one matcher per process)</li>
-<li><strong>puma-crusty</strong> (Rust core via PyO3, releases GIL during evaluation)</li>
-</ul>
-<p>For ReDoS protection with untrusted regex input, use <code>puma-crusty</code> instead of pure <code>puma</code>. See <a href="../performance/redos.html">ReDoS Protection</a>.</p>
-<h2 id="integration-examples"><a class="header" href="#integration-examples">Integration Examples</a></h2>
-<h3 id="fastapi-middleware"><a class="header" href="#fastapi-middleware">FastAPI Middleware</a></h3>
-<pre><code class="language-python">from fastapi import FastAPI, Request, Response
-from puma.http import HttpRequest, compile_route_matches
-
-app = FastAPI()
-matcher = compile_route_matches(...)
-
-@app.middleware("http")
-async def route_matcher_middleware(request: Request, call_next):
-    req = HttpRequest(
-        method=request.method,
-        raw_path=str(request.url.path),
-        headers=dict(request.headers),
-    )
-
-    action = matcher.evaluate(req)
-
-    if action == "denied":
-        return Response("Access denied", status_code=403)
-
-    return await call_next(request)
-</code></pre>
-<h3 id="flask-before-request"><a class="header" href="#flask-before-request">Flask Before Request</a></h3>
-<pre><code class="language-python">from flask import Flask, request, abort
-from puma.http import HttpRequest, compile_route_matches
-
-app = Flask(__name__)
-matcher = compile_route_matches(...)
-
-@app.before_request
-def check_route():
-    req = HttpRequest(
-        method=request.method,
-        raw_path=request.path,
-        headers=dict(request.headers),
-    )
-
-    action = matcher.evaluate(req)
-
-    if action == "denied":
-        abort(403)
-</code></pre>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
 <ul>
-<li><a href="../tutorials/http-router.html">Build an HTTP Router</a> — full routing patterns</li>
-<li><a href="../concepts/predicates.html">Predicate Composition</a> — AND/OR/NOT logic</li>
-<li><a href="../performance/benchmarks.html">Benchmark Results</a> — performance deep dive</li>
-<li><a href="../reference/python.html">Python API Reference</a> — complete type documentation</li>
+<li><a href="../concepts/pipeline.html">The Matching Pipeline</a> — how data flows through the matcher</li>
+<li><a href="../tutorials/http-router.html">Build an HTTP Router</a> — full routing with headers and query params</li>
+<li><a href="../domains/http.html">HTTP Matching</a> — all inputs, config types, and the compiler</li>
 </ul>
 
                     </main>

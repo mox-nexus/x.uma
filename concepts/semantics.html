@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,100 +181,63 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="first-match-wins-semantics"><a class="header" href="#first-match-wins-semantics">First-Match-Wins Semantics</a></h1>
-<p>Evaluation order matters. The first match wins, and nested failures propagate.</p>
-<h2 id="the-rules"><a class="header" href="#the-rules">The Rules</a></h2>
-<p>x.uma follows xDS matcher semantics. Six rules govern evaluation:</p>
+<p>Evaluation order matters. x.uma follows xDS matcher semantics — six rules govern how a matcher tree produces a decision.</p>
+<h2 id="the-six-rules"><a class="header" href="#the-six-rules">The Six Rules</a></h2>
 <ol>
-<li>First-match-wins</li>
-<li>OnMatch exclusivity</li>
-<li>Nested matcher failure propagation</li>
-<li>on_no_match fallback</li>
-<li>None → false invariant</li>
-<li>Depth validation</li>
+<li><strong>First-match-wins</strong> — first matching predicate’s action is returned</li>
+<li><strong>OnMatch exclusivity</strong> — action XOR nested matcher, never both</li>
+<li><strong>Nested matcher failure</strong> — continues to next field matcher</li>
+<li><strong>on_no_match fallback</strong> — used only when nothing matches</li>
+<li><strong>None-to-false</strong> — missing data means predicate is false</li>
+<li><strong>Depth validation</strong> — max 32 levels, checked at construction</li>
 </ol>
-<p>Each rule affects what happens when you evaluate a matcher tree. Get these wrong, and your routes won’t behave as expected.</p>
 <h2 id="rule-1-first-match-wins"><a class="header" href="#rule-1-first-match-wins">Rule 1: First-Match-Wins</a></h2>
 <p>Matchers evaluate field matchers in order. The first matching predicate wins. Later matches are never consulted.</p>
-<pre><code class="language-python">from puma import Matcher, FieldMatcher, SinglePredicate, PrefixMatcher, Action
-from puma.http import HttpRequest, PathInput
+<pre><code class="language-python">from xuma import Matcher, FieldMatcher, SinglePredicate, PrefixMatcher, Action
+from xuma.http import HttpRequest, PathInput
 
 matcher = Matcher(
     matcher_list=(
         FieldMatcher(
             predicate=SinglePredicate(PathInput(), PrefixMatcher("/api")),
-            on_match=Action("api_backend")
+            on_match=Action("api_backend"),
         ),
         FieldMatcher(
             predicate=SinglePredicate(PathInput(), PrefixMatcher("/api/v2")),
-            on_match=Action("api_v2_backend")  # NEVER REACHED!
+            on_match=Action("api_v2_backend"),  # NEVER REACHED for /api/v2 paths
         ),
-    )
+    ),
 )
 
 request = HttpRequest(raw_path="/api/v2/users")
-result = matcher.evaluate(request)
-assert result == "api_backend"  # First match wins
+assert matcher.evaluate(request) == "api_backend"  # First rule wins
 </code></pre>
-<p>The path <code>/api/v2/users</code> matches both rules, but the first rule wins. The second rule is shadowed.</p>
-<p><strong>Order matters.</strong> More specific rules must come first:</p>
-<pre><code class="language-python"># Correct order: specific before general
-matcher = Matcher(
-    matcher_list=(
-        FieldMatcher(
-            predicate=SinglePredicate(PathInput(), PrefixMatcher("/api/v2")),
-            on_match=Action("api_v2_backend")
-        ),
-        FieldMatcher(
-            predicate=SinglePredicate(PathInput(), PrefixMatcher("/api")),
-            on_match=Action("api_backend")
-        ),
-    )
-)
-
-request = HttpRequest(raw_path="/api/v2/users")
-result = matcher.evaluate(request)
-assert result == "api_v2_backend"  # Correct!
-</code></pre>
+<p>The path <code>/api/v2/users</code> matches both rules, but the first one wins. <strong>Order matters.</strong> Put specific rules before general ones.</p>
 <h2 id="rule-2-onmatch-exclusivity"><a class="header" href="#rule-2-onmatch-exclusivity">Rule 2: OnMatch Exclusivity</a></h2>
-<p>Each <code>OnMatch</code> is either an action (terminal) or a nested matcher (continue evaluation), never both.</p>
-<pre><code class="language-python">from puma import Action, NestedMatcher
-
-# Valid: action
-on_match = Action("route_here")
-
-# Valid: nested matcher
-on_match = NestedMatcher(matcher=sub_matcher)
-
-# Invalid: can't have both
-# (Not representable in the type system)
-</code></pre>
-<p>The type system enforces this. You can’t accidentally create an <code>OnMatch</code> that does both. This prevents ambiguity: when a predicate matches, the outcome is clear.</p>
-<p><strong>Rust makes this explicit with an enum:</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum OnMatch&lt;Ctx, A&gt; {
+<p>Each <code>OnMatch</code> is either an action (terminal) or a nested matcher (continue evaluation). Never both. The type system enforces this:</p>
+<p><strong>Rust:</strong></p>
+<pre><code class="language-rust ignore">pub enum OnMatch&lt;Ctx, A&gt; {
     Action(A),
     Matcher(Box&lt;Matcher&lt;Ctx, A&gt;&gt;),
-}
-<span class="boring">}</span></code></pre>
-<p><strong>Python uses a union type:</strong></p>
+}</code></pre>
+<p><strong>Python:</strong></p>
 <pre><code class="language-python">type OnMatch[Ctx, A] = Action[A] | NestedMatcher[Ctx, A]
 </code></pre>
-<p>Same constraint, different syntax. Illegal states are unrepresentable.</p>
-<h2 id="rule-3-nested-matcher-failure-propagation"><a class="header" href="#rule-3-nested-matcher-failure-propagation">Rule 3: Nested Matcher Failure Propagation</a></h2>
-<p>If a nested matcher returns <code>None</code>, evaluation continues to the next field matcher. There is no implicit fallback to <code>on_no_match</code>.</p>
-<pre><code class="language-python">from puma import Matcher, FieldMatcher, NestedMatcher, SinglePredicate, ExactMatcher, Action
-from puma.http import HttpRequest, MethodInput, PathInput
+<p>Illegal states are unrepresentable. When a predicate matches, the outcome is unambiguous.</p>
+<h2 id="rule-3-nested-matcher-failure"><a class="header" href="#rule-3-nested-matcher-failure">Rule 3: Nested Matcher Failure</a></h2>
+<p>If a predicate matches but its nested matcher returns <code>None</code>, evaluation continues to the next field matcher. There is no implicit fallback.</p>
+<pre><code class="language-python">from xuma import Matcher, FieldMatcher, NestedMatcher, SinglePredicate, ExactMatcher, Action
+from xuma.http import HttpRequest, MethodInput, PathInput
 
-# Nested matcher that only matches POST
+# Nested matcher: only matches POST
 nested = Matcher(
     matcher_list=(
         FieldMatcher(
             predicate=SinglePredicate(MethodInput(), ExactMatcher("POST")),
-            on_match=Action("create_resource")
+            on_match=Action("create"),
         ),
     ),
-    on_no_match=None  # No fallback!
+    on_no_match=None,  # No fallback inside nested
 )
 
 # Parent matcher
@@ -282,128 +245,52 @@ matcher = Matcher(
     matcher_list=(
         FieldMatcher(
             predicate=SinglePredicate(PathInput(), PrefixMatcher("/api")),
-            on_match=NestedMatcher(nested)  # Continue into nested matcher
+            on_match=NestedMatcher(nested),
         ),
         FieldMatcher(
             predicate=SinglePredicate(PathInput(), PrefixMatcher("/health")),
-            on_match=Action("health_check")
+            on_match=Action("health_check"),
         ),
-    )
+    ),
+    on_no_match=Action("not_found"),
 )
 
-# GET /api → nested matcher evaluates, returns None, parent continues to next rule
+# GET /api → path matches, enters nested → method doesn't match → nested returns None
+# → continues to /health → doesn't match → falls to on_no_match
 request = HttpRequest(method="GET", raw_path="/api/users")
-result = matcher.evaluate(request)
-assert result == None  # /health doesn't match, no fallback
-
-# GET /health → second rule matches
-request = HttpRequest(method="GET", raw_path="/health")
-result = matcher.evaluate(request)
-assert result == "health_check"
+assert matcher.evaluate(request) == "not_found"
 </code></pre>
-<p><strong>Common mistake:</strong> Expecting nested matcher failure to use the parent’s <code>on_no_match</code>. It doesn’t. Nested failure means “this branch didn’t match, try the next field matcher.”</p>
+<p><strong>Common mistake:</strong> expecting nested failure to use the parent’s <code>on_no_match</code>. It doesn’t. Nested failure means “this branch didn’t match, try the next field matcher.”</p>
 <h2 id="rule-4-on_no_match-fallback"><a class="header" href="#rule-4-on_no_match-fallback">Rule 4: on_no_match Fallback</a></h2>
-<p>If no predicate matches, the matcher consults <code>on_no_match</code>. If absent, the matcher returns <code>None</code>.</p>
-<pre><code class="language-python">from puma import Matcher, FieldMatcher, SinglePredicate, PrefixMatcher, Action
-from puma.http import HttpRequest, PathInput
-
-# With fallback
+<p>If no predicate in <code>matcher_list</code> matches, the matcher consults <code>on_no_match</code>. If absent, returns <code>None</code>/<code>null</code>.</p>
+<pre><code class="language-python"># With fallback
 matcher = Matcher(
     matcher_list=(
         FieldMatcher(
             predicate=SinglePredicate(PathInput(), PrefixMatcher("/api")),
-            on_match=Action("api_backend")
+            on_match=Action("api"),
         ),
     ),
-    on_no_match=Action("default_backend")  # Fallback for non-matches
+    on_no_match=Action("default"),  # Used when no rules match
 )
 
-request = HttpRequest(raw_path="/other")
-result = matcher.evaluate(request)
-assert result == "default_backend"
-
-# Without fallback
-matcher = Matcher(
-    matcher_list=(
-        FieldMatcher(
-            predicate=SinglePredicate(PathInput(), PrefixMatcher("/api")),
-            on_match=Action("api_backend")
-        ),
-    ),
-    on_no_match=None  # No fallback
-)
-
-request = HttpRequest(raw_path="/other")
-result = matcher.evaluate(request)
-assert result == None
+assert matcher.evaluate(HttpRequest(raw_path="/other")) == "default"
 </code></pre>
-<p><code>on_no_match</code> applies only when no predicate in <code>matcher_list</code> matches. It doesn’t apply when a nested matcher fails (Rule 3).</p>
-<h2 id="rule-5-none--false-invariant"><a class="header" href="#rule-5-none--false-invariant">Rule 5: None → False Invariant</a></h2>
-<p>If a <code>DataInput</code> returns <code>None</code>, the predicate evaluates to <code>False</code> without calling the matcher.</p>
-<pre><code class="language-python">from puma import SinglePredicate, ExactMatcher
-from puma.http import HttpRequest, HeaderInput
-
-predicate = SinglePredicate(
-    input=HeaderInput("x-api-key"),
-    matcher=ExactMatcher("secret")
-)
-
-# Header not present → input returns None → predicate returns False
-request = HttpRequest(headers={})
-assert predicate.evaluate(request) == False
-
-# Header present → input returns str → predicate evaluates normally
-request = HttpRequest(headers={"x-api-key": "wrong"})
-assert predicate.evaluate(request) == False
-
-request = HttpRequest(headers={"x-api-key": "secret"})
-assert predicate.evaluate(request) == True
-</code></pre>
-<p>This simplifies matcher implementations. They only handle present values. Missing values are handled upstream by the predicate.</p>
+<p><code>on_no_match</code> applies only when no predicate matches. It does not apply when a nested matcher fails (Rule 3).</p>
+<h2 id="rule-5-none-to-false"><a class="header" href="#rule-5-none-to-false">Rule 5: None-to-False</a></h2>
+<p>Covered in <a href="predicates.html">Predicate Composition</a>. When <code>DataInput</code> returns <code>None</code>/<code>null</code>, the predicate evaluates to <code>false</code> without calling the matcher. Missing data never accidentally matches.</p>
 <h2 id="rule-6-depth-validation"><a class="header" href="#rule-6-depth-validation">Rule 6: Depth Validation</a></h2>
 <p>Matcher trees exceeding <code>MAX_DEPTH</code> (32 levels) are rejected at construction time.</p>
-<pre><code class="language-python">from puma import Matcher, FieldMatcher, NestedMatcher, SinglePredicate, ExactMatcher, Action, MatcherError
-from puma.http import HttpRequest, PathInput
-
-# Build a deeply nested matcher
-def build_nested(depth):
-    if depth == 0:
-        return Matcher(
-            matcher_list=(
-                FieldMatcher(
-                    predicate=SinglePredicate(PathInput(), ExactMatcher("/deep")),
-                    on_match=Action("leaf")
-                ),
-            )
-        )
-    return Matcher(
-        matcher_list=(
-            FieldMatcher(
-                predicate=SinglePredicate(PathInput(), ExactMatcher("/")),
-                on_match=NestedMatcher(build_nested(depth - 1))
-            ),
-        )
-    )
-
-# Depth 32 is ok
-matcher = build_nested(31)  # 32 levels total
-assert matcher.depth() == 32
-
-# Depth 33 raises error
-try:
-    matcher = build_nested(32)  # 33 levels total
-    assert False, "Should have raised MatcherError"
-except MatcherError as e:
-    assert "depth exceeds MAX_DEPTH" in str(e)
+<pre><code class="language-python"># Attempting to build a tree deeper than 32 levels raises MatcherError
 </code></pre>
-<p>Validation happens in <code>__post_init__</code> (Python) or constructor (Rust). You can’t accidentally create invalid trees.</p>
-<p><strong>Why 32?</strong> Balance between flexibility and safety. Deep nesting risks stack overflow (when iterative evaluation is deferred) and signals overly complex config. Most real-world matchers use 3-5 levels.</p>
-<h2 id="evaluation-example"><a class="header" href="#evaluation-example">Evaluation Example</a></h2>
-<p>Combine all rules in one matcher:</p>
-<pre><code class="language-python">from puma import Matcher, FieldMatcher, NestedMatcher, SinglePredicate, And, PrefixMatcher, ExactMatcher, Action
-from puma.http import HttpRequest, PathInput, MethodInput, HeaderInput
+<p>Validation happens at construction, not evaluation. If a <code>Matcher</code> object exists, it’s known to be valid. Parse, don’t validate.</p>
+<h2 id="walkthrough"><a class="header" href="#walkthrough">Walkthrough</a></h2>
+<p>All six rules in one example:</p>
+<pre><code class="language-python">from xuma import Matcher, FieldMatcher, NestedMatcher, SinglePredicate, And
+from xuma import PrefixMatcher, ExactMatcher, Action
+from xuma.http import HttpRequest, PathInput, MethodInput, HeaderInput
 
-# Nested matcher: POST with auth header
+# Nested: POST with auth header
 auth_required = Matcher(
     matcher_list=(
         FieldMatcher(
@@ -411,60 +298,56 @@ auth_required = Matcher(
                 SinglePredicate(MethodInput(), ExactMatcher("POST")),
                 SinglePredicate(HeaderInput("authorization"), PrefixMatcher("Bearer ")),
             )),
-            on_match=Action("authenticated_api")
+            on_match=Action("authenticated_api"),
         ),
     ),
-    on_no_match=None  # Fail if not POST with auth
+    on_no_match=None,
 )
 
-# Top-level matcher
+# Top-level
 matcher = Matcher(
     matcher_list=(
         FieldMatcher(
             predicate=SinglePredicate(PathInput(), PrefixMatcher("/api")),
-            on_match=NestedMatcher(auth_required)  # Nested evaluation
+            on_match=NestedMatcher(auth_required),
         ),
         FieldMatcher(
             predicate=SinglePredicate(PathInput(), PrefixMatcher("/health")),
-            on_match=Action("health_check")
+            on_match=Action("health_check"),
         ),
     ),
-    on_no_match=Action("not_found")  # Fallback
+    on_no_match=Action("not_found"),
 )
 
-# Test cases
-# 1. POST /api with auth → nested matches
-request = HttpRequest(method="POST", raw_path="/api/users", headers={"authorization": "Bearer token"})
-assert matcher.evaluate(request) == "authenticated_api"
+# POST /api with auth → nested matches → "authenticated_api"
+r1 = HttpRequest(method="POST", raw_path="/api/users",
+                 headers={"authorization": "Bearer token"})
+assert matcher.evaluate(r1) == "authenticated_api"
 
-# 2. GET /api → nested fails (not POST), continues to next field matcher, then fallback
-request = HttpRequest(method="GET", raw_path="/api/users")
-assert matcher.evaluate(request) == "not_found"
+# GET /api → nested fails (not POST) → continues → /health doesn't match → "not_found"
+r2 = HttpRequest(method="GET", raw_path="/api/users")
+assert matcher.evaluate(r2) == "not_found"
 
-# 3. GET /health → second rule matches
-request = HttpRequest(method="GET", raw_path="/health")
-assert matcher.evaluate(request) == "health_check"
-
-# 4. GET /other → no match, uses fallback
-request = HttpRequest(method="GET", raw_path="/other")
-assert matcher.evaluate(request) == "not_found"
+# GET /health → second rule matches → "health_check"
+r3 = HttpRequest(method="GET", raw_path="/health")
+assert matcher.evaluate(r3) == "health_check"
 </code></pre>
-<p>Walk through case 2:</p>
+<p>Walk through <code>GET /api</code>:</p>
 <ol>
-<li>First field matcher: path matches <code>/api</code> → predicate is <code>True</code></li>
-<li>OnMatch is nested matcher → evaluate <code>auth_required</code></li>
-<li>Nested matcher: method is GET (not POST) → predicate is <code>False</code></li>
-<li>Nested matcher returns <code>None</code> (Rule 4: no <code>on_no_match</code>)</li>
-<li>Nested failure propagates (Rule 3) → continue to next field matcher</li>
-<li>Second field matcher: path doesn’t match <code>/health</code> → predicate is <code>False</code></li>
-<li>No more field matchers → use <code>on_no_match</code> (Rule 4)</li>
+<li>First field matcher: path matches <code>/api</code> (Rule 1)</li>
+<li>OnMatch is nested matcher (Rule 2: exclusive)</li>
+<li>Nested: method is GET, not POST — predicate false</li>
+<li>Nested returns <code>None</code> — no <code>on_no_match</code> (Rule 4)</li>
+<li>Nested failure propagates (Rule 3) — continue to next field matcher</li>
+<li>Second field matcher: path <code>/api/users</code> doesn’t start with <code>/health</code></li>
+<li>No more field matchers — use <code>on_no_match</code> (Rule 4)</li>
 <li>Return <code>"not_found"</code></li>
 </ol>
-<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<h2 id="next"><a class="header" href="#next">Next</a></h2>
 <ul>
-<li><a href="pipeline.html">The Matching Pipeline</a> — Where evaluation fits in the flow</li>
-<li><a href="predicates.html">Predicate Composition</a> — Building the conditions that drive evaluation</li>
-<li><a href="../tutorials/http-router.html">Build an HTTP Router</a> — Apply these semantics to real routing</li>
+<li><a href="pipeline.html">The Matching Pipeline</a> — where evaluation fits in the data flow</li>
+<li><a href="predicates.html">Predicate Composition</a> — the Boolean logic that drives evaluation</li>
+<li><a href="../tutorials/http-router.html">Build an HTTP Router</a> — apply these semantics to real routing</li>
 </ul>
 
                     </main>
@@ -475,7 +358,7 @@ assert matcher.evaluate(request) == "not_found"
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../guides/adding-domain.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../tutorials/http-router.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -489,7 +372,7 @@ assert matcher.evaluate(request) == "not_found"
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../guides/adding-domain.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../tutorials/http-router.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

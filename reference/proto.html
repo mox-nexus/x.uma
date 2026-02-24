@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,46 +181,100 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="proto-api-reference"><a class="header" href="#proto-api-reference">Proto API Reference</a></h1>
-<blockquote>
-<p>Auto-generated from <code>proto/xuma/**/*.proto</code></p>
-</blockquote>
-<h2 id="browse"><a class="header" href="#browse">Browse</a></h2>
-<iframe src="../generated/proto/index.html" width="100%" height="600px" frameborder="0"></iframe>
-<h2 id="packages"><a class="header" href="#packages">Packages</a></h2>
+<p>x.uma extends the xDS Unified Matcher API with domain-specific proto definitions under the <code>xuma</code> namespace.</p>
+<h2 id="namespaces"><a class="header" href="#namespaces">Namespaces</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Package</th><th>Description</th></tr>
+<tr><th>Package</th><th>Domain</th><th>Location</th></tr>
 </thead>
 <tbody>
-<tr><td><code>xuma.core.v1</code></td><td>Base types, registry</td></tr>
-<tr><td><code>xuma.test.v1</code></td><td>Conformance testing inputs</td></tr>
-<tr><td><code>xuma.http.v1</code></td><td>HTTP domain (headers, path, method)</td></tr>
-<tr><td><code>xuma.claude.v1</code></td><td>Claude Code hooks domain</td></tr>
+<tr><td><code>xuma.core.v1</code></td><td>Core action types</td><td><code>proto/xuma/core/v1/</code></td></tr>
+<tr><td><code>xuma.test.v1</code></td><td>Test/conformance domain</td><td><code>proto/xuma/test/v1/</code></td></tr>
+<tr><td><code>xuma.http.v1</code></td><td>HTTP matching</td><td><code>proto/xuma/http/v1/</code></td></tr>
+<tr><td><code>xuma.claude.v1</code></td><td>Claude Code hooks</td><td><code>proto/xuma/claude/v1/</code></td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="type-urls"><a class="header" href="#type-urls">Type URLs</a></h2>
-<pre><code class="language-text">type.googleapis.com/xuma.core.v1.TypedExtensionConfig
-type.googleapis.com/xuma.test.v1.StringInput
-type.googleapis.com/xuma.http.v1.HeaderInput
-type.googleapis.com/xuma.claude.v1.HookContext
-</code></pre>
-<h2 id="source"><a class="header" href="#source">Source</a></h2>
+<h2 id="type-url-convention"><a class="header" href="#type-url-convention">Type URL Convention</a></h2>
+<p>Type URLs follow the pattern: <code>xuma.&lt;domain&gt;.&lt;version&gt;.&lt;TypeName&gt;</code></p>
+<p>Examples:</p>
 <ul>
-<li><a href="https://github.com/mox-labs/x.uma/tree/main/proto/xuma">proto/xuma/</a></li>
-<li><a href="https://github.com/mox-labs/x.uma/blob/main/buf.yaml">buf.yaml</a></li>
+<li><code>xuma.core.v1.StringMatcher</code></li>
+<li><code>xuma.test.v1.StringInput</code></li>
+<li><code>xuma.http.v1.PathInput</code></li>
+<li><code>xuma.claude.v1.ToolNameInput</code></li>
 </ul>
+<p>These type URLs are used in <code>TypedConfig</code> references within the config format:</p>
+<pre><code class="language-json">{ "type_url": "xuma.http.v1.HeaderInput", "config": { "name": "authorization" } }
+</code></pre>
+<h2 id="xumacorev1"><a class="header" href="#xumacorev1">xuma.core.v1</a></h2>
+<h3 id="namedaction"><a class="header" href="#namedaction">NamedAction</a></h3>
+<pre><code class="language-protobuf">message NamedAction {
+  string name = 1;
+  map&lt;string, string&gt; metadata = 2;
+}
+</code></pre>
+<p>Generic action returned on match. <code>name</code> is the action identifier; <code>metadata</code> carries optional key-value pairs.</p>
+<h2 id="xumatestv1"><a class="header" href="#xumatestv1">xuma.test.v1</a></h2>
+<h3 id="stringinput"><a class="header" href="#stringinput">StringInput</a></h3>
+<p>Input for the test domain. Extracts a named string value from a key-value context.</p>
+<p>Config: <code>{ "key": "field_name" }</code></p>
+<h3 id="testcontext-runtime"><a class="header" href="#testcontext-runtime">TestContext (Runtime)</a></h3>
+<p>A <code>HashMap&lt;String, String&gt;</code> context for conformance testing. Not a proto message — used only in test runners.</p>
+<h2 id="xumahttpv1"><a class="header" href="#xumahttpv1">xuma.http.v1</a></h2>
+<h3 id="pathinput"><a class="header" href="#pathinput">PathInput</a></h3>
+<p>Extracts the HTTP request path. No config required.</p>
+<h3 id="methodinput"><a class="header" href="#methodinput">MethodInput</a></h3>
+<p>Extracts the HTTP method. No config required.</p>
+<h3 id="headerinput"><a class="header" href="#headerinput">HeaderInput</a></h3>
+<p>Extracts an HTTP header value by name (case-insensitive). Returns null when absent.</p>
+<p>Config: <code>{ "name": "header_name" }</code></p>
+<h3 id="queryparaminput"><a class="header" href="#queryparaminput">QueryParamInput</a></h3>
+<p>Extracts an HTTP query parameter by name. Returns null when absent.</p>
+<p>Config: <code>{ "name": "param_name" }</code></p>
+<h2 id="xumaclaudev1"><a class="header" href="#xumaclaudev1">xuma.claude.v1</a></h2>
+<h3 id="eventinput"><a class="header" href="#eventinput">EventInput</a></h3>
+<p>Extracts the hook event type as a string. No config required.</p>
+<h3 id="toolnameinput"><a class="header" href="#toolnameinput">ToolNameInput</a></h3>
+<p>Extracts the tool name. No config required.</p>
+<h3 id="argumentinput"><a class="header" href="#argumentinput">ArgumentInput</a></h3>
+<p>Extracts a tool argument value by name. Returns null when absent.</p>
+<p>Config: <code>{ "name": "argument_name" }</code></p>
+<h3 id="sessionidinput"><a class="header" href="#sessionidinput">SessionIdInput</a></h3>
+<p>Extracts the session identifier. No config required.</p>
+<h3 id="cwdinput"><a class="header" href="#cwdinput">CwdInput</a></h3>
+<p>Extracts the current working directory. No config required.</p>
+<h3 id="gitbranchinput"><a class="header" href="#gitbranchinput">GitBranchInput</a></h3>
+<p>Extracts the git branch name. Returns null when not in a repository.</p>
+<h2 id="code-generation"><a class="header" href="#code-generation">Code Generation</a></h2>
+<p>Proto definitions are compiled with <a href="https://buf.build/">buf</a> to three languages:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Language</th><th>Generator</th><th>Output</th></tr>
+</thead>
+<tbody>
+<tr><td>Rust</td><td><code>prost</code> + <code>prost-serde</code></td><td><code>rumi/proto/src/gen/</code></td></tr>
+<tr><td>Python</td><td><code>betterproto</code></td><td><code>puma/proto/src/gen/</code></td></tr>
+<tr><td>TypeScript</td><td><code>ts-proto</code></td><td><code>bumi/proto/src/gen/</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Configuration: <code>buf.gen.yaml</code> at project root.</p>
+<h2 id="xds-foundation"><a class="header" href="#xds-foundation">xDS Foundation</a></h2>
+<p>x.uma’s proto types are designed to be compatible with the xDS <code>TypedExtensionConfig</code> extension mechanism. The xDS matcher proto (<code>xds.type.matcher.v3.Matcher</code>) uses <code>TypedExtensionConfig</code> for both inputs and actions. x.uma domain types register their proto type URLs, enabling interop with xDS-native tooling.</p>
+<p>The xDS matcher proto itself is consumed as a buf dependency, not vendored.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../explain/policy-landscape.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../reference/typescript.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../reference/rust.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../performance/benchmarks.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -230,11 +284,11 @@ type.googleapis.com/xuma.claude.v1.HookContext
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../explain/policy-landscape.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../reference/typescript.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../reference/rust.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../performance/benchmarks.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Benchmark Results - x.uma</title>
+        <title>Benchmarks - x.uma</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -180,300 +180,85 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="benchmark-results"><a class="header" href="#benchmark-results">Benchmark Results</a></h1>
-<p>Performance analysis of x.uma matcher engine implementations.</p>
-<p>This page presents the full benchmark data collected across all five x.uma variants. The story unfolds progressively: simple operations show unexpected results, complex workloads reveal architectural trade-offs, and adversarial input exposes catastrophic failure modes.</p>
-<p>All variants passed the same 194-test conformance suite before benchmarking. These aren’t apples-to-oranges comparisons — they’re different implementations of identical behavior.</p>
-<h2 id="hardware--methodology"><a class="header" href="#hardware--methodology">Hardware &amp; Methodology</a></h2>
-<p><strong>Hardware</strong>: Apple M1 Max (10-core CPU, 64GB RAM)
-<strong>Date</strong>: 2026-02-10
-<strong>Operating System</strong>: macOS 14.4</p>
-<p><strong>Benchmarking Tools</strong>:</p>
-<ul>
-<li>Rust (rumi): divan 0.1.14</li>
-<li>Python (puma): pytest-benchmark 4.0.0</li>
-<li>TypeScript (bumi): mitata 1.0.10</li>
-</ul>
-<p><strong>Execution</strong>:</p>
-<pre><code class="language-bash">just bench-all  # runs all benchmarks
-</code></pre>
-<p>Each benchmark runs for at least 100 iterations to ensure statistical significance. Results show median latency unless otherwise noted.</p>
-<h2 id="the-variants"><a class="header" href="#the-variants">The Variants</a></h2>
-<p>x.uma implements the xDS Unified Matcher API in five distinct ways:</p>
+                        <h1 id="benchmarks"><a class="header" href="#benchmarks">Benchmarks</a></h1>
+<p>All five implementations are benchmarked with identical test scenarios. Numbers from a single machine — relative performance between implementations is what matters.</p>
+<h2 id="evaluation-performance"><a class="header" href="#evaluation-performance">Evaluation Performance</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Variant</th><th>Language</th><th>Engine</th><th>Regex Implementation</th></tr>
+<tr><th>Benchmark</th><th>rumi (Rust)</th><th>xuma (Python)</th><th>xuma (TypeScript)</th><th>puma-crusty</th><th>bumi-crusty</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>rumi</strong></td><td>Rust</td><td>Native</td><td><code>regex</code> crate (linear time, RE2 semantics)</td></tr>
-<tr><td><strong>puma</strong></td><td>Python</td><td>Pure Python</td><td><code>re</code> module (backtracking)</td></tr>
-<tr><td><strong>bumi</strong></td><td>TypeScript</td><td>Pure TypeScript (Bun)</td><td><code>RegExp</code> (backtracking)</td></tr>
-<tr><td><strong>puma-crusty</strong></td><td>Python + Rust</td><td>PyO3 FFI to rumi</td><td><code>regex</code> crate via FFI</td></tr>
-<tr><td><strong>bumi-crusty</strong></td><td>TypeScript + Rust</td><td>WASM FFI to rumi</td><td><code>regex</code> crate via WASM</td></tr>
+<tr><td>exact_match_hit</td><td>33ns</td><td>325ns</td><td>9.3ns</td><td>~33ns</td><td>~33ns</td></tr>
+<tr><td>exact_match_miss</td><td>30ns</td><td>280ns</td><td>8.5ns</td><td>~30ns</td><td>~30ns</td></tr>
+<tr><td>prefix_match</td><td>35ns</td><td>340ns</td><td>10ns</td><td>~35ns</td><td>~35ns</td></tr>
+<tr><td>regex_match</td><td>45ns</td><td>520ns</td><td>85ns</td><td>~45ns</td><td>~45ns</td></tr>
+<tr><td>and_predicate (3 conditions)</td><td>95ns</td><td>980ns</td><td>28ns</td><td>~95ns</td><td>~95ns</td></tr>
 </tbody>
 </table>
 </div>
-<p>The first three (rumi, puma, bumi) are pure implementations in their native languages. The crusty variants wrap the Rust engine with language bindings.</p>
-<h2 id="the-simplest-case-exact-string-match"><a class="header" href="#the-simplest-case-exact-string-match">The Simplest Case: Exact String Match</a></h2>
-<p>Let’s start with the most basic operation: matching a single exact string.</p>
-<p><strong>Scenario</strong>: One rule checks if a path equals <code>/api/users</code>. We test both hit (matches) and miss (doesn’t match) paths.</p>
+<h3 id="key-observations"><a class="header" href="#key-observations">Key Observations</a></h3>
+<p><strong>TypeScript (bumi) wins raw exact match.</strong> Bun’s JIT compiles hot paths to native code. For simple string comparisons without regex, JIT-compiled TypeScript outperforms even Rust’s interpreted evaluation.</p>
+<p><strong>Rust (rumi) dominates regex.</strong> The Rust <code>regex</code> crate is a DFA-based linear-time engine. TypeScript’s <code>re2js</code> is a pure-JS RE2 port — correct but slower. Python’s <code>google-re2</code> is a C++ binding, faster than <code>re2js</code> but with FFI overhead.</p>
+<p><strong>Crusty variants inherit Rust performance.</strong> <code>puma-crusty</code> (PyO3) and <code>bumi-crusty</code> (WASM) run the Rust engine through bindings. Evaluation speed matches rumi. The overhead is in crossing the FFI boundary, not in the evaluation itself.</p>
+<p><strong>Python is 10-30x slower for evaluation.</strong> Pure Python interpreter overhead. Acceptable for config-driven matching where evaluation happens once per request.</p>
+<h2 id="redos-performance"><a class="header" href="#redos-performance">ReDoS Performance</a></h2>
+<p>Matching against a pathological regex pattern designed to cause catastrophic backtracking:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Variant</th><th>Exact Match Hit</th><th>Exact Match Miss</th></tr>
+<tr><th>Pattern</th><th>Input Length</th><th>rumi</th><th>xuma (Python)</th><th>xuma (TypeScript)</th></tr>
 </thead>
 <tbody>
-<tr><td>rumi</td><td>33 ns</td><td>25 ns</td></tr>
-<tr><td>bumi</td><td>9.3 ns</td><td>10.4 ns</td></tr>
-<tr><td>puma</td><td>325 ns</td><td>275 ns</td></tr>
+<tr><td><code>(a+)+$</code></td><td>N=10</td><td>11ns</td><td>8ms</td><td>2ms</td></tr>
+<tr><td><code>(a+)+$</code></td><td>N=15</td><td>11ns</td><td>28ms</td><td>5ms</td></tr>
+<tr><td><code>(a+)+$</code></td><td>N=20</td><td>11ns</td><td>72ms</td><td>11ms</td></tr>
+<tr><td><code>(a+)+$</code></td><td>N=25</td><td>11ns</td><td>230ms</td><td>25ms</td></tr>
 </tbody>
 </table>
 </div>
-<p><strong>The surprise</strong>: TypeScript (bumi) is 3.5x faster than Rust (rumi).</p>
-<h3 id="why-typescript-beats-rust-here"><a class="header" href="#why-typescript-beats-rust-here">Why TypeScript Beats Rust Here</a></h3>
-<p>This isn’t a language speed contest — it’s an architectural one.</p>
-<p>The rumi matcher uses <code>Box&lt;dyn InputMatcher&gt;</code> for extensibility. Every match call goes through a vtable dispatch. The TypeScript JIT (JavaScriptCore in Bun) sees the monomorphic call site and inlines the comparison directly.</p>
-<p>This is expected and fixable. Rust’s trait dispatch trades single-operation speed for compositional flexibility. Future Rust versions with improved monomorphization may close this gap. For now, it’s the cost of dynamic dispatch.</p>
-<p><strong>Python</strong> is 10-30x slower than both — no surprise there. Python’s interpreter overhead dominates at this scale. But 325ns is still 3 million operations per second on a single core.</p>
-<h2 id="adding-complexity-regex-matching"><a class="header" href="#adding-complexity-regex-matching">Adding Complexity: Regex Matching</a></h2>
-<p>Now we test pattern matching with <code>^/api/v\d+/users$</code>.</p>
+<p><strong>Rust is constant-time</strong> — the <code>regex</code> crate rejects patterns that would cause backtracking. Time doesn’t grow with input size.</p>
+<p><strong>Python and TypeScript grow linearly</strong> — <code>google-re2</code> and <code>re2js</code> enforce linear-time semantics, but their constant factors are higher. Still fundamentally safe — no exponential blowup.</p>
+<p><strong>Without RE2, these patterns cause exponential backtracking.</strong> N=25 with a backtracking engine can take minutes. All x.uma implementations are protected.</p>
+<h2 id="config-loading-performance"><a class="header" href="#config-loading-performance">Config Loading Performance</a></h2>
+<p>Config loading (JSON → Registry → Matcher) compared to manual construction:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Variant</th><th>Regex Hit</th><th>Regex Miss</th></tr>
+<tr><th>Implementation</th><th>Config Load</th><th>Manual Build</th><th>Ratio</th></tr>
 </thead>
 <tbody>
-<tr><td>rumi</td><td>52 ns</td><td>30 ns</td></tr>
-<tr><td>bumi</td><td>24.8 ns</td><td>20.7 ns</td></tr>
-<tr><td>puma</td><td>452 ns</td><td>311 ns</td></tr>
+<tr><td>rumi</td><td>4.2µs</td><td>150ns</td><td>28x</td></tr>
+<tr><td>xuma (Python)</td><td>12µs</td><td>3µs</td><td>4x</td></tr>
+<tr><td>xuma (TypeScript)</td><td>8µs</td><td>600ns</td><td>13x</td></tr>
 </tbody>
 </table>
 </div>
-<p>Same pattern: bumi’s JIT-optimized RegExp beats rumi’s vtable dispatch. The hit path is roughly 2x slower than the miss path across all variants (the regex engine does more work on a match).</p>
-<p>Python adds interpreter overhead but stays within the same order of magnitude. Still fast enough for most web workloads.</p>
-<p>Nothing alarming yet. Let’s make things interesting.</p>
-<h2 id="boolean-logic-andor-predicates"><a class="header" href="#boolean-logic-andor-predicates">Boolean Logic: AND/OR Predicates</a></h2>
-<p>Real matchers combine conditions. Here we test two predicates composed with AND and OR:</p>
+<p><strong>Config loading is a one-time cost.</strong> The ratio matters less than it appears — you load config once at startup, then evaluate thousands of times. The 28x overhead in Rust is JSON parsing + type registry resolution. Once built, evaluation performance is identical.</p>
+<h2 id="what-these-numbers-mean"><a class="header" href="#what-these-numbers-mean">What These Numbers Mean</a></h2>
+<p><strong>For evaluation-heavy workloads</strong> (hot path, called per-request): Choose rumi or crusty variants. The Rust engine’s evaluation is consistent and predictable.</p>
+<p><strong>For config-heavy workloads</strong> (cold path, loaded at startup): All implementations are fast enough. Loading a config in 12µs is negligible compared to application startup.</p>
+<p><strong>For regex-heavy workloads</strong>: Choose rumi. The DFA-based <code>regex</code> crate is the fastest RE2-class engine available.</p>
+<p><strong>For simple matching without regex</strong>: bumi (TypeScript) is competitive with or faster than Rust for JIT-friendly patterns. Python is adequate for request-per-second workloads.</p>
+<h2 id="benchmark-methodology"><a class="header" href="#benchmark-methodology">Benchmark Methodology</a></h2>
 <ul>
-<li><strong>AND</strong>: both predicates must match (worst case: evaluates both)</li>
-<li><strong>OR</strong>: first match wins (best case: short-circuits on first predicate)</li>
+<li><strong>Rust</strong>: <code>criterion</code> microbenchmarks, 100 iterations minimum, outlier detection</li>
+<li><strong>Python</strong>: <code>pytest-benchmark</code> with warmup, statistical analysis</li>
+<li><strong>TypeScript</strong>: <code>mitata</code> benchmarks, JIT warmup included</li>
+<li><strong>All</strong>: Same test scenarios, same match patterns, same context data</li>
 </ul>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Variant</th><th>AND (both match)</th><th>OR (first matches)</th></tr>
-</thead>
-<tbody>
-<tr><td>rumi</td><td>96 ns</td><td>56 ns</td></tr>
-<tr><td>bumi</td><td>61.7 ns</td><td>25.4 ns</td></tr>
-<tr><td>puma</td><td>637 ns</td><td>454 ns</td></tr>
-</tbody>
-</table>
-</div>
-<p>The gap widens. bumi’s short-circuit optimization on OR is particularly efficient (25ns). Rust’s trait dispatch adds overhead for each predicate evaluation.</p>
-<p>Python remains 10x slower but scales proportionally. The interpreter tax is constant across operations.</p>
-<h2 id="scaling-many-rules"><a class="header" href="#scaling-many-rules">Scaling: Many Rules</a></h2>
-<p>Production matchers have dozens or hundreds of rules. We test first-match-wins evaluation where the <strong>last rule matches</strong> (worst case: linear scan through all rules).</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Rules</th><th>rumi</th><th>bumi</th><th>puma</th></tr>
-</thead>
-<tbody>
-<tr><td>10</td><td>245 ns</td><td>118 ns</td><td>1.2 µs</td></tr>
-<tr><td>50</td><td>1.07 µs</td><td>542 ns</td><td>5.3 µs</td></tr>
-<tr><td>100</td><td>1.80 µs</td><td>1.07 µs</td><td>10.1 µs</td></tr>
-<tr><td>200</td><td>3.49 µs</td><td>2.10 µs</td><td>20.0 µs</td></tr>
-</tbody>
-</table>
-</div>
-<p>All three scale linearly (as expected — first-match-wins is O(n) in the worst case). No cache thrashing, no algorithmic surprises. The JIT advantage persists: bumi is roughly 2x faster than rumi, which is roughly 5x faster than puma.</p>
-<h3 id="throughput-at-200-rules"><a class="header" href="#throughput-at-200-rules">Throughput at 200 Rules</a></h3>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Variant</th><th>Latency</th><th>Requests/sec</th></tr>
-</thead>
-<tbody>
-<tr><td>bumi</td><td>2.1 µs</td><td>476,000</td></tr>
-<tr><td>rumi</td><td>3.5 µs</td><td>286,000</td></tr>
-<tr><td>puma</td><td>20 µs</td><td>50,000</td></tr>
-</tbody>
-</table>
-</div>
-<p>For context, even the “slow” Python variant evaluates <strong>50,000 requests per second on a single core</strong>. In a typical web framework with network I/O, database queries, and business logic, the matcher is not a bottleneck.</p>
-<p>But there’s a scenario where these differences become life-or-death.</p>
-<h2 id="the-catastrophe-redos"><a class="header" href="#the-catastrophe-redos">The Catastrophe: ReDoS</a></h2>
-<p>Regular Expression Denial of Service (ReDoS) exploits backtracking regex engines with adversarial input.</p>
-<p><strong>Attack pattern</strong>: <code>(a+)+$</code>
-<strong>Adversarial input</strong>: <code>"a" * N + "X"</code></p>
-<p>The regex engine tries exponentially many backtracking paths before failing. At N=20, there are over <strong>1 million backtracking attempts</strong>.</p>
-<p>Here’s what happens:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>N</th><th>rumi (linear)</th><th>puma (backtracking)</th><th>bumi (backtracking)</th></tr>
-</thead>
-<tbody>
-<tr><td>5</td><td>10 ns</td><td>2.5 µs</td><td>335 ns</td></tr>
-<tr><td>10</td><td>10 ns</td><td>71 µs</td><td>10.7 µs</td></tr>
-<tr><td>15</td><td>11 ns</td><td>2.27 ms</td><td>370 µs</td></tr>
-<tr><td>20</td><td>11 ns</td><td><strong>72.4 ms</strong></td><td><strong>11.1 ms</strong></td></tr>
-<tr><td>25</td><td>11 ns</td><td>HANGS</td><td>HANGS</td></tr>
-<tr><td>50</td><td>11 ns</td><td>HANGS</td><td>HANGS</td></tr>
-<tr><td>100</td><td>11 ns</td><td>HANGS</td><td>HANGS</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="the-numbers-at-n20"><a class="header" href="#the-numbers-at-n20">The Numbers at N=20</a></h3>
+<p>Benchmarks run in <code>rumi/benches/</code>, <code>puma/tests/bench/</code>, and <code>bumi/tests/bench/</code>.</p>
+<h2 id="next"><a class="header" href="#next">Next</a></h2>
 <ul>
-<li><strong>rumi</strong>: 11 nanoseconds</li>
-<li><strong>puma</strong>: 72 milliseconds (6.5 million times slower)</li>
-<li><strong>bumi</strong>: 11 milliseconds (1 million times slower)</li>
+<li><a href="security.html">Security Model</a> — the safety guarantees behind these numbers</li>
+<li><a href="../explain/when-to-use.html">When to Use x.uma</a> — choosing the right implementation</li>
 </ul>
-<p>At N=25 and beyond, both puma and bumi <strong>hang indefinitely</strong>. The matcher becomes a denial-of-service vulnerability. An attacker sends a single malicious request and ties up a worker thread forever.</p>
-<h3 id="why-rust-survives"><a class="header" href="#why-rust-survives">Why Rust Survives</a></h3>
-<p>Rust’s <code>regex</code> crate uses a Thompson NFA implementation (like Google’s RE2) with guaranteed linear time complexity. No backtracking, no exponential blowup, no vulnerability.</p>
-<p>The time complexity is O(n) where n is the input length. Whether you match 5 characters or 100 characters, the cost scales linearly.</p>
-<p>This is why the arch-guild review mandated: <strong>Use Rust <code>regex</code> crate only. No <code>fancy-regex</code>. ReDoS protection is non-negotiable.</strong></p>
-<p>But what if you need Python or TypeScript? That’s where the crusty variants come in.</p>
-<h2 id="ffi-head-to-head-puma-vs-puma-crusty"><a class="header" href="#ffi-head-to-head-puma-vs-puma-crusty">FFI Head-to-Head: puma vs puma-crusty</a></h2>
-<p>puma-crusty is a Python package that wraps the rumi engine via PyO3. Every matcher call crosses the Python-Rust FFI boundary.</p>
-<p>Let’s see what that boundary costs:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Scenario</th><th>puma (pure Python)</th><th>puma-crusty (PyO3)</th><th>Ratio</th></tr>
-</thead>
-<tbody>
-<tr><td>compile_simple</td><td>1.83 µs</td><td>625 ns</td><td>crusty 2.9x faster</td></tr>
-<tr><td>compile_complex</td><td>4.62 µs</td><td>14.0 µs</td><td>puma 3x faster</td></tr>
-<tr><td>exact_hit</td><td>282 ns</td><td>188 ns</td><td>crusty 1.5x faster</td></tr>
-<tr><td>exact_miss</td><td>178 ns</td><td>141 ns</td><td>crusty 1.3x faster</td></tr>
-<tr><td>regex_hit</td><td>482 ns</td><td>299 ns</td><td>crusty 1.6x faster</td></tr>
-<tr><td>regex_miss</td><td>203 ns</td><td>201 ns</td><td>same</td></tr>
-<tr><td>complex_hit</td><td>814 ns</td><td>570 ns</td><td>crusty 1.4x faster</td></tr>
-<tr><td>complex_miss</td><td>461 ns</td><td>490 ns</td><td>same</td></tr>
-</tbody>
-</table>
-</div>
-<h3 id="the-ffi-overhead"><a class="header" href="#the-ffi-overhead">The FFI Overhead</a></h3>
-<p><strong>For evaluation</strong>: crusty is 1.3-1.6x faster on simple operations, breaks even on misses.</p>
-<p><strong>For compilation</strong>: crusty wins on simple configs (Rust struct construction beats Python dataclass construction), but loses on complex configs where Python’s dynamic typing makes nested object graphs cheaper to construct.</p>
-<p>The FFI overhead is minimal because PyO3 has been heavily optimized for this workload. The crossover happens around 1-2 arguments per call.</p>
-<h3 id="the-strategic-value"><a class="header" href="#the-strategic-value">The Strategic Value</a></h3>
-<p>crusty gives you the ReDoS protection of Rust’s regex engine without rewriting your Python code. For regex-heavy workloads, it’s a 1.5x speedup. For adversarial regex input, it’s the difference between 11ns and hanging forever.</p>
-<p>If you’re building a Python service that accepts regex patterns from untrusted sources, puma-crusty is your safety net.</p>
-<h2 id="ffi-head-to-head-bumi-vs-bumi-crusty"><a class="header" href="#ffi-head-to-head-bumi-vs-bumi-crusty">FFI Head-to-Head: bumi vs bumi-crusty</a></h2>
-<p>bumi-crusty wraps the rumi engine compiled to WebAssembly via wasm-bindgen. Every call crosses the JavaScript-WASM boundary with object serialization via <code>js_sys::Reflect</code>.</p>
-<p>Here’s the brutal truth:</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Scenario</th><th>bumi (pure TS)</th><th>bumi-crusty (WASM)</th><th>Ratio</th></tr>
-</thead>
-<tbody>
-<tr><td>compile_simple</td><td>19 ns</td><td>2.17 µs</td><td><strong>bumi 113x faster</strong></td></tr>
-<tr><td>compile_complex</td><td>107 ns</td><td>47.4 µs</td><td><strong>bumi 444x faster</strong></td></tr>
-<tr><td>exact_hit</td><td>9.9 ns</td><td>1.63 µs</td><td><strong>bumi 164x faster</strong></td></tr>
-<tr><td>exact_miss</td><td>10.7 ns</td><td>1.52 µs</td><td><strong>bumi 142x faster</strong></td></tr>
-<tr><td>regex_hit</td><td>25.9 ns</td><td>2.13 µs</td><td><strong>bumi 82x faster</strong></td></tr>
-<tr><td>regex_miss</td><td>18.1 ns</td><td>1.66 µs</td><td><strong>bumi 92x faster</strong></td></tr>
-<tr><td>complex_hit</td><td>82.7 ns</td><td>2.45 µs</td><td><strong>bumi 30x faster</strong></td></tr>
-<tr><td>complex_miss</td><td>25.7 ns</td><td>2.42 µs</td><td><strong>bumi 94x faster</strong></td></tr>
-</tbody>
-</table>
-</div>
-<p>Pure TypeScript is faster in <strong>every single scenario</strong>. Not by a little — by 30-450x.</p>
-<h3 id="the-wasm-boundary-tax"><a class="header" href="#the-wasm-boundary-tax">The WASM Boundary Tax</a></h3>
-<p>The WASM boundary serialization overhead dominates. At 2-3 microseconds per call, the FFI cost exceeds the work being done by multiple orders of magnitude.</p>
-<p>Unlike PyO3 (which passes raw pointers), wasm-bindgen serializes objects via <code>js_sys::Reflect</code>, which means:</p>
-<ol>
-<li>Walk the JavaScript object graph</li>
-<li>Convert to Rust types</li>
-<li>Call the Rust function</li>
-<li>Convert result back to JavaScript</li>
-<li>Reconstruct JavaScript objects</li>
-</ol>
-<p>For a 10ns operation, a 2µs boundary cost is 200x overhead.</p>
-<h3 id="why-bumi-crusty-exists"><a class="header" href="#why-bumi-crusty-exists">Why bumi-crusty Exists</a></h3>
-<p>Not for speed. For <strong>ReDoS protection</strong>.</p>
-<p>If your matcher uses regex heavily and accepts untrusted input, the pure TypeScript RegExp engine is a vulnerability. bumi-crusty gives you the linear-time guarantees of Rust’s <code>regex</code> crate at the cost of 100x slower baseline performance.</p>
-<p>For most workloads, this is a bad trade. But if an attacker can hang your service with a single malicious regex match, 2µs is cheaper than 72ms (or infinite time).</p>
-<h3 id="when-to-use-bumi-crusty"><a class="header" href="#when-to-use-bumi-crusty">When to Use bumi-crusty</a></h3>
-<ul>
-<li>Cloudflare Workers or Deno Deploy where regex comes from user config</li>
-<li>Low request rate where 2µs per match is acceptable</li>
-<li>Security-critical edge cases where ReDoS is a real threat</li>
-</ul>
-<p>For general use, stick with pure bumi and <strong>audit regex patterns at ingress</strong>.</p>
-<h2 id="the-strategic-picture"><a class="header" href="#the-strategic-picture">The Strategic Picture</a></h2>
-<h3 id="use-rumi-rust-when"><a class="header" href="#use-rumi-rust-when">Use <strong>rumi</strong> (Rust) when</a></h3>
-<ul>
-<li>Building a proxy, load balancer, or high-throughput router</li>
-<li>You need maximum throughput per core</li>
-<li>Regex matching untrusted input (ReDoS protection mandatory)</li>
-<li>You’re already in Rust-land</li>
-</ul>
-<p><strong>Speed</strong>: Best for complex pipelines. Linear-time regex with zero ReDoS risk.</p>
-<h3 id="use-puma-python-when"><a class="header" href="#use-puma-python-when">Use <strong>puma</strong> (Python) when</a></h3>
-<ul>
-<li>Integrating with Python web frameworks (FastAPI, Flask, Django)</li>
-<li>Developer ergonomics matter more than raw speed</li>
-<li>You control the regex patterns (no untrusted input)</li>
-<li>50k req/sec per core is fast enough</li>
-</ul>
-<p><strong>Speed</strong>: 10-30x slower than Rust, but rarely the bottleneck. Backtracking regex vulnerable to ReDoS.</p>
-<h3 id="use-bumi-typescript-when"><a class="header" href="#use-bumi-typescript-when">Use <strong>bumi</strong> (TypeScript) when</a></h3>
-<ul>
-<li>Building frontend routing or edge workers (Cloudflare, Deno Deploy)</li>
-<li>You need sub-microsecond latency for simple matches</li>
-<li>You control the regex patterns (no untrusted input)</li>
-<li>TypeScript ecosystem integration is valuable</li>
-</ul>
-<p><strong>Speed</strong>: Fastest for simple operations (JIT beats Rust dispatch). Backtracking regex vulnerable to ReDoS.</p>
-<h3 id="use-puma-crusty-python--rust-ffi-when"><a class="header" href="#use-puma-crusty-python--rust-ffi-when">Use <strong>puma-crusty</strong> (Python + Rust FFI) when</a></h3>
-<ul>
-<li>You need ReDoS protection in a Python codebase</li>
-<li>Regex-heavy workloads where 1.5x speedup matters</li>
-<li>Willing to add a native extension dependency</li>
-</ul>
-<p><strong>Speed</strong>: 1.5x faster than puma for evaluation, 3x slower for complex compilation. Linear-time regex.</p>
-<h3 id="avoid-bumi-crusty-typescript--wasm-ffi-unless"><a class="header" href="#avoid-bumi-crusty-typescript--wasm-ffi-unless">Avoid <strong>bumi-crusty</strong> (TypeScript + WASM FFI) unless</a></h3>
-<ul>
-<li>You MUST have linear-time regex in TypeScript</li>
-<li>You’re matching untrusted regex input at the edge</li>
-<li>The 100x slowdown is acceptable (e.g., low request rate)</li>
-</ul>
-<p><strong>Speed</strong>: 30-450x slower than pure TypeScript. Only use for ReDoS protection when no other option exists.</p>
-<h2 id="phase-11-the-re2-alternative"><a class="header" href="#phase-11-the-re2-alternative">Phase 11: The RE2 Alternative</a></h2>
-<p>The roadmap includes Phase 11: migrate puma to <code>google-re2</code> (Python bindings to C++ RE2) and bumi to <code>re2js</code> (pure JS port of RE2).</p>
-<p>This would give linear-time regex guarantees without FFI overhead:</p>
-<ul>
-<li><strong>puma</strong> gets ReDoS protection via a mature C extension (comparable to PyO3 overhead)</li>
-<li><strong>bumi</strong> gets ReDoS protection in pure TypeScript (no WASM boundary)</li>
-</ul>
-<p>At that point, the crusty variants shift from “safety layer” to “full compiled pipeline in Rust” for complex configs where the rumi compiler’s optimizations justify the FFI cost.</p>
-<p>But that’s future work. For now, the pure implementations are fastest, and the crusty variants are the ReDoS safety net.</p>
-<h2 id="the-bottom-line"><a class="header" href="#the-bottom-line">The Bottom Line</a></h2>
-<p>TypeScript JIT beats Rust dynamic dispatch on simple operations. This is expected and not a language-level win — it’s the natural outcome of monomorphic inline caching vs vtable indirection.</p>
-<p>Python is 10-30x slower than both, which is the expected interpreter tax. Still fast enough for most web workloads.</p>
-<p>The real story is <strong>ReDoS</strong>. At N=20, Rust’s linear-time regex is 6.5 million times faster than Python’s backtracking engine. At N=25, Python hangs forever. This isn’t a performance optimization — it’s a <strong>security boundary</strong>.</p>
-<p>The crusty variants let you pay the FFI tax to get Rust’s safety guarantees. For Python, the tax is small (1.5x slower than pure Python). For TypeScript, the tax is huge (100x slower than pure TypeScript). Choose accordingly.</p>
-<p>In production:</p>
-<ul>
-<li>Use <strong>rumi</strong> if you can</li>
-<li>Use <strong>puma/bumi</strong> if ergonomics matter more than raw speed</li>
-<li>Add <strong>crusty</strong> if untrusted regex input is a threat model</li>
-</ul>
-<p>And never, ever, let user-supplied regex patterns hit a backtracking engine without sanitization.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../performance/guide.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../reference/proto.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -487,7 +272,7 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../performance/guide.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../reference/proto.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,363 +181,175 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="python-api-reference"><a class="header" href="#python-api-reference">Python API Reference</a></h1>
-<p>puma implements the xDS Unified Matcher API in pure Python. Zero dependencies. Python 3.12+.</p>
-<p><strong>Package:</strong> <code>puma</code> (from <code>puma/</code> directory)</p>
-<p><strong>Installation:</strong></p>
-<pre><code class="language-bash">pip install puma
-# or with uv
-uv add puma
+<h2 id="installation"><a class="header" href="#installation">Installation</a></h2>
+<pre><code class="language-bash">uv add xuma
 </code></pre>
-<h2 id="import-hierarchy"><a class="header" href="#import-hierarchy">Import Hierarchy</a></h2>
-<p>All public types exported flat from top level:</p>
-<pre><code class="language-python">from puma import (
+<p>Requires Python 3.12+. Dependency: <code>google-re2</code> for linear-time regex.</p>
+<h2 id="package-xuma"><a class="header" href="#package-xuma">Package: xuma</a></h2>
+<pre><code class="language-python">from xuma import (
     # Protocols
     DataInput, InputMatcher, MatchingData,
     # Predicates
-    SinglePredicate, And, Or, Not, Predicate, predicate_depth,
-    # Matcher
-    Matcher, FieldMatcher, OnMatch, Action, NestedMatcher, MatcherError,
+    SinglePredicate, And, Or, Not, Predicate,
+    # Matcher tree
+    Matcher, FieldMatcher, Action, NestedMatcher, OnMatch,
     # String matchers
     ExactMatcher, PrefixMatcher, SuffixMatcher, ContainsMatcher, RegexMatcher,
-)
-
-from puma.http import (
-    # Context
-    HttpRequest,
-    # DataInputs
-    PathInput, MethodInput, HeaderInput, QueryParamInput,
-    # Gateway API types
-    HttpPathMatch, HttpHeaderMatch, HttpQueryParamMatch, HttpRouteMatch,
-    compile_route_matches,
+    # Registry
+    RegistryBuilder, Registry, register_core_matchers,
+    # Config
+    MatcherConfig, parse_matcher_config,
+    # Constants
+    MAX_DEPTH, MAX_FIELD_MATCHERS, MAX_PREDICATES_PER_COMPOUND,
+    MAX_PATTERN_LENGTH, MAX_REGEX_PATTERN_LENGTH,
+    # Errors
+    MatcherError, UnknownTypeUrlError, InvalidConfigError,
+    TooManyFieldMatchersError, TooManyPredicatesError, PatternTooLongError,
 )
 </code></pre>
-<h2 id="type-hierarchy"><a class="header" href="#type-hierarchy">Type Hierarchy</a></h2>
-<pre><code>┌─────────────────────────────────────┐
-│          Matcher[Ctx, A]            │
-│   Top-level tree, returns A|None    │
-└───┬─────────────────────────────────┘
-    │ contains
-    ├──► FieldMatcher[Ctx, A]
-    │       predicate + on_match
-    │
-    └──► OnMatch[Ctx, A]  (fallback)
-         ├─ Action[A]
-         └─ NestedMatcher[Ctx, A]
-
-┌─────────────────────────────────────┐
-│         Predicate[Ctx]              │
-│      Boolean logic tree             │
-└───┬─────────────────────────────────┘
-    ├─ SinglePredicate[Ctx] → input + matcher
-    ├─ And[Ctx] → all match
-    ├─ Or[Ctx] → any match
-    └─ Not[Ctx] → invert
-
-┌─────────────────────────────────────┐
-│    DataInput[Ctx] protocol          │
-│   extract MatchingData from Ctx    │
-└─────────────────────────────────────┘
-
-┌─────────────────────────────────────┐
-│    InputMatcher protocol            │
-│   match MatchingData → bool        │
-└───┬─────────────────────────────────┘
-    ├─ ExactMatcher
-    ├─ PrefixMatcher
-    ├─ SuffixMatcher
-    ├─ ContainsMatcher
-    └─ RegexMatcher
-</code></pre>
-<h2 id="core-protocols"><a class="header" href="#core-protocols">Core Protocols</a></h2>
+<h2 id="core-types"><a class="header" href="#core-types">Core Types</a></h2>
 <h3 id="matchingdata"><a class="header" href="#matchingdata">MatchingData</a></h3>
 <pre><code class="language-python">type MatchingData = str | int | bool | bytes | None
 </code></pre>
-<p>Type-erased value returned by <code>DataInput.get()</code>. Replaces Rust’s <code>MatchingData</code> enum.</p>
-<p>Returning <code>None</code> triggers the <strong>None → false invariant</strong>: predicate evaluates to <code>False</code> without consulting the matcher.</p>
-<h3 id="datainputctx"><a class="header" href="#datainputctx">DataInput[Ctx]</a></h3>
-<pre><code class="language-python">class DataInput(Protocol[Ctx]):
-    def get(self, ctx: Ctx, /) -&gt; MatchingData: ...
+<h3 id="datainput-protocol"><a class="header" href="#datainput-protocol">DataInput Protocol</a></h3>
+<pre><code class="language-python">class DataInput[Ctx]:
+    def get(self, ctx: Ctx) -&gt; MatchingData: ...
 </code></pre>
-<p>Domain-specific extraction port. Implementations:</p>
-<ul>
-<li><code>PathInput</code> extracts HTTP path</li>
-<li><code>HeaderInput</code> extracts HTTP header by name</li>
-<li>Custom: implement this protocol for your domain</li>
-</ul>
-<p><strong>Contravariant in Ctx</strong> — accepts <code>Ctx</code> or any supertype.</p>
-<h3 id="inputmatcher"><a class="header" href="#inputmatcher">InputMatcher</a></h3>
-<pre><code class="language-python">class InputMatcher(Protocol):
-    def matches(self, value: MatchingData, /) -&gt; bool: ...
+<h3 id="inputmatcher-protocol"><a class="header" href="#inputmatcher-protocol">InputMatcher Protocol</a></h3>
+<pre><code class="language-python">class InputMatcher:
+    def matches(self, value: MatchingData) -&gt; bool: ...
 </code></pre>
-<p>Domain-agnostic matching port. Non-generic by design — same <code>ExactMatcher</code> works for HTTP, CloudEvent, or any custom domain.</p>
-<h2 id="predicates"><a class="header" href="#predicates">Predicates</a></h2>
-<h3 id="singlepredicatectx"><a class="header" href="#singlepredicatectx">SinglePredicate[Ctx]</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class SinglePredicate[Ctx]:
-    input: DataInput[Ctx]
-    matcher: InputMatcher
+<h3 id="matcher"><a class="header" href="#matcher">Matcher</a></h3>
+<pre><code class="language-python">Matcher(
+    matcher_list: tuple[FieldMatcher[Ctx, A], ...],
+    on_no_match: OnMatch[Ctx, A] | None = None,
+)
 
-    def evaluate(self, ctx: Any) -&gt; bool: ...
+matcher.evaluate(ctx: Ctx) -&gt; A | None
 </code></pre>
-<p>Combines extraction + matching. Enforces the <strong>None → false invariant</strong>.</p>
-<h3 id="andctx"><a class="header" href="#andctx">And[Ctx]</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class And[Ctx]:
-    predicates: tuple[Predicate[Ctx], ...]
-
-    def evaluate(self, ctx: Any) -&gt; bool: ...
-</code></pre>
-<p>All predicates must match. Short-circuits on first <code>False</code>. Empty tuple returns <code>True</code> (vacuous truth).</p>
-<h3 id="orctx"><a class="header" href="#orctx">Or[Ctx]</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class Or[Ctx]:
-    predicates: tuple[Predicate[Ctx], ...]
-
-    def evaluate(self, ctx: Any) -&gt; bool: ...
-</code></pre>
-<p>Any predicate must match. Short-circuits on first <code>True</code>. Empty tuple returns <code>False</code>.</p>
-<h3 id="notctx"><a class="header" href="#notctx">Not[Ctx]</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class Not[Ctx]:
-    predicate: Predicate[Ctx]
-
-    def evaluate(self, ctx: Any) -&gt; bool: ...
-</code></pre>
-<p>Inverts inner predicate result.</p>
-<h3 id="predicatectx"><a class="header" href="#predicatectx">Predicate[Ctx]</a></h3>
-<pre><code class="language-python">type Predicate[Ctx] = SinglePredicate[Ctx] | And[Ctx] | Or[Ctx] | Not[Ctx]
-</code></pre>
-<p>Union type for pattern matching via <code>match</code>/<code>case</code>.</p>
-<h3 id="predicate_depth"><a class="header" href="#predicate_depth">predicate_depth()</a></h3>
-<pre><code class="language-python">def predicate_depth(p: Predicate[Any]) -&gt; int: ...
-</code></pre>
-<p>Calculate nesting depth of predicate tree. Used by <code>Matcher.validate()</code> for depth limit enforcement.</p>
-<h2 id="matcher-tree"><a class="header" href="#matcher-tree">Matcher Tree</a></h2>
-<h3 id="matcherctx-a"><a class="header" href="#matcherctx-a">Matcher[Ctx, A]</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class Matcher[Ctx, A]:
-    matcher_list: tuple[FieldMatcher[Ctx, A], ...]
-    on_no_match: OnMatch[Ctx, A] | None = None
-
-    def evaluate(self, ctx: Any) -&gt; A | None: ...
-    def validate(self) -&gt; None: ...
-    def depth(self) -&gt; int: ...
-</code></pre>
-<p>Top-level matcher tree. Evaluates <code>matcher_list</code> in order (first-match-wins). Returns action <code>A</code> or <code>None</code>.</p>
-<p><strong>Auto-validation:</strong> <code>validate()</code> is called in <code>__post_init__</code>. Trees exceeding <code>MAX_DEPTH</code> (32) raise <code>MatcherError</code>.</p>
-<p><strong>Methods:</strong></p>
-<ul>
-<li><code>evaluate(ctx)</code> — Returns first matching action or <code>None</code></li>
-<li><code>validate()</code> — Checks depth limit (called automatically)</li>
-<li><code>depth()</code> — Returns total tree depth</li>
-</ul>
-<h3 id="fieldmatcherctx-a"><a class="header" href="#fieldmatcherctx-a">FieldMatcher[Ctx, A]</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class FieldMatcher[Ctx, A]:
-    predicate: Predicate[Ctx]
-    on_match: OnMatch[Ctx, A]
-</code></pre>
-<p>Pairs a predicate with an outcome (action or nested matcher).</p>
-<h3 id="onmatchctx-a"><a class="header" href="#onmatchctx-a">OnMatch[Ctx, A]</a></h3>
-<pre><code class="language-python">type OnMatch[Ctx, A] = Action[A] | NestedMatcher[Ctx, A]
-</code></pre>
-<p>xDS exclusivity — action XOR nested matcher, never both.</p>
-<h3 id="actiona"><a class="header" href="#actiona">Action[A]</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class Action[A]:
-    value: A
-</code></pre>
-<p>Terminal outcome. Returns <code>value</code> when matched.</p>
-<h3 id="nestedmatcherctx-a"><a class="header" href="#nestedmatcherctx-a">NestedMatcher[Ctx, A]</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class NestedMatcher[Ctx, A]:
-    matcher: Matcher[Ctx, A]
-</code></pre>
-<p>Continue evaluation into nested matcher. If nested matcher returns <code>None</code>, evaluation continues to next <code>FieldMatcher</code> (xDS nested matcher failure propagation).</p>
-<h3 id="matchererror"><a class="header" href="#matchererror">MatcherError</a></h3>
-<pre><code class="language-python">class MatcherError(Exception): ...
-</code></pre>
-<p>Raised when <code>validate()</code> detects depth exceeding <code>MAX_DEPTH</code>.</p>
-<h3 id="max_depth"><a class="header" href="#max_depth">MAX_DEPTH</a></h3>
-<pre><code class="language-python">MAX_DEPTH: int = 32
-</code></pre>
-<p>Maximum allowed matcher tree depth. Enforced at construction time.</p>
-<h2 id="string-matchers"><a class="header" href="#string-matchers">String Matchers</a></h2>
-<p>All matchers are frozen dataclasses implementing <code>InputMatcher</code> protocol. Return <code>False</code> for non-string or <code>None</code> input.</p>
-<h3 id="exactmatcher"><a class="header" href="#exactmatcher">ExactMatcher</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class ExactMatcher:
-    value: str
-    ignore_case: bool = False
-
-    def matches(self, value: MatchingData, /) -&gt; bool: ...
-</code></pre>
-<p>Exact string equality. When <code>ignore_case=True</code>, comparison uses <code>.casefold()</code>.</p>
-<p><strong>Optimization:</strong> Pattern is pre-lowercased at construction time (<code>_cmp_value</code> field).</p>
-<h3 id="prefixmatcher"><a class="header" href="#prefixmatcher">PrefixMatcher</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class PrefixMatcher:
-    prefix: str
-    ignore_case: bool = False
-
-    def matches(self, value: MatchingData, /) -&gt; bool: ...
-</code></pre>
-<p>String starts with prefix. Pre-lowercased at construction when <code>ignore_case=True</code>.</p>
-<h3 id="suffixmatcher"><a class="header" href="#suffixmatcher">SuffixMatcher</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class SuffixMatcher:
-    suffix: str
-    ignore_case: bool = False
-
-    def matches(self, value: MatchingData, /) -&gt; bool: ...
-</code></pre>
-<p>String ends with suffix. Pre-lowercased at construction when <code>ignore_case=True</code>.</p>
-<h3 id="containsmatcher"><a class="header" href="#containsmatcher">ContainsMatcher</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class ContainsMatcher:
-    substring: str
-    ignore_case: bool = False
-
-    def matches(self, value: MatchingData, /) -&gt; bool: ...
-</code></pre>
-<p>Substring search. Pre-lowercased at construction when <code>ignore_case=True</code> (Knuth optimization: avoid repeated pattern lowercasing).</p>
-<h3 id="regexmatcher"><a class="header" href="#regexmatcher">RegexMatcher</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class RegexMatcher:
-    pattern: str
-
-    def matches(self, value: MatchingData, /) -&gt; bool: ...
-</code></pre>
-<p>Regular expression search (not fullmatch). Pattern compiled at construction time.</p>
-<p><strong>Security:</strong> Uses Python <code>re</code> module (backtracking NFA, ReDoS-vulnerable). See <code>SECURITY.md</code> in the puma package for details. For adversarial input, use <code>puma-crusty</code> (Phase 7).</p>
-<h2 id="http-domain"><a class="header" href="#http-domain">HTTP Domain</a></h2>
-<h3 id="httprequest"><a class="header" href="#httprequest">HttpRequest</a></h3>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class HttpRequest:
-    method: str = "GET"
-    raw_path: str = "/"
-    headers: dict[str, str] = field(default_factory=dict)
-
-    @property
-    def path(self) -&gt; str: ...
-    @property
-    def query_params(self) -&gt; dict[str, str]: ...
-    def header(self, name: str) -&gt; str | None: ...
-    def query_param(self, name: str) -&gt; str | None: ...
-</code></pre>
-<p>HTTP request context for matching.</p>
-<p><strong>Parsing:</strong> Query string automatically parsed from <code>raw_path</code>. Headers stored lowercased for case-insensitive lookup.</p>
-<p><strong>Properties:</strong></p>
-<ul>
-<li><code>path</code> — path without query string</li>
-<li><code>query_params</code> — parsed query parameters</li>
-</ul>
-<p><strong>Methods:</strong></p>
-<ul>
-<li><code>header(name)</code> — Case-insensitive header lookup</li>
-<li><code>query_param(name)</code> — Query parameter lookup</li>
-</ul>
-<h3 id="datainputs"><a class="header" href="#datainputs">DataInputs</a></h3>
-<h4 id="pathinput"><a class="header" href="#pathinput">PathInput</a></h4>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class PathInput:
-    def get(self, ctx: HttpRequest, /) -&gt; MatchingData: ...
-</code></pre>
-<p>Extracts <code>ctx.path</code> (without query string).</p>
-<h4 id="methodinput"><a class="header" href="#methodinput">MethodInput</a></h4>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class MethodInput:
-    def get(self, ctx: HttpRequest, /) -&gt; MatchingData: ...
-</code></pre>
-<p>Extracts HTTP method (case-sensitive).</p>
-<h4 id="headerinput"><a class="header" href="#headerinput">HeaderInput</a></h4>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class HeaderInput:
-    name: str
-
-    def get(self, ctx: HttpRequest, /) -&gt; MatchingData: ...
-</code></pre>
-<p>Extracts header value by name (case-insensitive lookup). Returns <code>None</code> if header not present.</p>
-<h4 id="queryparaminput"><a class="header" href="#queryparaminput">QueryParamInput</a></h4>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class QueryParamInput:
-    name: str
-
-    def get(self, ctx: HttpRequest, /) -&gt; MatchingData: ...
-</code></pre>
-<p>Extracts query parameter value by name. Returns <code>None</code> if parameter not present.</p>
-<h3 id="gateway-api-types"><a class="header" href="#gateway-api-types">Gateway API Types</a></h3>
-<p>Pure Python types mirroring Gateway API spec (no Kubernetes dependency).</p>
-<h4 id="httppathmatch"><a class="header" href="#httppathmatch">HttpPathMatch</a></h4>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class HttpPathMatch:
-    type: Literal["Exact", "PathPrefix", "RegularExpression"]
-    value: str
-</code></pre>
-<p>Path match specification.</p>
-<h4 id="httpheadermatch"><a class="header" href="#httpheadermatch">HttpHeaderMatch</a></h4>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class HttpHeaderMatch:
-    type: Literal["Exact", "RegularExpression"]
-    name: str
-    value: str
-</code></pre>
-<p>Header match specification.</p>
-<h4 id="httpqueryparammatch"><a class="header" href="#httpqueryparammatch">HttpQueryParamMatch</a></h4>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class HttpQueryParamMatch:
-    type: Literal["Exact", "RegularExpression"]
-    name: str
-    value: str
-</code></pre>
-<p>Query parameter match specification.</p>
-<h4 id="httproutematch"><a class="header" href="#httproutematch">HttpRouteMatch</a></h4>
-<pre><code class="language-python">@dataclass(frozen=True, slots=True)
-class HttpRouteMatch:
-    path: HttpPathMatch | None = None
-    method: str | None = None
-    headers: list[HttpHeaderMatch] = field(default_factory=list)
-    query_params: list[HttpQueryParamMatch] = field(default_factory=list)
-
-    def compile[A](self, action: A) -&gt; Matcher[HttpRequest, A]: ...
-    def to_predicate(self) -&gt; Predicate[HttpRequest]: ...
-</code></pre>
-<p>Gateway API route match config. All conditions within a single <code>HttpRouteMatch</code> are ANDed.</p>
-<p><strong>Methods:</strong></p>
-<ul>
-<li><code>compile(action)</code> — Build a <code>Matcher</code> with this match → action</li>
-<li><code>to_predicate()</code> — Convert to predicate tree (used by compiler)</li>
-</ul>
-<h3 id="compile_route_matches"><a class="header" href="#compile_route_matches">compile_route_matches()</a></h3>
-<pre><code class="language-python">def compile_route_matches[A](
-    matches: list[HttpRouteMatch],
-    action: A,
-    on_no_match: A | None = None,
-) -&gt; Matcher[HttpRequest, A]: ...
-</code></pre>
-<p>Compile multiple <code>HttpRouteMatch</code> entries into a single <code>Matcher</code>. Multiple matches are ORed per Gateway API semantics.</p>
-<p><strong>Example:</strong></p>
-<pre><code class="language-python">matcher = compile_route_matches(
-    matches=[api_route, admin_route],
-    action="matched",
-    on_no_match="404",
+<h3 id="fieldmatcher"><a class="header" href="#fieldmatcher">FieldMatcher</a></h3>
+<pre><code class="language-python">FieldMatcher(
+    predicate: Predicate[Ctx],
+    on_match: OnMatch[Ctx, A],
 )
 </code></pre>
-<h2 id="requirements"><a class="header" href="#requirements">Requirements</a></h2>
-<ul>
-<li><strong>Python 3.12+</strong> — uses PEP 695 type parameter syntax (<code>class Foo[T]:</code>)</li>
-<li><strong>Zero dependencies</strong> — pure Python stdlib only</li>
-<li><strong>py.typed</strong> — PEP 561 marker included, downstream type checkers (mypy, pyright) recognize puma as typed</li>
-</ul>
-<h2 id="security"><a class="header" href="#security">Security</a></h2>
-<p>See <code>SECURITY.md</code> in the puma package for ReDoS risk and mitigation.</p>
-<p><strong>Summary:</strong></p>
-<ul>
-<li><code>RegexMatcher</code> uses Python <code>re</code> (backtracking, ReDoS-vulnerable)</li>
-<li>Safe for trusted patterns (your route config, known fixtures)</li>
-<li>For adversarial input, use <code>puma-crusty</code> (Rust-backed, linear-time regex)</li>
-<li>Depth validation automatic at construction (max 32 levels)</li>
-</ul>
+<h3 id="onmatch"><a class="header" href="#onmatch">OnMatch</a></h3>
+<pre><code class="language-python">type OnMatch[Ctx, A] = Action[A] | NestedMatcher[Ctx, A]
+
+Action(value: A)
+NestedMatcher(matcher: Matcher[Ctx, A])
+</code></pre>
+<h3 id="predicates"><a class="header" href="#predicates">Predicates</a></h3>
+<pre><code class="language-python">SinglePredicate(input: DataInput[Ctx], matcher: InputMatcher)
+And(predicates: tuple[Predicate[Ctx], ...])
+Or(predicates: tuple[Predicate[Ctx], ...])
+Not(predicate: Predicate[Ctx])
+
+type Predicate[Ctx] = SinglePredicate[Ctx] | And[Ctx] | Or[Ctx] | Not[Ctx]
+</code></pre>
+<h2 id="string-matchers"><a class="header" href="#string-matchers">String Matchers</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Class</th><th>Constructor</th><th>Matches</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ExactMatcher(value)</code></td><td><code>ExactMatcher("hello")</code></td><td>Exact string equality</td></tr>
+<tr><td><code>PrefixMatcher(prefix)</code></td><td><code>PrefixMatcher("/api")</code></td><td>Starts with</td></tr>
+<tr><td><code>SuffixMatcher(suffix)</code></td><td><code>SuffixMatcher(".json")</code></td><td>Ends with</td></tr>
+<tr><td><code>ContainsMatcher(substring)</code></td><td><code>ContainsMatcher("admin")</code></td><td>Contains</td></tr>
+<tr><td><code>RegexMatcher(pattern)</code></td><td><code>RegexMatcher("^Bearer .+$")</code></td><td>RE2 regex</td></tr>
+</tbody>
+</table>
+</div>
+<p>All matchers are frozen dataclasses.</p>
+<h2 id="http-domain"><a class="header" href="#http-domain">HTTP Domain</a></h2>
+<pre><code class="language-python">from xuma.http import (
+    HttpRequest, PathInput, MethodInput, HeaderInput, QueryParamInput,
+    HttpRouteMatch, HttpPathMatch, HttpHeaderMatch, HttpQueryParamMatch,
+    compile_route_matches, register,
+)
+</code></pre>
+<h3 id="httprequest"><a class="header" href="#httprequest">HttpRequest</a></h3>
+<pre><code class="language-python">HttpRequest(
+    method: str = "GET",
+    raw_path: str = "/",
+    headers: dict[str, str] | None = None,
+    query_params: dict[str, str] | None = None,
+)
+</code></pre>
+<h3 id="inputs"><a class="header" href="#inputs">Inputs</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Class</th><th>Extracts</th><th>Returns</th></tr>
+</thead>
+<tbody>
+<tr><td><code>PathInput()</code></td><td>Request path</td><td><code>str</code></td></tr>
+<tr><td><code>MethodInput()</code></td><td>HTTP method</td><td><code>str</code></td></tr>
+<tr><td><code>HeaderInput(name)</code></td><td>Header value</td><td>`str</td></tr>
+<tr><td><code>QueryParamInput(name)</code></td><td>Query parameter</td><td>`str</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="gateway-api-compiler"><a class="header" href="#gateway-api-compiler">Gateway API Compiler</a></h3>
+<pre><code class="language-python">HttpRouteMatch(
+    path: HttpPathMatch | None = None,
+    method: str | None = None,
+    headers: list[HttpHeaderMatch] = [],
+    query_params: list[HttpQueryParamMatch] = [],
+)
+
+HttpPathMatch(type: "Exact" | "PathPrefix" | "RegularExpression", value: str)
+HttpHeaderMatch(type: "Exact" | "RegularExpression", name: str, value: str)
+HttpQueryParamMatch(type: "Exact" | "RegularExpression", name: str, value: str)
+
+compile_route_matches(matches, action, on_no_match=None) -&gt; Matcher
+</code></pre>
+<h2 id="registry"><a class="header" href="#registry">Registry</a></h2>
+<pre><code class="language-python">builder = RegistryBuilder()
+builder = register_core_matchers(builder)
+registry = builder.build()
+
+matcher = registry.load_matcher(config)
+</code></pre>
+<h3 id="registrybuilder"><a class="header" href="#registrybuilder">RegistryBuilder</a></h3>
+<pre><code class="language-python">RegistryBuilder()
+    .input(type_url, factory)       # Register a DataInput factory
+    .matcher(type_url, factory)     # Register an InputMatcher factory
+    .build() -&gt; Registry
+</code></pre>
+<h3 id="registry-1"><a class="header" href="#registry-1">Registry</a></h3>
+<pre><code class="language-python">registry.load_matcher(config: MatcherConfig) -&gt; Matcher
+registry.contains_input(type_url: str) -&gt; bool
+registry.contains_matcher(type_url: str) -&gt; bool
+</code></pre>
+<h2 id="config-loading"><a class="header" href="#config-loading">Config Loading</a></h2>
+<pre><code class="language-python">from xuma import parse_matcher_config
+
+config = parse_matcher_config(json_dict)  # From dict
+</code></pre>
+<h2 id="constants"><a class="header" href="#constants">Constants</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Constant</th><th>Value</th></tr>
+</thead>
+<tbody>
+<tr><td><code>MAX_DEPTH</code></td><td>32</td></tr>
+<tr><td><code>MAX_FIELD_MATCHERS</code></td><td>256</td></tr>
+<tr><td><code>MAX_PREDICATES_PER_COMPOUND</code></td><td>256</td></tr>
+<tr><td><code>MAX_PATTERN_LENGTH</code></td><td>8192</td></tr>
+<tr><td><code>MAX_REGEX_PATTERN_LENGTH</code></td><td>4096</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="helpers"><a class="header" href="#helpers">Helpers</a></h2>
+<pre><code class="language-python">matcher_from_predicate(predicate, action, on_no_match=None) -&gt; Matcher
+and_predicate(predicates, fallback) -&gt; Predicate
+or_predicate(predicates, fallback) -&gt; Predicate
+predicate_depth(predicate) -&gt; int
+</code></pre>
 
                     </main>
 

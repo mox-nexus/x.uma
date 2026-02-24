@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "searchindex-86c44684.js";
+            window.path_to_searchindex_js = "searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-eb7188b1.js"></script>
+        <script src="toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -182,180 +182,74 @@
                     <main>
                         <h1 id="xuma"><a class="header" href="#xuma">x.uma</a></h1>
 <blockquote>
-<p>Cross-Platform Unified Matcher API</p>
+<p>One matcher engine. Five implementations. Same semantics everywhere.</p>
 </blockquote>
-<p><strong>Alpha status</strong> — API is under active development and will change.</p>
-<p>x.uma implements the <a href="https://github.com/cncf/xds">xDS Unified Matcher API</a> across multiple languages. Match structured data (HTTP requests, events, messages) against rule trees with first-match-wins semantics.</p>
+<p>x.uma implements the <a href="https://www.envoyproxy.io/docs/envoy/latest/api-v3/xds/type/matcher/v3/matcher.proto">xDS Unified Matcher API</a> — the same matching protocol Envoy uses at Google scale — across Rust, Python, and TypeScript.</p>
+<p>Write matching rules once. Evaluate them in any language. Get the same answer every time.</p>
+<pre><code>Context → DataInput → MatchingData → InputMatcher → bool
+           domain-      erased         domain-
+           specific                    agnostic
+</code></pre>
+<p>An <code>ExactMatcher</code> doesn’t know whether it’s matching HTTP paths, Claude Code hook events, or your custom domain. It matches <em>data</em>. The domain-specific part — extracting that data from your context — is a separate port. This is the key architectural insight, borrowed from Envoy and proven at Google scale.</p>
 <h2 id="implementations"><a class="header" href="#implementations">Implementations</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Package</th><th>Language</th><th>Status</th></tr>
+<tr><th>Package</th><th>Language</th><th>What it is</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>rumi</strong></td><td>Rust</td><td>Production-ready core (195 tests)</td></tr>
-<tr><td><strong>puma</strong></td><td>Python 3.12+</td><td>Alpha v0.1.0 (194 tests)</td></tr>
-<tr><td><strong>bumi</strong></td><td>TypeScript/Bun</td><td>Alpha v0.1.0 (202 tests)</td></tr>
-<tr><td><strong>puma-crusty</strong></td><td>Python (PyO3 bindings)</td><td>Alpha (37 tests)</td></tr>
-<tr><td><strong>bumi-crusty</strong></td><td>TypeScript (wasm-bindgen)</td><td>Alpha (36 tests)</td></tr>
+<tr><td><strong>rumi</strong></td><td>Rust</td><td>Core engine (reference implementation)</td></tr>
+<tr><td><strong>xuma</strong></td><td>Python 3.12+</td><td>Pure Python, zero native deps beyond RE2</td></tr>
+<tr><td><strong>xuma</strong></td><td>TypeScript/Bun</td><td>Pure TypeScript, zero native deps beyond RE2</td></tr>
+<tr><td><strong>puma-crusty</strong></td><td>Python</td><td>Rust bindings via PyO3</td></tr>
+<tr><td><strong>bumi-crusty</strong></td><td>TypeScript</td><td>Rust bindings via WASM</td></tr>
 </tbody>
 </table>
 </div>
-<p>All implementations pass the same conformance test suite. <strong>Total: 268 tests</strong> across 5 variants.</p>
-<h2 id="quick-example"><a class="header" href="#quick-example">Quick Example</a></h2>
-<p>The same pattern in Rust, Python, and TypeScript.</p>
-<h3 id="rust"><a class="header" href="#rust">Rust</a></h3>
-<pre><code class="language-rust ignore">use rumi::prelude::*;
-use rumi_http::{HttpMessage, PathInput, PrefixMatcher};
-
-let matcher = Matcher::new(
-    vec![
-        FieldMatcher::new(
-            Predicate::Single(SinglePredicate::new(
-                Box::new(PathInput),
-                Box::new(PrefixMatcher::new("/api")),
-            )),
-            OnMatch::Action("api_handler"),
-        ),
-    ],
-    Some(OnMatch::Action("default")),
-);
-
-// ProcessingRequest -&gt; HttpMessage -&gt; evaluate
-let action = matcher.evaluate(&amp;http_message);</code></pre>
-<h3 id="python"><a class="header" href="#python">Python</a></h3>
-<pre><code class="language-python">from puma import Matcher, FieldMatcher, SinglePredicate, Action
-from puma import PrefixMatcher
-from puma.http import HttpRequest, PathInput
-
-matcher = Matcher(
-    matcher_list=(
-        FieldMatcher(
-            predicate=SinglePredicate(
-                input=PathInput(),
-                matcher=PrefixMatcher("/api")
-            ),
-            on_match=Action("api_handler")
-        ),
-    ),
-    on_no_match=Action("default")
-)
-
-request = HttpRequest(method="GET", raw_path="/api/users")
-action = matcher.evaluate(request)  # "api_handler"
-</code></pre>
-<h3 id="typescript"><a class="header" href="#typescript">TypeScript</a></h3>
-<pre><code class="language-typescript">import { Matcher, FieldMatcher, SinglePredicate, Action } from "bumi";
-import { PrefixMatcher } from "bumi";
-import { HttpRequest, PathInput } from "bumi/http";
-
-const matcher = new Matcher([
-    new FieldMatcher(
-        new SinglePredicate(
-            new PathInput(),
-            new PrefixMatcher("/api")
-        ),
-        new Action("api_handler")
-    ),
-], new Action("default"));
-
-const request = new HttpRequest("GET", "/api/users");
-const action = matcher.evaluate(request); // "api_handler"
-</code></pre>
-<h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
-<p>x.uma follows hexagonal architecture (ports and adapters). The core is domain-agnostic. Domains plug in at the edges.</p>
-<pre><code class="language-text">┌─────────────────────────────────┐
-│       Domain Adapters           │
-│   HTTP  CloudEvent  Custom      │
-└───────────────┬─────────────────┘
-                │
-┌───────────────▼─────────────────┐
-│           PORTS                 │
-│  DataInput[Ctx] → MatchingValue │
-│  InputMatcher → bool            │
-└───────────────┬─────────────────┘
-                │
-┌───────────────▼─────────────────┐
-│           CORE                  │
-│  Matcher, Predicate, Actions    │
-│    (domain-agnostic)            │
-└─────────────────────────────────┘
-</code></pre>
-<p><strong>DataInput</strong> extracts values from your context (HTTP request, event, custom type).</p>
-<p><strong>InputMatcher</strong> matches the extracted value (exact, prefix, regex, etc).</p>
-<p><strong>Matcher</strong> composes predicates with first-match-wins semantics.</p>
-<p>The same <code>ExactMatcher</code> works for HTTP headers, event types, or your custom domain. This is the key design insight from Envoy’s matcher architecture.</p>
-<h2 id="why-xuma"><a class="header" href="#why-xuma">Why x.uma?</a></h2>
-<p><strong>Domain-agnostic core.</strong> The same matcher logic works for HTTP routing, event filtering, access control, or your custom domain. Add a new domain by implementing <code>DataInput</code> for your context type.</p>
-<p><strong>Type-safe composition.</strong> Predicates compose with AND/OR/NOT. Matchers nest. Actions are exclusive (action XOR nested matcher, never both).</p>
-<p><strong>Battle-tested semantics.</strong> Built on the same xDS protocol Envoy uses at Google scale. First-match-wins, nested matcher failure propagation, depth limits — all enforced by design.</p>
-<p><strong>Multi-language.</strong> Same API across Rust, Python, and TypeScript. Write matchers once, run anywhere.</p>
-<p><strong>Performance.</strong> Sub-microsecond evaluation. Linear-time regex (Rust implementations). Zero-copy where possible.</p>
-<p><strong>Security.</strong> ReDoS protection via linear-time regex. Depth limits (max 32 levels). Fail-closed validation.</p>
-<h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
+<p>All five pass the same conformance test suite (~958 tests total). They implement identical semantics with different performance characteristics.</p>
+<h2 id="pick-your-language"><a class="header" href="#pick-your-language">Pick Your Language</a></h2>
+<p>Already know which language you need? Start here:</p>
+<ul>
+<li><strong><a href="getting-started/rust.html">Rust</a></strong> — <code>rumi</code> + <code>rumi-http</code> in your <code>Cargo.toml</code></li>
+<li><strong><a href="getting-started/python.html">Python</a></strong> — <code>uv add xuma</code>, build a matcher in 10 lines</li>
+<li><strong><a href="getting-started/typescript.html">TypeScript</a></strong> — <code>bun add xuma</code>, same API shape as Python</li>
+</ul>
+<p>Each quick start gets you from install to working HTTP route matcher in under 5 minutes.</p>
+<h2 id="understand-first"><a class="header" href="#understand-first">Understand First</a></h2>
+<p>Not sure whether x.uma fits your problem? Read these:</p>
+<ul>
+<li><strong><a href="explain/when-to-use.html">When to Use x.uma</a></strong> — x.uma vs OPA vs Cedar vs Zanzibar. Honest comparison with decision framework.</li>
+<li><strong><a href="explain/architecture.html">Architecture</a></strong> — Hexagonal architecture, ACES design philosophy, why five implementations.</li>
+</ul>
+<h2 id="domains"><a class="header" href="#domains">Domains</a></h2>
+<p>x.uma ships with two domain adapters. Adding your own is <a href="guides/adding-domain.html">straightforward</a>.</p>
+<p><strong><a href="domains/http.html">HTTP Matching</a></strong> — Path, method, header, and query parameter matching. Gateway API config types. Compiles <code>HttpRouteMatch</code> into a <code>Matcher</code> in one call.</p>
+<p><strong><a href="domains/claude.html">Claude Code Hooks</a></strong> — Match Claude Code hook events by event type, tool name, arguments, session, working directory, or git branch. Compiles <code>HookMatch</code> into a <code>Matcher</code> for multi-rule OR semantics.</p>
+<h2 id="what-it-guarantees"><a class="header" href="#what-it-guarantees">What It Guarantees</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Section</th><th>What you’ll learn</th></tr>
+<tr><th>Guarantee</th><th>How</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>Getting Started</strong></td><td></td></tr>
-<tr><td><a href="getting-started/choose.html">Choose Your Implementation</a></td><td>Which variant fits your use case</td></tr>
-<tr><td><a href="getting-started/rust.html">Rust Quick Start</a></td><td>Get rumi running in 5 minutes</td></tr>
-<tr><td><a href="getting-started/python.html">Python Quick Start</a></td><td>Get puma running in 5 minutes</td></tr>
-<tr><td><a href="getting-started/typescript.html">TypeScript Quick Start</a></td><td>Get bumi running in 5 minutes</td></tr>
-<tr><td><strong>Tutorials</strong></td><td></td></tr>
-<tr><td><a href="tutorials/http-router.html">Build an HTTP Router</a></td><td>Step-by-step routing example</td></tr>
-<tr><td><strong>Core Concepts</strong></td><td></td></tr>
-<tr><td><a href="concepts/pipeline.html">The Matching Pipeline</a></td><td>How evaluation works</td></tr>
-<tr><td><a href="concepts/type-erasure.html">Type Erasure and Ports</a></td><td>Why DataInput/InputMatcher split exists</td></tr>
-<tr><td><a href="concepts/predicates.html">Predicate Composition</a></td><td>AND/OR/NOT logic trees</td></tr>
-<tr><td><a href="concepts/semantics.html">First-Match-Wins Semantics</a></td><td>Evaluation order and fallback</td></tr>
-<tr><td><strong>Performance &amp; Security</strong></td><td></td></tr>
-<tr><td><a href="performance/guide.html">Performance Guide</a></td><td>Optimization techniques</td></tr>
-<tr><td><a href="performance/benchmarks.html">Benchmark Results</a></td><td>Cross-language numbers</td></tr>
-<tr><td><a href="performance/security.html">Security Model</a></td><td>Threat model and mitigations</td></tr>
-<tr><td><a href="performance/redos.html">ReDoS Protection</a></td><td>Linear-time regex guarantees</td></tr>
-<tr><td><strong>Understanding x.uma</strong></td><td></td></tr>
-<tr><td><a href="explain/architecture.html">Architecture</a></td><td>Why it’s built this way</td></tr>
-<tr><td><a href="explain/why-aces.html">Why ACES</a></td><td>Design philosophy deep dive</td></tr>
-<tr><td><a href="explain/when-to-use.html">When to Use x.uma</a></td><td>x.uma vs OPA vs Cedar vs Zanzibar</td></tr>
-<tr><td><a href="explain/policy-landscape.html">Policy Landscape</a></td><td>Where x.uma fits in the ecosystem</td></tr>
-<tr><td><strong>Reference</strong></td><td></td></tr>
-<tr><td><a href="reference/proto.html">Proto API</a></td><td>xDS protocol definitions</td></tr>
-<tr><td><a href="reference/rust.html">Rust API</a></td><td>rumi API reference</td></tr>
-<tr><td><a href="reference/python.html">Python API</a></td><td>puma API reference</td></tr>
-<tr><td><a href="reference/typescript.html">TypeScript API</a></td><td>bumi API reference</td></tr>
-<tr><td><a href="reference/http.html">HTTP Domain</a></td><td>HTTP matching across languages</td></tr>
+<tr><td><strong>No ReDoS</strong></td><td>Rust <code>regex</code> crate (linear time). Python uses <code>google-re2</code>. TypeScript uses <code>re2js</code>.</td></tr>
+<tr><td><strong>Bounded depth</strong></td><td>Max 32 levels of nesting, validated at config load</td></tr>
+<tr><td><strong>Fail-closed</strong></td><td>Missing data means predicate returns <code>false</code>. Never matches by accident.</td></tr>
+<tr><td><strong>Thread-safe</strong></td><td>All types are <code>Send + Sync</code> (Rust) / immutable (Python, TypeScript)</td></tr>
+<tr><td><strong>Config validated at construction</strong></td><td>Invalid configs rejected before evaluation. Parse, don’t validate.</td></tr>
 </tbody>
 </table>
 </div>
 <h2 id="status"><a class="header" href="#status">Status</a></h2>
-<p>x.uma is alpha software. The API is under active development and will change.</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Phase</th><th>Focus</th><th>Status</th></tr>
-</thead>
-<tbody>
-<tr><td>5</td><td>puma (Python)</td><td>✅ Done (v0.1.0)</td></tr>
-<tr><td>6</td><td>bumi (TypeScript)</td><td>✅ Done (v0.1.0)</td></tr>
-<tr><td>7</td><td>puma-crusty (PyO3 bindings)</td><td>✅ Done</td></tr>
-<tr><td>8</td><td>bumi-crusty (WASM bindings)</td><td>✅ Done</td></tr>
-<tr><td>9</td><td>Cross-language benchmarks</td><td>🚧 In Progress</td></tr>
-<tr><td>10</td><td>Semantic matching (cosine similarity)</td><td>Planned</td></tr>
-<tr><td>11</td><td>RE2 migration (linear-time regex natively)</td><td>Planned</td></tr>
-</tbody>
-</table>
-</div>
-<p>See <a href="development/roadmap.html">Roadmap</a> for details.</p>
+<p><strong>Version 0.0.2</strong> — Alpha. API is stabilizing but may change before 1.0.</p>
+<p>Phases 0-18 complete. Core engine, HTTP domain, Claude domain, config/registry layer, RE2 migration, CLI, cross-language benchmarks — all shipped. Name resolution pending before crates.io/PyPI/npm publish.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
 
-                            <a rel="next prefetch" href="getting-started/choose.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="getting-started/rust.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -366,7 +260,7 @@ const action = matcher.evaluate(request); // "api_handler"
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
 
-                    <a rel="next prefetch" href="getting-started/choose.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="getting-started/rust.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,23 +181,20 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="predicate-composition"><a class="header" href="#predicate-composition">Predicate Composition</a></h1>
-<p>Real matchers combine conditions. AND, OR, NOT — compose them freely.</p>
-<h2 id="singlepredicate-the-building-block"><a class="header" href="#singlepredicate-the-building-block">SinglePredicate: The Building Block</a></h2>
-<p>A predicate is extraction plus matching in one step:</p>
-<pre><code class="language-python">from puma import SinglePredicate, PrefixMatcher
-from puma.http import PathInput
+<p>Predicates combine conditions with Boolean logic. AND, OR, NOT — compose them freely.</p>
+<h2 id="singlepredicate"><a class="header" href="#singlepredicate">SinglePredicate</a></h2>
+<p>The building block. Pairs a <code>DataInput</code> (extract data) with an <code>InputMatcher</code> (match data):</p>
+<pre><code class="language-python">from xuma import SinglePredicate, PrefixMatcher
+from xuma.http import PathInput
 
 # "Does the path start with /api?"
-predicate = SinglePredicate(
-    input=PathInput(),
-    matcher=PrefixMatcher("/api")
-)
+predicate = SinglePredicate(input=PathInput(), matcher=PrefixMatcher("/api"))
 </code></pre>
-<p>When evaluated, it extracts the path and checks if it starts with <code>/api</code>. One step.</p>
-<h2 id="and-all-must-match"><a class="header" href="#and-all-must-match">AND: All Must Match</a></h2>
-<p>Combine multiple conditions. All must be true.</p>
-<pre><code class="language-python">from puma import And, SinglePredicate, PrefixMatcher, ExactMatcher
-from puma.http import PathInput, MethodInput
+<p>Evaluation: extract the path, check if it starts with <code>/api</code>, return <code>bool</code>.</p>
+<h2 id="and"><a class="header" href="#and">And</a></h2>
+<p>All conditions must be true. Short-circuits on the first <code>false</code>.</p>
+<pre><code class="language-python">from xuma import And, SinglePredicate, PrefixMatcher, ExactMatcher
+from xuma.http import PathInput, MethodInput
 
 # "Is it GET /api/*?"
 predicate = And((
@@ -205,31 +202,25 @@ predicate = And((
     SinglePredicate(MethodInput(), ExactMatcher("GET")),
 ))
 </code></pre>
-<p><strong>Short-circuits:</strong> Stops evaluating on the first false condition. If the path check fails, the method check never runs.</p>
-<p><strong>Rust equivalent:</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rumi::prelude::*;
-use rumi_http::{PathInput, MethodInput};
-
-let predicate = Predicate::and(vec![
-    SinglePredicate::new(PathInput, PrefixMatcher::new("/api")),
-    SinglePredicate::new(MethodInput, ExactMatcher::new("GET")),
-]);
-<span class="boring">}</span></code></pre>
-<p><strong>TypeScript equivalent:</strong></p>
-<pre><code class="language-typescript">import { And, SinglePredicate, PrefixMatcher, ExactMatcher } from '@x.uma/buma';
-import { PathInput, MethodInput } from '@x.uma/buma/http';
-
-const predicate = new And([
-  new SinglePredicate(new PathInput(), new PrefixMatcher('/api')),
-  new SinglePredicate(new MethodInput(), new ExactMatcher('GET')),
+<p><strong>Rust:</strong></p>
+<pre><code class="language-rust ignore">let predicate = Predicate::And(vec![
+    Predicate::Single(SinglePredicate::new(
+        Box::new(SimplePathInput), Box::new(PrefixMatcher::new("/api")),
+    )),
+    Predicate::Single(SinglePredicate::new(
+        Box::new(SimpleMethodInput), Box::new(ExactMatcher::new("GET")),
+    )),
+]);</code></pre>
+<p><strong>TypeScript:</strong></p>
+<pre><code class="language-typescript">const predicate = new And([
+  new SinglePredicate(new PathInput(), new PrefixMatcher("/api")),
+  new SinglePredicate(new MethodInput(), new ExactMatcher("GET")),
 ]);
 </code></pre>
-<h2 id="or-any-must-match"><a class="header" href="#or-any-must-match">OR: Any Must Match</a></h2>
-<p>At least one condition must be true.</p>
-<pre><code class="language-python">from puma import Or, SinglePredicate, PrefixMatcher
-from puma.http import PathInput
+<h2 id="or"><a class="header" href="#or">Or</a></h2>
+<p>At least one condition must be true. Short-circuits on the first <code>true</code>.</p>
+<pre><code class="language-python">from xuma import Or, SinglePredicate, PrefixMatcher
+from xuma.http import PathInput
 
 # "Does the path start with /api or /admin?"
 predicate = Or((
@@ -237,134 +228,73 @@ predicate = Or((
     SinglePredicate(PathInput(), PrefixMatcher("/admin")),
 ))
 </code></pre>
-<p><strong>Short-circuits:</strong> Stops evaluating on the first true condition. If the first prefix matches, the second check never runs.</p>
-<h2 id="not-invert-the-result"><a class="header" href="#not-invert-the-result">NOT: Invert the Result</a></h2>
-<p>Negate any predicate.</p>
-<pre><code class="language-python">from puma import Not, SinglePredicate, ExactMatcher
-from puma.http import MethodInput
+<h2 id="not"><a class="header" href="#not">Not</a></h2>
+<p>Negate any predicate. Useful for exclusion rules.</p>
+<pre><code class="language-python">from xuma import Not, SinglePredicate, ExactMatcher
+from xuma.http import MethodInput
 
 # "Is it NOT a POST request?"
-predicate = Not(
-    SinglePredicate(MethodInput(), ExactMatcher("POST"))
-)
+predicate = Not(SinglePredicate(MethodInput(), ExactMatcher("POST")))
 </code></pre>
-<p>Useful for exclusion rules (match everything except X).</p>
-<h2 id="nesting-combine-freely"><a class="header" href="#nesting-combine-freely">Nesting: Combine Freely</a></h2>
-<p>Predicates nest arbitrarily up to <code>MAX_DEPTH</code> (32 levels).</p>
-<pre><code class="language-python">from puma import And, Or, SinglePredicate, PrefixMatcher, ExactMatcher
-from puma.http import PathInput, MethodInput, HeaderInput
+<h2 id="nesting"><a class="header" href="#nesting">Nesting</a></h2>
+<p>Predicates nest arbitrarily up to <code>MAX_DEPTH</code> (32 levels):</p>
+<pre><code class="language-python">from xuma import And, Or, SinglePredicate, PrefixMatcher, ExactMatcher
+from xuma.http import PathInput, MethodInput, HeaderInput
 
-# "(GET /api/* OR POST /api/*) AND has auth header"
+# "(GET or POST) to /api/* with an auth header"
 predicate = And((
+    SinglePredicate(PathInput(), PrefixMatcher("/api")),
     Or((
-        And((
-            SinglePredicate(MethodInput(), ExactMatcher("GET")),
-            SinglePredicate(PathInput(), PrefixMatcher("/api")),
-        )),
-        And((
-            SinglePredicate(MethodInput(), ExactMatcher("POST")),
-            SinglePredicate(PathInput(), PrefixMatcher("/api")),
-        )),
+        SinglePredicate(MethodInput(), ExactMatcher("GET")),
+        SinglePredicate(MethodInput(), ExactMatcher("POST")),
     )),
     SinglePredicate(HeaderInput("authorization"), PrefixMatcher("Bearer ")),
 ))
 </code></pre>
-<p>This reads like: “Accept GET or POST to <code>/api/*</code>, but only if the request has an authorization header starting with <code>Bearer </code>.”</p>
-<p><strong>Depth validation:</strong> Trees exceeding 32 levels raise <code>MatcherError</code> at construction time. This protects against stack overflow and enforces a reasonable complexity limit.</p>
-<h2 id="gateway-api-compiler"><a class="header" href="#gateway-api-compiler">Gateway API Compiler</a></h2>
-<p>Manual predicate construction is verbose. The HTTP domain provides a compiler that builds predicates from Gateway API config:</p>
-<pre><code class="language-python">from puma.http import HttpRouteMatch, HttpPathMatch, HttpHeaderMatch
-
-# Human-friendly config
-route = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/api"),
-    method="GET",
-    headers=[
-        HttpHeaderMatch(type="Exact", name="content-type", value="application/json")
-    ],
-)
-
-# Compiler builds the predicate tree for you
-predicate = route.to_predicate()
-</code></pre>
-<p>This generates an <code>And</code> with three conditions (path, method, header). You don’t write the nesting manually.</p>
-<p><strong>Rust equivalent:</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rumi_http::{HttpRouteMatch, HttpPathMatch, HttpHeaderMatch};
-
-let route = HttpRouteMatch {
-    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-    method: Some("GET".into()),
-    headers: Some(vec![
-        HttpHeaderMatch::Exact {
-            name: "content-type".into(),
-            value: "application/json".into(),
-        }
-    ]),
-    ..Default::default()
-};
-
-let predicate = route.to_predicate();
-<span class="boring">}</span></code></pre>
-<h2 id="empty-and-and-or"><a class="header" href="#empty-and-and-or">Empty AND and OR</a></h2>
-<p>Edge cases with empty lists:</p>
-<p><strong>Empty AND:</strong> Returns <code>true</code> (vacuous truth). No conditions to fail means success.</p>
-<pre><code class="language-python">from puma import And
-
-predicate = And(())  # Empty tuple
-assert predicate.evaluate(request) == True
-</code></pre>
-<p><strong>Empty OR:</strong> Returns <code>false</code>. No conditions to pass means failure.</p>
-<pre><code class="language-python">from puma import Or
-
-predicate = Or(())  # Empty tuple
-assert predicate.evaluate(request) == False
-</code></pre>
-<p>These match standard boolean algebra. In practice, you rarely construct empty predicates directly.</p>
-<h2 id="the-none--false-invariant"><a class="header" href="#the-none--false-invariant">The None → False Invariant</a></h2>
-<p>If a <code>DataInput</code> returns <code>None</code>, the predicate evaluates to <code>False</code> without calling the matcher.</p>
-<pre><code class="language-python">from puma import SinglePredicate, ExactMatcher
-from puma.http import HttpRequest, HeaderInput
+<p>Trees exceeding 32 levels raise <code>MatcherError</code> at construction time. Most real matchers use 3-5 levels.</p>
+<h2 id="empty-and--or"><a class="header" href="#empty-and--or">Empty And / Or</a></h2>
+<p>Edge cases with empty predicate lists:</p>
+<ul>
+<li><strong>Empty <code>And</code></strong> returns <code>true</code> (vacuous truth — no conditions to fail).</li>
+<li><strong>Empty <code>Or</code></strong> returns <code>false</code> (no conditions to pass).</li>
+</ul>
+<p>Standard Boolean algebra. Rarely constructed directly.</p>
+<h2 id="the-none-to-false-rule"><a class="header" href="#the-none-to-false-rule">The None-to-False Rule</a></h2>
+<p>If a <code>DataInput</code> returns <code>None</code>/<code>null</code>, the <code>SinglePredicate</code> evaluates to <code>false</code> without calling the matcher. The matcher never sees missing data.</p>
+<pre><code class="language-python">from xuma import SinglePredicate, ExactMatcher
+from xuma.http import HttpRequest, HeaderInput
 
 predicate = SinglePredicate(
     input=HeaderInput("x-api-key"),
-    matcher=ExactMatcher("secret")
+    matcher=ExactMatcher("secret"),
 )
 
-# Header not present → DataInput returns None → predicate returns False
+# Header not present → None → false
 request = HttpRequest(headers={})
 assert predicate.evaluate(request) == False
 </code></pre>
-<p>The matcher never sees <code>None</code>. The predicate handles it upstream. This simplifies matcher implementations (they only handle present values).</p>
-<h2 id="cross-language-predicate-types"><a class="header" href="#cross-language-predicate-types">Cross-Language Predicate Types</a></h2>
-<p>All three implementations provide the same predicate types with identical semantics.</p>
+<p>This is a security invariant: missing data never accidentally matches.</p>
+<h2 id="cross-language-types"><a class="header" href="#cross-language-types">Cross-Language Types</a></h2>
+<p>Same predicate types across all implementations:</p>
 <p><strong>Rust:</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub enum Predicate&lt;Ctx&gt; {
+<pre><code class="language-rust ignore">pub enum Predicate&lt;Ctx&gt; {
     Single(SinglePredicate&lt;Ctx&gt;),
     And(Vec&lt;Predicate&lt;Ctx&gt;&gt;),
     Or(Vec&lt;Predicate&lt;Ctx&gt;&gt;),
     Not(Box&lt;Predicate&lt;Ctx&gt;&gt;),
-}
-<span class="boring">}</span></code></pre>
+}</code></pre>
 <p><strong>Python:</strong></p>
 <pre><code class="language-python">type Predicate[Ctx] = SinglePredicate[Ctx] | And[Ctx] | Or[Ctx] | Not[Ctx]
 </code></pre>
 <p><strong>TypeScript:</strong></p>
-<pre><code class="language-typescript">type Predicate&lt;Ctx&gt; =
-  | SinglePredicate&lt;Ctx&gt;
-  | And&lt;Ctx&gt;
-  | Or&lt;Ctx&gt;
-  | Not&lt;Ctx&gt;;
+<pre><code class="language-typescript">type Predicate&lt;Ctx&gt; = SinglePredicate&lt;Ctx&gt; | And&lt;Ctx&gt; | Or&lt;Ctx&gt; | Not&lt;Ctx&gt;;
 </code></pre>
-<p>Same structure. Same short-circuit behavior. Same depth limits. Write once in any language, the logic transfers.</p>
-<h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
+<p>Same structure. Same short-circuit behavior. Same depth limits.</p>
+<h2 id="next"><a class="header" href="#next">Next</a></h2>
 <ul>
-<li><a href="pipeline.html">The Matching Pipeline</a> — Where predicates fit in the flow</li>
-<li><a href="semantics.html">First-Match-Wins Semantics</a> — How matchers use predicates</li>
-<li><a href="../tutorials/http-router.html">Build an HTTP Router</a> — Predicates in action</li>
+<li><a href="pipeline.html">The Matching Pipeline</a> — where predicates fit in the flow</li>
+<li><a href="semantics.html">First-Match-Wins Semantics</a> — how matchers use predicates to choose actions</li>
+<li><a href="../tutorials/http-router.html">Build an HTTP Router</a> — predicates in practice</li>
 </ul>
 
                     </main>

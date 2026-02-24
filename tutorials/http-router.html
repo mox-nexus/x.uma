@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,383 +181,202 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="build-an-http-router"><a class="header" href="#build-an-http-router">Build an HTTP Router</a></h1>
-<p>Route HTTP requests to handlers in under 50 lines. Start simple, add complexity progressively.</p>
-<h2 id="step-1-three-path-prefixes"><a class="header" href="#step-1-three-path-prefixes">Step 1: Three Path Prefixes</a></h2>
-<p>Route requests based on path prefix:</p>
-<ul>
-<li><code>/api/*</code> → <code>"api_backend"</code></li>
-<li><code>/admin/*</code> → <code>"admin_backend"</code></li>
-<li><code>/health</code> → <code>"health_check"</code></li>
-</ul>
-<p><strong>Python:</strong></p>
-<pre><code class="language-python">from puma.http import HttpRouteMatch, HttpPathMatch, compile_route_matches, HttpRequest
+<p>This tutorial builds an HTTP route matcher step by step. You’ll start with a single route and finish with a multi-route matcher that handles paths, methods, headers, and query parameters.</p>
+<p>Examples are in Python. The same patterns apply to TypeScript and Rust — see the <a href="../getting-started/python.html">Getting Started</a> guides for language-specific syntax.</p>
+<h2 id="step-1-match-a-single-path"><a class="header" href="#step-1-match-a-single-path">Step 1: Match a Single Path</a></h2>
+<p>Route requests starting with <code>/api</code> to the API backend:</p>
+<pre><code class="language-python">from xuma import Matcher, FieldMatcher, SinglePredicate, Action, PrefixMatcher
+from xuma.http import HttpRequest, PathInput
 
-# Define routes with Gateway API syntax
-routes = [
-    HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/api")),
-    HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/admin")),
-    HttpRouteMatch(path=HttpPathMatch(type="Exact", value="/health")),
-]
-
-# Compile to a matcher (returns action or None)
-matcher = compile_route_matches(routes, action="matched", on_no_match="not_found")
-
-# Evaluate requests
-assert matcher.evaluate(HttpRequest(raw_path="/api/users")) == "matched"
-assert matcher.evaluate(HttpRequest(raw_path="/admin/config")) == "matched"
-assert matcher.evaluate(HttpRequest(raw_path="/health")) == "matched"
-assert matcher.evaluate(HttpRequest(raw_path="/other")) == "not_found"
-</code></pre>
-<p><strong>Rust:</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rumi_http::{HttpRouteMatch, HttpPathMatch, compile_route_matches, HttpMessage};
-
-let routes = vec![
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/admin".into() }),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::Exact { value: "/health".into() }),
-        ..Default::default()
-    },
-];
-
-let matcher = compile_route_matches(&amp;routes, "matched", Some("not_found"));
-
-assert_eq!(matcher.evaluate(&amp;http_message), Some("matched"));
-<span class="boring">}</span></code></pre>
-<p>Gateway API <code>HttpRouteMatch</code> is the config layer. The compiler builds the matcher tree for you.</p>
-<h2 id="step-2-add-method-matching"><a class="header" href="#step-2-add-method-matching">Step 2: Add Method Matching</a></h2>
-<p>Route GET and POST differently:</p>
-<ul>
-<li><code>GET /api/*</code> → <code>"api_read"</code></li>
-<li><code>POST /api/*</code> → <code>"api_write"</code></li>
-</ul>
-<p><strong>Python:</strong></p>
-<pre><code class="language-python">from puma.http import HttpRouteMatch, HttpPathMatch, HttpRequest
-
-routes = [
-    HttpRouteMatch(
-        path=HttpPathMatch(type="PathPrefix", value="/api"),
-        method="GET"
-    ),
-    HttpRouteMatch(
-        path=HttpPathMatch(type="PathPrefix", value="/api"),
-        method="POST"
-    ),
-]
-
-# Different actions per route
-matchers = [route.compile(action) for route, action in zip(routes, ["api_read", "api_write"])]
-
-# Combine into one matcher with on_no_match
-from puma import Matcher, FieldMatcher, Or, NestedMatcher, Action
-
-combined = Matcher(
-    matcher_list=tuple(
-        FieldMatcher(
-            predicate=route.to_predicate(),
-            on_match=Action(action)
-        )
-        for route, action in zip(routes, ["api_read", "api_write"])
-    ),
-    on_no_match=Action("method_not_allowed")
-)
-
-# Test
-assert combined.evaluate(HttpRequest(method="GET", raw_path="/api/users")) == "api_read"
-assert combined.evaluate(HttpRequest(method="POST", raw_path="/api/users")) == "api_write"
-assert combined.evaluate(HttpRequest(method="DELETE", raw_path="/api/users")) == "method_not_allowed"
-</code></pre>
-<p>Within a single <code>HttpRouteMatch</code>, all conditions are ANDed (path AND method). Multiple <code>HttpRouteMatch</code> entries are ORed.</p>
-<p><strong>Rust:</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rumi_http::{HttpRouteMatch, HttpPathMatch, HttpMessage};
-
-let routes = vec![
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-        method: Some("GET".into()),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-        method: Some("POST".into()),
-        ..Default::default()
-    },
-];
-
-// Build separate matchers or use compile_route_matches with action types
-<span class="boring">}</span></code></pre>
-<h2 id="step-3-add-header-conditions"><a class="header" href="#step-3-add-header-conditions">Step 3: Add Header Conditions</a></h2>
-<p>Require authentication for POST requests:</p>
-<ul>
-<li><code>POST /api/*</code> with <code>Authorization: Bearer *</code> → <code>"api_authenticated"</code></li>
-<li><code>POST /api/*</code> without auth → <code>"unauthorized"</code></li>
-</ul>
-<p><strong>Python:</strong></p>
-<pre><code class="language-python">from puma.http import HttpRouteMatch, HttpPathMatch, HttpHeaderMatch, HttpRequest
-
-auth_route = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/api"),
-    method="POST",
-    headers=[
-        HttpHeaderMatch(type="RegularExpression", name="authorization", value=r"^Bearer .+$")
-    ]
-)
-
-noauth_route = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/api"),
-    method="POST"
-)
-
-# Order matters: more specific (auth required) comes first
-routes = [auth_route, noauth_route]
-actions = ["api_authenticated", "unauthorized"]
-
-matcher = Matcher(
-    matcher_list=tuple(
-        FieldMatcher(predicate=route.to_predicate(), on_match=Action(action))
-        for route, action in zip(routes, actions)
-    ),
-    on_no_match=Action("not_found")
-)
-
-# Test
-request = HttpRequest(
-    method="POST",
-    raw_path="/api/users",
-    headers={"authorization": "Bearer token123"}
-)
-assert matcher.evaluate(request) == "api_authenticated"
-
-request = HttpRequest(method="POST", raw_path="/api/users", headers={})
-assert matcher.evaluate(request) == "unauthorized"
-</code></pre>
-<p>First-match-wins semantics: the auth route matches first if the header is present. If it doesn’t match, evaluation continues to the noauth route.</p>
-<p><strong>Rust:</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rumi_http::{HttpRouteMatch, HttpPathMatch, HttpHeaderMatch};
-
-let auth_route = HttpRouteMatch {
-    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-    method: Some("POST".into()),
-    headers: Some(vec![
-        HttpHeaderMatch::RegularExpression {
-            name: "authorization".into(),
-            value: r"^Bearer .+$".into(),
-        }
-    ]),
-    ..Default::default()
-};
-<span class="boring">}</span></code></pre>
-<h2 id="step-4-add-query-parameter-matching"><a class="header" href="#step-4-add-query-parameter-matching">Step 4: Add Query Parameter Matching</a></h2>
-<p>Route based on query parameters:</p>
-<ul>
-<li><code>/search?version=2</code> → <code>"search_v2"</code></li>
-<li><code>/search?version=1</code> → <code>"search_v1"</code></li>
-<li><code>/search</code> (no version) → <code>"search_latest"</code></li>
-</ul>
-<p><strong>Python:</strong></p>
-<pre><code class="language-python">from puma.http import HttpRouteMatch, HttpPathMatch, HttpQueryParamMatch, HttpRequest
-
-routes = [
-    HttpRouteMatch(
-        path=HttpPathMatch(type="Exact", value="/search"),
-        query_params=[
-            HttpQueryParamMatch(type="Exact", name="version", value="2")
-        ]
-    ),
-    HttpRouteMatch(
-        path=HttpPathMatch(type="Exact", value="/search"),
-        query_params=[
-            HttpQueryParamMatch(type="Exact", name="version", value="1")
-        ]
-    ),
-    HttpRouteMatch(
-        path=HttpPathMatch(type="Exact", value="/search")
-    ),
-]
-
-actions = ["search_v2", "search_v1", "search_latest"]
-
-matcher = Matcher(
-    matcher_list=tuple(
-        FieldMatcher(predicate=route.to_predicate(), on_match=Action(action))
-        for route, action in zip(routes, actions)
-    )
-)
-
-# Test
-assert matcher.evaluate(HttpRequest(raw_path="/search?version=2")) == "search_v2"
-assert matcher.evaluate(HttpRequest(raw_path="/search?version=1")) == "search_v1"
-assert matcher.evaluate(HttpRequest(raw_path="/search")) == "search_latest"
-assert matcher.evaluate(HttpRequest(raw_path="/search?other=param")) == "search_latest"
-</code></pre>
-<p>Query parameters are parsed from <code>raw_path</code> automatically. Order matters: version-specific routes come before the no-version route.</p>
-<p><strong>Rust:</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rumi_http::{HttpRouteMatch, HttpPathMatch, HttpQueryParamMatch};
-
-let v2_route = HttpRouteMatch {
-    path: Some(HttpPathMatch::Exact { value: "/search".into() }),
-    query_params: Some(vec![
-        HttpQueryParamMatch::Exact {
-            name: "version".into(),
-            value: "2".into(),
-        }
-    ]),
-    ..Default::default()
-};
-<span class="boring">}</span></code></pre>
-<h2 id="step-5-multiple-routes-with-fallback"><a class="header" href="#step-5-multiple-routes-with-fallback">Step 5: Multiple Routes with Fallback</a></h2>
-<p>Combine everything into a production-ready router:</p>
-<p><strong>Python:</strong></p>
-<pre><code class="language-python">from puma.http import (
-    HttpRouteMatch, HttpPathMatch, HttpHeaderMatch, HttpQueryParamMatch,
-    compile_route_matches, HttpRequest
-)
-
-# Define routes
-api_auth = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/api"),
-    method="POST",
-    headers=[HttpHeaderMatch(type="RegularExpression", name="authorization", value=r"^Bearer .+$")]
-)
-
-api_get = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/api"),
-    method="GET"
-)
-
-admin = HttpRouteMatch(
-    path=HttpPathMatch(type="PathPrefix", value="/admin"),
-    headers=[HttpHeaderMatch(type="Exact", name="x-admin-key", value="secret")]
-)
-
-health = HttpRouteMatch(
-    path=HttpPathMatch(type="Exact", value="/health")
-)
-
-# Build matcher
-routes = [api_auth, api_get, admin, health]
-actions = ["api_write", "api_read", "admin_panel", "health_check"]
-
-matcher = Matcher(
-    matcher_list=tuple(
-        FieldMatcher(predicate=route.to_predicate(), on_match=Action(action))
-        for route, action in zip(routes, actions)
-    ),
-    on_no_match=Action("not_found")
-)
-
-# Test all cases
-assert matcher.evaluate(
-    HttpRequest(method="POST", raw_path="/api/users", headers={"authorization": "Bearer token"})
-) == "api_write"
-
-assert matcher.evaluate(
-    HttpRequest(method="GET", raw_path="/api/users")
-) == "api_read"
-
-assert matcher.evaluate(
-    HttpRequest(raw_path="/admin", headers={"x-admin-key": "secret"})
-) == "admin_panel"
-
-assert matcher.evaluate(HttpRequest(raw_path="/health")) == "health_check"
-
-assert matcher.evaluate(HttpRequest(raw_path="/unknown")) == "not_found"
-</code></pre>
-<p>This is a complete HTTP router in 30 lines of config. No framework. No DSL. Pure Gateway API.</p>
-<p><strong>Rust equivalent:</strong></p>
-<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use rumi::prelude::*;
-use rumi_http::{HttpRouteMatch, HttpPathMatch, HttpHeaderMatch, HttpMessage};
-
-let routes = vec![
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-        method: Some("POST".into()),
-        headers: Some(vec![HttpHeaderMatch::RegularExpression {
-            name: "authorization".into(),
-            value: r"^Bearer .+$".into(),
-        }]),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
-        method: Some("GET".into()),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::PathPrefix { value: "/admin".into() }),
-        headers: Some(vec![HttpHeaderMatch::Exact {
-            name: "x-admin-key".into(),
-            value: "secret".into(),
-        }]),
-        ..Default::default()
-    },
-    HttpRouteMatch {
-        path: Some(HttpPathMatch::Exact { value: "/health".into() }),
-        ..Default::default()
-    },
-];
-
-// Build matcher per route with different actions
-// Or use custom action enum to distinguish routes
-<span class="boring">}</span></code></pre>
-<h2 id="whats-next"><a class="header" href="#whats-next">What’s Next</a></h2>
-<p>This tutorial showed the Gateway API compiler pattern. You can also build matchers manually for finer control:</p>
-<p><strong>Manual matcher construction:</strong></p>
-<pre><code class="language-python">from puma import Matcher, FieldMatcher, SinglePredicate, PrefixMatcher, Action
-from puma.http import PathInput
-
-# Bypass the compiler, build the tree directly
 matcher = Matcher(
     matcher_list=(
         FieldMatcher(
             predicate=SinglePredicate(PathInput(), PrefixMatcher("/api")),
-            on_match=Action("api_backend")
+            on_match=Action("api_backend"),
         ),
-    )
+    ),
+    on_no_match=Action("not_found"),
 )
+
+assert matcher.evaluate(HttpRequest(raw_path="/api/users")) == "api_backend"
+assert matcher.evaluate(HttpRequest(raw_path="/other")) == "not_found"
 </code></pre>
-<p>Manual construction is more verbose but gives you full control over the matcher tree structure.</p>
-<p><strong>Learn more:</strong></p>
+<p><code>PrefixMatcher("/api")</code> matches any path starting with <code>/api</code>. The <code>on_no_match</code> fallback catches everything else.</p>
+<h2 id="step-2-add-method-matching"><a class="header" href="#step-2-add-method-matching">Step 2: Add Method Matching</a></h2>
+<p>Only allow GET requests to the API:</p>
+<pre><code class="language-python">from xuma import And, ExactMatcher
+from xuma.http import MethodInput
+
+predicate = And((
+    SinglePredicate(PathInput(), PrefixMatcher("/api")),
+    SinglePredicate(MethodInput(), ExactMatcher("GET")),
+))
+
+matcher = Matcher(
+    matcher_list=(
+        FieldMatcher(predicate=predicate, on_match=Action("api_get")),
+    ),
+    on_no_match=Action("not_found"),
+)
+
+assert matcher.evaluate(HttpRequest(method="GET", raw_path="/api/users")) == "api_get"
+assert matcher.evaluate(HttpRequest(method="POST", raw_path="/api/users")) == "not_found"
+</code></pre>
+<p><code>And</code> combines conditions. All must be true. Short-circuits on the first false.</p>
+<h2 id="step-3-multiple-routes"><a class="header" href="#step-3-multiple-routes">Step 3: Multiple Routes</a></h2>
+<p>Add a health check endpoint:</p>
+<pre><code class="language-python">matcher = Matcher(
+    matcher_list=(
+        FieldMatcher(
+            predicate=And((
+                SinglePredicate(PathInput(), PrefixMatcher("/api")),
+                SinglePredicate(MethodInput(), ExactMatcher("GET")),
+            )),
+            on_match=Action("api_get"),
+        ),
+        FieldMatcher(
+            predicate=SinglePredicate(PathInput(), ExactMatcher("/health")),
+            on_match=Action("health"),
+        ),
+    ),
+    on_no_match=Action("not_found"),
+)
+
+assert matcher.evaluate(HttpRequest(method="GET", raw_path="/api/users")) == "api_get"
+assert matcher.evaluate(HttpRequest(raw_path="/health")) == "health"
+assert matcher.evaluate(HttpRequest(method="POST", raw_path="/api/users")) == "not_found"
+</code></pre>
+<p>Field matchers evaluate in order. First match wins. <code>/health</code> uses <code>ExactMatcher</code> — only the exact path matches, not <code>/health/check</code>.</p>
+<h2 id="step-4-header-conditions"><a class="header" href="#step-4-header-conditions">Step 4: Header Conditions</a></h2>
+<p>Require an authorization header for the API:</p>
+<pre><code class="language-python">from xuma.http import HeaderInput
+
+api_predicate = And((
+    SinglePredicate(PathInput(), PrefixMatcher("/api")),
+    SinglePredicate(MethodInput(), ExactMatcher("GET")),
+    SinglePredicate(HeaderInput("authorization"), PrefixMatcher("Bearer ")),
+))
+
+matcher = Matcher(
+    matcher_list=(
+        FieldMatcher(predicate=api_predicate, on_match=Action("api_authenticated")),
+        FieldMatcher(
+            predicate=SinglePredicate(PathInput(), ExactMatcher("/health")),
+            on_match=Action("health"),
+        ),
+    ),
+    on_no_match=Action("unauthorized"),
+)
+
+# With valid auth header
+request = HttpRequest(
+    method="GET",
+    raw_path="/api/users",
+    headers={"authorization": "Bearer token123"},
+)
+assert matcher.evaluate(request) == "api_authenticated"
+
+# Without auth header — HeaderInput returns None → predicate is false
+request = HttpRequest(method="GET", raw_path="/api/users")
+assert matcher.evaluate(request) == "unauthorized"
+</code></pre>
+<p>When the <code>authorization</code> header is missing, <code>HeaderInput</code> returns <code>None</code>. The None-to-false rule makes the predicate false without calling the matcher. Missing data never accidentally matches.</p>
+<h2 id="step-5-use-the-compiler"><a class="header" href="#step-5-use-the-compiler">Step 5: Use the Compiler</a></h2>
+<p>The Gateway API compiler builds the same matcher from declarative config:</p>
+<pre><code class="language-python">from xuma.http import (
+    HttpRouteMatch, HttpPathMatch, HttpHeaderMatch,
+    compile_route_matches, HttpRequest,
+)
+
+routes = [
+    HttpRouteMatch(
+        path=HttpPathMatch(type="PathPrefix", value="/api"),
+        method="GET",
+        headers=[
+            HttpHeaderMatch(type="RegularExpression", name="authorization", value="^Bearer .+$"),
+        ],
+    ),
+    HttpRouteMatch(
+        path=HttpPathMatch(type="Exact", value="/health"),
+    ),
+]
+
+matcher = compile_route_matches(routes, "allowed", on_no_match="denied")
+
+# Authenticated API request
+request = HttpRequest(
+    method="GET",
+    raw_path="/api/users",
+    headers={"authorization": "Bearer token123"},
+)
+assert matcher.evaluate(request) == "allowed"
+
+# Health check (no auth needed)
+assert matcher.evaluate(HttpRequest(raw_path="/health")) == "allowed"
+
+# Unauthenticated API request
+assert matcher.evaluate(HttpRequest(method="GET", raw_path="/api/users")) == "denied"
+</code></pre>
+<p>The compiler:</p>
 <ul>
-<li><a href="../concepts/pipeline.html">The Matching Pipeline</a> — How data flows through the matcher</li>
-<li><a href="../concepts/type-erasure.html">Type Erasure and Ports</a> — Why matchers are reusable</li>
-<li><a href="../concepts/predicates.html">Predicate Composition</a> — AND, OR, NOT in detail</li>
-<li><a href="../concepts/semantics.html">First-Match-Wins Semantics</a> — Evaluation order and fallbacks</li>
-<li><a href="../guides/adding-domain.html">Adding a Domain</a> — Create matchers for CloudEvents, gRPC, etc.</li>
+<li>ANDs conditions within each <code>HttpRouteMatch</code></li>
+<li>ORs multiple <code>HttpRouteMatch</code> entries</li>
+<li>Returns the first matching route’s action</li>
 </ul>
-<p><strong>Performance:</strong></p>
+<p>This is equivalent to the manual construction in Steps 1-4, with less boilerplate.</p>
+<h2 id="step-6-custom-action-types"><a class="header" href="#step-6-custom-action-types">Step 6: Custom Action Types</a></h2>
+<p>Use structured actions instead of strings:</p>
+<pre><code class="language-python">from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class RouteAction:
+    backend: str
+    timeout_ms: int = 5000
+
+routes = [
+    HttpRouteMatch(
+        path=HttpPathMatch(type="PathPrefix", value="/api"),
+        method="GET",
+    ),
+]
+
+matcher = compile_route_matches(
+    routes,
+    RouteAction(backend="api-service", timeout_ms=10000),
+    on_no_match=RouteAction(backend="default", timeout_ms=1000),
+)
+
+result = matcher.evaluate(HttpRequest(method="GET", raw_path="/api/users"))
+assert result.backend == "api-service"
+assert result.timeout_ms == 10000
+</code></pre>
+<p>The generic <code>A</code> in <code>Matcher[HttpRequest, A]</code> accepts any type. Strings, dataclasses, enums — the engine doesn’t interpret actions, it returns them.</p>
+<h2 id="what-you-built"><a class="header" href="#what-you-built">What You Built</a></h2>
+<p>A route matcher that:</p>
+<ol>
+<li>Evaluates rules in order (first match wins)</li>
+<li>Combines path, method, and header conditions with AND</li>
+<li>Handles missing data safely (None-to-false)</li>
+<li>Supports both manual construction and declarative config</li>
+<li>Works with any action type</li>
+</ol>
+<p>The same matcher can be built in TypeScript or Rust with identical semantics.</p>
+<h2 id="next"><a class="header" href="#next">Next</a></h2>
 <ul>
-<li>Matchers are immutable and thread-safe — share them across threads</li>
-<li>Regex compilation happens at construction time — no per-request overhead</li>
-<li>First-match-wins means early rules short-circuit evaluation</li>
-<li>For production workloads, consider <code>puma-crusty</code> (Rust-backed) for 10x+ speedup</li>
+<li><a href="../domains/http.html">HTTP Matching</a> — full HTTP domain reference</li>
+<li><a href="../concepts/semantics.html">First-Match-Wins Semantics</a> — evaluation rules in depth</li>
+<li><a href="../concepts/predicates.html">Predicate Composition</a> — AND, OR, NOT</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../getting-started/typescript.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../concepts/semantics.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../concepts/pipeline.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../domains/http.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -567,11 +386,11 @@ matcher = Matcher(
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../getting-started/typescript.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../concepts/semantics.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../concepts/pipeline.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../domains/http.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>TypeScript Quick Start - x.uma</title>
+        <title>TypeScript - x.uma</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,283 +181,129 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="typescript-quick-start"><a class="header" href="#typescript-quick-start">TypeScript Quick Start</a></h1>
-<p>Build an HTTP route matcher in 10 lines.</p>
-<p>x.uma’s TypeScript implementation (<code>bumi</code>) translates Gateway API route configuration into efficient runtime matchers. Routes defined at config time become compiled trees evaluated at request time.</p>
+<p>Build an HTTP route matcher with <code>xuma</code> in 10 lines.</p>
 <h2 id="install"><a class="header" href="#install">Install</a></h2>
-<p>Add <code>bumi</code> to your project:</p>
-<pre><code class="language-bash">bun add @x.uma/bumi
+<pre><code class="language-bash">bun add xuma
 </code></pre>
-<p><strong>Requires Bun runtime</strong> — bumi uses Bun’s fast startup and zero-overhead module system. It will not run on Node.js without transpilation.</p>
-<p>Alternatively, import from source if you’re working in the x.uma monorepo:</p>
-<pre><code class="language-typescript">import { Matcher, compile_route_matches } from "bumi";
-</code></pre>
+<p>Requires Bun runtime. The only runtime dependency is <code>re2js</code> for linear-time regex.</p>
 <h2 id="your-first-matcher"><a class="header" href="#your-first-matcher">Your First Matcher</a></h2>
-<p>Match GET requests to <code>/api/*</code> and POST requests to <code>/admin/*</code>:</p>
-<pre><code class="language-typescript">import {
-	type HttpRouteMatch,
-	HttpRequest,
-	compileRouteMatches,
-} from "@x.uma/bumi/http";
+<p>Match requests by path prefix:</p>
+<pre><code class="language-typescript">import { Matcher, FieldMatcher, SinglePredicate, Action, PrefixMatcher } from "xuma";
+import { HttpRequest, PathInput } from "xuma/http";
 
-// Define routes using Gateway API syntax
+// Build a predicate: path starts with /api
+const predicate = new SinglePredicate(
+  new PathInput(),
+  new PrefixMatcher("/api"),
+);
+
+// Build the matcher tree
+const matcher = new Matcher&lt;HttpRequest, string&gt;(
+  [new FieldMatcher(predicate, new Action("api_backend"))],
+  new Action("default_backend"),
+);
+
+// Evaluate
+const request = new HttpRequest("GET", "/api/users");
+console.assert(matcher.evaluate(request) === "api_backend");
+
+// No match falls through
+const other = new HttpRequest("GET", "/other");
+console.assert(matcher.evaluate(other) === "default_backend");
+</code></pre>
+<p><code>Matcher</code> takes a list of <code>FieldMatcher</code>s (tried in order) and an optional fallback. First match wins.</p>
+<h2 id="the-gateway-api-compiler"><a class="header" href="#the-gateway-api-compiler">The Gateway API Compiler</a></h2>
+<p>The HTTP domain ships a compiler that builds matchers from Gateway API config:</p>
+<pre><code class="language-typescript">import { compileRouteMatches, HttpRequest } from "xuma/http";
+import type { HttpRouteMatch } from "xuma/http";
+
+// Declarative config
 const routes: HttpRouteMatch[] = [
-	{
-		path: { type: "PathPrefix", value: "/api" },
-		method: "GET",
-	},
-	{
-		path: { type: "PathPrefix", value: "/admin" },
-		method: "POST",
-	},
+  {
+    path: { type: "PathPrefix", value: "/api" },
+    method: "GET",
+  },
+  {
+    path: { type: "PathPrefix", value: "/admin" },
+    method: "POST",
+  },
 ];
 
-// Compile routes into a matcher
-const matcher = compileRouteMatches(
-	routes,
-	"allowed",  // action when any route matches
-	"denied",   // action when no routes match
-);
+// One call compiles all routes
+const matcher = compileRouteMatches(routes, "allowed", "denied");
 
-// Evaluate against requests
-let request = new HttpRequest("GET", "/api/users");
-let result = matcher.evaluate(request);
-console.assert(result === "allowed");
-
-request = new HttpRequest("DELETE", "/api/users");
-result = matcher.evaluate(request);
-console.assert(result === "denied"); // DELETE not in routes
+console.assert(matcher.evaluate(new HttpRequest("GET", "/api/users")) === "allowed");
+console.assert(matcher.evaluate(new HttpRequest("DELETE", "/api/users")) === "denied");
 </code></pre>
-<p>The <code>compileRouteMatches</code> function is the high-level API. It takes a list of <code>HttpRouteMatch</code> configs and produces a <code>Matcher&lt;HttpRequest, A&gt;</code> that runs in microseconds.</p>
-<h2 id="how-compilation-works"><a class="header" href="#how-compilation-works">How Compilation Works</a></h2>
-<p>Gateway API route configuration is declarative. You specify what to match, not how to evaluate it:</p>
-<pre><code class="language-typescript">import type {
-	HttpRouteMatch,
-	HttpPathMatch,
-	HttpHeaderMatch,
-} from "@x.uma/bumi/http";
-
-const route: HttpRouteMatch = {
-	path: { type: "PathPrefix", value: "/api" },
-	method: "GET",
-	headers: [
-		{
-			type: "Exact",
-			name: "content-type",
-			value: "application/json",
-		},
-	],
+<p>Within a single <code>HttpRouteMatch</code>, all conditions are ANDed. Multiple routes are ORed. First match wins.</p>
+<h2 id="adding-header-conditions"><a class="header" href="#adding-header-conditions">Adding Header Conditions</a></h2>
+<pre><code class="language-typescript">const route: HttpRouteMatch = {
+  path: { type: "PathPrefix", value: "/api" },
+  method: "POST",
+  headers: [
+    {
+      type: "RegularExpression",
+      name: "authorization",
+      value: "^Bearer .+$",
+    },
+  ],
 };
 </code></pre>
-<p>All conditions within a single <code>HttpRouteMatch</code> are ANDed together. When you pass multiple <code>HttpRouteMatch</code> entries to <code>compileRouteMatches</code>, they are ORed.</p>
-<p>The compiler produces a tree of predicates:</p>
-<pre><code>Matcher
-└── FieldMatcher
-    └── Or
-        ├── And(path=/api, method=GET, header=content-type)
-        └── And(path=/admin, method=POST)
-</code></pre>
-<p>At evaluation time, the tree walks first-match-wins until a predicate succeeds.</p>
-<h2 id="under-the-hood-manual-construction"><a class="header" href="#under-the-hood-manual-construction">Under the Hood: Manual Construction</a></h2>
-<p>The Gateway API compiler is syntactic sugar. Here’s what it generates:</p>
-<pre><code class="language-typescript">import {
-	Matcher,
-	FieldMatcher,
-	Action,
-	SinglePredicate,
-	And,
-} from "@x.uma/bumi";
-import {
-	ExactMatcher,
-	PrefixMatcher,
-} from "@x.uma/bumi";
-import {
-	HttpRequest,
-	PathInput,
-	MethodInput,
-} from "@x.uma/bumi/http";
-
-// Manual construction of the same matcher
-const matcher = new Matcher&lt;HttpRequest, string&gt;([
-	new FieldMatcher(
-		new And([
-			new SinglePredicate(
-				new PathInput(),
-				new PrefixMatcher("/api"),
-			),
-			new SinglePredicate(
-				new MethodInput(),
-				new ExactMatcher("GET"),
-			),
-		]),
-		new Action("allowed"),
-	),
-	new FieldMatcher(
-		new SinglePredicate(
-			new PathInput(),
-			new PrefixMatcher("/admin"),
-		),
-		new Action("allowed"),
-	),
-], new Action("denied"));
-</code></pre>
-<p>This is verbose but explicit. You control the exact tree structure.</p>
-<p><strong>When to use manual construction:</strong></p>
-<ul>
-<li>Building matchers programmatically from non-Gateway-API configs</li>
-<li>Implementing custom <code>DataInput</code> or <code>InputMatcher</code> interfaces</li>
-<li>Debugging compilation behavior</li>
-</ul>
-<p><strong>When to use the compiler:</strong></p>
-<ul>
-<li>Standard HTTP routing (99% of use cases)</li>
-<li>Gateway API configurations from Kubernetes</li>
-<li>Less code, same performance</li>
-</ul>
-<h2 id="the-httprequest-context"><a class="header" href="#the-httprequest-context">The HttpRequest Context</a></h2>
-<p><code>HttpRequest</code> is a readonly class with parsed query parameters and lowercased headers:</p>
-<pre><code class="language-typescript">import { HttpRequest } from "@x.uma/bumi/http";
-
-// Query string parsed from rawPath
-const request = new HttpRequest(
-	"GET",
-	"/search?q=hello&amp;lang=en",
-	{ "Content-Type": "application/json" },
-);
-
-console.assert(request.path === "/search");
-console.assert(request.queryParam("q") === "hello");
-console.assert(request.queryParam("lang") === "en");
-
-// Headers are case-insensitive
-console.assert(request.header("content-type") === "application/json");
-console.assert(request.header("Content-Type") === "application/json");
-</code></pre>
-<p>The query string is parsed once at construction time (O(n) scan). Every <code>queryParam()</code> lookup is O(1) dictionary access.</p>
-<p>Headers are stored lowercased to avoid repeated string operations during matching.</p>
-<h2 id="the-readonly-pattern"><a class="header" href="#the-readonly-pattern">The Readonly Pattern</a></h2>
-<p>bumi uses readonly classes instead of interfaces to ensure immutability:</p>
-<pre><code class="language-typescript">export class Matcher&lt;Ctx, A&gt; {
-	constructor(
-		readonly matcherList: readonly FieldMatcher&lt;Ctx, A&gt;[],
-		readonly onNoMatch: Action&lt;A&gt; | null = null,
-	) {}
-
-	evaluate(ctx: Ctx): A | null {
-		// ...
-	}
-}
-</code></pre>
-<p>Every field is <code>readonly</code>. Arrays are <code>readonly T[]</code>. This prevents accidental mutation after construction.</p>
-<p>TypeScript’s type system enforces immutability at compile time. At runtime, there’s no additional overhead compared to mutable objects.</p>
-<h2 id="actions-beyond-strings"><a class="header" href="#actions-beyond-strings">Actions: Beyond Strings</a></h2>
-<p>The examples use <code>string</code> actions for simplicity. In production, actions are often objects or discriminated unions:</p>
+<p>Regex uses <code>re2js</code> — linear time, no ReDoS vulnerability.</p>
+<h2 id="custom-action-types"><a class="header" href="#custom-action-types">Custom Action Types</a></h2>
+<p>Use discriminated unions or any TypeScript type:</p>
 <pre><code class="language-typescript">type RouteAction =
-	| { type: "forward"; backend: string; weight: number }
-	| { type: "redirect"; location: string; status: number }
-	| { type: "deny"; reason: string };
+  | { type: "forward"; backend: string }
+  | { type: "deny"; reason: string };
 
-const matcher = compileRouteMatches(
-	routes,
-	{ type: "forward", backend: "api-service", weight: 100 },
-	{ type: "deny", reason: "no route matched" },
+const matcher = compileRouteMatches&lt;RouteAction&gt;(
+  routes,
+  { type: "forward", backend: "api-service" },
+  { type: "deny", reason: "no route matched" },
 );
 
 const result = matcher.evaluate(request);
 if (result?.type === "forward") {
-	console.log(`Forwarding to ${result.backend}`);
+  console.log(`Forwarding to ${result.backend}`);
 }
 </code></pre>
-<p>The action type can be any TypeScript type. The matcher returns it by reference when a match succeeds.</p>
-<h2 id="validation-and-safety"><a class="header" href="#validation-and-safety">Validation and Safety</a></h2>
-<p>Matchers enforce safety constraints:</p>
-<ul>
-<li><strong>Depth limit</strong>: Nested matchers cannot exceed 32 levels (prevents stack overflow)</li>
-<li><strong>Immutability</strong>: All types are readonly (no accidental mutation)</li>
-<li><strong>Type safety</strong>: TypeScript catches type mismatches at compile time</li>
-</ul>
-<p>Check depth limits with <code>validate()</code>:</p>
-<pre><code class="language-typescript">try {
-	matcher.validate();
-	console.log("Matcher is valid");
-} catch (e) {
-	if (e instanceof MatcherError) {
-		console.error(`Validation failed: ${e.message}`);
-	}
-}
-</code></pre>
-<p>The Gateway API compiler produces valid trees. Manual construction can violate depth limits if you nest <code>NestedMatcher</code> recursively.</p>
-<h2 id="performance-notes"><a class="header" href="#performance-notes">Performance Notes</a></h2>
-<p>At 200 routing rules, <code>bumi</code> evaluates worst-case (last rule matches) in 2.1 microseconds on Apple M1 Max. That’s 475,000 requests per second per core.</p>
-<p><strong>Why is TypeScript faster than Rust?</strong> This isn’t a language speed contest. The Rust implementation uses <code>Box&lt;dyn InputMatcher&gt;</code> for extensibility, which requires vtable dispatch. The TypeScript JIT (JavaScriptCore in Bun) sees the monomorphic call site and inlines the comparison directly.</p>
-<p>For simple operations (exact string match), bumi is 3.5x faster than rumi. For regex matching or complex predicates, the gap narrows. At ReDoS-vulnerable patterns, Rust’s linear-time regex is 6.5 million times faster.</p>
-<p><strong>Thread safety</strong>: Bun is single-threaded. If you need parallelism, spawn worker threads:</p>
-<pre><code class="language-typescript">import { Worker } from "bun";
+<h2 id="integration-bun-http-server"><a class="header" href="#integration-bun-http-server">Integration: Bun HTTP Server</a></h2>
+<pre><code class="language-typescript">import { compileRouteMatches, HttpRequest } from "xuma/http";
 
-const worker = new Worker("./matcher-worker.ts");
-worker.postMessage({ method: "GET", path: "/api/users" });
-</code></pre>
-<p>Each worker gets its own JavaScript heap and its own matcher instance.</p>
-<p>For ReDoS protection with untrusted regex input, use <code>bumi-crusty</code> instead of pure <code>bumi</code>. See <a href="../performance/redos.html">ReDoS Protection</a>.</p>
-<h2 id="integration-examples"><a class="header" href="#integration-examples">Integration Examples</a></h2>
-<h3 id="cloudflare-workers"><a class="header" href="#cloudflare-workers">Cloudflare Workers</a></h3>
-<pre><code class="language-typescript">import { compileRouteMatches, HttpRequest } from "@x.uma/bumi/http";
-
-const matcher = compileRouteMatches([
-	{ path: { type: "PathPrefix", value: "/api" }, method: "GET" },
-], "allowed", "denied");
-
-export default {
-	async fetch(request: Request): Promise&lt;Response&gt; {
-		const url = new URL(request.url);
-		const req = new HttpRequest(
-			request.method,
-			url.pathname,
-			Object.fromEntries(request.headers),
-		);
-
-		const action = matcher.evaluate(req);
-
-		if (action === "denied") {
-			return new Response("Access denied", { status: 403 });
-		}
-
-		return new Response("OK");
-	},
-};
-</code></pre>
-<h3 id="bun-http-server"><a class="header" href="#bun-http-server">Bun HTTP Server</a></h3>
-<pre><code class="language-typescript">import { compileRouteMatches, HttpRequest } from "@x.uma/bumi/http";
-
-const matcher = compileRouteMatches([
-	{ path: { type: "PathPrefix", value: "/api" }, method: "GET" },
-], "allowed", "denied");
+const matcher = compileRouteMatches(
+  [{ path: { type: "PathPrefix", value: "/api" }, method: "GET" }],
+  "allowed",
+  "denied",
+);
 
 Bun.serve({
-	port: 3000,
-	fetch(req) {
-		const url = new URL(req.url);
-		const request = new HttpRequest(
-			req.method,
-			url.pathname + url.search,
-			Object.fromEntries(req.headers),
-		);
-
-		const action = matcher.evaluate(request);
-
-		if (action === "denied") {
-			return new Response("Access denied", { status: 403 });
-		}
-
-		return new Response("OK");
-	},
+  port: 3000,
+  fetch(req) {
+    const url = new URL(req.url);
+    const request = new HttpRequest(
+      req.method,
+      url.pathname + url.search,
+      Object.fromEntries(req.headers),
+    );
+    if (matcher.evaluate(request) === "denied") {
+      return new Response("Not found", { status: 404 });
+    }
+    return new Response("OK");
+  },
 });
 </code></pre>
+<h2 id="safety"><a class="header" href="#safety">Safety</a></h2>
+<ul>
+<li><strong>ReDoS protection</strong> — <code>re2js</code> guarantees linear-time regex matching.</li>
+<li><strong>Immutable</strong> — all types use <code>readonly</code> fields.</li>
+<li><strong>Depth limits</strong> — nested matchers capped at 32 levels.</li>
+<li><strong>Fail-closed</strong> — missing data from <code>DataInput</code> returns <code>null</code>, which makes the predicate evaluate to <code>false</code>.</li>
+</ul>
 <h2 id="next-steps"><a class="header" href="#next-steps">Next Steps</a></h2>
 <ul>
-<li><a href="../tutorials/http-router.html">Build an HTTP Router</a> — full routing patterns</li>
-<li><a href="../concepts/predicates.html">Predicate Composition</a> — AND/OR/NOT logic</li>
-<li><a href="../performance/benchmarks.html">Benchmark Results</a> — performance deep dive</li>
-<li><a href="../reference/typescript.html">TypeScript API Reference</a> — complete type documentation</li>
+<li><a href="../concepts/pipeline.html">The Matching Pipeline</a> — how data flows through the matcher</li>
+<li><a href="../tutorials/http-router.html">Build an HTTP Router</a> — full routing with headers and query params</li>
+<li><a href="../domains/http.html">HTTP Matching</a> — all inputs, config types, and the compiler</li>
 </ul>
 
                     </main>
@@ -468,7 +314,7 @@ Bun.serve({
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../tutorials/http-router.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../concepts/pipeline.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -482,7 +328,7 @@ Bun.serve({
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../tutorials/http-router.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../concepts/pipeline.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

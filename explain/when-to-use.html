@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,163 +181,83 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="when-to-use-xuma"><a class="header" href="#when-to-use-xuma">When to Use x.uma</a></h1>
-<p>x.uma isn’t the right tool for everything. Here’s when it fits and when other engines are better.</p>
-<h2 id="use-xuma-when"><a class="header" href="#use-xuma-when">Use x.uma When</a></h2>
-<h3 id="http-routing-and-traffic-control"><a class="header" href="#http-routing-and-traffic-control">HTTP Routing and Traffic Control</a></h3>
-<p>You’re building HTTP routers, API gateways, or traffic shapers. x.uma implements the same matching semantics Envoy uses for routing at Google scale.</p>
-<p><strong>Concrete use cases:</strong></p>
-<ul>
-<li>Multi-tenant API gateways (route by header, method, path)</li>
-<li>Feature flags based on request context</li>
-<li>A/B testing routing (route users to backend variants)</li>
-<li>Traffic splitting for canary deployments</li>
-<li>Rate limit rule matching before quota enforcement</li>
-</ul>
-<p><strong>Why x.uma:</strong> Gateway API compiler built-in. <code>HttpRouteMatch</code> → <code>Matcher</code> translation is a first-class feature. Path prefix matching, header matching, query param matching — all tested against 268 conformance fixtures.</p>
-<h3 id="event-filtering-and-message-routing"><a class="header" href="#event-filtering-and-message-routing">Event Filtering and Message Routing</a></h3>
-<p>You’re processing event streams (Kafka, Kinesis, message queues) and need first-match-wins routing logic.</p>
-<p><strong>Concrete use cases:</strong></p>
-<ul>
-<li>CloudEvent filtering by type, source, extensions</li>
-<li>Message bus routing (AMQP, MQTT)</li>
-<li>Webhook dispatchers (route incoming webhooks by headers, payload fields)</li>
-<li>Log aggregation pipelines (route by severity, source, tags)</li>
-</ul>
-<p><strong>Why x.uma:</strong> Domain-agnostic core. Implement <code>DataInput</code> for your event type, reuse all the predicate composition and string matching. The same AND/OR/NOT logic, the same depth limits.</p>
-<h3 id="polyglot-codebases"><a class="header" href="#polyglot-codebases">Polyglot Codebases</a></h3>
-<p>Your system spans Rust, Python, and TypeScript. You need consistent matching behavior across all three.</p>
-<p><strong>Concrete use cases:</strong></p>
-<ul>
-<li>Rust ext_proc filter + Python control plane + TypeScript edge workers</li>
-<li>ML inference pipelines (Python) calling routing services (Rust)</li>
-<li>Cloudflare Workers (TypeScript) with backend services (Rust)</li>
-</ul>
-<p><strong>Why x.uma:</strong> Three native implementations (rumi, puma, bumi) plus Rust bindings (puma-crusty, bumi-crusty). All pass the same test suite. Write matchers once, run anywhere.</p>
-<h3 id="envoy-proven-semantics"><a class="header" href="#envoy-proven-semantics">Envoy-Proven Semantics</a></h3>
-<p>You want xDS Unified Matcher API semantics without running Envoy. Maybe you’re building a sidecar, a policy engine, or a custom proxy.</p>
-<p><strong>Concrete use cases:</strong></p>
-<ul>
-<li>Custom proxies that need Envoy-compatible route matching</li>
-<li>Policy engines that compile xDS <code>Matcher</code> proto into evaluation logic</li>
-<li>Testing Envoy configs without spinning up Envoy itself</li>
-</ul>
-<p><strong>Why x.uma:</strong> Direct implementation of the xDS spec. The proto definitions are the source of truth. Nested matcher failure propagation, on_no_match fallback, first-match-wins — all match Envoy’s behavior.</p>
-<h2 id="use-opa-when"><a class="header" href="#use-opa-when">Use OPA When</a></h2>
-<h3 id="general-purpose-policy-language"><a class="header" href="#general-purpose-policy-language">General-Purpose Policy Language</a></h3>
-<p>You need to query complex input documents, join data from multiple sources, or express policies that don’t fit a tree structure.</p>
-<p><strong>Example:</strong> “Allow if user is in the ‘engineering’ team AND the resource has tag ‘internal’ AND it’s a weekday during business hours.”</p>
-<p>OPA’s Rego is Datalog — you can express arbitrary joins and aggregations. x.uma is tree traversal with first-match-wins. Different models.</p>
-<h3 id="kubernetes-admission-control"><a class="header" href="#kubernetes-admission-control">Kubernetes Admission Control</a></h3>
-<p>You’re using Gatekeeper to enforce OPA policies as Kubernetes admission webhooks.</p>
-<p>The CNCF ecosystem is built around OPA + Gatekeeper. x.uma has no Kubernetes-specific tooling.</p>
-<h3 id="compliance-and-audit"><a class="header" href="#compliance-and-audit">Compliance and Audit</a></h3>
-<p>You need to generate compliance reports showing which policies matched, which conditions were evaluated, and why a decision was made.</p>
-<p>OPA has mature audit tooling. x.uma has trace output (evaluate + explain), but it’s debugging-focused, not compliance-focused.</p>
-<h2 id="use-cedar-when"><a class="header" href="#use-cedar-when">Use Cedar When</a></h2>
-<h3 id="aws-ecosystem"><a class="header" href="#aws-ecosystem">AWS Ecosystem</a></h3>
-<p>You’re using AWS services (Verified Permissions, Verified Access, Cognito) or building authorization for AWS-integrated apps.</p>
-<p>Cedar integrates natively with AWS IAM, Cognito user pools, and resource tags. x.uma has no AWS-specific integrations.</p>
-<h3 id="formal-verification"><a class="header" href="#formal-verification">Formal Verification</a></h3>
-<p>You need provably correct policies. Cedar uses Dafny to verify policies can’t produce unintended outcomes (no confused deputy bugs, no authorization bypass).</p>
-<p>x.uma has type safety and depth limits, but no formal verification.</p>
-<h3 id="classic-authorization-parc-model"><a class="header" href="#classic-authorization-parc-model">Classic Authorization (PARC Model)</a></h3>
-<p>Your domain maps cleanly to Principal-Action-Resource-Context. You’re answering “Can this user perform this action on this resource?”</p>
-<p>Cedar is purpose-built for this. x.uma is matcher trees — you can represent PARC, but Cedar makes it native.</p>
-<h2 id="use-zanzibaropenfga-when"><a class="header" href="#use-zanzibaropenfga-when">Use Zanzibar/OpenFGA When</a></h2>
-<h3 id="graph-based-permissions"><a class="header" href="#graph-based-permissions">Graph-Based Permissions</a></h3>
-<p>Your authorization model is a graph. Users → teams → folders → documents. You need to answer “Can alice view doc123?” by checking if a path exists.</p>
-<p><strong>Example use cases:</strong></p>
-<ul>
-<li>Google Drive-style sharing (folders inherit permissions)</li>
-<li>Organization hierarchies (managers can approve for their reports)</li>
-<li>Social graphs (friends-of-friends visibility)</li>
-</ul>
-<p>x.uma evaluates predicates against structured input. It doesn’t traverse graphs. Wrong tool.</p>
-<h2 id="comparison-table"><a class="header" href="#comparison-table">Comparison Table</a></h2>
+<p>x.uma is a matcher engine. It evaluates structured data against rules and returns the first matching action. This page helps you decide whether it fits your problem.</p>
+<h2 id="xuma-is-for"><a class="header" href="#xuma-is-for">x.uma Is For</a></h2>
+<p><strong>Structured matching with known fields.</strong> You have data with named fields (HTTP method, path, headers; tool names, arguments; event types) and need to route, filter, or classify based on combinations of those fields.</p>
+<p><strong>Cross-language consistency.</strong> You need the same matching rules to produce the same results in Rust, Python, and TypeScript. One config format, five implementations, identical semantics.</p>
+<p><strong>Config-driven matching.</strong> Your matching rules come from configuration files (JSON, YAML, protobuf) rather than hardcoded logic. Rules change without redeployment.</p>
+<p><strong>First-match-wins routing.</strong> Your problem is “which rule matches first?” — not “what are all the rules that match?” or “what is the aggregate policy across all rules?”</p>
+<p><strong>Safety-critical matching.</strong> You need guarantees: linear-time regex (no ReDoS), depth limits (no stack overflow), immutable matchers (no race conditions), fail-closed on missing data.</p>
+<h2 id="xuma-is-not-for"><a class="header" href="#xuma-is-not-for">x.uma Is Not For</a></h2>
+<p><strong>General-purpose policy evaluation.</strong> If you need attribute-based access control with complex policy logic (role hierarchies, contextual permissions, deny-overrides), use a policy engine like OPA or Cedar. x.uma finds matches — it doesn’t evaluate policies.</p>
+<p><strong>Free-text search.</strong> x.uma matches structured fields against patterns. If you need full-text search, fuzzy matching, or semantic similarity, use a search engine.</p>
+<p><strong>Stateful decisions.</strong> x.uma matchers are pure functions — same input always produces same output. If your decision depends on previous requests, rate counters, or session state, you need stateful middleware.</p>
+<p><strong>Dynamic rule updates at runtime.</strong> x.uma registries and matchers are immutable after construction. If you need to add or remove rules during execution without reconstruction, x.uma’s model doesn’t fit.</p>
+<h2 id="comparison"><a class="header" href="#comparison">Comparison</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Feature</th><th>x.uma</th><th>OPA</th><th>Cedar</th><th>Zanzibar/OpenFGA</th></tr>
+<tr><th>Need</th><th>x.uma</th><th>Alternative</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>Model</strong></td><td>Tree traversal, first-match-wins</td><td>Datalog queries</td><td>PARC authorization</td><td>Graph traversal</td></tr>
-<tr><td><strong>Language</strong></td><td>Matcher proto (compiled)</td><td>Rego</td><td>Cedar</td><td>Tuple-based</td></tr>
-<tr><td><strong>Domain</strong></td><td>Agnostic</td><td>Agnostic</td><td>Authorization</td><td>Authorization</td></tr>
-<tr><td><strong>Evaluation</strong></td><td>O(depth × predicates)</td><td>O(policy complexity)</td><td>O(policy complexity)</td><td>O(graph traversal)</td></tr>
-<tr><td><strong>Cross-language</strong></td><td>Rust, Python, TypeScript (native)</td><td>Go, WASM bindings</td><td>Rust, Java bindings</td><td>Go, varies by impl</td></tr>
-<tr><td><strong>Formal verification</strong></td><td>No</td><td>No</td><td>Yes (Dafny)</td><td>No</td></tr>
-<tr><td><strong>HTTP routing</strong></td><td>Built-in (Gateway API)</td><td>DIY</td><td>DIY</td><td>Not applicable</td></tr>
-<tr><td><strong>Best for</strong></td><td>Routing, filtering, polyglot</td><td>General policy</td><td>AWS, formal correctness</td><td>Social graphs, hierarchies</td></tr>
+<tr><td>HTTP route matching</td><td>Yes — built-in domain</td><td>nginx, Envoy, framework routers</td></tr>
+<tr><td>Tool/hook gating</td><td>Yes — Claude Code domain</td><td>Custom if/else chains</td></tr>
+<tr><td>Config-driven matching</td><td>Yes — JSON/YAML/proto config</td><td>Hand-rolled config parsers</td></tr>
+<tr><td>ABAC / RBAC policies</td><td><strong>No</strong> — use a policy engine</td><td>OPA (Rego), Cedar, Zanzibar</td></tr>
+<tr><td>Complex authorization</td><td><strong>No</strong> — matcher, not policy engine</td><td>OPA, Casbin, custom logic</td></tr>
+<tr><td>Full-text search</td><td><strong>No</strong> — structured fields only</td><td>Elasticsearch, MeiliSearch</td></tr>
+<tr><td>Rate limiting</td><td><strong>No</strong> — stateless matching</td><td>Redis, middleware</td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="theyre-not-mutually-exclusive"><a class="header" href="#theyre-not-mutually-exclusive">They’re Not Mutually Exclusive</a></h2>
-<p>Some systems combine engines:</p>
-<p><strong>OPA + x.uma:</strong> OPA makes high-level allow/deny decision. If allowed, x.uma routes to specific backend based on request attributes.</p>
-<p>Example: OPA checks “Is this user authorized for the admin API?” (yes/no). x.uma routes to admin-v1 vs admin-v2 based on feature flags in headers.</p>
-<p><strong>Cedar + x.uma:</strong> Cedar handles “can this agent invoke this tool?” x.uma handles “which tool variant should execute given these parameters?”</p>
-<p>Example: Cedar checks “Can agent use read_file?” (yes/no). x.uma routes to sandboxed reader vs full reader based on path prefix.</p>
-<p><strong>OpenFGA + x.uma:</strong> OpenFGA answers “does user have viewer permission on resource?” x.uma handles “which cache strategy for this request?”</p>
-<p>Example: OpenFGA checks graph for user→resource edge. x.uma routes to CDN vs origin based on request headers.</p>
-<h2 id="when-xuma-is-wrong"><a class="header" href="#when-xuma-is-wrong">When x.uma Is Wrong</a></h2>
-<h3 id="complex-joins-and-aggregations"><a class="header" href="#complex-joins-and-aggregations">Complex Joins and Aggregations</a></h3>
-<p>If your policy is “allow if user belongs to a team that owns a resource in a project with budget &gt; $1000”, you need Rego. x.uma is tree traversal, not SQL.</p>
-<h3 id="stateful-decisions"><a class="header" href="#stateful-decisions">Stateful Decisions</a></h3>
-<p>If your policy depends on “number of requests in the last 5 minutes” or “this is the 3rd failed attempt”, x.uma doesn’t help. It evaluates one request at a time with no state.</p>
-<p>Use rate limiters (Envoy’s rate limit service, Redis + Lua) or stateful policy engines (OPA with external data).</p>
-<h3 id="graph-queries"><a class="header" href="#graph-queries">Graph Queries</a></h3>
-<p>If your policy is “allow if there’s a path in the org chart from user to resource owner”, you need a graph database or Zanzibar-style engine.</p>
-<p>x.uma evaluates predicates. It doesn’t traverse relationships.</p>
-<h2 id="decision-framework"><a class="header" href="#decision-framework">Decision Framework</a></h2>
-<p>Answer these questions:</p>
+<h2 id="xuma--policy-engines"><a class="header" href="#xuma--policy-engines">x.uma + Policy Engines</a></h2>
+<p>x.uma and policy engines solve different problems. They compose well:</p>
+<pre><code class="language-text">Request → x.uma (structured matching) → action
+                                            ↓
+                              Policy engine (authorization) → permit/deny
+</code></pre>
+<p>x.uma handles the fast path: “which rule matches this request?” The policy engine handles the complex path: “given this match, is the action authorized?” This is the Istio pattern — data plane matches, control plane decides.</p>
+<h2 id="when-performance-matters"><a class="header" href="#when-performance-matters">When Performance Matters</a></h2>
+<p>x.uma evaluation is fast — 9-33ns for exact matches depending on implementation. But the performance advantage over hand-written <code>if/else</code> chains only matters when:</p>
+<ol>
+<li><strong>Rules come from config</strong> — you can’t hardcode what you don’t know at compile time</li>
+<li><strong>Rules change</strong> — reconstruction is cheaper than redeployment</li>
+<li><strong>Cross-language parity</strong> — you need the same rules in multiple runtimes</li>
+<li><strong>Safety guarantees</strong> — ReDoS protection and depth limits matter</li>
+</ol>
+<p>If you have five static rules that never change and only run in one language, <code>if/else</code> is simpler. x.uma pays off when the rule set grows, changes, or crosses language boundaries.</p>
+<h2 id="choosing-an-implementation"><a class="header" href="#choosing-an-implementation">Choosing an Implementation</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Question</th><th>Answer</th><th>Recommendation</th></tr>
+<tr><th>Choose</th><th>When</th></tr>
 </thead>
 <tbody>
-<tr><td>Is this HTTP routing or event filtering?</td><td>Yes</td><td><strong>x.uma</strong></td></tr>
-<tr><td>Do I need graph traversal?</td><td>Yes</td><td><strong>OpenFGA/SpiceDB</strong></td></tr>
-<tr><td>Is this classic authorization (can user X do Y on Z)?</td><td>Yes</td><td><strong>Cedar</strong> (if AWS) or <strong>OPA</strong></td></tr>
-<tr><td>Do I need Datalog-style queries?</td><td>Yes</td><td><strong>OPA</strong></td></tr>
-<tr><td>Is my codebase polyglot (Rust + Python + TypeScript)?</td><td>Yes</td><td><strong>x.uma</strong></td></tr>
-<tr><td>Do I need formal verification?</td><td>Yes</td><td><strong>Cedar</strong></td></tr>
-<tr><td>Am I running in Kubernetes?</td><td>Yes</td><td><strong>OPA + Gatekeeper</strong></td></tr>
+<tr><td><strong>rumi</strong> (Rust)</td><td>Maximum performance, Rust codebase, embedding in other systems</td></tr>
+<tr><td><strong>xuma</strong> (Python)</td><td>Python codebase, prototyping, Django/Flask/FastAPI integration</td></tr>
+<tr><td><strong>xuma</strong> (TypeScript)</td><td>TypeScript codebase, Bun runtime, edge functions</td></tr>
+<tr><td><strong>puma-crusty</strong> (Python+Rust)</td><td>Python codebase needing Rust performance (especially regex)</td></tr>
+<tr><td><strong>bumi-crusty</strong> (TypeScript+WASM)</td><td>TypeScript needing Rust performance in the browser or edge</td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="performance-considerations"><a class="header" href="#performance-considerations">Performance Considerations</a></h2>
-<p>x.uma is fast (sub-microsecond evaluation, linear-time regex in Rust implementations). But:</p>
+<p>Pure implementations (rumi, xuma Python, xuma TypeScript) are self-contained with no native dependencies beyond RE2. Crusty variants wrap the Rust core through FFI — same API, Rust performance.</p>
+<h2 id="next"><a class="header" href="#next">Next</a></h2>
 <ul>
-<li><strong>For complex policies with hundreds of rules:</strong> Compiled Rego (OPA) might be faster. Benchmark your workload.</li>
-<li><strong>For high-cardinality attribute checks:</strong> Redis + Lua or custom C++ might be faster. x.uma is general-purpose, not hyper-optimized.</li>
-<li><strong>For graph queries:</strong> Specialized graph databases (Zanzibar, SpiceDB) will be orders of magnitude faster.</li>
-</ul>
-<p>See Performance &gt; Benchmarks for concrete numbers.</p>
-<h2 id="sources"><a class="header" href="#sources">Sources</a></h2>
-<p><strong>Policy Engines:</strong></p>
-<ul>
-<li><a href="https://www.openpolicyagent.org/">OPA Documentation</a> — CNCF graduated project</li>
-<li><a href="https://www.cedarpolicy.com/">Cedar Language Guide</a> — AWS authorization language</li>
-<li><a href="https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/">Zanzibar: Google’s Authorization System</a> — ReBAC research</li>
-<li><a href="https://openfga.dev/">OpenFGA</a> — Open-source Zanzibar implementation</li>
-</ul>
-<p><strong>x.uma Positioning:</strong></p>
-<ul>
-<li><a href="https://www.envoyproxy.io/docs/envoy/latest/api-v3/xds/type/matcher/v3/matcher.proto">xDS Unified Matcher API</a> — Source protocol</li>
-<li><a href="https://gateway-api.sigs.k8s.io/">Gateway API Specification</a> — HTTP route matching semantics</li>
-<li>x.uma implements xDS for polyglot routing and filtering, not general authorization</li>
+<li><a href="architecture.html">Architecture</a> — the design behind the engine</li>
+<li><a href="../performance/benchmarks.html">Benchmarks</a> — concrete performance numbers</li>
+<li><a href="../performance/security.html">Security Model</a> — safety guarantees in depth</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../explain/why-aces.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../explain/architecture.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../explain/policy-landscape.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../explain/xds-semantics.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -347,11 +267,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../explain/why-aces.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../explain/architecture.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../explain/policy-landscape.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../explain/xds-semantics.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

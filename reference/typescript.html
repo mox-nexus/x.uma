@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "coal";
-            window.path_to_searchindex_js = "../searchindex-86c44684.js";
+            window.path_to_searchindex_js = "../searchindex-20d2e022.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-eb7188b1.js"></script>
+        <script src="../toc-0ba3f3c3.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,432 +181,184 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="typescript-api-reference"><a class="header" href="#typescript-api-reference">TypeScript API Reference</a></h1>
-<p>bumi implements the xDS Unified Matcher API in pure TypeScript. Zero runtime dependencies. Bun runtime. TypeScript 5+.</p>
-<p><strong>Package:</strong> <code>bumi</code> (from <code>bumi/</code> directory)</p>
-<p><strong>Installation:</strong></p>
-<pre><code class="language-bash">bun add bumi
+<h2 id="installation"><a class="header" href="#installation">Installation</a></h2>
+<pre><code class="language-bash">bun add xuma
 </code></pre>
-<h2 id="import-hierarchy"><a class="header" href="#import-hierarchy">Import Hierarchy</a></h2>
-<p>All public types exported flat from top level:</p>
+<p>Requires Bun runtime. Dependency: <code>re2js</code> for linear-time regex.</p>
+<h2 id="package-xuma"><a class="header" href="#package-xuma">Package: xuma</a></h2>
 <pre><code class="language-typescript">import {
-    // Protocols
-    DataInput, InputMatcher, MatchingData,
-    // Predicates
-    SinglePredicate, And, Or, Not, Predicate, evaluatePredicate, predicateDepth,
-    // Matcher
-    Matcher, FieldMatcher, OnMatch, Action, NestedMatcher, MatcherError, MAX_DEPTH,
-    // String matchers
-    ExactMatcher, PrefixMatcher, SuffixMatcher, ContainsMatcher, RegexMatcher,
-} from "bumi";
-
-import {
-    // Context
-    HttpRequest,
-    // DataInputs
-    PathInput, MethodInput, HeaderInput, QueryParamInput,
-    // Gateway API types
-    HttpPathMatch, HttpHeaderMatch, HttpQueryParamMatch, HttpRouteMatch,
-    compileRouteMatch, compileRouteMatches,
-} from "bumi/http";
+  // Core types
+  type DataInput, type InputMatcher, type MatchingData,
+  // Predicates
+  SinglePredicate, And, Or, Not, type Predicate,
+  // Matcher tree
+  Matcher, FieldMatcher, Action, NestedMatcher, type OnMatch,
+  // String matchers
+  ExactMatcher, PrefixMatcher, SuffixMatcher, ContainsMatcher, RegexMatcher,
+  // Registry
+  RegistryBuilder, Registry,
+  // Config
+  type MatcherConfig, parseMatcherConfig,
+  // Constants
+  MAX_DEPTH, MAX_FIELD_MATCHERS, MAX_PREDICATES_PER_COMPOUND,
+  MAX_PATTERN_LENGTH, MAX_REGEX_PATTERN_LENGTH,
+  // Errors
+  MatcherError, UnknownTypeUrlError, InvalidConfigError,
+  TooManyFieldMatchersError, TooManyPredicatesError, PatternTooLongError,
+} from "xuma";
 </code></pre>
-<h2 id="type-hierarchy"><a class="header" href="#type-hierarchy">Type Hierarchy</a></h2>
-<pre><code>┌─────────────────────────────────────┐
-│          Matcher&lt;Ctx, A&gt;            │
-│   Top-level tree, returns A|null    │
-└───┬─────────────────────────────────┘
-    │ contains
-    ├──► FieldMatcher&lt;Ctx, A&gt;
-    │       predicate + onMatch
-    │
-    └──► OnMatch&lt;Ctx, A&gt;  (fallback)
-         ├─ Action&lt;A&gt;
-         └─ NestedMatcher&lt;Ctx, A&gt;
-
-┌─────────────────────────────────────┐
-│         Predicate&lt;Ctx&gt;              │
-│      Boolean logic tree             │
-└───┬─────────────────────────────────┘
-    ├─ SinglePredicate&lt;Ctx&gt; → input + matcher
-    ├─ And&lt;Ctx&gt; → all match
-    ├─ Or&lt;Ctx&gt; → any match
-    └─ Not&lt;Ctx&gt; → invert
-
-┌─────────────────────────────────────┐
-│    DataInput&lt;Ctx&gt; interface         │
-│   extract MatchingData from Ctx     │
-└─────────────────────────────────────┘
-
-┌─────────────────────────────────────┐
-│    InputMatcher interface           │
-│   match MatchingData → bool         │
-└───┬─────────────────────────────────┘
-    ├─ ExactMatcher
-    ├─ PrefixMatcher
-    ├─ SuffixMatcher
-    ├─ ContainsMatcher
-    └─ RegexMatcher
-</code></pre>
-<h2 id="core-interfaces"><a class="header" href="#core-interfaces">Core Interfaces</a></h2>
+<h2 id="core-types"><a class="header" href="#core-types">Core Types</a></h2>
 <h3 id="matchingdata"><a class="header" href="#matchingdata">MatchingData</a></h3>
 <pre><code class="language-typescript">type MatchingData = string | number | boolean | Uint8Array | null;
 </code></pre>
-<p>Type-erased value returned by <code>DataInput.get()</code>. Replaces Rust’s <code>MatchingData</code> enum.</p>
-<p>Returning <code>null</code> triggers the <strong>null → false invariant</strong>: predicate evaluates to <code>false</code> without consulting the matcher.</p>
-<h3 id="datainputctx"><a class="header" href="#datainputctx"><code>DataInput&lt;Ctx&gt;</code></a></h3>
+<h3 id="datainput"><a class="header" href="#datainput">DataInput</a></h3>
 <pre><code class="language-typescript">interface DataInput&lt;Ctx&gt; {
-    get(ctx: Ctx): MatchingData;
+  get(ctx: Ctx): MatchingData;
 }
 </code></pre>
-<p>Domain-specific extraction port. Implementations:</p>
-<ul>
-<li><code>PathInput</code> extracts HTTP path</li>
-<li><code>HeaderInput</code> extracts HTTP header by name</li>
-<li>Custom: implement this interface for your domain</li>
-</ul>
-<p><strong>Generic over Ctx</strong> — accepts context of type <code>Ctx</code>.</p>
 <h3 id="inputmatcher"><a class="header" href="#inputmatcher">InputMatcher</a></h3>
 <pre><code class="language-typescript">interface InputMatcher {
-    matches(value: MatchingData): boolean;
+  matches(value: MatchingData): boolean;
 }
 </code></pre>
-<p>Domain-agnostic matching port. Non-generic by design — same <code>ExactMatcher</code> works for HTTP, test contexts, or any custom domain.</p>
-<h2 id="predicates"><a class="header" href="#predicates">Predicates</a></h2>
-<h3 id="singlepredicatectx"><a class="header" href="#singlepredicatectx"><code>SinglePredicate&lt;Ctx&gt;</code></a></h3>
-<pre><code class="language-typescript">class SinglePredicate&lt;Ctx&gt; {
-    constructor(
-        readonly input: DataInput&lt;Ctx&gt;,
-        readonly matcher: InputMatcher,
-    );
-
-    evaluate(ctx: Ctx): boolean;
-}
-</code></pre>
-<p>Combines extraction + matching. Enforces the <strong>null → false invariant</strong>.</p>
-<p><strong>Example:</strong></p>
-<pre><code class="language-typescript">const pred = new SinglePredicate(
-    new PathInput(),
-    new PrefixMatcher("/api")
-);
-pred.evaluate(request); // true if path starts with /api
-</code></pre>
-<h3 id="andctx"><a class="header" href="#andctx"><code>And&lt;Ctx&gt;</code></a></h3>
-<pre><code class="language-typescript">class And&lt;Ctx&gt; {
-    constructor(readonly predicates: readonly Predicate&lt;Ctx&gt;[]);
-
-    evaluate(ctx: Ctx): boolean;
-}
-</code></pre>
-<p>All predicates must match. Short-circuits on first <code>false</code>. Empty array returns <code>true</code> (vacuous truth).</p>
-<h3 id="orctx"><a class="header" href="#orctx"><code>Or&lt;Ctx&gt;</code></a></h3>
-<pre><code class="language-typescript">class Or&lt;Ctx&gt; {
-    constructor(readonly predicates: readonly Predicate&lt;Ctx&gt;[]);
-
-    evaluate(ctx: Ctx): boolean;
-}
-</code></pre>
-<p>Any predicate must match. Short-circuits on first <code>true</code>. Empty array returns <code>false</code>.</p>
-<h3 id="notctx"><a class="header" href="#notctx"><code>Not&lt;Ctx&gt;</code></a></h3>
-<pre><code class="language-typescript">class Not&lt;Ctx&gt; {
-    constructor(readonly predicate: Predicate&lt;Ctx&gt;);
-
-    evaluate(ctx: Ctx): boolean;
-}
-</code></pre>
-<p>Inverts inner predicate result.</p>
-<h3 id="predicatectx"><a class="header" href="#predicatectx"><code>Predicate&lt;Ctx&gt;</code></a></h3>
-<pre><code class="language-typescript">type Predicate&lt;Ctx&gt; = SinglePredicate&lt;Ctx&gt; | And&lt;Ctx&gt; | Or&lt;Ctx&gt; | Not&lt;Ctx&gt;;
-</code></pre>
-<p>Discriminated union of all predicate types. Check variant with <code>instanceof</code>.</p>
-<h3 id="evaluatepredicate"><a class="header" href="#evaluatepredicate">evaluatePredicate()</a></h3>
-<pre><code class="language-typescript">function evaluatePredicate&lt;Ctx&gt;(p: Predicate&lt;Ctx&gt;, ctx: Ctx): boolean;
-</code></pre>
-<p>Evaluate any predicate variant. Dispatches to the appropriate <code>.evaluate()</code> method.</p>
-<h3 id="predicatedepth"><a class="header" href="#predicatedepth">predicateDepth()</a></h3>
-<pre><code class="language-typescript">function predicateDepth&lt;Ctx&gt;(p: Predicate&lt;Ctx&gt;): number;
-</code></pre>
-<p>Calculate nesting depth of predicate tree. Used by <code>Matcher.validate()</code> for depth limit enforcement.</p>
-<h2 id="matcher-tree"><a class="header" href="#matcher-tree">Matcher Tree</a></h2>
-<h3 id="matcherctx-a"><a class="header" href="#matcherctx-a"><code>Matcher&lt;Ctx, A&gt;</code></a></h3>
+<h3 id="matcher"><a class="header" href="#matcher">Matcher</a></h3>
 <pre><code class="language-typescript">class Matcher&lt;Ctx, A&gt; {
-    constructor(
-        readonly matchers: readonly FieldMatcher&lt;Ctx, A&gt;[],
-        readonly onNoMatch: OnMatch&lt;Ctx, A&gt; | null = null,
-    );
-
-    evaluate(ctx: Ctx): A | null;
-    validate(): void;
-    depth(): number;
+  constructor(matchers: FieldMatcher&lt;Ctx, A&gt;[], onNoMatch?: OnMatch&lt;Ctx, A&gt;);
+  evaluate(ctx: Ctx): A | null;
 }
 </code></pre>
-<p>Top-level matcher tree. Evaluates <code>matchers</code> in order (first-match-wins). Returns action <code>A</code> or <code>null</code>.</p>
-<p><strong>Auto-validation:</strong> <code>validate()</code> is called in constructor. Trees exceeding <code>MAX_DEPTH</code> (32) throw <code>MatcherError</code>.</p>
-<p><strong>Methods:</strong></p>
-<ul>
-<li><code>evaluate(ctx)</code> — Returns first matching action or <code>null</code></li>
-<li><code>validate()</code> — Checks depth limit (called automatically)</li>
-<li><code>depth()</code> — Returns total tree depth</li>
-</ul>
-<p><strong>Example:</strong></p>
-<pre><code class="language-typescript">const matcher = new Matcher([
-    new FieldMatcher(
-        new SinglePredicate(new PathInput(), new PrefixMatcher("/api")),
-        new Action("api")
-    ),
-], new Action("default"));
-
-const action = matcher.evaluate(request); // "api" or "default"
-</code></pre>
-<h3 id="fieldmatcherctx-a"><a class="header" href="#fieldmatcherctx-a"><code>FieldMatcher&lt;Ctx, A&gt;</code></a></h3>
+<h3 id="fieldmatcher"><a class="header" href="#fieldmatcher">FieldMatcher</a></h3>
 <pre><code class="language-typescript">class FieldMatcher&lt;Ctx, A&gt; {
-    constructor(
-        readonly predicate: Predicate&lt;Ctx&gt;,
-        readonly onMatch: OnMatch&lt;Ctx, A&gt;,
-    );
+  constructor(predicate: Predicate&lt;Ctx&gt;, onMatch: OnMatch&lt;Ctx, A&gt;);
 }
 </code></pre>
-<p>Pairs a predicate with an outcome (action or nested matcher).</p>
-<h3 id="onmatchctx-a"><a class="header" href="#onmatchctx-a"><code>OnMatch&lt;Ctx, A&gt;</code></a></h3>
+<h3 id="onmatch"><a class="header" href="#onmatch">OnMatch</a></h3>
 <pre><code class="language-typescript">type OnMatch&lt;Ctx, A&gt; = Action&lt;A&gt; | NestedMatcher&lt;Ctx, A&gt;;
+
+class Action&lt;A&gt; { constructor(value: A); }
+class NestedMatcher&lt;Ctx, A&gt; { constructor(matcher: Matcher&lt;Ctx, A&gt;); }
 </code></pre>
-<p>xDS exclusivity — action XOR nested matcher, never both. Check variant with <code>instanceof</code>.</p>
-<h3 id="actiona"><a class="header" href="#actiona"><code>Action&lt;A&gt;</code></a></h3>
-<pre><code class="language-typescript">class Action&lt;A&gt; {
-    constructor(readonly value: A);
-}
+<h3 id="predicates"><a class="header" href="#predicates">Predicates</a></h3>
+<pre><code class="language-typescript">class SinglePredicate&lt;Ctx&gt; { constructor(input: DataInput&lt;Ctx&gt;, matcher: InputMatcher); }
+class And&lt;Ctx&gt; { constructor(predicates: Predicate&lt;Ctx&gt;[]); }
+class Or&lt;Ctx&gt; { constructor(predicates: Predicate&lt;Ctx&gt;[]); }
+class Not&lt;Ctx&gt; { constructor(predicate: Predicate&lt;Ctx&gt;); }
+
+type Predicate&lt;Ctx&gt; = SinglePredicate&lt;Ctx&gt; | And&lt;Ctx&gt; | Or&lt;Ctx&gt; | Not&lt;Ctx&gt;;
 </code></pre>
-<p>Terminal outcome. Returns <code>value</code> when matched.</p>
-<h3 id="nestedmatcherctx-a"><a class="header" href="#nestedmatcherctx-a"><code>NestedMatcher&lt;Ctx, A&gt;</code></a></h3>
-<pre><code class="language-typescript">class NestedMatcher&lt;Ctx, A&gt; {
-    constructor(readonly matcher: Matcher&lt;Ctx, A&gt;);
-}
-</code></pre>
-<p>Continue evaluation into nested matcher. If nested matcher returns <code>null</code>, evaluation continues to next <code>FieldMatcher</code> (xDS nested matcher failure propagation).</p>
-<h3 id="matchererror"><a class="header" href="#matchererror">MatcherError</a></h3>
-<pre><code class="language-typescript">class MatcherError extends Error {
-    constructor(message: string);
-}
-</code></pre>
-<p>Thrown when <code>validate()</code> detects depth exceeding <code>MAX_DEPTH</code>, or when compiling invalid regex patterns.</p>
-<h3 id="max_depth"><a class="header" href="#max_depth">MAX_DEPTH</a></h3>
-<pre><code class="language-typescript">const MAX_DEPTH: number = 32;
-</code></pre>
-<p>Maximum allowed matcher tree depth. Enforced at construction time.</p>
 <h2 id="string-matchers"><a class="header" href="#string-matchers">String Matchers</a></h2>
-<p>All matchers are classes with <code>readonly</code> properties implementing <code>InputMatcher</code> interface. Return <code>false</code> for non-string or <code>null</code> input.</p>
-<h3 id="exactmatcher"><a class="header" href="#exactmatcher">ExactMatcher</a></h3>
-<pre><code class="language-typescript">class ExactMatcher {
-    constructor(
-        readonly value: string,
-        readonly ignoreCase: boolean = false,
-    );
-
-    matches(value: MatchingData): boolean;
-}
-</code></pre>
-<p>Exact string equality. When <code>ignoreCase=true</code>, comparison uses <code>.toLowerCase()</code>.</p>
-<p><strong>Optimization:</strong> Pattern is pre-lowercased at construction time (private <code>cmpValue</code> field).</p>
-<h3 id="prefixmatcher"><a class="header" href="#prefixmatcher">PrefixMatcher</a></h3>
-<pre><code class="language-typescript">class PrefixMatcher {
-    constructor(
-        readonly prefix: string,
-        readonly ignoreCase: boolean = false,
-    );
-
-    matches(value: MatchingData): boolean;
-}
-</code></pre>
-<p>String starts with prefix. Pre-lowercased at construction when <code>ignoreCase=true</code>.</p>
-<h3 id="suffixmatcher"><a class="header" href="#suffixmatcher">SuffixMatcher</a></h3>
-<pre><code class="language-typescript">class SuffixMatcher {
-    constructor(
-        readonly suffix: string,
-        readonly ignoreCase: boolean = false,
-    );
-
-    matches(value: MatchingData): boolean;
-}
-</code></pre>
-<p>String ends with suffix. Pre-lowercased at construction when <code>ignoreCase=true</code>.</p>
-<h3 id="containsmatcher"><a class="header" href="#containsmatcher">ContainsMatcher</a></h3>
-<pre><code class="language-typescript">class ContainsMatcher {
-    constructor(
-        readonly substring: string,
-        readonly ignoreCase: boolean = false,
-    );
-
-    matches(value: MatchingData): boolean;
-}
-</code></pre>
-<p>Substring search. Pre-lowercased at construction when <code>ignoreCase=true</code> (Knuth optimization: avoid repeated pattern lowercasing).</p>
-<h3 id="regexmatcher"><a class="header" href="#regexmatcher">RegexMatcher</a></h3>
-<pre><code class="language-typescript">class RegexMatcher {
-    constructor(readonly pattern: string);
-
-    matches(value: MatchingData): boolean;
-}
-</code></pre>
-<p>Regular expression search (not fullmatch). Pattern compiled at construction time. Uses <code>RegExp.test()</code>.</p>
-<p><strong>Security:</strong> Uses JavaScript’s <code>RegExp</code> engine (backtracking, ReDoS-vulnerable). See Performance &gt; ReDoS Protection in the docs. For adversarial input, use <code>bumi-crusty</code> (Phase 8).</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Class</th><th>Constructor</th><th>Matches</th></tr>
+</thead>
+<tbody>
+<tr><td><code>new ExactMatcher(value)</code></td><td><code>new ExactMatcher("hello")</code></td><td>Exact equality</td></tr>
+<tr><td><code>new PrefixMatcher(prefix)</code></td><td><code>new PrefixMatcher("/api")</code></td><td>Starts with</td></tr>
+<tr><td><code>new SuffixMatcher(suffix)</code></td><td><code>new SuffixMatcher(".json")</code></td><td>Ends with</td></tr>
+<tr><td><code>new ContainsMatcher(sub)</code></td><td><code>new ContainsMatcher("admin")</code></td><td>Contains</td></tr>
+<tr><td><code>new RegexMatcher(pattern)</code></td><td><code>new RegexMatcher("^Bearer .+$")</code></td><td>RE2 regex</td></tr>
+</tbody>
+</table>
+</div>
+<p>All types use <code>readonly</code> fields.</p>
 <h2 id="http-domain"><a class="header" href="#http-domain">HTTP Domain</a></h2>
+<pre><code class="language-typescript">import {
+  HttpRequest, PathInput, MethodInput, HeaderInput, QueryParamInput,
+  compileRouteMatch, compileRouteMatches, register,
+  type HttpRouteMatch, type HttpPathMatch, type HttpHeaderMatch, type HttpQueryParamMatch,
+} from "xuma/http";
+</code></pre>
 <h3 id="httprequest"><a class="header" href="#httprequest">HttpRequest</a></h3>
 <pre><code class="language-typescript">class HttpRequest {
-    constructor(
-        readonly method: string = "GET",
-        readonly rawPath: string = "/",
-        readonly headers: Readonly&lt;Record&lt;string, string&gt;&gt; = {},
-    );
-
-    readonly path: string;
-    readonly queryParams: Readonly&lt;Record&lt;string, string&gt;&gt;;
-
-    header(name: string): string | null;
-    queryParam(name: string): string | null;
+  constructor(method: string, rawPath: string, headers?: Record&lt;string, string&gt;,
+              queryParams?: Record&lt;string, string&gt;);
 }
 </code></pre>
-<p>HTTP request context for matching.</p>
-<p><strong>Parsing:</strong> Query string automatically parsed from <code>rawPath</code> at construction. Headers stored lowercased for case-insensitive lookup.</p>
-<p><strong>Properties:</strong></p>
-<ul>
-<li><code>path</code> — path without query string</li>
-<li><code>queryParams</code> — parsed query parameters</li>
-</ul>
-<p><strong>Methods:</strong></p>
-<ul>
-<li><code>header(name)</code> — Case-insensitive header lookup</li>
-<li><code>queryParam(name)</code> — Query parameter lookup</li>
-</ul>
-<p><strong>Example:</strong></p>
-<pre><code class="language-typescript">const req = new HttpRequest(
-    "GET",
-    "/api/users?role=admin",
-    { "Content-Type": "application/json" }
-);
-
-req.path;              // "/api/users"
-req.queryParams;       // { role: "admin" }
-req.header("content-type"); // "application/json" (case-insensitive)
-req.queryParam("role"); // "admin"
-</code></pre>
-<h3 id="datainputs"><a class="header" href="#datainputs">DataInputs</a></h3>
-<h4 id="pathinput"><a class="header" href="#pathinput">PathInput</a></h4>
-<pre><code class="language-typescript">class PathInput {
-    get(ctx: HttpRequest): MatchingData;
-}
-</code></pre>
-<p>Extracts <code>ctx.path</code> (without query string).</p>
-<h4 id="methodinput"><a class="header" href="#methodinput">MethodInput</a></h4>
-<pre><code class="language-typescript">class MethodInput {
-    get(ctx: HttpRequest): MatchingData;
-}
-</code></pre>
-<p>Extracts HTTP method (case-sensitive).</p>
-<h4 id="headerinput"><a class="header" href="#headerinput">HeaderInput</a></h4>
-<pre><code class="language-typescript">class HeaderInput {
-    constructor(readonly name: string);
-
-    get(ctx: HttpRequest): MatchingData;
-}
-</code></pre>
-<p>Extracts header value by name (case-insensitive lookup). Returns <code>null</code> if header not present.</p>
-<h4 id="queryparaminput"><a class="header" href="#queryparaminput">QueryParamInput</a></h4>
-<pre><code class="language-typescript">class QueryParamInput {
-    constructor(readonly name: string);
-
-    get(ctx: HttpRequest): MatchingData;
-}
-</code></pre>
-<p>Extracts query parameter value by name. Returns <code>null</code> if parameter not present.</p>
-<h3 id="gateway-api-types"><a class="header" href="#gateway-api-types">Gateway API Types</a></h3>
-<p>Pure TypeScript types mirroring Gateway API spec (no Kubernetes dependency).</p>
-<h4 id="httppathmatch"><a class="header" href="#httppathmatch">HttpPathMatch</a></h4>
-<pre><code class="language-typescript">interface HttpPathMatch {
-    readonly type: "Exact" | "PathPrefix" | "RegularExpression";
-    readonly value: string;
-}
-</code></pre>
-<p>Path match specification.</p>
-<h4 id="httpheadermatch"><a class="header" href="#httpheadermatch">HttpHeaderMatch</a></h4>
-<pre><code class="language-typescript">interface HttpHeaderMatch {
-    readonly type: "Exact" | "RegularExpression";
-    readonly name: string;
-    readonly value: string;
-}
-</code></pre>
-<p>Header match specification.</p>
-<h4 id="httpqueryparammatch"><a class="header" href="#httpqueryparammatch">HttpQueryParamMatch</a></h4>
-<pre><code class="language-typescript">interface HttpQueryParamMatch {
-    readonly type: "Exact" | "RegularExpression";
-    readonly name: string;
-    readonly value: string;
-}
-</code></pre>
-<p>Query parameter match specification.</p>
-<h4 id="httproutematch"><a class="header" href="#httproutematch">HttpRouteMatch</a></h4>
+<h3 id="inputs"><a class="header" href="#inputs">Inputs</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Class</th><th>Extracts</th><th>Returns</th></tr>
+</thead>
+<tbody>
+<tr><td><code>new PathInput()</code></td><td>Request path</td><td><code>string</code></td></tr>
+<tr><td><code>new MethodInput()</code></td><td>HTTP method</td><td><code>string</code></td></tr>
+<tr><td><code>new HeaderInput(name)</code></td><td>Header value</td><td><code>string | null</code></td></tr>
+<tr><td><code>new QueryParamInput(name)</code></td><td>Query parameter</td><td><code>string | null</code></td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="gateway-api-compiler"><a class="header" href="#gateway-api-compiler">Gateway API Compiler</a></h3>
 <pre><code class="language-typescript">interface HttpRouteMatch {
-    readonly path?: HttpPathMatch;
-    readonly method?: string;
-    readonly headers?: readonly HttpHeaderMatch[];
-    readonly queryParams?: readonly HttpQueryParamMatch[];
+  readonly path?: HttpPathMatch;
+  readonly method?: string;
+  readonly headers?: readonly HttpHeaderMatch[];
+  readonly queryParams?: readonly HttpQueryParamMatch[];
+}
+
+interface HttpPathMatch {
+  readonly type: "Exact" | "PathPrefix" | "RegularExpression";
+  readonly value: string;
+}
+
+interface HttpHeaderMatch {
+  readonly type: "Exact" | "RegularExpression";
+  readonly name: string;
+  readonly value: string;
+}
+
+interface HttpQueryParamMatch {
+  readonly type: "Exact" | "RegularExpression";
+  readonly name: string;
+  readonly value: string;
+}
+
+function compileRouteMatches&lt;A&gt;(matches: HttpRouteMatch[], action: A, onNoMatch?: A): Matcher&lt;HttpRequest, A&gt;;
+function compileRouteMatch&lt;A&gt;(routeMatch: HttpRouteMatch, action: A): Matcher&lt;HttpRequest, A&gt;;
+</code></pre>
+<h2 id="registry"><a class="header" href="#registry">Registry</a></h2>
+<pre><code class="language-typescript">const builder = new RegistryBuilder&lt;MyContext&gt;();
+// Register inputs and matchers...
+const registry = builder.build();
+const matcher = registry.loadMatcher(config);
+</code></pre>
+<h3 id="registrybuilder"><a class="header" href="#registrybuilder">RegistryBuilder</a></h3>
+<pre><code class="language-typescript">class RegistryBuilder&lt;Ctx&gt; {
+  input(typeUrl: string, factory: InputFactory&lt;Ctx&gt;): this;
+  matcher(typeUrl: string, factory: MatcherFactory): this;
+  build(): Registry&lt;Ctx&gt;;
 }
 </code></pre>
-<p>Gateway API route match config. All conditions within a single <code>HttpRouteMatch</code> are ANDed.</p>
-<h3 id="compileroutematch"><a class="header" href="#compileroutematch">compileRouteMatch()</a></h3>
-<pre><code class="language-typescript">function compileRouteMatch&lt;A&gt;(
-    routeMatch: HttpRouteMatch,
-    action: A,
-): Matcher&lt;HttpRequest, A&gt;;
+<h3 id="registry-1"><a class="header" href="#registry-1">Registry</a></h3>
+<pre><code class="language-typescript">class Registry&lt;Ctx&gt; {
+  loadMatcher&lt;A&gt;(config: MatcherConfig&lt;A&gt;): Matcher&lt;Ctx, A&gt;;
+  containsInput(typeUrl: string): boolean;
+  containsMatcher(typeUrl: string): boolean;
+}
 </code></pre>
-<p>Compile a single <code>HttpRouteMatch</code> into a <code>Matcher</code>.</p>
-<p><strong>Example:</strong></p>
-<pre><code class="language-typescript">const matcher = compileRouteMatch(
-    { path: { type: "PathPrefix", value: "/api" } },
-    "api_handler"
-);
+<h2 id="constants"><a class="header" href="#constants">Constants</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Constant</th><th>Value</th></tr>
+</thead>
+<tbody>
+<tr><td><code>MAX_DEPTH</code></td><td>32</td></tr>
+<tr><td><code>MAX_FIELD_MATCHERS</code></td><td>256</td></tr>
+<tr><td><code>MAX_PREDICATES_PER_COMPOUND</code></td><td>256</td></tr>
+<tr><td><code>MAX_PATTERN_LENGTH</code></td><td>8192</td></tr>
+<tr><td><code>MAX_REGEX_PATTERN_LENGTH</code></td><td>4096</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="helpers"><a class="header" href="#helpers">Helpers</a></h2>
+<pre><code class="language-typescript">function matcherFromPredicate&lt;Ctx, A&gt;(predicate: Predicate&lt;Ctx&gt;, action: A, onNoMatch?: A): Matcher&lt;Ctx, A&gt;;
+function andPredicate&lt;Ctx&gt;(predicates: Predicate&lt;Ctx&gt;[], fallback: Predicate&lt;Ctx&gt;): Predicate&lt;Ctx&gt;;
+function orPredicate&lt;Ctx&gt;(predicates: Predicate&lt;Ctx&gt;[], fallback: Predicate&lt;Ctx&gt;): Predicate&lt;Ctx&gt;;
+function evaluatePredicate&lt;Ctx&gt;(predicate: Predicate&lt;Ctx&gt;, ctx: Ctx): boolean;
+function predicateDepth&lt;Ctx&gt;(predicate: Predicate&lt;Ctx&gt;): number;
 </code></pre>
-<h3 id="compileroutematches"><a class="header" href="#compileroutematches">compileRouteMatches()</a></h3>
-<pre><code class="language-typescript">function compileRouteMatches&lt;A&gt;(
-    matches: readonly HttpRouteMatch[],
-    action: A,
-    onNoMatch?: A,
-): Matcher&lt;HttpRequest, A&gt;;
-</code></pre>
-<p>Compile multiple <code>HttpRouteMatch</code> entries into a single <code>Matcher</code>. Multiple matches are ORed per Gateway API semantics. Empty <code>matches</code> array creates a catch-all matcher.</p>
-<p><strong>Example:</strong></p>
-<pre><code class="language-typescript">const apiRoute: HttpRouteMatch = {
-    path: { type: "PathPrefix", value: "/api" },
-    method: "GET"
-};
-
-const adminRoute: HttpRouteMatch = {
-    headers: [{ type: "Exact", name: "x-admin", value: "true" }]
-};
-
-const matcher = compileRouteMatches(
-    [apiRoute, adminRoute],
-    "matched",
-    "not_found"
-);
-
-matcher.evaluate(request); // "matched" or "not_found"
-</code></pre>
-<h2 id="requirements"><a class="header" href="#requirements">Requirements</a></h2>
-<ul>
-<li><strong>Bun runtime</strong> — uses Bun’s fast module resolution and test runner</li>
-<li><strong>TypeScript 5+</strong> — uses modern TS features (generic classes, discriminated unions)</li>
-<li><strong>Zero runtime dependencies</strong> — stdlib only (no lodash, no ramda)</li>
-<li>Development dependencies: Biome (lint/format), js-yaml (conformance tests)</li>
-</ul>
-<h2 id="security"><a class="header" href="#security">Security</a></h2>
-<p>See Performance &gt; ReDoS Protection in the docs for regex security details.</p>
-<p><strong>Summary:</strong></p>
-<ul>
-<li><code>RegexMatcher</code> uses JavaScript’s <code>RegExp</code> (backtracking, ReDoS-vulnerable)</li>
-<li>Safe for trusted patterns (your route config, known fixtures)</li>
-<li>For adversarial input, use <code>bumi-crusty</code> (Rust-backed via WASM, linear-time regex)</li>
-<li>Depth validation automatic at construction (max 32 levels)</li>
-<li>Query string parsing uses simple split (no complex URL parsing vulnerabilities)</li>
-<li>Headers stored with <code>Object.create(null)</code> to prevent prototype pollution</li>
-</ul>
 
                     </main>
 
@@ -616,7 +368,7 @@ matcher.evaluate(request); // "matched" or "not_found"
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../reference/http.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../reference/proto.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -630,7 +382,7 @@ matcher.evaluate(request); // "matched" or "not_found"
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../reference/http.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../reference/proto.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
