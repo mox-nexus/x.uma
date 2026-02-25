@@ -10,6 +10,8 @@
     "sync": "svelte-kit sync"
   },
   "dependencies": {
+    "@xyflow/svelte": "^1.5.1",
+    "elkjs": "^0.11.0",
     "xuma": "../bumi"
   },
   "devDependencies": {
