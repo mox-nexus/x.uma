@@ -1,29 +1,55 @@
 import type { Preset } from "../types.js";
 
-export const fallback: Preset = {
-  id: "fallback",
-  name: "Fallback",
-  mode: "config",
-  description: "on_no_match provides a default action when nothing matches",
+export const authGateway: Preset = {
+  id: "auth-gateway",
+  name: "Auth Gateway",
+  mode: "http",
+  description:
+    "Require Bearer token and JSON content-type on /api paths",
   config: JSON.stringify(
-    {
-      matchers: [
-        {
-          predicate: {
-            type: "single",
-            input: {
-              type_url: "xuma.test.v1.StringInput",
-              config: { key: "status" },
+    [
+      {
+        match: {
+          method: "POST",
+          path: { type: "PathPrefix", value: "/api/" },
+          headers: [
+            {
+              type: "RegularExpression",
+              name: "authorization",
+              value: "^Bearer .+$",
             },
-            value_match: { Exact: "active" },
-          },
-          on_match: { type: "action", action: "allow" },
+            {
+              type: "Exact",
+              name: "content-type",
+              value: "application/json",
+            },
+          ],
         },
-      ],
-      on_no_match: { type: "action", action: "deny" },
-    },
+        action: "authorized",
+      },
+      {
+        match: {
+          path: { type: "PathPrefix", value: "/api/" },
+        },
+        action: "unauthorized",
+      },
+      {
+        match: {
+          path: { type: "Exact", value: "/health" },
+        },
+        action: "healthcheck",
+      },
+    ],
     null,
     2,
   ),
-  context: { status: "suspended" },
+  context: {},
+  http: {
+    method: "POST",
+    path: "/api/users",
+    headers: {
+      authorization: "Bearer eyJhbGciOiJIUzI1NiJ9.test",
+      "content-type": "application/json",
+    },
+  },
 };

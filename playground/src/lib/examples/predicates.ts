@@ -1,10 +1,11 @@
 import type { Preset } from "../types.js";
 
-export const predicates: Preset = {
-  id: "predicates",
-  name: "AND Predicate",
+export const branchProtection: Preset = {
+  id: "claude-branch-protect",
+  name: "Protect Main",
   mode: "config",
-  description: "Compound AND: both role=admin AND org prefix acme must match",
+  description:
+    "Claude Code hook: block file writes when on the main branch",
   config: JSON.stringify(
     {
       matchers: [
@@ -16,26 +17,39 @@ export const predicates: Preset = {
                 type: "single",
                 input: {
                   type_url: "xuma.test.v1.StringInput",
-                  config: { key: "role" },
+                  config: { key: "event" },
                 },
-                value_match: { Exact: "admin" },
+                value_match: { Exact: "PreToolUse" },
               },
               {
                 type: "single",
                 input: {
                   type_url: "xuma.test.v1.StringInput",
-                  config: { key: "org" },
+                  config: { key: "tool_name" },
                 },
-                value_match: { Prefix: "acme" },
+                value_match: { Exact: "Write" },
+              },
+              {
+                type: "single",
+                input: {
+                  type_url: "xuma.test.v1.StringInput",
+                  config: { key: "git_branch" },
+                },
+                value_match: { Exact: "main" },
               },
             ],
           },
-          on_match: { type: "action", action: "admin_acme" },
+          on_match: { type: "action", action: "BLOCK" },
         },
       ],
+      on_no_match: { type: "action", action: "ALLOW" },
     },
     null,
     2,
   ),
-  context: { role: "admin", org: "acme-corp" },
+  context: {
+    event: "PreToolUse",
+    tool_name: "Write",
+    git_branch: "main",
+  },
 };
