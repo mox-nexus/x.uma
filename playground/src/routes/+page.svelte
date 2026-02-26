@@ -73,7 +73,7 @@
 <div class="container">
   <header class="header">
     <div class="title">
-      <h1>x.uma <span class="subtitle">Playground</span></h1>
+      <h1>x.uma <span class="subtitle">Playground</span> <span class="alpha-badge">alpha</span></h1>
     </div>
     <ModeTabs bind:mode onchange={onModeChange} />
   </header>
@@ -167,6 +167,21 @@
   .subtitle {
     font-weight: 400;
     color: var(--text-muted);
+  }
+
+  .alpha-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--yellow, #f9e2af) 15%, transparent);
+    color: var(--yellow, #f9e2af);
+    border: 1px solid var(--yellow, #f9e2af);
+    vertical-align: middle;
+    margin-left: 8px;
   }
 
   .main-layout {
