@@ -79,5 +79,9 @@ playground/build/
 playground/.svelte-kit/
 !playground/src/lib/
 
+# Screenshots / Playwright
+.playwright-mcp/
+*.png
+
 # Bun workspace
 bun.lock
