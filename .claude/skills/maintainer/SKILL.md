@@ -24,8 +24,8 @@ The goal: sustainable excellence — no rewrites needed. Growth happens at edges
 | **rumi** | Rust | Core engine (reference implementation) |
 | **puma** | Python | Pure Python implementation |
 | **bumi** | TypeScript | Pure TypeScript implementation |
-| **puma-crusty** | Python+Rust | PyO3 bindings (rumi/crusts/python/) |
-| **bumi-crusty** | TS+WASM | wasm-bindgen bindings (rumi/crusts/wasm/) |
+| **xuma-crust** | Python+Rust | PyO3 bindings (rumi/crusts/python/) |
+| **xuma-crust** | TS+WASM | wasm-bindgen bindings (rumi/crusts/wasm/) |
 
 ```
 x.uma/

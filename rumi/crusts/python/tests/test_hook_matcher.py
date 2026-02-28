@@ -1,4 +1,4 @@
-"""Tests for puma-crusty HookMatcher.
+"""Tests for xuma-crust HookMatcher.
 
 Covers:
 - Conformance: same input → same result as Rust rumi::claude
@@ -8,7 +8,7 @@ Covers:
 
 import pytest
 
-from puma_crusty import HookMatcher, HookMatch, StringMatch
+from xuma_crust import HookMatcher, HookMatch, StringMatch
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

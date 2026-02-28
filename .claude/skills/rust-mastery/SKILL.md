@@ -1,6 +1,6 @@
 ---
 name: rust-mastery
-description: "x.uma Rust mastery — architectural judgment from 13 elite codebases, applied to this project. Use when: writing rumi code, designing traits, choosing dependencies, making performance decisions, building registry/config patterns, or working on crusty FFI bindings. Overrides generic Rust advice with x.uma-specific conventions. Source: 13 mined codebases cross-referenced against x.uma architecture."
+description: "x.uma Rust mastery — architectural judgment from 13 elite codebases, applied to this project. Use when: writing rumi code, designing traits, choosing dependencies, making performance decisions, building registry/config patterns, or working on xuma-crust FFI bindings. Overrides generic Rust advice with x.uma-specific conventions. Source: 13 mined codebases cross-referenced against x.uma architecture."
 ---
 
 # Rust Mastery — x.uma Edition
@@ -31,7 +31,7 @@ These conventions diverge from generic Rust practice. Follow these, not the defa
 
 x.uma's `DataInput::get(&self)` and `InputMatcher::matches(&self)` take `&self`. This enables blanket impls for `&T`, `Box<T>`, `Arc<T>` — the same wrapper algebra hyper gained when `Service::call` went from `&mut self` to `&self`.
 
-**Rule:** If either trait ever takes `&mut self`, the crusty FFI bindings break (can't share through `Arc`). This is a hard constraint.
+**Rule:** If either trait ever takes `&mut self`, the xuma-crust FFI bindings break (can't share through `Arc`). This is a hard constraint.
 
 ### 2. Thin Generic Wrapper, Fat Dynamic Interior
 
@@ -157,7 +157,7 @@ Config (JSON/Python dict/JS object) → Compile in Rust → Evaluate in Rust →
 
 - PyO3 `extension-module` feature prevents linking to libpython → `cargo test` fails
 - Solution: `default-members` in workspace excludes crusts; test via `maturin develop && pytest`
-- `cdylib` + `lib` crate types for puma-crusty; `cdylib` only for bumi-crusty
+- `cdylib` + `lib` crate types for xuma-crust (Python); `cdylib` only for xuma-crust (WASM)
 - Pre-commit hook uses bare `cargo test` (no `--workspace`) so `default-members` naturally excludes crusts
 
 ## Decision Quick Reference

@@ -172,8 +172,8 @@ FILE_PARSERS: dict[str, tuple[str, Any]] = {
     "rust.json": ("rumi", parse_divan_json),
     "python.json": ("puma", parse_pytest_benchmark_json),
     "typescript.json": ("bumi", parse_mitata_json),
-    "puma-crusty.json": ("puma-crusty", parse_pytest_benchmark_json),
-    "bumi-crusty.json": ("bumi-crusty", parse_mitata_json),
+    "xuma-crust-python.json": ("xuma-crust-python", parse_pytest_benchmark_json),
+    "xuma-crust-wasm.json": ("xuma-crust-wasm", parse_mitata_json),
 }
 
 

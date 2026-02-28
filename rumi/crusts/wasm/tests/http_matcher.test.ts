@@ -1,13 +1,13 @@
 /**
- * Tests for bumi-crusty HttpMatcher.
+ * Tests for xuma-crust HttpMatcher.
  *
  * Config-driven HTTP matching via Rust registry, exposed through wasm-bindgen.
- * Mirrors puma-crusty's test_http_matcher.py tests.
+ * Mirrors xuma-crust (Python)'s test_http_matcher.py tests.
  */
 
 import { beforeAll, describe, expect, test } from "bun:test";
 // @ts-expect-error — generated WASM package has no TS project reference
-import init, { HttpMatcher } from "../pkg/bumi_crusty.js";
+import init, { HttpMatcher } from "../pkg/xuma_crust.js";
 
 beforeAll(async () => {
   await init();

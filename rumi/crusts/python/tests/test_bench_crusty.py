@@ -1,4 +1,4 @@
-"""Head-to-head: puma (pure Python) vs puma-crusty (PyO3 Rust bindings).
+"""Head-to-head: puma (pure Python) vs xuma-crust (PyO3 Rust bindings).
 
 Compares identical workloads through both implementations to isolate:
 1. FFI overhead — crusty's boundary crossing cost
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from puma_crusty import HookMatch, HookMatcher, StringMatch
+from xuma_crust import HookMatch, HookMatcher, StringMatch
 
 # Also import xuma (pure Python) for comparison
 from xuma import (

@@ -9,6 +9,7 @@
   import ResultBadge from "$lib/components/ResultBadge.svelte";
   import PresetPicker from "$lib/components/PresetPicker.svelte";
   import ModeTabs from "$lib/components/ModeTabs.svelte";
+  import MatcherGraph from "$lib/components/graph/MatcherGraph.svelte";
 
   // State
   let mode: ModeKind = $state("config");
@@ -22,6 +23,7 @@
   let httpHeaders: Record<string, string> = $state({});
   let result: EvalResult | null = $state(null);
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let leftView: "code" | "graph" | "both" = $state("both");
 
   function loadPreset(preset: Preset) {
     activePresetId = preset.id;
@@ -71,7 +73,7 @@
 <div class="container">
   <header class="header">
     <div class="title">
-      <h1>x.uma <span class="subtitle">Playground</span></h1>
+      <h1>x.uma <span class="subtitle">Playground</span> <span class="alpha-badge">alpha</span></h1>
     </div>
     <ModeTabs bind:mode onchange={onModeChange} />
   </header>
@@ -84,12 +86,39 @@
         onselect={loadPreset}
       />
 
-      <div class="editor-section">
-        <div class="label">
-          {mode === "config" ? "Matcher Config" : "Route Config"}
-        </div>
-        <Editor bind:value={configJson} oninput={debouncedEvaluate} />
+      <div class="view-tabs">
+        <button
+          class="view-tab"
+          class:active={leftView === "code"}
+          onclick={() => (leftView = "code")}
+        >Code</button>
+        <button
+          class="view-tab"
+          class:active={leftView === "graph"}
+          onclick={() => (leftView = "graph")}
+        >Graph</button>
+        <button
+          class="view-tab"
+          class:active={leftView === "both"}
+          onclick={() => (leftView = "both")}
+        >Both</button>
       </div>
+
+      {#if leftView !== "graph"}
+        <div class="editor-section">
+          <div class="label">
+            {mode === "config" ? "Matcher Config" : "Route Config"}
+          </div>
+          <Editor bind:value={configJson} oninput={debouncedEvaluate} />
+        </div>
+      {/if}
+
+      {#if leftView !== "code"}
+        <div class="graph-section">
+          <div class="label">Matcher Tree</div>
+          <MatcherGraph {configJson} {mode} />
+        </div>
+      {/if}
 
       <button class="eval-btn" onclick={evaluate}>Evaluate</button>
     </div>
@@ -140,6 +169,21 @@
     color: var(--text-muted);
   }
 
+  .alpha-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--yellow, #f9e2af) 15%, transparent);
+    color: var(--yellow, #f9e2af);
+    border: 1px solid var(--yellow, #f9e2af);
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+
   .main-layout {
     display: grid;
     grid-template-columns: 1fr 360px;
@@ -159,7 +203,39 @@
     gap: 20px;
   }
 
+  .view-tabs {
+    display: flex;
+    gap: 4px;
+  }
+
+  .view-tab {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .view-tab.active {
+    background: var(--bg-elevated);
+    color: var(--text);
+    border-color: var(--text-muted);
+  }
+
+  .view-tab:hover:not(.active) {
+    background: var(--bg-surface);
+  }
+
   .editor-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .graph-section {
     display: flex;
     flex-direction: column;
     gap: 6px;

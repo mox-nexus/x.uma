@@ -1,10 +1,10 @@
 import type { Preset } from "../types.js";
 
-export const httpRouting: Preset = {
-  id: "http-routing",
-  name: "HTTP Routing",
+export const apiGateway: Preset = {
+  id: "api-gateway",
+  name: "API Routes",
   mode: "http",
-  description: "Gateway API-style route matching with method + path + headers",
+  description: "Gateway API: route GET/POST/DELETE to different backends",
   config: JSON.stringify(
     [
       {
@@ -12,21 +12,21 @@ export const httpRouting: Preset = {
           method: "GET",
           path: { type: "PathPrefix", value: "/api/" },
         },
-        action: "api_get",
+        action: "api_read",
       },
       {
         match: {
           method: "POST",
           path: { type: "PathPrefix", value: "/api/" },
-          headers: [
-            {
-              type: "Exact",
-              name: "content-type",
-              value: "application/json",
-            },
-          ],
         },
-        action: "api_post_json",
+        action: "api_write",
+      },
+      {
+        match: {
+          method: "DELETE",
+          path: { type: "PathPrefix", value: "/api/" },
+        },
+        action: "api_delete",
       },
       {
         match: {

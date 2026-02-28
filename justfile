@@ -56,20 +56,37 @@ fmt-check:
 # Run all checks (lint + fmt-check + test)
 check: lint fmt-check test
 
-# Build Rust documentation
+# Build and open Rust documentation
 doc:
-    cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps --open
+    cargo doc --manifest-path rumi/Cargo.toml --workspace --exclude rumi-proto --no-deps --open
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Documentation Site
+# Documentation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Build full docs site (mdbook + rustdoc + proto)
+# Generate Rust API docs
+docs-rust:
+    cargo doc --manifest-path rumi/Cargo.toml --workspace --exclude rumi-proto --no-deps
+
+# Generate Python API docs
+docs-python:
+    cd puma && uv run pdoc xuma -o ../docs/api/python --html
+
+# Generate TypeScript API docs
+docs-typescript:
+    cd bumi && bunx typedoc src/index.ts --out ../docs/api/typescript
+
+# Generate all API docs
+docs-api: docs-rust docs-python docs-typescript
+    mkdir -p docs/api/rust
+    cp -r rumi/target/doc/* docs/api/rust/
+
+# Build mdBook site
 docs-build:
-    mkdir -p docs/src/generated/rust docs/src/generated/proto
-    cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps
-    cp -r rumi/target/doc/* docs/src/generated/rust/
     mdbook build docs
+
+# Build everything (mdBook + API docs)
+docs: docs-api docs-build
 
 # Serve docs locally with hot reload
 docs-serve:
@@ -77,7 +94,7 @@ docs-serve:
 
 # Clean generated docs
 docs-clean:
-    rm -rf docs/book docs/src/generated
+    rm -rf docs/book docs/api
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Benchmarks
@@ -97,16 +114,16 @@ bench-bumi:
     cd bumi && bun run bench
     cd bumi && bun run bench/config.bench.ts
 
-# Run puma-crusty vs puma comparison benchmarks
-bench-crusty-puma:
+# Run xuma-crust (Python) vs puma comparison benchmarks
+bench-xuma-crust-py:
     cd rumi/crusts/python && maturin develop && uv run pytest tests/test_bench_crusty.py tests/test_bench_config.py --benchmark-only --benchmark-disable-gc
 
-# Run bumi-crusty vs bumi comparison benchmarks
-bench-crusty-bumi:
+# Run xuma-crust (WASM) vs bumi comparison benchmarks
+bench-xuma-crust-wasm:
     cd rumi/crusts/wasm && wasm-pack build --target web && bun run bench/crusty.bench.ts && bun run bench/config.bench.ts
 
 # Run all benchmarks
-bench-all: bench-rust bench-puma bench-bumi bench-crusty-puma bench-crusty-bumi
+bench-all: bench-rust bench-puma bench-bumi bench-xuma-crust-py bench-xuma-crust-wasm
 
 # Alias for bench-all
 bench: bench-all

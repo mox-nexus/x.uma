@@ -1,10 +1,11 @@
 import type { Preset } from "../types.js";
 
-export const nested: Preset = {
-  id: "nested",
-  name: "Nested Matcher",
+export const tieredRouting: Preset = {
+  id: "tiered-routing",
+  name: "Tiered Routing",
   mode: "config",
-  description: "Outer matches tier, inner dispatches on region",
+  description:
+    "Nested matcher: premium users route by region, free users get default",
   config: JSON.stringify(
     {
       matchers: [
@@ -30,7 +31,10 @@ export const nested: Preset = {
                     },
                     value_match: { Exact: "us-east" },
                   },
-                  on_match: { type: "action", action: "premium_us_east" },
+                  on_match: {
+                    type: "action",
+                    action: "premium_us_east",
+                  },
                 },
                 {
                   predicate: {
@@ -41,10 +45,16 @@ export const nested: Preset = {
                     },
                     value_match: { Exact: "eu-west" },
                   },
-                  on_match: { type: "action", action: "premium_eu_west" },
+                  on_match: {
+                    type: "action",
+                    action: "premium_eu_west",
+                  },
                 },
               ],
-              on_no_match: { type: "action", action: "premium_default" },
+              on_no_match: {
+                type: "action",
+                action: "premium_default",
+              },
             },
           },
         },

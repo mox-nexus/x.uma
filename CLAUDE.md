@@ -9,8 +9,8 @@ A matcher engine implementing the xDS Unified Matcher API across multiple langua
 | **rumi** | Rust | Core engine (reference implementation) |
 | **puma** | Python | Pure Python implementation (dir: `puma/`) |
 | **bumi** | Bun/TypeScript | Pure TypeScript implementation (dir: `bumi/`) |
-| **puma-crusty** | Python | Rust bindings via PyO3 (from `rumi/crusts/python/`) |
-| **bumi-crusty** | TypeScript | Rust bindings via wasm-bindgen (from `rumi/crusts/wasm/`) |
+| **xuma-crust** | Python | Rust bindings via PyO3 (from `rumi/crusts/python/`) |
+| **xuma-crust** | TypeScript | Rust bindings via wasm-bindgen (from `rumi/crusts/wasm/`) |
 
 All implementations pass the same conformance test suite (`spec/tests/`).
 
@@ -115,9 +115,9 @@ x.uma/
 | 5.1 | puma arch-guild hardening | ✅ Done |
 | 6 | bumi (Bun/TypeScript + HTTP) | ✅ Done |
 | 6.1 | bumi arch-guild hardening | ✅ Done |
-| 7 | puma-crusty: PyO3 Python bindings | ✅ Done |
+| 7 | xuma-crust: PyO3 Python bindings | ✅ Done |
 | 7.5 | rumi-claude: trace + HookMatch compiler | ✅ Done |
-| 8 | bumi-crusty: wasm-bindgen TypeScript bindings | ✅ Done |
+| 8 | xuma-crust: wasm-bindgen TypeScript bindings | ✅ Done |
 | 9 | Cross-language benchmarks (all 5 variants) | ✅ Done |
 | 10 | TypedExtensionConfig Registry (`IntoDataInput`, `RegistryBuilder`) | ✅ Done |
 | 11 | Test audit (removed 18 ineffective tests → 216 total) | ✅ Done |
@@ -130,10 +130,10 @@ x.uma/
 
 ## Current Work
 
-**Post-Phase 15: Publish Prep Complete**
+**Post-Phase 15: Multi-domain CLI + docs rewrite**
 
-rumi-claude folded into `rumi` core as `claude` feature. Metadata updated, version 0.0.2.
-Awaiting name resolution before actual publish (crates.io, PyPI, npm).
+Names resolved: `rumi-core` on crates.io (lib name = `rumi`), `rumi-http`, `rumi-cli`.
+`xuma` on PyPI, `xuma-crust` on PyPI/npm.
 
 ## Tooling
 
@@ -283,15 +283,15 @@ rumi/
 │   ├── test/           # rumi-test (conformance, publish=false)
 │   └── http/           # rumi-http (HTTP matching)
 └── crusts/             # Language bindings (🦀 crustacean → crusty, publish=false)
-    ├── python/         # PyO3 → puma-crusty wheel (maturin)
-    └── wasm/           # wasm-bindgen → bumi-crusty (wasm-pack)
+    ├── python/         # PyO3 → xuma-crust wheel (maturin)
+    └── wasm/           # wasm-bindgen → xuma-crust (wasm-pack)
 ```
 
 **Extension pattern:** Claude is a feature, HTTP is a separate crate:
 
 ```toml
 [dependencies]
-rumi = { version = "0.0.2", features = ["claude"] }
+rumi-core = { version = "0.0.2", features = ["claude"] }
 rumi-http = "0.0.2"
 ```
 

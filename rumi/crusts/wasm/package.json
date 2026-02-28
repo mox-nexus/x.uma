@@ -1,5 +1,5 @@
 {
-  "name": "bumi-crusty-tests",
+  "name": "xuma-crust-wasm-tests",
   "private": true,
   "scripts": {
     "build": "wasm-pack build --target web",

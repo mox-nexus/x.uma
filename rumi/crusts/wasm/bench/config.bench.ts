@@ -1,5 +1,5 @@
 /**
- * Head-to-head config benchmarks: bumi (pure TS) vs bumi-crusty (WASM).
+ * Head-to-head config benchmarks: bumi (pure TS) vs xuma-crust (WASM).
  *
  * Compares the config loading path across both implementations to isolate:
  * 1. Config parsing overhead — JSON → config types
@@ -14,8 +14,8 @@
 
 import { bench, run, summary } from "mitata";
 
-// bumi-crusty (WASM Rust bindings)
-import init, { HttpMatcher, TestMatcher } from "../pkg/bumi_crusty.js";
+// xuma-crust (WASM Rust bindings)
+import init, { HttpMatcher, TestMatcher } from "../pkg/xuma_crust.js";
 await init();
 
 // bumi (pure TypeScript)

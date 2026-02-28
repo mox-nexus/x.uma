@@ -1,0 +1,173 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Dry run (skip actual publish)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write  # needed to create tag
+
+jobs:
+  # ── Read version + create tag ─────────────────────────────────────
+  tag:
+    name: Create release tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from Cargo workspace
+        id: version
+        run: |
+          VERSION=$(grep '^version' rumi/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
+
+      - name: Verify versions match across packages
+        env:
+          EXPECTED: ${{ steps.version.outputs.version }}
+        run: |
+          PUMA=$(grep '^version' puma/pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          BUMI=$(node -p "require('./bumi/package.json').version")
+          echo "Rust:       $EXPECTED"
+          echo "Python:     $PUMA"
+          echo "TypeScript: $BUMI"
+          if [ "$PUMA" != "$EXPECTED" ] || [ "$BUMI" != "$EXPECTED" ]; then
+            echo "::error::Version mismatch! All packages must have the same version."
+            exit 1
+          fi
+
+      - name: Check tag doesn't already exist
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists."
+            exit 1
+          fi
+
+      - name: Create and push tag
+        if: inputs.dry-run == false
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+
+  # ── Rust → crates.io ──────────────────────────────────────────────
+  rust:
+    name: Publish Rust crates
+    needs: tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            rumi/target/
+          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Publish rumi-core
+        if: inputs.dry-run == false
+        run: cargo publish --manifest-path rumi/core/Cargo.toml
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Dry run rumi-core
+        if: inputs.dry-run == true
+        run: cargo publish --manifest-path rumi/core/Cargo.toml --dry-run
+
+      - name: Wait for crates.io index
+        if: inputs.dry-run == false
+        run: sleep 30
+
+      - name: Publish rumi-http
+        if: inputs.dry-run == false
+        run: cargo publish --manifest-path rumi/ext/http/Cargo.toml
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Dry run rumi-http
+        if: inputs.dry-run == true
+        run: cargo publish --manifest-path rumi/ext/http/Cargo.toml --dry-run
+
+      - name: Wait for crates.io index
+        if: inputs.dry-run == false
+        run: sleep 30
+
+      - name: Publish rumi-cli
+        if: inputs.dry-run == false
+        run: cargo publish --manifest-path rumi/cli/Cargo.toml
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Dry run rumi-cli
+        if: inputs.dry-run == true
+        run: cargo publish --manifest-path rumi/cli/Cargo.toml --dry-run
+
+  # ── Python (xuma) → PyPI ──────────────────────────────────────────
+  python:
+    name: Publish xuma to PyPI
+    needs: tag
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # trusted publisher OIDC
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build
+        run: uv build
+        working-directory: puma
+
+      - name: Publish to PyPI
+        if: inputs.dry-run == false
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: puma/dist/
+
+      - name: Dry run
+        if: inputs.dry-run == true
+        run: ls -la puma/dist/
+
+  # ── TypeScript (xuma) → npm ───────────────────────────────────────
+  npm:
+    name: Publish xuma to npm
+    needs: tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+        working-directory: bumi
+
+      - name: Publish
+        if: inputs.dry-run == false
+        run: bun publish --access public
+        working-directory: bumi
+        env:
+          BUN_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Dry run
+        if: inputs.dry-run == true
+        run: bun publish --access public --dry-run
+        working-directory: bumi

@@ -1,5 +1,5 @@
 [package]
-name = "bumi-crusty"
+name = "xuma-crust-wasm"
 description = "TypeScript bindings for rumi via wasm-bindgen"
 publish = false
 version.workspace = true
@@ -9,7 +9,7 @@ repository.workspace = true
 authors.workspace = true
 
 [lib]
-name = "bumi_crusty"
+name = "xuma_crust"
 crate-type = ["cdylib"]
 
 [dependencies]

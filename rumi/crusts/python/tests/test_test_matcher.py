@@ -1,4 +1,4 @@
-"""Tests for puma-crusty TestMatcher.
+"""Tests for xuma-crust TestMatcher.
 
 Covers:
 - Config-driven matcher loading from JSON
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from puma_crusty import TestMatcher
+from xuma_crust import TestMatcher
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[4] / "spec" / "tests" / "06_config"

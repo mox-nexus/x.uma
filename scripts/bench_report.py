@@ -109,7 +109,7 @@ def main(db: str, output: str) -> None:
     # FFI overhead analysis
     lines.append("## FFI Overhead Analysis\n")
 
-    ffi_pairs = [("puma", "puma-crusty"), ("bumi", "bumi-crusty")]
+    ffi_pairs = [("puma", "xuma-crust-python"), ("bumi", "xuma-crust-wasm")]
     for pure, crusty in ffi_pairs:
         ffi_results = con.execute(
             """SELECT

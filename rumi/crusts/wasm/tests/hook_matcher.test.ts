@@ -1,7 +1,7 @@
 /**
- * Tests for bumi-crusty HookMatcher.
+ * Tests for xuma-crust HookMatcher.
  *
- * Mirrors puma-crusty's 37 pytest tests:
+ * Mirrors xuma-crust (Python)'s 37 pytest tests:
  * - Conformance: same input → same result as Rust rumi::claude
  * - Security: fail-closed, input limits, invalid regex
  * - Trace: debugging visibility
@@ -11,7 +11,7 @@
 
 import { beforeAll, describe, expect, test } from "bun:test";
 // @ts-expect-error — generated WASM package has no TS project reference
-import init, { HookMatcher, StringMatch } from "../pkg/bumi_crusty.js";
+import init, { HookMatcher, StringMatch } from "../pkg/xuma_crust.js";
 
 beforeAll(async () => {
   await init();

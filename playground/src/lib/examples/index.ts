@@ -1,16 +1,22 @@
 import type { Preset } from "../types.js";
-import { simpleExact } from "./simple-exact.js";
-import { predicates } from "./predicates.js";
-import { nested } from "./nested.js";
-import { httpRouting } from "./http-routing.js";
-import { fallback } from "./fallback.js";
+import { blockDangerousCommands } from "./simple-exact.js";
+import { branchProtection } from "./predicates.js";
+import { tieredRouting } from "./nested.js";
+import { apiGateway } from "./http-routing.js";
+import { authGateway } from "./fallback.js";
 
 export const presets: Preset[] = [
-  simpleExact,
-  predicates,
-  nested,
-  httpRouting,
-  fallback,
+  blockDangerousCommands,
+  branchProtection,
+  tieredRouting,
+  apiGateway,
+  authGateway,
 ];
 
-export { simpleExact, predicates, nested, httpRouting, fallback };
+export {
+  blockDangerousCommands,
+  branchProtection,
+  tieredRouting,
+  apiGateway,
+  authGateway,
+};

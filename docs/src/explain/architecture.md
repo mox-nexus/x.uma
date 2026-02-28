@@ -158,8 +158,8 @@ Both paths produce the same `Matcher`. The compiler path is for programmatic con
 | **rumi** | Rust | Reference implementation |
 | **xuma** (Python) | Python | Pure Python |
 | **xuma** (TypeScript) | TypeScript | Pure TypeScript |
-| **puma-crusty** | Python | Rust core via PyO3 |
-| **bumi-crusty** | TypeScript | Rust core via WASM |
+| **xuma-crust** | Python | Rust core via PyO3 |
+| **xuma-crust** | TypeScript | Rust core via WASM |
 
 All five pass the same conformance test suite. Same config format, same evaluation semantics, same results. Choose based on your runtime and performance needs.
 
@@ -167,4 +167,3 @@ All five pass the same conformance test suite. Same config format, same evaluati
 
 - [The Matching Pipeline](../concepts/pipeline.md) — how data flows through evaluation
 - [Type Erasure and Ports](../concepts/type-erasure.md) — the technical details of the seam
-- [When to Use x.uma](when-to-use.md) — where x.uma fits and where it doesn't

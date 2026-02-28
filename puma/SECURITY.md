@@ -3,7 +3,7 @@
 | Package | Regex engine | ReDoS safe |
 |---------|-------------|------------|
 | puma | `google-re2` | Yes |
-| puma-crusty | Rust `regex` crate (via FFI) | Yes |
+| xuma-crust | Rust `regex` crate (via FFI) | Yes |
 
 ## Regex
 

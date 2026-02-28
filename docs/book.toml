@@ -12,8 +12,8 @@ create-missing = true
 [output.html]
 default-theme = "rust"
 preferred-dark-theme = "coal"
-git-repository-url = "https://github.com/mox-labs/x.uma"
-edit-url-template = "https://github.com/mox-labs/x.uma/edit/main/docs/{path}"
+git-repository-url = "https://github.com/mox-nexus/x.uma"
+edit-url-template = "https://github.com/mox-nexus/x.uma/edit/main/docs/{path}"
 site-url = "/x.uma/"
 
 # Rust playground integration

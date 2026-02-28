@@ -150,5 +150,3 @@ The boundary at `MatchingData` is what makes the engine domain-agnostic. Cross i
 ## Next
 
 - [Type Erasure and Ports](type-erasure.md) — why `InputMatcher` is non-generic
-- [Predicate Composition](predicates.md) — combining conditions with AND/OR/NOT
-- [First-Match-Wins Semantics](semantics.md) — evaluation order and nested matchers

@@ -128,5 +128,3 @@ The matcher never sees `None`. Missing data is handled upstream. This is a secur
 ## Next
 
 - [The Matching Pipeline](pipeline.md) — how data flows through the full evaluation
-- [Predicate Composition](predicates.md) — combining predicates with AND/OR/NOT
-- [Adding a Domain Adapter](../guides/adding-domain.md) — create your own `DataInput` types

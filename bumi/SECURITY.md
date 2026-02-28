@@ -3,7 +3,7 @@
 | Package | Regex engine | ReDoS safe |
 |---------|-------------|------------|
 | bumi | `re2js` (pure JS RE2 port) | Yes |
-| bumi-crusty | Rust `regex` crate (via WASM) | Yes |
+| xuma-crust | Rust `regex` crate (via WASM) | Yes |
 
 ## Regex
 

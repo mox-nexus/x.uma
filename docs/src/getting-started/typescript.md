@@ -1,55 +1,114 @@
 # TypeScript Quick Start
 
-Build an HTTP route matcher with `xuma` in 10 lines.
+Build an HTTP route matcher with `xuma` (pure TypeScript) or `xuma-crust` (WASM-backed).
 
 ## Install
 
 ```bash
+# Pure TypeScript
 bun add xuma
+
+# WASM-backed (faster, same API surface)
+bun add xuma-crust
 ```
 
-Requires Bun runtime. The only runtime dependency is `re2js` for linear-time regex.
+Requires Bun runtime. `xuma` uses `re2js` for linear-time regex.
 
-## Your First Matcher
+## Write a Config
 
-Match requests by path prefix:
+Create `routes.yaml`:
+
+```yaml
+matchers:
+  - predicate:
+      type: and
+      predicates:
+        - type: single
+          input: { type_url: "xuma.http.v1.PathInput", config: {} }
+          value_match: { Prefix: "/api" }
+        - type: single
+          input: { type_url: "xuma.http.v1.MethodInput", config: {} }
+          value_match: { Exact: "GET" }
+    on_match: { type: action, action: "api_read" }
+
+  - predicate:
+      type: single
+      input: { type_url: "xuma.http.v1.PathInput", config: {} }
+      value_match: { Exact: "/health" }
+    on_match: { type: action, action: "health" }
+
+on_no_match: { type: action, action: "not_found" }
+```
+
+## Validate with the CLI
+
+```bash
+$ rumi check http routes.yaml
+Config valid
+```
+
+## Run with the CLI
+
+```bash
+$ rumi run http routes.yaml --method GET --path /api/users
+api_read
+
+$ rumi run http routes.yaml --method GET --path /health
+health
+
+$ rumi run http routes.yaml --method DELETE --path /other
+not_found
+```
+
+## Load in Your App (xuma)
+
+The pure TypeScript implementation loads the same config:
 
 ```typescript
-import { Matcher, FieldMatcher, SinglePredicate, Action, PrefixMatcher } from "xuma";
-import { HttpRequest, PathInput } from "xuma/http";
+import { RegistryBuilder, registerHttp, type MatcherConfig } from "xuma";
+import { HttpRequest } from "xuma/http";
+import { parse } from "yaml";
 
-// Build a predicate: path starts with /api
-const predicate = new SinglePredicate(
-  new PathInput(),
-  new PrefixMatcher("/api"),
-);
+// Build registry with HTTP inputs
+const builder = new RegistryBuilder();
+registerHttp(builder);
+const registry = builder.build();
 
-// Build the matcher tree
-const matcher = new Matcher<HttpRequest, string>(
-  [new FieldMatcher(predicate, new Action("api_backend"))],
-  new Action("default_backend"),
-);
+// Load config
+const yaml = await Bun.file("routes.yaml").text();
+const config: MatcherConfig = parse(yaml);
+const matcher = registry.loadMatcher(config);
 
 // Evaluate
 const request = new HttpRequest("GET", "/api/users");
-console.assert(matcher.evaluate(request) === "api_backend");
-
-// No match falls through
-const other = new HttpRequest("GET", "/other");
-console.assert(matcher.evaluate(other) === "default_backend");
+console.assert(matcher.evaluate(request) === "api_read");
 ```
 
-`Matcher` takes a list of `FieldMatcher`s (tried in order) and an optional fallback. First match wins.
+## Load in Your App (xuma-crust)
 
-## The Gateway API Compiler
+The WASM-backed bindings use the same config format:
 
-The HTTP domain ships a compiler that builds matchers from Gateway API config:
+```typescript
+import { loadHttpMatcher, type HttpMatcher } from "xuma-crust";
+
+// Load config and build matcher in one call
+const matcher: HttpMatcher = loadHttpMatcher("routes.yaml");
+
+// Evaluate with method + path
+console.assert(matcher.evaluate("GET", "/api/users") === "api_read");
+console.assert(matcher.evaluate("DELETE", "/other") === "not_found");
+```
+
+`xuma-crust` is 3-10x faster than pure TypeScript for evaluation.
+
+## Compiler Shorthand
+
+For type-safe HTTP matching without config files:
 
 ```typescript
 import { compileRouteMatches, HttpRequest } from "xuma/http";
 import type { HttpRouteMatch } from "xuma/http";
 
-// Declarative config
 const routes: HttpRouteMatch[] = [
   {
     path: { type: "PathPrefix", value: "/api" },
@@ -61,7 +120,6 @@ const routes: HttpRouteMatch[] = [
   },
 ];
 
-// One call compiles all routes
 const matcher = compileRouteMatches(routes, "allowed", "denied");
 
 console.assert(matcher.evaluate(new HttpRequest("GET", "/api/users")) === "allowed");
@@ -69,45 +127,6 @@ console.assert(matcher.evaluate(new HttpRequest("DELETE", "/api/users")) === "de
 ```
 
 Within a single `HttpRouteMatch`, all conditions are ANDed. Multiple routes are ORed. First match wins.
-
-## Adding Header Conditions
-
-```typescript
-const route: HttpRouteMatch = {
-  path: { type: "PathPrefix", value: "/api" },
-  method: "POST",
-  headers: [
-    {
-      type: "RegularExpression",
-      name: "authorization",
-      value: "^Bearer .+$",
-    },
-  ],
-};
-```
-
-Regex uses `re2js` — linear time, no ReDoS vulnerability.
-
-## Custom Action Types
-
-Use discriminated unions or any TypeScript type:
-
-```typescript
-type RouteAction =
-  | { type: "forward"; backend: string }
-  | { type: "deny"; reason: string };
-
-const matcher = compileRouteMatches<RouteAction>(
-  routes,
-  { type: "forward", backend: "api-service" },
-  { type: "deny", reason: "no route matched" },
-);
-
-const result = matcher.evaluate(request);
-if (result?.type === "forward") {
-  console.log(`Forwarding to ${result.backend}`);
-}
-```
 
 ## Integration: Bun HTTP Server
 
@@ -139,13 +158,14 @@ Bun.serve({
 
 ## Safety
 
-- **ReDoS protection** — `re2js` guarantees linear-time regex matching.
-- **Immutable** — all types use `readonly` fields.
-- **Depth limits** — nested matchers capped at 32 levels.
-- **Fail-closed** — missing data from `DataInput` returns `null`, which makes the predicate evaluate to `false`.
+- **ReDoS protection** -- `re2js` guarantees linear-time regex matching.
+- **Immutable** -- all types use `readonly` fields.
+- **Depth limits** -- nested matchers capped at 32 levels.
+- **Fail-closed** -- missing data from `DataInput` returns `null`, which makes the predicate evaluate to `false`.
 
 ## Next Steps
 
-- [The Matching Pipeline](../concepts/pipeline.md) — how data flows through the matcher
-- [Build an HTTP Router](../tutorials/http-router.md) — full routing with headers and query params
-- [HTTP Matching](../domains/http.md) — all inputs, config types, and the compiler
+- [The Matching Pipeline](../concepts/pipeline.md) -- how data flows through the matcher
+- [CLI Reference](../reference/cli.md) -- all commands and domains
+- [Config Format](../reference/config.md) -- full config schema and type URL tables
+- [API Reference](../reference/api.md) -- generated docs for all languages

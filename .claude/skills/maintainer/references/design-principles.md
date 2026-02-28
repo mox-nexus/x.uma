@@ -90,7 +90,7 @@ Crusty bindings (PyO3, WASM) are like axum's body boundary — accept generic ty
 Wisdom that can't be mechanically enforced — it requires judgment:
 
 ### `&self` Enables the Full Wrapper Algebra
-hyper's `Service::call(&self)` enables blanket impls for `&S`, `Box<S>`, `Arc<S>`, `Rc<S>`. x.uma's `DataInput::get(&self)` and `InputMatcher::matches(&self)` already take `&self`. If either trait ever takes `&mut self`, the crusty FFI bindings break (can't share through `Arc`).
+hyper's `Service::call(&self)` enables blanket impls for `&S`, `Box<S>`, `Arc<S>`, `Rc<S>`. x.uma's `DataInput::get(&self)` and `InputMatcher::matches(&self)` already take `&self`. If either trait ever takes `&mut self`, the xuma-crust FFI bindings break (can't share through `Arc`).
 
 ### Thin Generic Wrapper, Fat Dynamic Interior
 rust-analyzer pattern: monomorphize at the API surface for ergonomics, erase to `dyn` for the implementation body. Prevents monomorphization explosion when generic utility functions process `MatcherConfig<A>` or `Registry<Ctx>`.

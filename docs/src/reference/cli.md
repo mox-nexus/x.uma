@@ -1,6 +1,6 @@
 # CLI Reference (rumi)
 
-`rumi` is the command-line interface for evaluating and validating matcher configs.
+`rumi` is the command-line interface for running and validating matcher configs across three domains.
 
 ## Installation
 
@@ -8,23 +8,71 @@
 cargo install --path rumi/cli
 ```
 
-## Commands
+## Usage
 
-### eval
-
-Evaluate a config file against a context:
-
-```bash
-rumi eval config.yaml --context method=GET path=/api
+```
+rumi <command> [domain] [options]
 ```
 
-Loads the config, builds the matcher, evaluates against the provided context, and prints the resulting action. Prints `(no match)` if nothing matched.
+## Domains
+
+The CLI supports three matching domains. Each domain has its own registry of type URLs and context type.
+
+| Domain | Context | Description |
+|--------|---------|-------------|
+| *(default)* | Key-value pairs | Test domain (`xuma.test.v1.*`) |
+| `http` | HTTP request | Method, path, headers, query params (`xuma.http.v1.*`) |
+| `claude` | Hook event | Claude Code hook events (`xuma.claude.v1.*`) |
+
+## Commands
+
+### run
+
+Run a config file against a context and print the resulting action.
+
+**Test domain (default):**
+
+```bash
+rumi run config.yaml --context method=GET path=/api
+```
 
 | Flag | Description |
 |------|-------------|
 | `--context key=value...` | Context key-value pairs |
 
-The config file can be YAML (`.yaml`, `.yml`) or JSON (`.json`). Context values are passed as string key-value pairs.
+**HTTP domain:**
+
+```bash
+rumi run http routes.yaml --method GET --path /api/users
+rumi run http routes.yaml --method POST --path /api --header content-type=application/json
+```
+
+| Flag | Description |
+|------|-------------|
+| `--method METHOD` | HTTP method (required) |
+| `--path PATH` | Request path (required) |
+| `--header key=value` | Header (repeatable) |
+| `--query key=value` | Query parameter (repeatable) |
+
+**Claude domain:**
+
+```bash
+rumi run claude hooks.yaml --event PreToolUse --tool Bash --arg command="ls -la"
+rumi run claude hooks.yaml --event SessionStart --cwd /home/user --branch main
+```
+
+| Flag | Description |
+|------|-------------|
+| `--event EVENT` | Hook event name (required) |
+| `--tool NAME` | Tool name |
+| `--arg key=value` | Tool argument (repeatable) |
+| `--cwd PATH` | Working directory |
+| `--branch NAME` | Git branch |
+| `--session ID` | Session ID |
+
+Valid events: `PreToolUse`, `PostToolUse`, `Stop`, `SubagentStop`, `UserPromptSubmit`, `SessionStart`, `SessionEnd`, `PreCompact`, `Notification`.
+
+Prints the matched action string, or `(no match)` if nothing matched.
 
 ### check
 
@@ -32,32 +80,51 @@ Validate a config file without evaluating:
 
 ```bash
 rumi check config.yaml
+rumi check http routes.yaml
+rumi check claude hooks.yaml
 ```
 
-Loads the config, builds the matcher (including registry resolution and depth validation), and reports success or failure. Catches: unknown type URLs, invalid regex patterns, depth limit violations, malformed config.
+Loads the config against the domain's registry (including type URL resolution and depth validation). Catches: unknown type URLs, invalid regex patterns, depth limit violations, malformed config.
 
 Prints `Config valid` on success. Exits with non-zero status on error.
 
 ### info
 
-List all registered type URLs:
+List all registered type URLs for a domain:
 
 ```bash
-rumi info
-```
-
-Output:
-
-```
+$ rumi info
 Registered inputs:
   xuma.test.v1.StringInput
 
 Registered matchers:
   xuma.core.v1.StringMatcher
   xuma.core.v1.BoolMatcher
-```
 
-Shows what types the CLI can resolve when loading configs. The CLI registers the test domain by default.
+$ rumi info http
+Registered inputs:
+  xuma.http.v1.PathInput
+  xuma.http.v1.MethodInput
+  xuma.http.v1.HeaderInput
+  xuma.http.v1.QueryParamInput
+
+Registered matchers:
+  xuma.core.v1.StringMatcher
+  xuma.core.v1.BoolMatcher
+
+$ rumi info claude
+Registered inputs:
+  xuma.claude.v1.EventInput
+  xuma.claude.v1.ToolNameInput
+  xuma.claude.v1.ArgumentInput
+  xuma.claude.v1.SessionIdInput
+  xuma.claude.v1.CwdInput
+  xuma.claude.v1.GitBranchInput
+
+Registered matchers:
+  xuma.core.v1.StringMatcher
+  xuma.core.v1.BoolMatcher
+```
 
 ### help
 
@@ -69,45 +136,20 @@ rumi -h
 
 ## Config File Format
 
-The CLI accepts the same config format used by all implementations. See [Config Format](config.md) for the full schema.
-
-Example `config.yaml`:
-
-```yaml
-matchers:
-  - predicate:
-      type: single
-      input: { type_url: "xuma.test.v1.StringInput", config: { key: "method" } }
-      value_match: { Exact: "GET" }
-    on_match: { type: action, action: "route-get" }
-  - predicate:
-      type: single
-      input: { type_url: "xuma.test.v1.StringInput", config: { key: "method" } }
-      value_match: { Exact: "POST" }
-    on_match: { type: action, action: "route-post" }
-on_no_match: { type: action, action: "fallback" }
-```
-
-```bash
-$ rumi eval config.yaml --context method=GET
-route-get
-
-$ rumi eval config.yaml --context method=DELETE
-fallback
-
-$ rumi check config.yaml
-Config valid
-```
+The CLI accepts the same config format used by all implementations. See [Config Format](config.md) for the full schema. Files can be YAML (`.yaml`, `.yml`) or JSON (`.json`).
 
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 1 | Error (invalid config, unknown command, etc.) |
+| 1 | Error (invalid config, unknown command, missing flags, etc.) |
 
 ## Design
 
-The CLI has zero dependencies beyond `rumi` and `rumi-test`. No `clap` — argument parsing is hand-written. The binary is small and builds fast.
+The CLI has zero runtime dependencies beyond `rumi`, `rumi-http`, and `rumi-test`. No `clap` -- argument parsing is hand-written. The binary is small and builds fast.
 
-The CLI uses the **config path**: JSON/YAML → `MatcherConfig` → `Registry::load_matcher()` → evaluate. It registers the test domain (`xuma.test.v1.*`), which provides `StringInput` for key-value context.
+Each domain registers its own `Registry<Ctx>`:
+- Test: `rumi_test::register()` -> `Registry<TestContext>`
+- HTTP: `rumi_http::register_simple()` -> `Registry<HttpRequest>`
+- Claude: `rumi::claude::register()` -> `Registry<HookContext>`

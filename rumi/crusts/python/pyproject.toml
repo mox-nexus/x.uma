@@ -3,7 +3,7 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "puma-crusty"
+name = "xuma-crust"
 requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Rust",
@@ -14,7 +14,7 @@ dynamic = ["version"]
 [tool.maturin]
 features = ["pyo3/extension-module"]
 python-source = "python"
-module-name = "puma_crusty"
+module-name = "xuma_crust"
 
 [dependency-groups]
 dev = [

@@ -43,7 +43,10 @@ jobs:
       # Generate Rust docs
       - name: Build Rust docs
         run: |
-          cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps --exclude rumi-proto
+          cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps \
+            --exclude rumi-proto \
+            --exclude xuma-crust-python \
+            --exclude xuma-crust-wasm
           mkdir -p docs/src/generated/rust
           cp -r rumi/target/doc/* docs/src/generated/rust/
 

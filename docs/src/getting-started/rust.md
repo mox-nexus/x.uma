@@ -6,129 +6,170 @@ Build an HTTP route matcher with `rumi` and `rumi-http`.
 
 ```toml
 [dependencies]
-rumi = "0.0.2"
+rumi-core = "0.0.2"
 rumi-http = "0.0.2"
 ```
 
-`rumi-http` brings in `rumi` as a transitive dependency.
+`rumi-http` brings in `rumi-core` as a transitive dependency. The lib name is `rumi`, so you write `use rumi::prelude::*`.
 
-## Your First Matcher
+The CLI is a separate binary:
 
-Match requests by path prefix:
+```bash
+cargo install --path rumi/cli
+```
+
+## Write a Config
+
+Create `routes.yaml`:
+
+```yaml
+matchers:
+  - predicate:
+      type: and
+      predicates:
+        - type: single
+          input: { type_url: "xuma.http.v1.PathInput", config: {} }
+          value_match: { Prefix: "/api" }
+        - type: single
+          input: { type_url: "xuma.http.v1.MethodInput", config: {} }
+          value_match: { Exact: "GET" }
+    on_match: { type: action, action: "api_read" }
+
+  - predicate:
+      type: and
+      predicates:
+        - type: single
+          input: { type_url: "xuma.http.v1.PathInput", config: {} }
+          value_match: { Prefix: "/api" }
+        - type: single
+          input: { type_url: "xuma.http.v1.MethodInput", config: {} }
+          value_match: { Exact: "POST" }
+    on_match: { type: action, action: "api_write" }
+
+on_no_match: { type: action, action: "not_found" }
+```
+
+The `type_url` selects which data input to extract. `value_match` tests the extracted value. See [Config Format](../reference/config.md) for the full schema.
+
+## Validate with the CLI
+
+```bash
+$ rumi check http routes.yaml
+Config valid
+```
+
+Catches unknown type URLs, invalid regex patterns, and depth limit violations at load time.
+
+## Run with the CLI
+
+```bash
+$ rumi run http routes.yaml --method GET --path /api/users
+api_read
+
+$ rumi run http routes.yaml --method POST --path /api/items
+api_write
+
+$ rumi run http routes.yaml --method DELETE --path /api/users
+not_found
+```
+
+## Load in Your App
+
+The same config file works programmatically via the Registry API:
 
 ```rust,ignore
 use rumi::prelude::*;
-use rumi_http::*;
+use rumi_http::{HttpRequest, register_simple};
 
 fn main() {
-    // Build a simple request
+    // Build registry with HTTP inputs
+    let registry = register_simple(RegistryBuilder::new()).build();
+
+    // Load the config
+    let yaml = std::fs::read_to_string("routes.yaml").unwrap();
+    let config: MatcherConfig<String> = serde_yaml::from_str(&yaml).unwrap();
+    let matcher = registry.load_matcher(config).unwrap();
+
+    // Evaluate
     let request = HttpRequest::builder()
         .method("GET")
         .path("/api/users")
         .build();
-
-    // Define a predicate: path starts with /api
-    let predicate = Predicate::Single(SinglePredicate::new(
-        Box::new(SimplePathInput),
-        Box::new(PrefixMatcher::new("/api")),
-    ));
-
-    // Build the matcher tree
-    let matcher: Matcher<HttpRequest, &str> = Matcher::new(
-        vec![FieldMatcher::new(
-            predicate,
-            OnMatch::Action("api_backend"),
-        )],
-        Some(OnMatch::Action("default_backend")),
-    );
-
-    // Evaluate
-    assert_eq!(matcher.evaluate(&request), Some(&"api_backend"));
-
-    // No match falls through to on_no_match
-    let other = HttpRequest::builder().method("GET").path("/other").build();
-    assert_eq!(matcher.evaluate(&other), Some(&"default_backend"));
+    assert_eq!(matcher.evaluate(&request), Some("api_read".to_string()));
 }
 ```
 
-`Matcher::new` takes a list of `FieldMatcher`s (tried in order) and an optional fallback. First match wins.
+The registry resolves `type_url` strings to concrete `DataInput` implementations at load time. Unknown type URLs produce an error listing available types.
 
-## Combining Conditions
+## Compiler Shorthand
 
-Use `Predicate::And` to require multiple conditions:
+For type-safe HTTP matching without config files, use the Gateway API compiler:
 
 ```rust,ignore
 use rumi::prelude::*;
-use rumi_http::*;
+use rumi_http::prelude::*;
 
-// GET /api/* — both path AND method must match
-let predicate = Predicate::And(vec![
-    Predicate::Single(SinglePredicate::new(
-        Box::new(SimplePathInput),
-        Box::new(PrefixMatcher::new("/api")),
-    )),
-    Predicate::Single(SinglePredicate::new(
-        Box::new(SimpleMethodInput),
-        Box::new(ExactMatcher::new("GET")),
-    )),
-]);
+// Declarative config
+let routes = vec![
+    HttpRouteMatch {
+        path: Some(HttpPathMatch::Prefix { value: "/api".into() }),
+        method: Some(HttpMethod::Get),
+        ..Default::default()
+    },
+];
 
-let matcher: Matcher<HttpRequest, &str> = Matcher::new(
-    vec![FieldMatcher::new(predicate, OnMatch::Action("api_read"))],
-    Some(OnMatch::Action("not_found")),
-);
+// One call compiles all routes into a matcher
+let matcher = compile_route_matches(&routes, "allowed", "denied").unwrap();
 
-let get_api = HttpRequest::builder().method("GET").path("/api/users").build();
-assert_eq!(matcher.evaluate(&get_api), Some(&"api_read"));
-
-let post_api = HttpRequest::builder().method("POST").path("/api/users").build();
-assert_eq!(matcher.evaluate(&post_api), Some(&"not_found"));
+let req = HttpRequest::builder().method("GET").path("/api/users").build();
+assert_eq!(matcher.evaluate(&req), Some(&"allowed"));
 ```
 
-## Custom Action Types
+This requires `rumi-http` with the `ext-proc` feature (enabled by default).
 
-The action type `A` is generic. Use enums, structs — anything `Clone + Send + Sync`:
+## Claude Code Hooks
 
-```rust,ignore
-#[derive(Debug, Clone, PartialEq)]
-enum RouteAction {
-    Forward(String),
-    Deny(String),
-}
+rumi also matches Claude Code hook events. Create `hooks.yaml`:
 
-let matcher: Matcher<HttpRequest, RouteAction> = Matcher::new(
-    vec![FieldMatcher::new(
-        predicate,
-        OnMatch::Action(RouteAction::Forward("api-service".into())),
-    )],
-    Some(OnMatch::Action(RouteAction::Deny("no route".into()))),
-);
+```yaml
+matchers:
+  - predicate:
+      type: and
+      predicates:
+        - type: single
+          input: { type_url: "xuma.claude.v1.EventInput", config: {} }
+          value_match: { Exact: "PreToolUse" }
+        - type: single
+          input: { type_url: "xuma.claude.v1.ToolNameInput", config: {} }
+          value_match: { Exact: "Bash" }
+        - type: single
+          input: { type_url: "xuma.claude.v1.ArgumentInput", config: { name: "command" } }
+          value_match: { Contains: "rm -rf" }
+    on_match: { type: action, action: "block" }
+
+on_no_match: { type: action, action: "allow" }
 ```
 
-## Thread Safety
+```bash
+$ rumi check claude hooks.yaml
+Config valid
 
-Matchers are `Send + Sync`. Share one instance across threads with no locking:
+$ rumi run claude hooks.yaml --event PreToolUse --tool Bash --arg command="rm -rf /"
+block
 
-```rust,ignore
-use std::sync::Arc;
-
-let matcher = Arc::new(matcher);
-let m = matcher.clone();
-std::thread::spawn(move || {
-    let result = m.evaluate(&request);
-});
+$ rumi run claude hooks.yaml --event PreToolUse --tool Read
+allow
 ```
 
-The matcher is immutable after construction. `Arc` adds one atomic refcount — nothing else.
+## Safety
 
-## Safety Guarantees
-
-- **ReDoS protection** — the `regex` crate guarantees linear-time matching. No backtracking.
-- **Depth limits** — nested matchers capped at 32 levels, validated at construction.
-- **No unsafe in core** — all `Send + Sync` is compiler-derived.
+- **ReDoS protection** -- the `regex` crate guarantees linear-time matching. No backtracking.
+- **Depth limits** -- nested matchers capped at 32 levels, validated at construction.
+- **No unsafe in core** -- all `Send + Sync` is compiler-derived.
 
 ## Next Steps
 
-- [The Matching Pipeline](../concepts/pipeline.md) — how data flows through the matcher
-- [Build an HTTP Router](../tutorials/http-router.md) — full routing with headers and query params
-- [HTTP Matching](../domains/http.md) — all inputs, config types, and the Gateway API compiler
+- [The Matching Pipeline](../concepts/pipeline.md) -- how data flows through the matcher
+- [CLI Reference](../reference/cli.md) -- all commands and domains
+- [Config Format](../reference/config.md) -- full config schema and type URL tables
+- [API Reference](../reference/api.md) -- generated docs for all languages

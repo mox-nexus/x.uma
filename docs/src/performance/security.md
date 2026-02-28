@@ -17,8 +17,8 @@ Matcher configs can come from untrusted sources — user-provided routing rules,
 | rumi (Rust) | `regex` crate (DFA) | Linear time, proven |
 | xuma (Python) | `google-re2` (C++ RE2 binding) | Linear time, Google RE2 |
 | xuma (TypeScript) | `re2js` (pure JS RE2 port) | Linear time, RE2 semantics |
-| puma-crusty | Rust `regex` via PyO3 | Same as rumi |
-| bumi-crusty | Rust `regex` via WASM | Same as rumi |
+| xuma-crust (Python) | Rust `regex` via PyO3 | Same as rumi |
+| xuma-crust (TypeScript) | Rust `regex` via WASM | Same as rumi |
 
 No implementation uses a backtracking regex engine. Patterns that would cause catastrophic backtracking in PCRE/Python `re`/JavaScript `RegExp` are either rejected or matched in linear time.
 
@@ -95,6 +95,4 @@ Self-correcting error messages help operators fix configs without guessing.
 
 ## Next
 
-- [Benchmarks](benchmarks.md) — concrete performance numbers
-- [xDS Semantics](../explain/xds-semantics.md) — the protocol behind the guarantees
 - [Architecture](../explain/architecture.md) — how safety is built into the design

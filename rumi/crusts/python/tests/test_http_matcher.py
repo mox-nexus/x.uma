@@ -1,4 +1,4 @@
-"""Tests for puma-crusty HttpMatcher.
+"""Tests for xuma-crust HttpMatcher.
 
 Covers:
 - Config-driven matcher loading from JSON
@@ -14,7 +14,7 @@ import json
 
 import pytest
 
-from puma_crusty import HttpMatcher
+from xuma_crust import HttpMatcher
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

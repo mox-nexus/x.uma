@@ -1,5 +1,5 @@
 /**
- * Head-to-head: bumi (pure TypeScript) vs bumi-crusty (WASM Rust bindings).
+ * Head-to-head: bumi (pure TypeScript) vs xuma-crust (WASM Rust bindings).
  *
  * Compares identical workloads through both implementations to isolate:
  * 1. WASM overhead — boundary crossing cost (JS ↔ WASM)
@@ -14,8 +14,8 @@
 
 import { bench, run, summary } from "mitata";
 
-// bumi-crusty (WASM Rust bindings)
-import init, { HookMatcher, StringMatch } from "../pkg/bumi_crusty.js";
+// xuma-crust (WASM Rust bindings)
+import init, { HookMatcher, StringMatch } from "../pkg/xuma_crust.js";
 await init();
 
 // bumi (pure TypeScript) — build equivalent matchers manually

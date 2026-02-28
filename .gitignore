@@ -72,12 +72,16 @@ test_send_sync
 test_soundness
 test_variance
 docs/book/
-docs/src/generated/
+docs/api/
 
 # Playground
 playground/build/
 playground/.svelte-kit/
 !playground/src/lib/
+
+# Screenshots / Playwright
+.playwright-mcp/
+*.png
 
 # Bun workspace
 bun.lock

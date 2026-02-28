@@ -15,8 +15,8 @@ x.uma implements the xDS Unified Matcher API in five distinct ways:
 | **rumi** | Rust | Native | `regex` crate (linear time, RE2 semantics) |
 | **puma** | Python | Pure Python | `re` module (backtracking) |
 | **bumi** | TypeScript | Pure TypeScript (Bun) | `RegExp` (backtracking) |
-| **puma-crusty** | Python + Rust | PyO3 FFI to rumi | `regex` crate via FFI |
-| **bumi-crusty** | TypeScript + Rust | WASM FFI to rumi | `regex` crate via WASM |
+| **xuma-crust** (Python) | Python + Rust | PyO3 FFI to rumi | `regex` crate via FFI |
+| **xuma-crust** (TypeScript) | TypeScript + Rust | WASM FFI to rumi | `regex` crate via WASM |
 
 Each variant passed the same 194-test conformance suite before benchmarking. These aren't apples-to-oranges comparisons — they're different implementations of identical behavior.
 
@@ -127,40 +127,40 @@ Rust's `regex` crate uses a Thompson NFA implementation (like Google's RE2) with
 
 This is why the arch-guild review mandated: **Use Rust `regex` crate only. No `fancy-regex`. ReDoS protection is non-negotiable.**
 
-But what if you need Python or TypeScript? That's where the crusty variants come in.
+But what if you need Python or TypeScript? That's where the xuma-crust variants come in.
 
-## FFI Head-to-Head: puma vs puma-crusty
+## FFI Head-to-Head: puma vs xuma-crust (Python)
 
-puma-crusty is a Python package that wraps the rumi engine via PyO3. Every matcher call crosses the Python-Rust FFI boundary.
+xuma-crust is a Python package that wraps the rumi engine via PyO3. Every matcher call crosses the Python-Rust FFI boundary.
 
 Let's see what that boundary costs:
 
-| Scenario | puma (pure Python) | puma-crusty (PyO3) | Ratio |
+| Scenario | puma (pure Python) | xuma-crust (PyO3) | Ratio |
 |----------|-------------------|-------------------|-------|
-| compile_simple | 1.83 µs | 625 ns | crusty 2.9x faster |
+| compile_simple | 1.83 µs | 625 ns | xuma-crust 2.9x faster |
 | compile_complex | 4.62 µs | 14.0 µs | puma 3x faster |
-| exact_hit | 282 ns | 188 ns | crusty 1.5x faster |
-| exact_miss | 178 ns | 141 ns | crusty 1.3x faster |
-| regex_hit | 482 ns | 299 ns | crusty 1.6x faster |
+| exact_hit | 282 ns | 188 ns | xuma-crust 1.5x faster |
+| exact_miss | 178 ns | 141 ns | xuma-crust 1.3x faster |
+| regex_hit | 482 ns | 299 ns | xuma-crust 1.6x faster |
 | regex_miss | 203 ns | 201 ns | same |
-| complex_hit | 814 ns | 570 ns | crusty 1.4x faster |
+| complex_hit | 814 ns | 570 ns | xuma-crust 1.4x faster |
 | complex_miss | 461 ns | 490 ns | same |
 
-**For evaluation**: crusty is 1.3-1.6x faster on simple operations, breaks even on misses.
+**For evaluation**: xuma-crust is 1.3-1.6x faster on simple operations, breaks even on misses.
 
-**For compilation**: crusty wins on simple configs (Rust struct construction beats Python dataclass construction), but loses on complex configs where Python's dynamic typing makes nested object graphs cheaper to construct.
+**For compilation**: xuma-crust wins on simple configs (Rust struct construction beats Python dataclass construction), but loses on complex configs where Python's dynamic typing makes nested object graphs cheaper to construct.
 
 The FFI overhead is minimal because PyO3 has been heavily optimized for this workload. The crossover happens around 1-2 arguments per call.
 
-**The strategic value**: crusty gives you the ReDoS protection of Rust's regex engine without rewriting your Python code. For regex-heavy workloads, it's a 1.5x speedup. For adversarial regex input, it's the difference between 11ns and hanging forever.
+**The strategic value**: xuma-crust gives you the ReDoS protection of Rust's regex engine without rewriting your Python code. For regex-heavy workloads, it's a 1.5x speedup. For adversarial regex input, it's the difference between 11ns and hanging forever.
 
-## FFI Head-to-Head: bumi vs bumi-crusty
+## FFI Head-to-Head: bumi vs xuma-crust (TypeScript)
 
-bumi-crusty wraps the rumi engine compiled to WebAssembly via wasm-bindgen. Every call crosses the JavaScript-WASM boundary with object serialization via `js_sys::Reflect`.
+xuma-crust wraps the rumi engine compiled to WebAssembly via wasm-bindgen. Every call crosses the JavaScript-WASM boundary with object serialization via `js_sys::Reflect`.
 
 Here's the brutal truth:
 
-| Scenario | bumi (pure TS) | bumi-crusty (WASM) | Ratio |
+| Scenario | bumi (pure TS) | xuma-crust (WASM) | Ratio |
 |----------|---------------|-------------------|-------|
 | compile_simple | 19 ns | 2.17 µs | **bumi 113x faster** |
 | compile_complex | 107 ns | 47.4 µs | **bumi 444x faster** |
@@ -175,11 +175,11 @@ Pure TypeScript is faster in **every single scenario**. Not by a little — by 3
 
 The WASM boundary serialization overhead dominates. At 2-3 microseconds per call, the FFI cost exceeds the work being done by multiple orders of magnitude.
 
-**Why does bumi-crusty exist?**
+**Why does xuma-crust (WASM) exist?**
 
 Not for speed. For ReDoS protection.
 
-If your matcher uses regex heavily and accepts untrusted input, the pure TypeScript RegExp engine is a vulnerability. bumi-crusty gives you the linear-time guarantees of Rust's `regex` crate at the cost of 100x slower baseline performance.
+If your matcher uses regex heavily and accepts untrusted input, the pure TypeScript RegExp engine is a vulnerability. xuma-crust gives you the linear-time guarantees of Rust's `regex` crate at the cost of 100x slower baseline performance.
 
 For most workloads, this is a bad trade. But if an attacker can hang your service with a single malicious regex match, 2µs is cheaper than 72ms (or infinite time).
 
@@ -205,12 +205,12 @@ When should you use each variant?
 - You control the regex patterns (no untrusted input)
 - TypeScript ecosystem integration is valuable
 
-### Use **puma-crusty** (Python + Rust FFI) when:
+### Use **xuma-crust** (Python + Rust FFI) when:
 - You need ReDoS protection in a Python codebase
 - Regex-heavy workloads where 1.5x speedup matters
 - Willing to add a native extension dependency
 
-### Avoid **bumi-crusty** (TypeScript + WASM FFI) unless:
+### Avoid **xuma-crust** (TypeScript + WASM FFI) unless:
 - You MUST have linear-time regex in TypeScript
 - You're matching untrusted regex input at the edge
 - The 100x slowdown is acceptable (e.g., low request rate)
@@ -262,25 +262,25 @@ Building the registry (type URL registration) is also a one-time cost:
 
 Negligible. HashMap construction with 1-2 entries.
 
-### FFI Config Overhead: puma-crusty
+### FFI Config Overhead: xuma-crust (Python)
 
 How does config loading compare through the PyO3 FFI boundary?
 
-| Scenario | puma (pure Python) | puma-crusty (Rust FFI) | Ratio |
+| Scenario | puma (pure Python) | xuma-crust (Rust FFI) | Ratio |
 |----------|-------------------|----------------------:|------:|
 | config_load_simple | 8.3 µs | 15.1 µs | puma 1.8x faster |
 | config_load_compound | 12.5 µs | 23.5 µs | puma 1.9x faster |
 | config_evaluate_simple | 312 ns | 2.7 µs | puma 8.7x faster |
 
-For config loading, crusty is ~2x slower than pure puma because it does JSON parsing on the Python side *and* on the Rust side (the JSON string crosses the FFI boundary, then Rust re-parses it with `serde_json`). For evaluation, crusty's FFI overhead (PyO3 dict → Rust HashMap conversion) adds ~2.4µs per call.
+For config loading, xuma-crust is ~2x slower than pure puma because it does JSON parsing on the Python side *and* on the Rust side (the JSON string crosses the FFI boundary, then Rust re-parses it with `serde_json`). For evaluation, xuma-crust's FFI overhead (PyO3 dict → Rust HashMap conversion) adds ~2.4µs per call.
 
 **Verdict**: For config-loaded matchers, use puma unless you need ReDoS protection. The FFI crossing overhead is amplified by the double JSON parsing.
 
-### FFI Config Overhead: bumi-crusty
+### FFI Config Overhead: xuma-crust (TypeScript)
 
 How does config loading compare through the WASM FFI boundary?
 
-| Scenario | bumi (pure TS) | bumi-crusty (WASM) | Ratio |
+| Scenario | bumi (pure TS) | xuma-crust (WASM) | Ratio |
 |----------|---------------|-------------------:|------:|
 | config_load_simple | 738 ns | 2.5 µs | bumi 3.3x faster |
 | config_load_compound | 1.2 µs | 4.5 µs | bumi 3.7x faster |
@@ -295,8 +295,8 @@ Same pattern as Phase 9: WASM boundary overhead dominates. Config loading is ~3.
 | **Config load vs manual** | 4-28x slower (dominated by JSON parsing) |
 | **Evaluation parity** | Identical (1.0x) — same Matcher type regardless of construction path |
 | **Registry build** | Negligible (100-700ns) |
-| **FFI config (puma-crusty)** | ~2x slower than pure puma for loading |
-| **FFI config (bumi-crusty)** | ~3.5x slower than pure bumi for loading |
+| **FFI config (xuma-crust Python)** | ~2x slower than pure puma for loading |
+| **FFI config (xuma-crust TypeScript)** | ~3.5x slower than pure bumi for loading |
 
 The config path is a **setup cost**, not a runtime cost. For applications that build matchers at startup and evaluate thousands of requests, the config loading time is amortized to zero.
 
@@ -308,9 +308,9 @@ This would give linear-time regex guarantees without FFI overhead:
 - puma gets ReDoS protection via a mature C extension
 - bumi gets ReDoS protection in pure TypeScript
 
-At that point, the crusty variants shift from "safety layer" to "full compiled pipeline in Rust" for complex configs where the rumi compiler's optimizations justify the FFI cost.
+At that point, the xuma-crust variants shift from "safety layer" to "full compiled pipeline in Rust" for complex configs where the rumi compiler's optimizations justify the FFI cost.
 
-But that's future work. For now, the pure implementations are fastest, and the crusty variants are the ReDoS safety net.
+But that's future work. For now, the pure implementations are fastest, and the xuma-crust variants are the ReDoS safety net.
 
 ## The Bottom Line
 
@@ -320,8 +320,8 @@ Python is 10-30x slower than both, which is the expected interpreter tax. Still 
 
 The real story is ReDoS. At N=20, Rust's linear-time regex is **6.5 million times faster** than Python's backtracking engine. At N=25, Python hangs forever. This isn't a performance optimization — it's a security boundary.
 
-The crusty variants let you pay the FFI tax to get Rust's safety guarantees. For Python, the tax is small (1.5x slower than pure Python). For TypeScript, the tax is huge (100x slower than pure TypeScript). Choose accordingly.
+The xuma-crust variants let you pay the FFI tax to get Rust's safety guarantees. For Python, the tax is small (1.5x slower than pure Python). For TypeScript, the tax is huge (100x slower than pure TypeScript). Choose accordingly.
 
-In production, use rumi if you can. Use puma/bumi if ergonomics matter more than raw speed. Add crusty if untrusted regex input is a threat model.
+In production, use rumi if you can. Use puma/bumi if ergonomics matter more than raw speed. Add xuma-crust if untrusted regex input is a threat model.
 
 And never, ever, let user-supplied regex patterns hit a backtracking engine without sanitization.

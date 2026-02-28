@@ -1,4 +1,4 @@
-"""Head-to-head config benchmarks: puma (pure Python) vs puma-crusty (PyO3).
+"""Head-to-head config benchmarks: puma (pure Python) vs xuma-crust (PyO3).
 
 Compares the config loading path across both implementations to isolate:
 1. Config parsing overhead — JSON → config types
@@ -17,7 +17,7 @@ import json
 
 import pytest
 
-from puma_crusty import HttpMatcher, TestMatcher
+from xuma_crust import HttpMatcher, TestMatcher
 
 # Pure Python for comparison
 from xuma import (

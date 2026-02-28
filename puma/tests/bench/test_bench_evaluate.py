@@ -214,5 +214,5 @@ def test_bench_trace_overhead_evaluate(benchmark):
 
 
 # NOTE: puma (pure Python) does not implement evaluate_with_trace.
-# Trace overhead comparison is measured in puma-crusty (Rust bindings)
+# Trace overhead comparison is measured in xuma-crust (Rust bindings)
 # where both evaluate() and evaluate_with_trace() are available.

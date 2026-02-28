@@ -1,5 +1,5 @@
 [package]
-name = "puma-crusty"
+name = "xuma-crust-python"
 description = "Python bindings for rumi via PyO3"
 publish = false
 version.workspace = true
@@ -9,7 +9,7 @@ repository.workspace = true
 authors.workspace = true
 
 [lib]
-name = "puma_crusty"
+name = "xuma_crust"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]

@@ -1,8 +1,8 @@
 /**
- * Tests for bumi-crusty TestMatcher.
+ * Tests for xuma-crust TestMatcher.
  *
  * Config-driven key-value matching via Rust registry, exposed through wasm-bindgen.
- * Mirrors puma-crusty's test_test_matcher.py tests.
+ * Mirrors xuma-crust (Python)'s test_test_matcher.py tests.
  * Includes conformance fixture validation.
  */
 
@@ -10,7 +10,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "bun:test";
 // @ts-expect-error — generated WASM package has no TS project reference
-import init, { TestMatcher } from "../pkg/bumi_crusty.js";
+import init, { TestMatcher } from "../pkg/xuma_crust.js";
 
 beforeAll(async () => {
   await init();

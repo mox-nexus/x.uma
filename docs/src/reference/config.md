@@ -104,7 +104,7 @@ Return a value:
 { "type": "action", "action": "route-get" }
 ```
 
-The `action` field can be any JSON value — string, number, object. The engine doesn't interpret it.
+The `action` field can be any JSON value -- string, number, object. The engine doesn't interpret it.
 
 ### matcher
 
@@ -120,7 +120,7 @@ Continue evaluation with a nested matcher:
 }
 ```
 
-Action XOR matcher — never both. This enforces OnMatch exclusivity from the xDS spec.
+Action XOR matcher -- never both. This enforces OnMatch exclusivity from the xDS spec.
 
 ## TypedConfig
 
@@ -157,7 +157,9 @@ Built-in string matchers:
 | `Contains` | String contains value |
 | `Regex` | RE2 regex pattern (linear time) |
 
-## Core Type URLs
+## Type URL Reference
+
+### Core (all domains)
 
 Registered by `register_core_matchers()` in all implementations:
 
@@ -166,9 +168,86 @@ Registered by `register_core_matchers()` in all implementations:
 | `xuma.core.v1.StringMatcher` | InputMatcher | `StringMatchSpec` |
 | `xuma.core.v1.BoolMatcher` | InputMatcher | `{ "value": true }` |
 
-## Full Example
+### Test Domain
 
-YAML config matching HTTP-like requests:
+| Type URL | Config | Extracts |
+|----------|--------|----------|
+| `xuma.test.v1.StringInput` | `{ "key": "method" }` | Value for key from test context |
+
+### HTTP Domain
+
+| Type URL | Config | Extracts |
+|----------|--------|----------|
+| `xuma.http.v1.PathInput` | `{}` | Request path |
+| `xuma.http.v1.MethodInput` | `{}` | HTTP method |
+| `xuma.http.v1.HeaderInput` | `{ "name": "content-type" }` | Header value by name |
+| `xuma.http.v1.QueryParamInput` | `{ "name": "page" }` | Query parameter by name |
+
+### Claude Domain
+
+| Type URL | Config | Extracts |
+|----------|--------|----------|
+| `xuma.claude.v1.EventInput` | `{}` | Hook event name (e.g. `PreToolUse`) |
+| `xuma.claude.v1.ToolNameInput` | `{}` | Tool name (e.g. `Bash`) |
+| `xuma.claude.v1.ArgumentInput` | `{ "name": "command" }` | Tool argument by name |
+| `xuma.claude.v1.SessionIdInput` | `{}` | Session ID |
+| `xuma.claude.v1.CwdInput` | `{}` | Working directory |
+| `xuma.claude.v1.GitBranchInput` | `{}` | Git branch |
+
+## Full Examples
+
+### HTTP Route Matching
+
+```yaml
+matchers:
+  - predicate:
+      type: and
+      predicates:
+        - type: single
+          input: { type_url: "xuma.http.v1.PathInput", config: {} }
+          value_match: { Prefix: "/api" }
+        - type: single
+          input: { type_url: "xuma.http.v1.MethodInput", config: {} }
+          value_match: { Exact: "GET" }
+    on_match: { type: action, action: "api_read" }
+
+  - predicate:
+      type: single
+      input: { type_url: "xuma.http.v1.HeaderInput", config: { name: "content-type" } }
+      value_match: { Exact: "application/json" }
+    on_match: { type: action, action: "json_handler" }
+
+on_no_match: { type: action, action: "not_found" }
+```
+
+### Claude Code Hook Policy
+
+```yaml
+matchers:
+  - predicate:
+      type: and
+      predicates:
+        - type: single
+          input: { type_url: "xuma.claude.v1.EventInput", config: {} }
+          value_match: { Exact: "PreToolUse" }
+        - type: single
+          input: { type_url: "xuma.claude.v1.ToolNameInput", config: {} }
+          value_match: { Exact: "Bash" }
+        - type: single
+          input: { type_url: "xuma.claude.v1.ArgumentInput", config: { name: "command" } }
+          value_match: { Contains: "rm -rf" }
+    on_match: { type: action, action: "block" }
+
+  - predicate:
+      type: single
+      input: { type_url: "xuma.claude.v1.EventInput", config: {} }
+      value_match: { Exact: "PreToolUse" }
+    on_match: { type: action, action: "allow" }
+
+on_no_match: { type: action, action: "allow" }
+```
+
+### Test Domain (key-value)
 
 ```yaml
 matchers:
