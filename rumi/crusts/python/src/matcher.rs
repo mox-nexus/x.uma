@@ -247,7 +247,7 @@ impl PyTraceResult {
 }
 
 /// One step in the evaluation trace.
-#[pyclass(frozen)]
+#[pyclass(frozen, from_py_object)]
 #[derive(Debug, Clone)]
 pub struct PyTraceStep {
     /// Index of the field matcher (0-based).

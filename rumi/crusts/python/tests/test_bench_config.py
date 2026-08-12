@@ -17,7 +17,7 @@ import json
 
 import pytest
 
-from xuma_crust import HttpMatcher, TestMatcher
+from xuma_crust import HttpMatcher, TestMatcher as CrustTestMatcher
 
 # Pure Python for comparison
 from xuma import (
@@ -115,7 +115,7 @@ def _puma_registry():
 
 def test_bench_crusty_config_load_simple(benchmark):
     """Crusty: TestMatcher.from_config(json)."""
-    benchmark(TestMatcher.from_config, SIMPLE_CONFIG)
+    benchmark(CrustTestMatcher.from_config, SIMPLE_CONFIG)
 
 
 def test_bench_puma_config_load_simple(benchmark):
@@ -131,7 +131,7 @@ def test_bench_puma_config_load_simple(benchmark):
 
 def test_bench_crusty_config_load_compound(benchmark):
     """Crusty: TestMatcher.from_config(compound json)."""
-    benchmark(TestMatcher.from_config, COMPOUND_CONFIG)
+    benchmark(CrustTestMatcher.from_config, COMPOUND_CONFIG)
 
 
 def test_bench_puma_config_load_compound(benchmark):
@@ -150,7 +150,7 @@ def test_bench_puma_config_load_compound(benchmark):
 
 @pytest.fixture
 def crusty_config_matcher():
-    return TestMatcher.from_config(SIMPLE_CONFIG)
+    return CrustTestMatcher.from_config(SIMPLE_CONFIG)
 
 
 @pytest.fixture

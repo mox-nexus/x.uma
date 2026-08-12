@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from xuma_crust import TestMatcher
+from xuma_crust import TestMatcher as CrustTestMatcher
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[4] / "spec" / "tests" / "06_config"
@@ -43,7 +43,7 @@ class TestBasicMatching:
             }],
             "on_no_match": {"type": "action", "action": "deny"},
         })
-        matcher = TestMatcher.from_config(config)
+        matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"role": "admin"}) == "allow"
         assert matcher.evaluate({"role": "viewer"}) == "deny"
         assert matcher.evaluate({"other": "admin"}) == "deny"
@@ -62,7 +62,7 @@ class TestBasicMatching:
                 "on_match": {"type": "action", "action": "internal"},
             }],
         })
-        matcher = TestMatcher.from_config(config)
+        matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"email": "alice@acme.com"}) == "internal"
         assert matcher.evaluate({"email": "bob@other.com"}) is None
 
@@ -80,7 +80,7 @@ class TestBasicMatching:
                 "on_match": {"type": "action", "action": "valid"},
             }],
         })
-        matcher = TestMatcher.from_config(config)
+        matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"version": "v1.0"}) == "valid"
         assert matcher.evaluate({"version": "latest"}) is None
 
@@ -120,7 +120,7 @@ class TestCompoundPredicates:
                 "on_match": {"type": "action", "action": "admin_acme"},
             }],
         })
-        matcher = TestMatcher.from_config(config)
+        matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"role": "admin", "org": "acme-corp"}) == "admin_acme"
         assert matcher.evaluate({"role": "admin", "org": "other"}) is None
         assert matcher.evaluate({"role": "viewer", "org": "acme-corp"}) is None
@@ -152,7 +152,7 @@ class TestCompoundPredicates:
                 "on_match": {"type": "action", "action": "privileged"},
             }],
         })
-        matcher = TestMatcher.from_config(config)
+        matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"role": "admin"}) == "privileged"
         assert matcher.evaluate({"role": "superadmin"}) == "privileged"
         assert matcher.evaluate({"role": "viewer"}) is None
@@ -174,7 +174,7 @@ class TestCompoundPredicates:
                 "on_match": {"type": "action", "action": "non_prod"},
             }],
         })
-        matcher = TestMatcher.from_config(config)
+        matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"env": "staging"}) == "non_prod"
         assert matcher.evaluate({"env": "prod"}) is None
 
@@ -232,7 +232,7 @@ class TestNesting:
             }],
             "on_no_match": {"type": "action", "action": "free_tier"},
         })
-        matcher = TestMatcher.from_config(config)
+        matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"tier": "premium", "region": "us-east"}) == "premium_us_east"
         assert matcher.evaluate({"tier": "premium", "region": "eu-west"}) == "premium_eu_west"
         assert matcher.evaluate({"tier": "premium", "region": "ap-south"}) == "premium_default"
@@ -255,7 +255,7 @@ class TestConformance:
     def test_fixture(self, fixture_file):
         """Run all test cases from a single fixture file."""
         yaml_content = fixture_file.read_text()
-        results = TestMatcher.run_fixtures(yaml_content)
+        results = CrustTestMatcher.run_fixtures(yaml_content)
         failures = [(name, case, detail) for name, case, passed, detail in results if not passed]
         assert not failures, f"Failed cases: {failures}"
 
@@ -270,7 +270,7 @@ class TestErrors:
 
     def test_invalid_json(self):
         with pytest.raises(ValueError, match="invalid config JSON"):
-            TestMatcher.from_config("{bad json}")
+            CrustTestMatcher.from_config("{bad json}")
 
     def test_unknown_type_url(self):
         config = json.dumps({
@@ -284,7 +284,7 @@ class TestErrors:
             }],
         })
         with pytest.raises(ValueError, match="xuma.fake.v1.Unknown"):
-            TestMatcher.from_config(config)
+            CrustTestMatcher.from_config(config)
 
     def test_invalid_regex(self):
         config = json.dumps({
@@ -301,7 +301,7 @@ class TestErrors:
             }],
         })
         with pytest.raises(ValueError):
-            TestMatcher.from_config(config)
+            CrustTestMatcher.from_config(config)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -327,7 +327,7 @@ class TestTrace:
             }],
             "on_no_match": {"type": "action", "action": "deny"},
         })
-        matcher = TestMatcher.from_config(config)
+        matcher = CrustTestMatcher.from_config(config)
         eval_result = matcher.evaluate({"role": "admin"})
         trace = matcher.trace({"role": "admin"})
         assert trace.result == eval_result
@@ -347,7 +347,7 @@ class TestTrace:
             }],
             "on_no_match": {"type": "action", "action": "deny"},
         })
-        matcher = TestMatcher.from_config(config)
+        matcher = CrustTestMatcher.from_config(config)
         trace = matcher.trace({"role": "viewer"})
         assert trace.result == "deny"
         assert trace.used_fallback is True
@@ -375,5 +375,5 @@ class TestDeveloperExperience:
                 "on_match": {"type": "action", "action": "z"},
             }],
         })
-        matcher = TestMatcher.from_config(config)
+        matcher = CrustTestMatcher.from_config(config)
         assert "TestMatcher" in repr(matcher)

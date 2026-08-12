@@ -80,26 +80,6 @@ wheels = [
 ]
 
 [[package]]
-name = "puma-crusty"
-source = { editable = "." }
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-benchmark" },
-    { name = "xuma" },
-]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-benchmark", specifier = ">=5.0" },
-    { name = "xuma", directory = "../../../puma" },
-]
-
-[[package]]
 name = "py-cpuinfo"
 version = "9.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -164,4 +144,24 @@ dev = [
     { name = "pytest-benchmark", specifier = ">=5.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", specifier = ">=0.8" },
+]
+
+[[package]]
+name = "xuma-crust"
+source = { editable = "." }
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-benchmark" },
+    { name = "xuma" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-benchmark", specifier = ">=5.0" },
+    { name = "xuma", directory = "../../../puma" },
 ]

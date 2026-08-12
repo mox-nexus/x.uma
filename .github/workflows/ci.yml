@@ -143,6 +143,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # The workspace lives in rumi/ and Cargo.lock is intentionally not
+      # committed, so resolve the dependency graph before auditing it.
+      # generate-lockfile only reads manifests, so the buf-generated
+      # rumi-proto sources (not checked in) are not needed.
+      - name: Generate lockfile
+        run: cargo generate-lockfile --manifest-path rumi/Cargo.toml
+
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: rumi
