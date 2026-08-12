@@ -1,0 +1,362 @@
+/* ===========================================
+   Mox Labs — Canonical Design Tokens
+   ===========================================
+   Motto:   Amplify. Radical. Non Conformity.
+   Mission: Every potential actualized.
+   Sigil:   27zmdbp
+   Scale:   built on 9 (9, 18, 27, 36, 54, 72 …)
+   ===========================================
+   Source of truth. Consumed by every mox surface.
+   Mirrors mox.tokens.json. Keep them in sync.
+   =========================================== */
+
+
+/* ===========================================
+   PRIMITIVES — raw values, never use directly
+   =========================================== */
+
+:root {
+
+  /* ─── Trichrome — equal lightness/chroma envelope ─── */
+
+  --ci-blue:  oklch(62% 0.15 240);   /* Spark      — thesis.    human, agency, interaction */
+  --ci-red:   oklch(58% 0.18 25);    /* Constraint — antithesis. machine, boundaries, warnings */
+  --ci-green: oklch(70% 0.18 145);   /* Emergence  — synthesis. the third thing, code, success */
+
+  /* ─── Spark layers (core → atmosphere) ─── */
+
+  --spark-core:       oklch(75% 0.18 240);
+  --spark-inner:      oklch(62% 0.15 240 / 0.6);
+  --spark-outer:      oklch(55% 0.12 240 / 0.2);
+  --spark-atmosphere: oklch(50% 0.08 240 / 0.05);
+
+  /* ─── Constraint layers ─── */
+
+  --constraint-core: oklch(62% 0.20 25);
+  --constraint-glow: oklch(58% 0.18 25 / 0.25);
+
+  /* ─── Emergence layers ─── */
+
+  --emergence-core:       oklch(75% 0.20 145);
+  --emergence-glow:       oklch(70% 0.18 145 / 0.30);
+  --emergence-atmosphere: oklch(65% 0.12 145 / 0.08);
+
+  /* ─── Depth — always carries the 240° trace. Never pure black. ─── */
+
+  --depth-abyss: oklch(3% 0.003 240);
+  --depth-void:  oklch(6% 0.005 240);
+
+  /* ─── Dao neutrals — zero chroma, so the trichrome can sing ─── */
+
+  --dao-bg:             oklch(12% 0.01 240);
+  --dao-surface:        oklch(14% 0 0);
+  --dao-surface-2:      oklch(18% 0 0);
+  --dao-surface-3:      oklch(22% 0 0);
+  --dao-border:         oklch(26% 0 0);
+  --dao-border-subtle:  oklch(20% 0 0);
+  --dao-text:           oklch(92% 0 0);
+  --dao-text-secondary: oklch(82% 0 0);
+  --dao-muted:          oklch(72% 0 0);
+
+  /* ─── Glyph tints — subtle, low-alpha card/code backgrounds ─── */
+
+  --glyph-blue:  oklch(62% 0.15 240 / 0.06);
+  --glyph-red:   oklch(58% 0.18 25 / 0.03);
+  --glyph-green: oklch(70% 0.18 145 / 0.025);
+
+  /* ─── Evidence levels — brightness encodes confidence ─── */
+
+  --ev-strong:        oklch(72% 0.16 145);
+  --ev-strong-bg:     oklch(72% 0.16 145 / 0.08);
+  --ev-moderate:      oklch(68% 0.12 230);
+  --ev-moderate-bg:   oklch(68% 0.12 230 / 0.08);
+  --ev-weak:          oklch(72% 0.14 85);
+  --ev-weak-bg:       oklch(72% 0.14 85 / 0.08);
+  --ev-speculative:   oklch(62% 0.02 240);
+  --ev-speculative-bg:oklch(62% 0.02 240 / 0.06);
+}
+
+
+/* ===========================================
+   SEMANTIC — named for purpose, used in components
+   =========================================== */
+
+:root {
+  --color-link:           var(--ci-blue);
+  --color-link-hover:     var(--spark-core);
+  --color-link-visited:   oklch(55% 0.12 240);
+  --color-code:           var(--ci-green);
+  --color-warning:        var(--ci-red);
+  --color-error:          var(--ci-red);
+  --color-success:        var(--ci-green);
+  --color-info:           var(--ci-blue);
+  --color-focus:          var(--ci-blue);
+  --color-accent:         var(--ci-blue);
+
+  --color-spark-core:        var(--spark-core);
+  --color-spark-inner:       var(--spark-inner);
+  --color-spark-outer:       var(--spark-outer);
+  --color-spark-atmosphere:  var(--spark-atmosphere);
+
+  --color-constraint-core:   var(--constraint-core);
+  --color-constraint-glow:   var(--constraint-glow);
+
+  --color-interactive:          var(--ci-blue);
+  --color-interactive-hover:    var(--spark-core);
+  --color-interactive-active:   oklch(68% 0.16 240);
+  --color-interactive-disabled: var(--dao-muted);
+
+  /* ─── Quadrant (documentation classification) ─── */
+  --quadrant-explanation: var(--spark-core);
+  --quadrant-how-to:      var(--emergence-core);
+  --quadrant-tutorials:   oklch(68% 0.15 190);
+  --quadrant-reference:   oklch(68% 0.10 290);
+}
+
+
+/* ===========================================
+   TYPOGRAPHY
+   =========================================== */
+
+:root {
+  /* ─── Type scale — 9-grid ─── */
+  --type-xs:   0.6875rem; /* 11 px — caption, meta */
+  --type-sm:   0.9375rem; /* 15 px — small body, labels */
+  --type-base: 1.125rem;  /* 18 px — body */
+  --type-lg:   1.5rem;    /* 24 px — large body, subheads */
+  --type-xl:   1.6875rem; /* 27 px — section heads */
+  --type-2xl:  2.25rem;   /* 36 px — page sections */
+  --type-3xl:  3.375rem;  /* 54 px — hero */
+  --type-4xl:  4.5rem;    /* 72 px — display, brand */
+
+  --leading-none:    1;
+  --leading-tight:   1.2;
+  --leading-snug:    1.35;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.625;
+  --leading-loose:   2;
+
+  --tracking-tighter: -0.02em;
+  --tracking-tight:   -0.01em;
+  --tracking-normal:   0;
+  --tracking-wide:     0.02em;
+  --tracking-wider:    0.04em;
+  --tracking-widest:   0.08em;
+
+  /* ─── Font stacks ─── */
+  --font-mono:    'IBM Plex Mono', ui-monospace, 'Cascadia Code',
+                  'Source Code Pro', Menlo, Consolas,
+                  'Liberation Mono', monospace;
+  --font-sans:    'IBM Plex Sans', system-ui, -apple-system,
+                  BlinkMacSystemFont, 'Segoe UI', Roboto,
+                  'Helvetica Neue', Arial, sans-serif;
+  --font-prose:   'Fraunces', Georgia, 'Iowan Old Style',
+                  'Palatino Linotype', serif;
+  --font-display: 'IM Fell English', 'EB Garamond', Garamond,
+                  Georgia, serif;
+
+  /* mox.studio landing — Space Grotesk 300 with green glow text-shadow */
+  --font-mission: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+
+  /* GNX register — Kendrick's blacked-out Buick.
+     Industrial billboard display, mono body. */
+  --font-gnx-display: 'Oswald', 'Impact', 'Haettenschweiler',
+                      'Helvetica Neue Condensed', sans-serif;
+  --font-gnx-body:    'DM Mono', 'JetBrains Mono', 'SF Mono',
+                      'IBM Plex Mono', monospace;
+
+  /* DAO register — scholarly warmth */
+  --font-dao-display: 'Literata', 'Iowan Old Style', Georgia, serif;
+  --font-dao-body:    'Alegreya', 'Iowan Old Style', Georgia, serif;
+
+  /* GOTHAM register — art deco noir */
+  --font-gotham-display: 'Cinzel', 'Trajan Pro', Georgia, serif;
+  --font-gotham-body:    'Libre Caslon Text', 'Iowan Old Style', Georgia, serif;
+
+  /* WU register — Staten Island grime */
+  --font-wu-display: 'Archivo Black', 'Impact', 'Helvetica Neue', sans-serif;
+  --font-wu-body:    'Space Mono', 'Courier Prime', 'JetBrains Mono', monospace;
+
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+}
+
+
+/* ===========================================
+   SPACING — multiples of 9
+   =========================================== */
+
+:root {
+  --space-px:  1px;
+  --space-0:   0;
+  --space-0-5: 0.28125rem; /* 4.5  px */
+  --space-1:   0.5625rem;  /* 9    px */
+  --space-1-5: 0.84375rem; /* 13.5 px */
+  --space-2:   1.125rem;   /* 18   px */
+  --space-3:   1.6875rem;  /* 27   px */
+  --space-4:   2.25rem;    /* 36   px */
+  --space-5:   3.375rem;   /* 54   px */
+  --space-6:   4.5rem;     /* 72   px */
+  --space-7:   5.625rem;   /* 90   px */
+  --space-8:   6.75rem;    /* 108  px */
+
+  /* ─── Asymmetric / dramatic ─── */
+  --pause-before:   calc(var(--space-4) * 1.2);
+  --pause-after:    var(--space-2);
+  --pause-dramatic: calc(var(--space-6) * 1.4);
+
+  /* ─── Semantic rhythm ─── */
+  --rhythm-micro:   var(--space-0-5);
+  --rhythm-tight:   var(--space-1);
+  --rhythm-item:    var(--space-2);
+  --rhythm-group:   var(--space-3);
+  --rhythm-section: var(--space-4);
+  --rhythm-breathe: var(--space-6);
+}
+
+
+/* ===========================================
+   LAYOUT
+   =========================================== */
+
+:root {
+  --content-narrow: 45ch;
+  --content-width:  65ch;
+  --content-wide:   85ch;
+  --content-full:   100%;
+
+  --sidebar-width:     240px;
+  --sidebar-collapsed: 60px;
+  --toc-width:         200px;
+  --header-height:     3.375rem;
+
+  --container-padding-x: var(--space-3);
+  --container-padding-y: var(--space-4);
+
+  --grid-gap:        var(--space-3);
+  --grid-gap-tight:  var(--space-2);
+  --grid-gap-loose:  var(--space-4);
+}
+
+
+/* ===========================================
+   BORDER & SHAPE — sharp by default
+   =========================================== */
+
+:root {
+  --radius-none: 0;
+  --radius-sm:   2px;
+  --radius-md:   4px;
+  --radius-full: 9999px;
+
+  --border-width:   1px;
+  --border-width-2: 2px;
+  --border-accent:  3px;
+
+  --shadow-sm:         0 1px 2px  oklch(0% 0 0 / 0.10);
+  --shadow-md:         0 4px 6px  oklch(0% 0 0 / 0.10);
+  --shadow-lg:         0 10px 15px oklch(0% 0 0 / 0.10);
+  --shadow-glow-spark:     0 0 20px var(--spark-outer);
+  --shadow-glow-emergence: 0 0 20px var(--emergence-glow);
+}
+
+
+/* ===========================================
+   MOTION
+   =========================================== */
+
+:root {
+  --duration-instant:   0ms;
+  --duration-fast:    100ms;
+  --duration-normal:  200ms;
+  --duration-slow:    400ms;
+  --duration-slower:  600ms;
+  --duration-counter: 800ms;
+  --duration-dramatic:1200ms;
+
+  --easing-linear:      linear;
+  --easing-smooth:      cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-enter:       cubic-bezier(0, 0, 0.2, 1);
+  --easing-exit:        cubic-bezier(0.4, 0, 1, 1);
+  --easing-spring:      cubic-bezier(0.34, 1.56, 0.64, 1); /* sparingly */
+
+  --transition-colors:    color    var(--duration-fast)   var(--easing-linear),
+                          background-color var(--duration-fast) var(--easing-linear),
+                          border-color var(--duration-fast) var(--easing-linear);
+  --transition-opacity:   opacity   var(--duration-normal) var(--easing-smooth);
+  --transition-transform: transform var(--duration-normal) var(--easing-smooth);
+  --transition-all:       all       var(--duration-normal) var(--easing-smooth);
+}
+
+
+/* ===========================================
+   GEIST MODES — the projection vocabulary
+   =========================================== */
+
+:root {
+  --mode-ambient-opacity:    0.55;
+  --mode-ambient-scale:      1.00;
+  --mode-ambient-breath:     3.2s;
+  --mode-ambient-glow:       0.0;
+
+  --mode-attentive-opacity:  0.85;
+  --mode-attentive-scale:    1.18;
+  --mode-attentive-breath:   2.2s;
+  --mode-attentive-glow:     0.35;
+
+  --mode-speaking-opacity:   1.00;
+  --mode-speaking-scale:     1.25;
+  --mode-speaking-breath:    1.6s;
+  --mode-speaking-glow:      0.6;
+
+  --mode-hidden-opacity:     0.00;
+  --mode-hidden-scale:       0.85;
+  --mode-hidden-breath:      4.0s;
+  --mode-hidden-glow:        0.0;
+}
+
+
+/* ===========================================
+   Z-INDEX
+   =========================================== */
+
+:root {
+  --z-below:    -1;
+  --z-base:      0;
+  --z-raised:   10;
+  --z-dropdown: 100;
+  --z-sticky:   200;
+  --z-overlay:  300;
+  --z-modal:    400;
+  --z-popover:  500;
+  --z-tooltip:  600;
+  --z-toast:    700;
+  --z-max:      9999;
+}
+
+
+/* ===========================================
+   ACCESSIBILITY — reduced motion / high contrast
+   =========================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast:     0ms;
+    --duration-normal:   0ms;
+    --duration-slow:     0ms;
+    --duration-slower:   0ms;
+    --duration-counter:  0ms;
+    --duration-dramatic: 0ms;
+  }
+}
+
+@media (prefers-contrast: high) {
+  :root {
+    --dao-border: oklch(40% 0.02 240);
+    --dao-text:   oklch(95% 0.01 240);
+    --dao-muted:  oklch(78% 0.02 240);
+    --border-width: 2px;
+  }
+}
