@@ -15,8 +15,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
@@ -79,7 +77,6 @@ docs/api/
 # needed someone to remember; these do not.
 .svelte-kit/
 pagefind/
-!playground/src/lib/
 
 # Screenshots / Playwright
 .playwright-mcp/
