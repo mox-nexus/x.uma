@@ -4,11 +4,12 @@
 //! rather than exposing raw dicts (Ace recommendation from guild review).
 
 use pyo3::prelude::*;
+use pyo3::Borrowed;
 
 /// How to match a string value.
 ///
 /// Bare strings passed to `HookMatch` fields are treated as exact matches.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Debug, Clone)]
 pub enum PyStringMatch {
     /// Exact equality.
@@ -76,7 +77,7 @@ impl PyStringMatch {
 /// An empty `HookMatch` (all fields None) is rejected at compile time
 /// unless `match_all=True` is explicitly passed. This prevents accidental
 /// catch-all rules from deserialization bugs.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Debug, Clone)]
 pub struct PyHookMatch {
     pub(crate) event: Option<String>,
@@ -154,8 +155,10 @@ impl From<PyStringMatchOrStr> for PyStringMatch {
     }
 }
 
-impl<'py> FromPyObject<'py> for PyStringMatchOrStr {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'a, 'py> FromPyObject<'a, 'py> for PyStringMatchOrStr {
+    type Error = PyErr;
+
+    fn extract(ob: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
         if let Ok(s) = ob.extract::<String>() {
             Ok(Self::Str(s))
         } else {
