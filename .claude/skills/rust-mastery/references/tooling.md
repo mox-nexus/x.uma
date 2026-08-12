@@ -5,7 +5,8 @@ Project setup, CI, and development workflow configurations.
 ## clippy.toml
 
 ```toml
-msrv = "1.80"
+# msrv = "1.80"   # x.uma declares no rust-version in any manifest.
+# Do not set one here until it lands in rumi/Cargo.toml.
 cognitive-complexity-threshold = 25
 too-many-lines-threshold = 100
 too-many-arguments-threshold = 7
@@ -21,7 +22,7 @@ disallowed-methods = [
 ## rustfmt.toml
 
 ```toml
-edition = "2024"
+edition = "2021"   # matches rumi/Cargo.toml:10
 max_width = 100
 tab_spaces = 4
 newline_style = "Unix"
@@ -112,7 +113,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: rustup toolchain install stable --profile minimal --component clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo clippy --manifest-path rumi/Cargo.toml --all-targets -- -D warnings
 
   fmt:
     runs-on: ubuntu-latest
@@ -236,9 +237,10 @@ async fn main() {
 3. `cargo nextest run` over cargo test
 4. mold linker for faster iteration
 
-**Before committing**:
-1. `cargo fmt --all`
-2. `cargo clippy --all-targets --all-features -- -D warnings`
+**Before committing** (order matters — `clippy --fix` rewrites code, so `fmt` runs after):
+1. `cargo clippy --fix --allow-dirty --manifest-path rumi/Cargo.toml -- -W clippy::pedantic`
+2. `cargo fmt --manifest-path rumi/Cargo.toml --all`
+3. `just ci`
 3. `cargo nextest run`
 4. `cargo deny check` (for libraries)
 

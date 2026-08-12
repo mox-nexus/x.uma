@@ -97,7 +97,9 @@ x.uma/
 ├── bumi/                       # Pure TypeScript implementation (package: bumi)
 │   └── proto/src/gen/          # buf-generated TypeScript types (ts-proto)
 ├── buf.gen.yaml                # Polyglot codegen config (all 3 languages)
-├── docs/                       # mdBook documentation
+├── docs/
+│   ├── content/                # plain Markdown, framework-free
+│   └── experience/             # SvelteKit docs site (adapter-static)
 └── justfile                    # polyglot task orchestration
 ```
 
@@ -130,10 +132,24 @@ x.uma/
 
 ## Current Work
 
-**Post-Phase 15: Multi-domain CLI + docs rewrite**
+**Public-readiness + mox-branded docsite**
 
-Names resolved: `rumi-core` on crates.io (lib name = `rumi`), `rumi-http`, `rumi-cli`.
-`xuma` on PyPI, `xuma-crust` on PyPI/npm.
+Decisions of record live in [`DECISIONS.md`](DECISIONS.md). Read it before
+revisiting anything below.
+
+**Publish status — nothing is published yet.** Names are *chosen, not reserved*:
+`rumi-core` on crates.io (lib name = `rumi`), `rumi-http`, `rumi-cli`; `xuma` on
+PyPI; `xuma-crust` on PyPI/npm. All resolve 404 today. Both release workflows are
+`workflow_dispatch` and have never been run. README and getting-started pages
+carry pre-release notes until a release lands (D-015).
+
+**Docsite** runs on SvelteKit, the cix pattern
+(`docs/content/` + `docs/experience/`), register `cix · operator`, brand tokens
+from `~/mox/brand/` (D-001 to D-005).
+
+**Playground** is the `/playground` route of the docs app, not a separate
+package. Its diagram renders with roughjs, and node sizing has a single source
+in `measure.ts` (D-006 to D-009, D-024).
 
 ## Tooling
 
@@ -354,7 +370,7 @@ On new session, read `scratch/next-session.md` and confirm understanding with us
 1. **Always fix, never skip** — when lints/checks fail, fix immediately. Don't ask whether to skip.
 2. **clippy --fix then fmt** — always run both in sequence before committing:
    ```bash
-   cargo clippy --fix --allow-dirty --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic
+   cargo clippy --fix --allow-dirty --manifest-path rumi/Cargo.toml -- -W clippy::pedantic
    cargo fmt --manifest-path rumi/Cargo.toml --all
    ```
 3. **Pre-commit auto-fixes** — if the hook fails, it auto-fixes and you re-stage + commit again.

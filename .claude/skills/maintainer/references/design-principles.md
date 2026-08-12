@@ -76,7 +76,7 @@ x.uma's protocol obligations:
 - `validate()` before evaluation (depth limit)
 - Regex uses `regex` crate only (linear time, ReDoS-safe)
 - Registry immutable after `build()` — no runtime registration
-- `evaluate_with_trace()` evaluates ALL children (no short-circuit for debug visibility)
+- `Predicate::evaluate_with_trace()` evaluates all child predicates (no short-circuit for debug visibility). Scoped to the predicate tree: the matcher-level trace still honours first-match-wins.
 
 **Trigger:** Any shortcut that violates these invariants.
 

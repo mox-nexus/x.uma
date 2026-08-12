@@ -755,9 +755,15 @@ mod tests {
 
     // ─── Config loading ──────────────────────────────────────────────────
 
+    /// Checked-in fixture, resolved relative to this crate so the tests pass
+    /// from any working directory and on any machine.
+    fn fixture_path() -> String {
+        format!("{}/tests/fixtures/config.yaml", env!("CARGO_MANIFEST_DIR"))
+    }
+
     #[test]
     fn load_yaml_config() {
-        let config = load_config("/tmp/xuma-yaml-test/config.yaml");
+        let config = load_config(&fixture_path());
         assert!(
             config.is_ok(),
             "failed to load YAML config: {:?}",
@@ -767,7 +773,7 @@ mod tests {
 
     #[test]
     fn eval_yaml_config() {
-        let config = load_config("/tmp/xuma-yaml-test/config.yaml").unwrap();
+        let config = load_config(&fixture_path()).unwrap();
         let registry = build_test_registry();
         let matcher = registry.load_matcher(config).unwrap();
 

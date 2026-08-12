@@ -102,10 +102,11 @@ pub trait CustomMatchData: Send + Sync + Debug {
 /// assert_eq!(data.as_str(), Some("hello"));
 /// assert!(!data.is_none());
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum MatchingData {
     /// No data available (extractor returned nothing).
     /// When a predicate receives this, it evaluates to `false` (INV: Dijkstra).
+    #[default]
     None,
 
     /// String data — the most common case for HTTP headers, paths, etc.
@@ -309,12 +310,6 @@ impl MatchingData {
             Self::Bytes(_) => "bytes",
             Self::Custom(c) => c.custom_type_name(),
         }
-    }
-}
-
-impl Default for MatchingData {
-    fn default() -> Self {
-        Self::None
     }
 }
 
@@ -545,7 +540,6 @@ mod tests {
         #[derive(Debug)]
         struct GeoRequest {
             user_location: GeoLocation,
-            user_id: String,
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -640,7 +634,6 @@ mod tests {
                     lat: 37.78,
                     lon: -122.42,
                 },
-                user_id: "user_sf".to_string(),
             };
             assert_eq!(
                 matcher.evaluate(&sf_request),
@@ -653,7 +646,6 @@ mod tests {
                     lat: 40.71,
                     lon: -74.01,
                 },
-                user_id: "user_nyc".to_string(),
             };
             assert_eq!(
                 matcher.evaluate(&nyc_request),
@@ -666,7 +658,6 @@ mod tests {
                     lat: 51.5074,
                     lon: -0.1278,
                 },
-                user_id: "user_london".to_string(),
             };
             assert_eq!(
                 matcher.evaluate(&london_request),

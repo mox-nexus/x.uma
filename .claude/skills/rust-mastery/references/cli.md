@@ -2,6 +2,13 @@
 
 Building command-line tools. Best-in-class choices.
 
+> **x.uma override.** This file is general Rust guidance. Where it recommends an
+> error-handling crate (`thiserror`, `anyhow`, `color-eyre`, `miette`, `snafu`),
+> x.uma does not use one. Errors are hand-written enums with manual `Display` and
+> `Error` impls (`rumi/core/src/lib.rs:216-331`). Adding a utility crate
+> dependency is a listed anti-pattern in CLAUDE.md. See SKILL.md → x.uma
+> Overrides before acting on anything below.
+
 ## Argument Parsing
 
 ```

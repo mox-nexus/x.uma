@@ -1,0 +1,21 @@
+# Fixture for the CLI's YAML config-loading tests.
+#
+# Checked in deliberately: these tests previously read a hardcoded
+# /tmp/xuma-yaml-test/config.yaml that no clone ever had, so they failed for
+# everyone but the machine that happened to create it by hand.
+#
+# Uses the test registry (xuma.test.v1.StringInput), matching on "method".
+matchers:
+  - predicate:
+      type: single
+      input: { type_url: "xuma.test.v1.StringInput", config: { key: "method" } }
+      value_match: { Exact: "GET" }
+    on_match: { type: action, action: "route-get" }
+
+  - predicate:
+      type: single
+      input: { type_url: "xuma.test.v1.StringInput", config: { key: "method" } }
+      value_match: { Exact: "POST" }
+    on_match: { type: action, action: "route-post" }
+
+on_no_match: { type: action, action: "fallback" }

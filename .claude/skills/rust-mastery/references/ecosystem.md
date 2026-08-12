@@ -2,6 +2,13 @@
 
 Crate selection, deprecations, and evaluation frameworks.
 
+> **x.uma override.** This file is general Rust guidance. Where it recommends an
+> error-handling crate (`thiserror`, `anyhow`, `color-eyre`, `miette`, `snafu`),
+> x.uma does not use one. Errors are hand-written enums with manual `Display` and
+> `Error` impls (`rumi/core/src/lib.rs:216-331`). Adding a utility crate
+> dependency is a listed anti-pattern in CLAUDE.md. See SKILL.md → x.uma
+> Overrides before acting on anything below.
+
 ## Sources
 
 | Attribution | URL |
@@ -39,7 +46,7 @@ BurntSushi on lexopt: "demonstrates exactly how something new can arrive on the 
 
 | Crate | Use When |
 |-------|----------|
-| thiserror | Library — callers match on variants |
+| thiserror | Library — callers match on variants. **Not in x.uma:** `MatcherError` is hand-written. |
 | anyhow | Application — just propagate errors |
 | color-eyre | CLI — colored pretty errors |
 | miette | Compiler/linter — source snippets |
