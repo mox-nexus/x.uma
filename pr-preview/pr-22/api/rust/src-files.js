@@ -1,0 +1,2 @@
+createSrcSidebar('[["rumi",["",[["claude",[],["compiler.rs","config.rs","context.rs","inputs.rs","mod.rs"]]],["config.rs","data_input.rs","field_matcher.rs","input_matcher.rs","lib.rs","matcher.rs","matcher_tree.rs","matching_data.rs","on_match.rs","predicate.rs","radix_tree.rs","registry.rs","string_match.rs","trace.rs"]]],["rumi",["",[],["main.rs"]]],["rumi_http",["",[],["compiler.rs","context.rs","inputs.rs","lib.rs","message.rs","simple.rs"]]],["rumi_test",["",[],["lib.rs"]]]]');
+//{"start":19,"fragment_lengths":[306,29,97,33]}
