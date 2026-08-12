@@ -27,23 +27,23 @@ breaking:
 
 # Build all crates
 build:
-    cargo build --manifest-path rumi/Cargo.toml --workspace
+    cargo build --manifest-path rumi/Cargo.toml
 
 # Build with all features
 build-full:
-    cargo build --manifest-path rumi/Cargo.toml --workspace --all-features
+    cargo build --manifest-path rumi/Cargo.toml --all-features
 
 # Run tests
 test:
-    cargo test --manifest-path rumi/Cargo.toml --workspace
+    cargo test --manifest-path rumi/Cargo.toml
 
 # Run tests with all features
 test-full:
-    cargo test --manifest-path rumi/Cargo.toml --workspace --all-features
+    cargo test --manifest-path rumi/Cargo.toml --all-features
 
 # Run clippy lints
 lint:
-    cargo clippy --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic
+    cargo clippy --manifest-path rumi/Cargo.toml -- -W clippy::pedantic
 
 # Format code
 fmt:
@@ -56,6 +56,13 @@ fmt-check:
 # Run all checks (lint + fmt-check + test)
 check: lint fmt-check test
 
+# Everything CI runs, in the same order. Green here means green there.
+ci: fmt-check lint-strict test test-fixtures puma-check bumi-check docs-check docs-build
+
+# Clippy as CI enforces it: all targets, warnings denied
+lint-strict:
+    cargo clippy --manifest-path rumi/Cargo.toml --all-targets -- -D warnings
+
 # Build and open Rust documentation
 doc:
     cargo doc --manifest-path rumi/Cargo.toml --workspace --exclude rumi-proto --no-deps --open
@@ -64,37 +71,25 @@ doc:
 # Documentation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Generate Rust API docs
+# Run the docs site with hot reload (localhost:6200)
+docs-dev: bumi-build
+    cd docs/experience && bun run dev
+
+# Build the docs site (includes Pagefind search index)
+docs-build: bumi-build
+    cd docs/experience && bun run build
+
+# Preview the production docs build
+docs-preview:
+    cd docs/experience && bun run preview
+
+# Type-check the docs site
+docs-check:
+    cd docs/experience && bun run check
+
+# Generate Rust API docs (assembled into the site at /api/rust by CI)
 docs-rust:
-    cargo doc --manifest-path rumi/Cargo.toml --workspace --exclude rumi-proto --no-deps
-
-# Generate Python API docs
-docs-python:
-    cd puma && uv run pdoc xuma -o ../docs/api/python --html
-
-# Generate TypeScript API docs
-docs-typescript:
-    cd bumi && bunx typedoc src/index.ts --out ../docs/api/typescript
-
-# Generate all API docs
-docs-api: docs-rust docs-python docs-typescript
-    mkdir -p docs/api/rust
-    cp -r rumi/target/doc/* docs/api/rust/
-
-# Build mdBook site
-docs-build:
-    mdbook build docs
-
-# Build everything (mdBook + API docs)
-docs: docs-api docs-build
-
-# Serve docs locally with hot reload
-docs-serve:
-    mdbook serve docs --open
-
-# Clean generated docs
-docs-clean:
-    rm -rf docs/book docs/api
+    cargo doc --manifest-path rumi/Cargo.toml --no-deps
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Benchmarks
@@ -128,10 +123,6 @@ bench-all: bench-rust bench-puma bench-bumi bench-xuma-crust-py bench-xuma-crust
 # Alias for bench-all
 bench: bench-all
 
-# Verify no_std compatibility (core only)
-check-no-std:
-    cargo build --manifest-path rumi/Cargo.toml -p rumi --no-default-features --features alloc
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Python (puma)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -140,6 +131,17 @@ check-no-std:
 puma-test:
     cd puma && uv run pytest
 
+# Lint puma
+puma-lint:
+    cd puma && uv run ruff check .
+
+# Type-check puma
+puma-typecheck:
+    cd puma && uv run mypy src/xuma
+
+# Run all puma checks
+puma-check: puma-lint puma-typecheck puma-test
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # TypeScript (bumi)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -147,6 +149,10 @@ puma-test:
 # Install bumi dependencies
 bumi-install:
     cd bumi && bun install
+
+# Build bumi to dist/ (published artifact — .js + .d.ts)
+bumi-build:
+    cd bumi && bun run build
 
 # Run bumi tests
 bumi-test:
@@ -170,26 +176,6 @@ bumi-fmt-check:
 
 # Run all bumi checks
 bumi-check: bumi-lint bumi-fmt-check bumi-typecheck bumi-test
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Playground
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Install playground dependencies
-playground-install:
-    cd playground && bun install
-
-# Run playground dev server
-playground-dev:
-    cd playground && bun run dev
-
-# Build playground for production
-playground-build:
-    cd playground && bun run build
-
-# Preview production playground build
-playground-preview:
-    cd playground && bun run preview
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Conformance Testing

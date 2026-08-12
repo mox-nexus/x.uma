@@ -236,8 +236,7 @@ impl HookMatch {
 fn trace_string_match(string_match: &StringMatch, value: &str) -> bool {
     string_match
         .to_input_matcher()
-        .map(|m| m.matches(&MatchingData::String(value.to_string())))
-        .unwrap_or(false)
+        .is_ok_and(|m| m.matches(&MatchingData::String(value.to_string())))
 }
 
 #[cfg(test)]

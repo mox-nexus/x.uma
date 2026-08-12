@@ -1,5 +1,10 @@
 name: Deploy Docs
 
+# One app, one build, one deploy. The docs site is a single SvelteKit app
+# (adapter-static) that carries the playground as its /playground route.
+# mdBook was retired on 2026-08-12; the standalone playground app was folded in
+# the same day (see DECISIONS.md D-024).
+
 on:
   push:
     branches: [main]
@@ -12,7 +17,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: "pages-${{ github.ref }}"
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -21,59 +26,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: oven-sh/setup-bun@v2
 
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/
-            ~/.cargo/git/
-            rumi/target/
-          key: ${{ runner.os }}-cargo-docs-${{ hashFiles('**/Cargo.lock') }}
+          workspaces: rumi
 
-      - name: Install mdBook
+      # bumi is a local file dep and bun copies it at install time, so its
+      # dist/ must exist before the docs app installs.
+      - name: Build bumi
+        working-directory: bumi
+        run: bun install --frozen-lockfile && bun run build
+
+      - name: Build docs site
+        working-directory: docs/experience
+        env:
+          BASE_PATH: ${{ github.event_name == 'pull_request' && format('/x.uma/pr-preview/pr-{0}', github.event.number) || '/x.uma' }}
+        run: bun install && bun run build
+
+      - name: Build Rust API docs
+        run: cargo doc --manifest-path rumi/Cargo.toml --no-deps
+
+      - name: Assemble site
         run: |
-          if ! command -v mdbook &> /dev/null; then
-            cargo install mdbook
-          fi
+          mkdir -p site
+          cp -r docs/experience/build/. site/
+          mkdir -p site/api/rust && cp -r rumi/target/doc/. site/api/rust/
+          echo "assembled:" && ls site
 
-      # Generate Rust docs
-      - name: Build Rust docs
-        run: |
-          cargo doc --manifest-path rumi/Cargo.toml --workspace --no-deps \
-            --exclude rumi-proto \
-            --exclude xuma-crust-python \
-            --exclude xuma-crust-wasm
-          mkdir -p docs/src/generated/rust
-          cp -r rumi/target/doc/* docs/src/generated/rust/
-
-      # Placeholder for Proto docs (until buf doc generation is set up)
-      - name: Create Proto docs placeholder
-        run: |
-          mkdir -p docs/src/generated/proto
-          echo '<html><body><h1>Proto docs coming soon</h1><p>Will be auto-generated from proto/xuma/**/*.proto</p></body></html>' > docs/src/generated/proto/index.html
-
-      # Build mdBook
-      - name: Build mdBook
-        run: mdbook build docs
-
-      # PR Preview
-      - name: Deploy PR Preview
+      - name: Deploy PR preview
         if: github.event_name == 'pull_request'
         uses: rossjrw/pr-preview-action@v1
         with:
-          source-dir: docs/book
+          source-dir: site
           preview-branch: gh-pages
           umbrella-dir: pr-preview
 
-      # Production deploy to gh-pages root (main only)
       - name: Deploy to gh-pages
         if: github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/book
-          keep_files: true  # Keep PR previews
+          publish_dir: site
+          keep_files: true

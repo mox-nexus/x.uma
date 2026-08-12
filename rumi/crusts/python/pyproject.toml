@@ -4,6 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "xuma-crust"
+description = "Rust-backed bindings for the x.uma matcher engine"
+license = "MIT OR Apache-2.0"
 requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Rust",

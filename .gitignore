@@ -75,8 +75,10 @@ docs/book/
 docs/api/
 
 # Playground
-playground/build/
-playground/.svelte-kit/
+# SvelteKit build artifacts, any app. Scoped rules meant each new app
+# needed someone to remember; these do not.
+.svelte-kit/
+pagefind/
 !playground/src/lib/
 
 # Screenshots / Playwright

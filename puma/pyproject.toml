@@ -3,7 +3,7 @@ name = "xuma"
 version = "0.0.2"
 description = "Pure Python implementation of xDS Unified Matcher API"
 requires-python = ">=3.12"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 readme = "README.md"
 dependencies = ["google-re2>=1.1"]
 
@@ -41,3 +41,9 @@ python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+
+# google-re2 ships no py.typed marker, so strict mode cannot analyze it.
+# Scoped to this module only; everything else stays strict.
+[[tool.mypy.overrides]]
+module = "re2"
+ignore_missing_imports = true

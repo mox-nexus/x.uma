@@ -14,7 +14,7 @@ Indexed list of x.uma's protocol obligations. Inspired by rust-analyzer's 26 lab
 | INV-4 | `OnMatch` is exclusive — Action XOR Matcher, never both | Rust enum (type-level) |
 | INV-5 | `Registry` is immutable after `build()` | `&self` methods only |
 | INV-6 | `MAX_DEPTH=32` enforced at `validate()` time | `MatcherError::DepthExceeded` |
-| INV-7 | `evaluate_with_trace()` evaluates ALL children (no short-circuit) | Unit tests compare trace coverage |
+| INV-7 | `Predicate::evaluate_with_trace()` evaluates all child **predicates** (no short-circuit). `Matcher::evaluate_with_trace` DOES stop at first match (`matcher.rs:193`) — required by INV-2/INV-3. | Unit tests compare trace coverage |
 
 When adding code that touches the evaluation or config-loading pipeline, verify that all 7 invariants hold. When writing `// INV:` comments in code, use the number.
 

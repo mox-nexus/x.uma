@@ -1,6 +1,6 @@
 # x.uma
 
-[![Docs](https://img.shields.io/badge/docs-mdbook-blue)](https://mox-nexus.github.io/x.uma/)
+[![Docs](https://img.shields.io/badge/docs-x.uma-4da6ff)](https://mox-nexus.github.io/x.uma/)
 [![CI](https://github.com/mox-nexus/x.uma/actions/workflows/docs.yml/badge.svg)](https://github.com/mox-nexus/x.uma/actions/workflows/docs.yml)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](LICENSE-MIT)
 
@@ -8,15 +8,26 @@
 
 Match structured data against rule trees. Write the rules once; evaluate them in Rust, Python, or TypeScript and get the same answer every time.
 
-**[Try the Playground →](https://mox-nexus.github.io/x.uma/playground/)**
+## Install
 
-## Choose your runtime
+> **Not yet on registries.** No release has been cut, so `rumi-core`, `xuma`, and
+> `xuma-crust` do not resolve on crates.io, PyPI, or npm yet. Build from source
+> until the first release lands.
+
+```bash
+git clone https://github.com/mox-nexus/x.uma
+cd x.uma
+just build          # all runtimes
+just test           # conformance suite, every implementation
+just docs-dev       # docs + playground on localhost:6200
+```
+
+Once released, the runtimes install as:
 
 **Rust** — reference implementation, lowest latency:
 ```bash
 cargo add rumi-core rumi-http
-# CLI
-cargo install --path rumi/cli  # binary: rumi
+cargo install rumi-cli   # binary: rumi
 ```
 
 **Python** — pure Python or Rust-backed:
@@ -125,14 +136,16 @@ allow
 | **Fail-closed** | Missing data from `DataInput` → predicate returns `false`. Never matches by accident. |
 | **Thread-safe** | `Send + Sync` (Rust) / immutable frozen types (Python, TypeScript) |
 
-~958 conformance tests pass across all five implementations.
+All five implementations run the same 27 conformance fixtures in `spec/tests/`.
+Suites at last run: 274 Rust, 294 Python, 258 TypeScript.
 
 ## Docs
 
-- **[Getting Started](https://mox-nexus.github.io/x.uma/)** — Rust, Python, TypeScript quick starts
-- **[Architecture](https://mox-nexus.github.io/x.uma/explain/architecture.html)** — Why type erasure at the data level
-- **[Config Format](https://mox-nexus.github.io/x.uma/reference/config.html)** — Full schema and type URL reference
-- **[CLI Reference](https://mox-nexus.github.io/x.uma/reference/cli.html)** — `rumi run`, `rumi check`, `rumi info`
+- **[Playground](https://mox-nexus.github.io/x.uma/playground/)** — build a matcher and watch it evaluate
+- **[Getting Started](https://mox-nexus.github.io/x.uma/docs/rust/)** — Rust, Python, TypeScript quick starts
+- **[How-to guides](https://mox-nexus.github.io/x.uma/docs/route-by-header/)** — routing, custom inputs, debugging a match
+- **[Architecture](https://mox-nexus.github.io/x.uma/docs/architecture/)** — why type erasure sits at the data level
+- **[Config Format](https://mox-nexus.github.io/x.uma/docs/config/)** — full schema and type URL reference
 
 ## License
 

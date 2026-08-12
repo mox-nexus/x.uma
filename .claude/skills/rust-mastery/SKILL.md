@@ -53,7 +53,9 @@ Apply this in `Registry::load_matcher()` if the method body grows large. Monomor
 
 **Source:** rustls (typestate builder → frozen config), confirmed across 8/13 codebases
 
-x.uma does this correctly: `Matcher::new` → `validate()` → use. The hot path (`evaluate()` at 33ns) is infallible. All validation happens at load time.
+x.uma does this on the loaded-config path: `Matcher::new` → `validate()` → use. The hot path (`evaluate()` at 33ns) is infallible.
+
+**Know which path you are on.** `Matcher::new` (`matcher.rs:64`) is a bare struct constructor that validates nothing; `validate()` is a separate call. It happens for you on the registry path (`registry.rs:414`) and at every FFI entry point. It does **not** happen in either domain compiler (`ext/http/src/compiler.rs:127`, `core/src/claude/compiler.rs:109`) — the very path CLAUDE.md promotes as the door handle. A hand-built `Matcher` that never calls `validate()` carries no guarantees at all.
 
 **Why this matters for x.uma:** Config loading can fail loudly. Evaluation must never panic. This is how Envoy works too — bad config is rejected at load, never at request time.
 
@@ -76,7 +78,9 @@ registry.load_matcher(config)?;  // No generics in sight
 
 **Source:** serde's 29-type data model
 
-`MatchingData` is x.uma's data model — the contract between `DataInput` (produces it) and `InputMatcher` (consumes it). Everything that maps cleanly to `MatchingData` variants works perfectly. The `Custom(Box<dyn Any>)` variant exists for extensibility but should be used sparingly.
+`MatchingData` is x.uma's data model — the contract between `DataInput` (produces it) and `InputMatcher` (consumes it). Everything that maps cleanly to `MatchingData` variants works perfectly. The `Custom(Arc<dyn CustomMatchData>)` variant (`matching_data.rs:139`) exists for extensibility but should be used sparingly.
+
+`Arc`, not `Box`, and `CustomMatchData`, not `Any`. Both matter: `Arc` is what makes the `Arc::ptr_eq` identity comparison possible, and `CustomMatchData: Send + Sync + Debug` (`matching_data.rs:54`) carries the FFI bounds plus the `custom_type_name()` hook that config-time validation reads. `Box<dyn Any>` would compile away all three.
 
 **Never bypass this contract.** Every DataInput produces MatchingData. Every InputMatcher consumes MatchingData. This indirection is what makes InputMatcher non-generic and shareable across all domain contexts.
 
@@ -93,6 +97,32 @@ pub enum OnMatch<Ctx, A> {
 ```
 
 This is making illegal states unrepresentable. The proto uses `oneof`, Rust uses `enum`. Both enforce the same constraint at the type level. Never weaken this to a struct with optional fields.
+
+**The three mechanisms, in order of durability.** When you need an invariant to hold, reach for these before reaching for a runtime check or a comment.
+
+1. **Enum over optional fields** — `OnMatch` (`on_match.rs:29`). Two things that must not co-occur become two variants. The wrong state has no spelling.
+
+2. **Consume `self` to transition** — `RegistryBuilder::build(self)` (`registry.rs:230`) turns "do not register after build" from a rule into a move error. The general form is typestate:
+
+   ```rust
+   pub struct Thing<State> { _state: PhantomData<State> }
+   pub struct Unvalidated;
+   pub struct Validated;
+
+   impl Thing<Unvalidated> {
+       pub fn validate(self) -> Result<Thing<Validated>, Error> { /* ... */ }
+   }
+
+   impl Thing<Validated> {
+       pub fn evaluate(&self) -> Decision { /* only reachable after validate */ }
+   }
+   ```
+
+   Note what this would buy x.uma: today `Matcher::new` returns a `Matcher` whether or not `validate()` was ever called, so the domain compilers hand back matchers carrying no guarantees. A typestate `Matcher<Unvalidated>` / `Matcher<Validated>` would make that path a compile error rather than a convention. Not proposed as work here, but it is the shape of the answer if the split ever bites.
+
+3. **Runtime check at a chokepoint** — `validate()` and the `Registry::load_*` limits. Weakest of the three, because it only holds on paths that call it. Use when the constraint is data-dependent and genuinely cannot be typed.
+
+Prefer 1, then 2, then 3. A comment saying "remember to X" is not on the list.
 
 ### 7. Two Type Parameters, No More
 
@@ -127,17 +157,20 @@ Non-negotiable. Every change must preserve these:
 | INV-4 | `OnMatch` is exclusive — Action XOR Matcher, never both | Ambiguous semantics — which takes precedence? |
 | INV-5 | `Registry` is immutable after `build()` | Thread-safety — concurrent mutation without locks |
 | INV-6 | `MAX_DEPTH=32` enforced at `validate()` time | Stack overflow from deeply nested matchers |
-| INV-7 | `evaluate_with_trace()` evaluates ALL children (no short-circuit) | Incomplete debug info — trace hides skipped branches |
+| INV-7 | `Predicate::evaluate_with_trace()` evaluates all child **predicates** (no short-circuit) | Incomplete debug info — trace hides skipped branches |
+
+INV-7 is scoped to the predicate tree deliberately. `Matcher::evaluate_with_trace` **does** stop at the first match (`matcher.rs:193`), because first-match-wins is INV-2 and the trace must agree with `evaluate()` per INV-3. Do not "restore" symmetry by deleting that early return. Known limitation: the matcher trace calls plain `evaluate` on the fallback (`matcher.rs:216`), so a nested `on_no_match` sub-trace is never recorded.
 
 ## Arch-Guild Constraints
 
 | Constraint | Enforcement |
 |------------|-------------|
 | ReDoS Protection | `regex` crate only (linear time). Never `fancy-regex`. |
+| Resource limits (5) | `MAX_DEPTH=32`, `MAX_FIELD_MATCHERS=256`, `MAX_PREDICATES_PER_COMPOUND=256`, `MAX_PATTERN_LENGTH=8192`, `MAX_REGEX_PATTERN_LENGTH=4096` (`lib.rs:183-205`). Only `MAX_DEPTH` is checked in `validate()`; the other four are enforced solely inside `Registry::load_*`, so a hand-built or compiler-built matcher bypasses them. The crusts **re-declare** the two pattern limits locally (`crusts/python/src/convert.rs:12`, `crusts/wasm/src/convert.rs:10`) instead of importing them — three copies with no compile-time link. |
 | Max 32 Depth | `MatcherError::DepthExceeded` at `validate()` time |
 | Registry Immutable | `&self` methods only after `build()` |
 | Send + Sync + Debug | All public types — FFI requirement (PyO3, WASM) |
-| Iterative Evaluation | No recursive `evaluate()` — use explicit stack |
+| Iterative Evaluation | **Deferred to v0.2.** Evaluation is recursive today (`matcher.rs:136`, `predicate.rs:150`). `MAX_DEPTH=32` holds the line. |
 | Action: 'static + Clone + Send + Sync | Lifetime simplicity for FFI + first-match-wins cloning |
 
 ## FFI Boundary Patterns
@@ -180,15 +213,17 @@ Reference files for domain-specific patterns:
 
 | Detected | Load |
 |----------|------|
-| `clap`, `lexopt`, CLI binary | [cli.md](references/cli.md) |
-| `axum`, `tonic`, `sqlx`, API/service | [backend.md](references/backend.md) |
-| `leptos`, `dioxus`, `wasm-bindgen`, browser WASM | [frontend.md](references/frontend.md) |
-| `tauri`, `egui`, desktop/mobile app | [native.md](references/native.md) |
-| `#![no_std]`, `cortex-m`, `embassy`, `rtic` | [embedded.md](references/embedded.md) |
-| `pingora`, `rama`, `proxy`, `xds` | [data-plane.md](references/data-plane.md) |
-| `bindgen`, `cbindgen`, `cxx`, `PyO3`, `unsafe` | [ffi-unsafe.md](references/ffi-unsafe.md) |
-| `proc-macro = true`, `syn`, `quote` | [proc-macros.md](references/proc-macros.md) |
-| `reqwest`, HTTP client, protocols | [networking.md](references/networking.md) |
+| `PyO3`, `wasm-bindgen`, crust work | **FFI Boundary Patterns above** — not a reference file |
+| WASM bundle size, JS interop cost | [wasm.md](references/wasm.md) |
+| `clap`, `lexopt`, `rumi-cli` | [cli.md](references/cli.md) |
 | Crate selection questions | [ecosystem.md](references/ecosystem.md) |
 | Project setup, CI, configs | [tooling.md](references/tooling.md) |
-| Deep async patterns, tokio internals | [async.md](references/async.md) |
+| `bindgen`, `cbindgen`, `cxx`, raw `unsafe` | [ffi-unsafe.md](references/ffi-unsafe.md) — **future trigger.** The repo contains zero `unsafe`; the crusts use safe PyO3/wasm-bindgen. |
+
+The corpus was trimmed on 2026-08-11. It previously carried eleven references
+covering async, backend services, native GUI, embedded, proc-macros, networking
+and proxy data planes — roughly 1,200 lines documenting domains this repo does
+not have, three of which recommended dependencies the row above forbids. They
+arrived wholesale in one commit (`52e22de`) as a side-car to an unrelated PR and
+were never reconciled against this project. Do not re-add a reference for a
+domain until the repo actually triggers it.
