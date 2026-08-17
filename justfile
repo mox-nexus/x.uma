@@ -30,7 +30,12 @@ gen:
     STAGE=$(mktemp -d)
     echo "gen: staging in $STAGE"
     buf generate -o "$STAGE"
-    buf generate buf.build/cncf/xds --template buf.gen.rust.yaml -o "$STAGE"
+    # Scoped with --path. `buf generate buf.build/cncf/xds` without it pulls the
+    # WHOLE module — ORCA load-reporting services, annotation metadata, the legacy
+    # udpa namespace — 14 extra files and ~4,500 lines that lib.rs never includes
+    # and nothing compiles. Only these three packages are used.
+    buf generate buf.build/cncf/xds --template buf.gen.rust.yaml -o "$STAGE" \
+        --path xds/core/v3 --path xds/type/v3 --path xds/type/matcher/v3
     for d in rumi/proto/src/gen puma/proto/src/gen bumi/proto/src/gen; do
         test -d "$STAGE/$d" || { echo "gen: $d missing from staging, refusing to swap"; exit 1; }
     done

@@ -43,17 +43,45 @@ dropping the alias was one of the options. Tested: removing the alias produces
 The alias is load-bearing and orthogonal; it is why protojson works at all.
 Keep it.
 
-**Generated code is now committed**, for all three languages. `.gitignore` had
-excluded it since `e36dd29` on the reason that it "keeps PRs reviewable" — but
-the same commit added `.gitattributes linguist-generated=true`, which already
-collapses those diffs. The exclusion's real effect was that `just gen` produced
-no diff *by construction*, so codegen drift was undetectable, and a crate could
-go its entire life uncompiled without CI noticing. Exactly that happened.
+**Generated code is now committed**, for all three languages — but the reason
+matters, because the first version of this entry gave the wrong one.
 
-Two consequences that bit immediately and are worth knowing:
+The argument that does *not* carry it: "the ignore made `just gen` produce no
+diff, so drift was undetectable." True, but committing is not the only fix — CI
+could regenerate fresh on every run and store nothing, and then drift is
+impossible because there is nothing to drift from. `protocol-mastery` lists that
+as the alternative (Envoy/Bazel). Nor did the ignore cause `rumi-proto` to go
+uncompiled; the unpinned plugin and a CI job that never ran `-p rumi-proto` did,
+and both are fixed independently.
+
+**The argument that does carry it is publishing.** E1 publishes `rumi-proto` to
+crates.io. `cargo package` follows git tracking, so gitignored generated code
+does not reach the published crate and it would ship broken. Generating at build
+time instead would force every consumer to have `buf` and network access. This is
+why prost-ecosystem crates commit generated code, and it is the reason here.
+
+This reverses `e36dd29`, which excluded generated code because it "keeps PRs
+reviewable". That concern is real and is now handled two ways: the same commit
+already added `.gitattributes linguist-generated=true`, which collapses these
+diffs in review, and the scoping below cuts the tracked tree in half.
+
+**Generate only what is used.** `buf generate buf.build/cncf/xds` without
+`--path` pulls the entire module: ORCA load-reporting messages and services, xDS
+and udpa annotation metadata, the legacy udpa namespace. That is **14 files and
+~4,500 lines that `lib.rs` never includes and nothing compiles** — committed once,
+in a matcher engine, before being caught. `just gen` now scopes to
+`xds/core/v3`, `xds/type/v3`, `xds/type/matcher/v3`. If a fourth package is ever
+needed, add it explicitly rather than removing the scoping.
+
+Three consequences that bit immediately and are worth knowing:
 - **ruff honours `.gitignore`.** Un-ignoring `puma/proto/src/gen/` made ruff
   start linting generated Python. Excluded explicitly in `pyproject.toml`; the
   ignore file had been doing lint configuration by accident.
+- **`clean: true` plus a two-pass network generate can destroy the tree.** The
+  second pass fetches from the BSR, which rate-limits; it failed after the first
+  pass had already wiped, leaving 44 files deleted from the working tree. `just
+  gen` now stages both passes and swaps only on success, and deletes nothing —
+  outgoing trees are moved into the staging directory for the OS to reap.
 - **The pin fixes the output layout too.** v0.4.0 emits flat files, v0.5.0 nested.
   `rumi/proto/src/lib.rs`'s `include!` paths follow the pin, and say so.
 
