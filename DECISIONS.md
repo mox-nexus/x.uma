@@ -85,9 +85,30 @@ Three consequences that bit immediately and are worth knowing:
 - **The pin fixes the output layout too.** v0.4.0 emits flat files, v0.5.0 nested.
   `rumi/proto/src/lib.rs`'s `include!` paths follow the pin, and say so.
 
-**What would overturn this:** wanting a prost 0.14 runtime. Then the pins move
-together with it, and whether `Any` gains `Eq`/`Hash` upstream has to be checked
-first — not assumed.
+**Alternatives considered, so this is not a one-way door.**
+
+*Generate in `build.rs` and track only the `.proto` sources* — the Envoy/Bazel
+shape. Measured: 3,673 tracked lines (175 ours + 3,498 vendored xDS) against
+10,990 generated, and the tracked content would be readable source. Rejected
+because `prost-build` 0.13 does not bundle `protoc`; it needs one in `PATH` or a
+~15 MB vendored-binary dependency, which puts a compiler toolchain between a user
+and `cargo add rumi-core`. Envoy can do this because it is an *application* whose
+consumers already run Bazel. We publish libraries to a registry. The published
+prost ecosystem — `tonic-health`, `tonic-reflection`, `etcd-client` — lands the
+same way we have, for the same reason.
+
+*Depend on an existing published xDS crate* (e.g. `xds-api`) instead of
+generating the xDS half at all. Not investigated. It would cut the tracked tree
+to our own 175 lines of protos plus their generated output, and it is the option
+most likely to make this decision obsolete. Worth a look before 0.2.
+
+**What would overturn this:**
+- `prost-build` bundling `protoc` again, or a zero-cost way to generate at
+  consumer build time. Then `build.rs` wins on tracked-line count outright.
+- A published upstream crate supplying the xDS types at a compatible prost
+  version — see `xds-api` above.
+- Wanting a prost 0.14 runtime. Then the plugin pins move with it, and whether
+  `Any` gains `Eq`/`Hash` upstream must be **checked, not assumed**.
 
 ---
 
