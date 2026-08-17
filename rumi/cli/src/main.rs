@@ -18,6 +18,7 @@ use rumi::MatcherConfig;
 use rumi_http::HttpRequest;
 use rumi_test::TestContext;
 
+mod hook;
 mod skill;
 mod trace_output;
 
@@ -347,6 +348,13 @@ fn cmd_run_claude(args: &[String]) -> Result<(), String> {
         return Err("run claude requires a config file path".into());
     }
 
+    if args.iter().any(|a| a == "--stdin") {
+        // Never returns: hook mode answers with an exit code, and mapping a
+        // Result back onto one here would lose the distinction between "block"
+        // and "errored", which are the same exit code for opposite reasons.
+        run_claude_hook(args);
+    }
+
     let trace = wants_trace(args);
     let args = without_trace(args);
     let config_path = &args[0];
@@ -362,6 +370,95 @@ fn cmd_run_claude(args: &[String]) -> Result<(), String> {
     report(&matcher, &ctx, trace);
 
     Ok(())
+}
+
+/// `rumi run claude --stdin <config>` — read a hook payload, exit with a verdict.
+///
+/// Diverges rather than returning, because the exit code *is* the answer. See
+/// `hook.rs` for the contract; the short version is that every failure exits
+/// with the block code, because Claude Code lets a tool call proceed on any
+/// non-zero code other than 2.
+fn run_claude_hook(args: &[String]) -> ! {
+    use std::io::Read;
+
+    let args = without_trace(args);
+    let config_path = &args[0];
+
+    let deny_actions: Vec<String> = match flag_value(&args, "--deny-action") {
+        Some(name) => vec![name],
+        None => hook::DEFAULT_DENY_ACTIONS
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect(),
+    };
+
+    let mut raw = String::new();
+    if let Err(e) = std::io::stdin().read_to_string(&mut raw) {
+        block("could not read the hook payload from stdin", &e.to_string());
+    }
+
+    let payload = match hook::parse_payload(&raw) {
+        Ok(p) => p,
+        Err(e) => block("malformed hook payload", &e),
+    };
+
+    let config = match load_config(config_path) {
+        Ok(c) => c,
+        Err(e) => block("could not load the hook config", &e),
+    };
+
+    let matcher = match build_claude_registry().load_matcher(config) {
+        Ok(m) => m,
+        Err(e) => block("hook config is invalid", &e.to_string()),
+    };
+
+    let claude_args = ClaudeArgs {
+        event: payload.event.clone(),
+        tool: payload.tool_name.clone(),
+        arguments: payload
+            .arguments
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect(),
+        cwd: (!payload.cwd.is_empty()).then(|| payload.cwd.clone()),
+        branch: None,
+        session_id: (!payload.session_id.is_empty()).then(|| payload.session_id.clone()),
+    };
+
+    let ctx = match build_claude_context(&claude_args) {
+        Ok(c) => c,
+        Err(e) => block("hook payload describes an event rumi does not know", &e),
+    };
+
+    let decision = matcher.evaluate(&ctx);
+    let code = hook::exit_code_for(decision.as_deref(), &deny_actions);
+
+    if code == hook::EXIT_BLOCK {
+        // stderr on exit 2 is shown to the model, so it should say why.
+        eprintln!(
+            "blocked by rumi: rule matched with action \"{}\"",
+            decision.as_deref().unwrap_or("(none)")
+        );
+    }
+    std::process::exit(code);
+}
+
+/// Report a failure and exit with the block code.
+///
+/// Failing closed is the whole point: `rumi` reaching this path means it does
+/// not know whether the call is safe.
+fn block(what: &str, detail: &str) -> ! {
+    eprintln!("blocked by rumi: {what} — {detail}");
+    eprintln!("(rumi fails closed: it could not decide, so it did not allow)");
+    std::process::exit(hook::EXIT_BLOCK);
+}
+
+/// Value of `--flag value`, if present.
+fn flag_value(args: &[String], flag: &str) -> Option<String> {
+    args.iter()
+        .position(|a| a == flag)
+        .and_then(|i| args.get(i + 1))
+        .cloned()
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -633,6 +730,14 @@ Domains:
 
 Flags (all domains):
   --trace                               Show why each rule did or did not match
+
+Flags (claude domain):
+  --stdin                               Read a Claude Code hook payload as JSON
+                                        on stdin and answer with an exit code:
+                                        0 allow, 2 block. Every failure exits 2,
+                                        because Claude Code lets a tool call
+                                        proceed on any other non-zero code.
+  --deny-action NAME                    Action that means block (default: deny, block)
 
 Flags (test domain, default):
   --context key=value...                Context key-value pairs
