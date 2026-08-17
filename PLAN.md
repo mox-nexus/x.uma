@@ -1,9 +1,13 @@
 # Release plan — x.uma 0.1.0
 
 **Written for an agent arriving with no context.** Read this file top to bottom
-before touching anything. It is self-contained: every claim in it was verified
-against the code on 2026-08-16, and every task tells you how to prove you are
-done.
+before touching anything. Every task tells you how to prove you are done.
+
+Claims were verified against the code on 2026-08-16 and **re-verified on
+2026-08-17**, when several were found to be wrong and were corrected in place —
+see §4, where the corrections are called out rather than quietly applied. Treat
+it as a lead list, not as truth, and re-verify before acting. That is the same
+rule the plan applies to everything else.
 
 Target fidelity: **tarmac**. Production-hardened, observable, documented, no
 known silent failures. Not "it works on my machine", not "tests pass".
@@ -38,8 +42,11 @@ already states plainly: that this project commits generated code, and that
 | `frontend-design` | Phase H, docs-site work only. |
 
 **Also read, they are not skills but they are context:**
-`CLAUDE.md` (project), `DECISIONS.md` (D-001 to D-025, newest first),
-`scratch/phase-12/prior-art.md` (2025 design conversations recovered from memex).
+`CLAUDE.md` (project), `DECISIONS.md` (D-001 to D-027, newest first — **D-026
+settles the config format and is load-bearing for Phases SF, C and E**),
+`scratch/security-review/2026-08-16-pre-publication.md` (the full security review;
+Phase S depends on it), `scratch/phase-12/prior-art.md` (2025 design
+conversations recovered from memex).
 
 `CLAUDE.md:359` tells you to read `scratch/next-session.md`. **That file does not
 exist.** Fixing that stale instruction is task A1.
@@ -106,7 +113,7 @@ Worked examples so the scale is calibrated:
 - The four how-to pages: currently **Documentation 1**. Prose with examples that
   do not run. That is what A4 fixes.
 - `MAX_PATTERN_LENGTH`: currently **Correctness 1** — enforced on the loader path
-  only, bypassed by both domain compilers. Phase S2 takes it to 3.
+  only, bypassed by both domain compilers. Phase S's SEC2 takes it to 3.
 - `keep_matching`: currently **0 across the board** and documented as enforced.
   That combination is the worst square on this table.
 
@@ -118,7 +125,7 @@ exceptions is a ritual. Score only what applies:
 
 | Task class | Axes that apply | Example |
 |---|---|---|
-| Behaviour change | all four | S2 moving limits into constructors |
+| Behaviour change | all four | SEC2 moving limits into constructors |
 | Schema / format | Correctness, Verification, Documentation | SF fixtures, type-URL renames |
 | Docs and prose | Documentation, Verification | A3 fixing how-to pages |
 | Build / tooling | Verification, Reproducibility | `just doctor`, CI jobs |
@@ -146,11 +153,11 @@ gate on partial evidence.
 | M | Name | Phases | Exit gate |
 |---|---|---|---|
 | **M1** | The repo stops asserting what it cannot show | A | Every doc code sample is classified and enforced per the taxonomy below. Every roadmap ✅ corresponds to something CI runs. |
-| **M2** | A stranger can start | B, H1–H3 | `cargo add rumi-core` + README example compiles unmodified, verified from a scratch crate outside the workspace. `just doctor` passes on a machine with nothing installed. |
-| **M3** | Nothing loads clean and lies | S | S1, S2, S3 fixed, each with its falsifying test committed as a regression fixture. |
+| **M2** | A stranger can start | B, H1–H3 | README example compiles unmodified in a scratch crate **outside** the workspace, resolving `rumi-core` by path. The `cargo add rumi-core` line itself is a `future` block naming M7 — it cannot resolve until then, and a gate that requires it is the same unsatisfiable shape M1's taxonomy exists to fix. `just doctor` passes on a machine with nothing installed. |
+| **M3** | Nothing loads clean and lies | S | SEC1, SEC2, SEC3 fixed, each with its falsifying test committed as a regression fixture. |
 | **M4** | **Schema freeze** | SF | Every defect in §4 that crosses a schema boundary exists as a **failing** conformance fixture, and the schema's shape is decided and recorded. |
-| **M5** | One schema | C | The M4 fixtures pass. `buf generate` is the only source of config types in all three languages. All 27 existing fixtures pass through the frozen schema everywhere. |
-| **M6** | Everything is publishable | E, F, K | `cargo publish --dry-run` passes for all five crates in dependency order with no path patching. No published crate depends on a `publish = false` crate. CI builds every artifact. |
+| **M5** | One schema | C | The M4 fixtures pass. `buf generate` is the only source of config types in all three languages, and all three `gen/` trees are **tracked** (F20). All 27 fixtures pass through the frozen schema everywhere, or C4 records why a fixture legitimately does not. `just test-full` compiles (F19). |
+| **M6** | Everything is publishable | E, F, K | `cargo publish --dry-run` passes for all five **crates** — `rumi-core`, `rumi-proto`, `rumi-kv`, `rumi-http`, `rumi-cli` — in dependency order with no path patching. No published crate depends on a `publish = false` crate. CI builds every artifact, including the two crusts and the puma/bumi packages (seven artifacts total; the crates are a subset). |
 | **M7** | Released | G | Published, install instructions true, every `future`-marked doc block resolved. Phase L follows in 0.1.x. |
 
 **Ordering.** M1 and M2 are independent of the rest and can run in parallel with
@@ -191,6 +198,13 @@ one. So classify instead. Every code block in the docs gets exactly one marker:
 `future` is the honest slot for `cargo add rumi-core` before M7. It is not an
 escape hatch: a `future` block naming a milestone that has passed fails CI. That
 is the mechanism that reminds Phase G to delete the pre-release notes.
+
+**That check needs state, and the plan does not define any.** "CI asserts the
+milestone is still unreached" requires a machine-readable record of which
+milestones have passed. Add one in Phase A — a `MILESTONES.toml` at repo root,
+or a table in this file that the checker parses. Whichever, it is the single
+source and reaching a milestone means editing it. Without this the taxonomy's
+sharpest marker is unimplementable.
 
 **At each gate, write the scores.** A milestone claimed without its rubric filled
 in is exactly the failure this plan exists to correct.
@@ -289,16 +303,20 @@ release costs real users.
 Do **not** keep `MatcherConfig` as a compatibility shim. Zero users means zero
 shims.
 
-**One open design question you must answer in Phase C, not skip:** protojson is
-substantially more verbose than today's YAML. A rule that is 5 lines today
-becomes roughly 9, with camelCase, `matcherList`/`singlePredicate` wrappers,
-fully-qualified `@type` URLs, and actions promoted from bare strings to
-`TypedExtensionConfig`. Decide explicitly whether protojson is the **authoring**
-surface or only the **wire** surface. If wire-only, keep the terse YAML as a
-documented authoring dialect that lowers to proto — the lowering already exists
-in the other direction in `rumi/proto/src/convert.rs`. If authoring, ship a
-`rumi lower` command in the same release or hand-authoring dies. Record the
-answer in `DECISIONS.md`.
+**The authoring-surface question is answered. See `DECISIONS.md` D-026.**
+protojson is the **authoring** surface, not merely the wire surface. Config files
+stay — rules are defined in YAML or JSON files, both accepted — but their
+contents follow protobuf's canonical JSON mapping. The terse dialect is retired,
+not kept as a lowering layer.
+
+The reason is the `x`: x.uma exists to implement the xDS matcher API across
+languages, and a bespoke config dialect makes that premise false on the one
+surface users actually touch. Verbosity (a compound rule goes from ~11 lines to
+~27) is accepted; where hand-authoring ergonomics matter the answer is tooling —
+a rule builder or graph export — not a second schema.
+
+Do not re-open this in Phase C. If you believe it is wrong, the only thing that
+overturns it is a rule protojson cannot express.
 
 ---
 
@@ -324,15 +342,17 @@ Re-verify before acting. `grep` for the symbol, never the line number. If a row
 no longer reproduces, that is itself a finding — record it and move on rather
 than hunting for the original.
 
-**Green:** 274 Rust tests, 294 Python, 258 TypeScript, 27 conformance fixtures,
-`cargo audit` clean, CI green on PR #22, docs site builds and deploys.
+**Green (re-measured 2026-08-17 on merged `main`):** **276** Rust tests under
+`just test` — note that is `default-members`, which excludes `rumi-proto` — 294
+Python, 258 TypeScript, 27 conformance fixtures, `cargo audit` clean, docs site
+builds and deploys. PR #22 is **merged**; `main` is the baseline now.
 
 **Broken or untrue:**
 
 | # | Finding | Evidence |
 |---|---|---|
-| F1 | `rumi-proto` has never compiled | Zero tracked files in `rumi/proto/src/gen` in every commit in history |
-| F2 | `keep_matching` documented as an enforced invariant, not implemented | `CLAUDE.md:213`; zero occurrences in any runtime source |
+| F1 | `rumi-proto` has never compiled | Reproduced 2026-08-17: `cargo check -p rumi-proto` → 4 errors, `pbjson_types::Any: Eq`/`Hash`. **Correction to the original evidence:** it is *not* true that `gen/` was never tracked — `935ed9f` added 14 files and `e36dd29` removed them, both ancestors of HEAD. 28 files (960K) sit there untracked today. See C1. |
+| F2 | `keep_matching` documented as an enforced invariant, not implemented | `CLAUDE.md:213`. **Corrected evidence:** not "zero occurrences" — there are 8, all `keep_matching: false` literals in `rumi/proto/src/convert.rs`'s test module. Zero in `rumi/{core,ext,cli,crusts}`, `puma/src`, `bumi/src`. |
 | F3 | `MatcherTree`/`RadixTree` unreachable from config | No tree variant in `MatcherConfig`; `convert.rs:88` returns "MatcherTree is not yet supported" |
 | F4 | Claude domain is Rust-only | Absent from `puma/src` and `bumi/src`; README presents it as a peer of HTTP |
 | F5 | CI never builds either crust | Zero `crust` references in `.github/workflows/ci.yml`; crusts are outside `default-members` |
@@ -349,10 +369,25 @@ than hunting for the original.
 | F16 | HTTP compiler swallows invalid regex | `rumi/ext/http/src/compiler.rs:77-81` falls back to exact-matching the pattern literal. Route silently disappears. Sibling Claude compiler returns `Result`. |
 | F17 | `data_type()` defaults to `"string"` | `data_input.rs:60-62`. A custom input returning `Int` that forgets to override passes the compatibility check, loads clean, never matches. |
 | F18 | Docs snippets are invisible to CI | Every Rust block is ```` ```rust,ignore ````; shell blocks are unchecked. This is the root cause of F8. |
+| F19 | **`just test-full` does not compile** | `cargo test --all-features` → the same 4 errors as F1, because `--all-features` enables `rumi-test/proto` → `rumi-proto`. `just ci` passes anyway: `just test` uses `default-members` (`rumi/Cargo.toml:6`) and `justfile:68` hard-codes `--exclude rumi-proto`. A shipped `just` target is red and the gate cannot see it. |
+| F20 | Generated code is gitignored in **all three** languages | `.gitignore:58-60` covers `rumi/proto/src/gen/`, `puma/proto/src/gen/`, `bumi/proto/src/gen/`. All three exist on disk untracked (28 / 7 / 6 files); nothing imports the Python or TypeScript ones. M5's "all three languages" gate and CI5's no-diff check are both vacuous over untracked trees. |
+| F21 | Fixtures use **four** dialects, not three | `matcher:` (14), `config:` (7), `http_route_match:` (5), `http_route_matches:` **plural** (1, `spec/tests/05_http/multiple_routes.yaml:5`), each with its own branch in all three loaders. A5 says three. |
 
-**Security review was still running when this plan was written.** Its findings
-are folded in below. Check for a completed report before starting and
-fold it in.
+**Security review: complete, and now in the repo.**
+`scratch/security-review/2026-08-16-pre-publication.md` — recovered 2026-08-17
+from the session transcript that produced it, having never been written to disk.
+Read it before Phase S; the falsifying tests SEC1–SEC3 need are in it, several
+already run and passing.
+
+**Its numbering does not match this document's.** The review uses `F-01..F-06`,
+`S-1..S-5`, `L-1..L-4`. This plan uses `F1..F21` for §4 findings and `SEC1..SEC3`
+for Phase S tasks. When you see a bare `F6`, check which document you are in.
+The mapping is in Phase S.
+
+**And it contains at least one error.** Review F-04 says there is no
+`SessionIdInput`; there is, at `rumi/core/src/claude/inputs.rs:48`, registered at
+`claude/mod.rs:72`. Treat the review as evidence, not as truth — the same rule
+this section applies to itself.
 
 ---
 
@@ -400,15 +435,37 @@ followed. None of this is blocked by anything else.
   the directory is `bumi`. The maps that would correct a newcomer are themselves
   drifting.
 
-- **A5.** Rewrite `spec/tests/README.md`. The fixtures use three incompatible
-  schemas — `matcher:`, `http_route_match:`, and `config:` — and the README
-  documents the first, which no user can write. Only `config:` is the shipping
-  format. Lead with it; rename the other two keys so they cannot be mistaken for
-  it (`native_matcher:`, `compiler_route_match:`). The casing differs by one
-  character between dialects (`{exact:}` vs `{Exact:}`), which is a trap.
+- **A5.** Rewrite `spec/tests/README.md`. **Read this whole item before starting;
+  it is not the cheap docs task the phase header implies.**
 
-**Done when:** every command and code sample in `README.md` and `docs/content/`
-either executes in CI or does not exist in the docs. `just ci` green.
+  The fixtures use **four** incompatible schemas, not three — `matcher:` (14),
+  `config:` (7), `http_route_match:` (5), and `http_route_matches:` plural (1,
+  `spec/tests/05_http/multiple_routes.yaml:5`). Each has its own branch in each
+  of three loaders (`rumi/ext/test/src/fixture.rs`, `puma/tests/conftest.py:213`,
+  `bumi/tests/helpers/fixture-loader.ts:180`). The README documents `matcher:`,
+  which no user can write.
+
+  **Do not rename the keys yet.** An earlier draft said to rename `matcher:` →
+  `native_matcher:` and `http_route_match:` → `compiler_route_match:`. D-026
+  retires the terse config dialect, and C4 decides whether the 14 `matcher:`
+  fixtures migrate to protojson or stay as native-construction tests. If they
+  migrate, renaming their keys first is throwaway work in three loaders.
+
+  So A5 splits:
+  - **Now:** document what exists, honestly — four dialects, which one is the
+    shipping format, which loader reads which. Say plainly that this is
+    transitional and points at C4.
+  - **After C4:** rename or delete, once you know which survive.
+
+  Rubric note: the rubric's task-class table files this under *Docs and prose*.
+  That is wrong for the second half — renaming keys parsed by three loaders is a
+  **behaviour change** and scores on all four axes.
+
+**Done when:** every code block in `README.md` and `docs/content/` carries
+exactly one `run` / `compile` / `cli` / `future` marker per §0.9's taxonomy, and
+CI enforces each class. (The earlier wording — "either executes in CI or does not
+exist" — predates the taxonomy and is the unsatisfiable form §0.9 replaced.)
+`just ci` green.
 
 ---
 
@@ -420,9 +477,15 @@ either executes in CI or does not exist in the docs. `just ci` green.
   the entire pitch and it is currently opt-in behind an undocumented flag (F7).
   Cost is `serde` + `serde_json` in core, which is the price of the advertised
   feature.
-- **B2.** Add `Registry`, `RegistryBuilder`, `MatcherConfig`, `TypedConfig`,
-  `IntoDataInput`, `IntoInputMatcher`, `UnitConfig` to `rumi::prelude` under
-  `#[cfg(feature = "registry")]`. Consider removing `RadixTree`/`MatcherTree`
+- **B2.** Add `Registry`, `RegistryBuilder`, `TypedConfig`, `IntoDataInput`,
+  `IntoInputMatcher`, `UnitConfig` to `rumi::prelude` under
+  `#[cfg(feature = "registry")]`.
+
+  **Do not add `MatcherConfig`** — C5 deletes it and D-026 retires the format it
+  describes. An earlier draft listed it here, which would have put a prelude
+  export and its deletion in the same release, two milestones apart. Whatever
+  replaces it as the loaded-config type after C5 goes in the prelude then, not
+  now. Consider removing `RadixTree`/`MatcherTree`
   from it — nothing in getting-started uses them, and every name in a prelude is
   a name the reader must decide to ignore.
 - **B3.** Delete `config: {}` from every example where it is empty. It is
@@ -440,8 +503,9 @@ either executes in CI or does not exist in the docs. `just ci` green.
 drift. `rumi run --trace` exists (`rumi/cli/src/trace_output.rs`) and renders
 the extracted value against the matcher per rule.
 
-**Done when:** `cargo add rumi-core`, paste the README example, and it compiles.
-Verify by building a scratch crate outside the workspace.
+**Done when:** the README example compiles unmodified in a scratch crate outside
+the workspace, with `rumi-core` resolved by path. `cargo add` is verified at M7,
+not here — see M2's gate.
 
 ---
 
@@ -459,13 +523,46 @@ time.
 
 **Load `protocol-mastery` before starting.**
 
-**SF0. Decide the schema shape. THIS IS A HUMAN DECISION — STOP AND ASK.**
+**SF0. The schema shape. DECIDED 2026-08-17 — `DECISIONS.md` D-026.**
 
-**The deployment model, which you need before you can cost this.** x.uma is
-embedded and **never speaks xDS itself**. Verified: no tonic, no
-`DiscoveryRequest`, no subscription anywhere in the tree. The
-`envoy_grpc_ext_proc` imports are type definitions, not a client. Config reaches
-x.uma one of two ways:
+**protojson is the authoring surface.** One schema for authoring and wire alike.
+Config files stay — YAML or JSON, both already accepted by the loader
+(`rumi/cli/src/main.rs:379-381`) — and their contents follow protobuf's canonical
+JSON mapping. The terse dialect (`type: and`, `value_match: { Exact: … }`, bare
+string actions) is **retired, not preserved** as a lowering layer.
+
+The deciding argument was not verbosity. It was that x.uma exists to implement
+the xDS matcher API across languages, and a bespoke config dialect makes that
+premise false on the one surface users touch. Verbosity is real — a compound rule
+goes from 11 lines to 27 — and is accepted; hand-authoring ergonomics are a
+tooling problem (rule builder, graph export), not a schema problem, and that
+tooling is post-release.
+
+Read D-026 for the full reasoning, the consequences it settles, and what would
+overturn it. **Do not re-open it here or in Phase C.**
+
+**What this decision settles elsewhere in this plan:**
+
+| Settled | Was |
+|---|---|
+| Type URLs carry `type.googleapis.com/` | open in SF8; protojson requires it in `@type` |
+| F13 (`StringInput.value` used as a key) is release-blocking | a schema wart |
+| PascalCase `Exact` beside lowercase `type:` (H11) | deleted by construction, not documented |
+| M5's gate has teeth | was satisfiable by renaming if the dialect survived |
+| `rumi --skill` / `rumi info --verbose` are critical path | Phase B polish |
+
+**Still open, and it is Phase C's to settle:** the 14 fixtures using the
+`matcher:` dialect load through `rumi/ext/test/src/fixture.rs`, which builds
+matchers directly and never touches the config path. Whether they migrate or stay
+as native-construction tests is a separate call. See A5, which must not rename
+their keys before this is answered.
+
+**The deployment model, which the decision rests on.** x.uma is embedded and
+**never speaks xDS itself**: no client we wrote and no subscription in our own
+source. (Careful with the stronger claim — `cargo tree -p rumi-http` *does* show
+`tonic v0.14.6` under default features, pulled transitively by
+`envoy-grpc-ext-proc`. That is exactly what E4 removes.) Config reaches x.uma one
+of two ways:
 
 ```
 human writes routes.yaml ──────────────► x.uma ──► Matcher
@@ -483,44 +580,76 @@ Two consequences that are not up for debate:
   including tokio, tonic, hyper and h2, into a library that never makes a
   network call. It is there for struct definitions. See E4.
 
-**Now the actual question:** is protojson the **authoring** surface, or only the
-**wire** surface?
-
-This is not an implementation detail and an agent must not settle it alone. It
-determines whether every example, fixture, playground preset and `--skill` output
-in the repo becomes nine lines of camelCase with `@type` URLs and actions
-promoted to `TypedExtensionConfig`, and whether puma and bumi each need a
-YAML-lowering layer.
-
 Envoy fuses the two paths into one schema: its YAML *is* protojson, run through
-`JsonStringToMessage`. That is precisely why Envoy YAML is verbose — you are
-hand-writing a wire format. **x.uma has a choice Envoy did not, because it owns
-both loaders**, and the two paths have different audiences: the proto path is
-consumed by a machine that generates it, where verbosity costs nothing; the YAML
-path is typed by a human, where it costs a great deal.
+`JsonStringToMessage`. x.uma now does the same thing, for the same reason.
 
-The maintainer's current lean is **wire-only**: proto is the wire schema and the
-validation authority, terse YAML stays the authoring surface and lowers into it.
-The bridge is enforceable rather than asserted — a conformance fixture proves
-terse YAML and its protojson equivalent build an *identical* matcher.
+**What the format actually looks like**, so nobody has to re-derive it. Field
+names below come from the generated serde impls
+(`gen/xds/type/matcher/v3/*.serde.rs`, `gen/xds/core/v3/*.serde.rs`), not from
+memory. Today's `spec/tests/06_config/02_compound_predicates.yaml`, 11 lines:
 
-Honest cost of wire-only: two loaders to maintain, and the terse YAML becomes a
-schema x.uma owns and must version.
+```yaml
+matchers:
+  - predicate:
+      type: and
+      predicates:
+        - type: single
+          input: { type_url: "xuma.test.v1.StringInput", config: { key: "role" } }
+          value_match: { Exact: "admin" }
+        - type: single
+          input: { type_url: "xuma.test.v1.StringInput", config: { key: "org" } }
+          value_match: { Prefix: "acme" }
+    on_match: { type: action, action: "admin_acme" }
+```
 
-What would overturn it: a control plane that needs to **emit** config a human
-then hand-edits. Then one format must win and it has to be protojson. Confirm
-that is not the model before committing.
+The same rule as protojson, 27 lines:
 
-Prepare both options with real costs — convert three representative fixtures each
-way and count lines, concepts, and the diff to the docs — then **stop and put it
-to the maintainer.** Record the answer in `DECISIONS.md` before writing migration
-code.
+```yaml
+matcherList:
+  matchers:
+    - predicate:
+        andMatcher:
+          predicate:
+            - singlePredicate:
+                input:
+                  name: role-input
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.test.v1.MapInput
+                    key: role
+                valueMatch:
+                  exact: admin
+            - singlePredicate:
+                input:
+                  name: org-input
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.test.v1.MapInput
+                    key: org
+                valueMatch:
+                  prefix: acme
+      onMatch:
+        action:
+          name: admin_acme
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: admin_acme
+```
 
-Note the trap in the wire-only answer: if terse YAML survives as the authoring
-dialect, the hand-written config layer is not retired, it is *renamed*. M5's gate
-(`grep -rn MatcherConfig` returns only generated code) would then be satisfiable
-by renaming, which is exactly the sort of gamed gate this plan exists to prevent.
-If wire-only is chosen, replace that gate with one that has teeth.
+Three things that example exposes, each of which is a task below:
+
+1. The action stops being a string. `NamedAction`
+   (`proto/xuma/core/v1/action.proto`) is the adapter between xDS's
+   "action is a `TypedExtensionConfig`" and rumi's `A = String`. It is currently
+   referenced **only** in `convert.rs`'s test module, so its shape is still free.
+2. That says `MapInput`, not `StringInput` — because the proto's `StringInput`
+   has one field, `value`, while the Rust `StringInput` holds a `key` and does a
+   map lookup (`rumi/ext/test/src/lib.rs:61-75`). Terse YAML hid this by passing
+   `config` through opaquely. protojson cannot. That is F13 / SF4, and D-026
+   makes it release-blocking.
+3. `keepMatching` is a plain boolean on every `onMatch`, one keystroke from being
+   set and doing nothing. That is F2 / SF2.
+
+**This example is hand-derived and unexecuted** — `rumi-proto` does not compile
+(C1). Treat it as schema-correct and runtime-unverified until C2 runs.
 
 **SF1–SF7. Write these fixtures. All must be red at the end of this phase.**
 
@@ -538,13 +667,21 @@ If wire-only is chosen, replace that gate with one that has teeth.
 frozen by publishing, so they must be decided here, not in Phase E:
 - `xuma.test.v1.*` → `xuma.kv.v1.*`, with the crate split described in E2. The
   concept was never "test"; it is the CLI's default domain.
-- Whether type URLs carry the `type.googleapis.com/` prefix. `protocol-mastery`
-  states that convention; the code registers bare names. Pick one.
-- The PascalCase `Exact` / lowercase `type:` inconsistency resolves itself if
-  protojson wins. Confirm rather than assume.
+- ~~Whether type URLs carry the `type.googleapis.com/` prefix.~~ **Settled by
+  D-026.** protojson requires the full URL in `@type`, so the bare names the code
+  registers (`registry.rs`) are now a defect. Write a fixture that fails on a
+  bare name.
+- ~~The PascalCase `Exact` / lowercase `type:` inconsistency.~~ **Deleted by
+  D-026**, since the dialect that carried it is retired. Confirm with a grep at
+  the end of Phase C rather than assuming.
+- **SF9 (new).** A fixture asserting the same rule, written as protojson-in-YAML
+  and as protojson-in-JSON, builds an identical matcher. Both syntaxes are
+  already accepted (`main.rs:379-381`); D-026 makes that a supported guarantee
+  rather than an accident, so it needs a test.
 
-**Done when:** every fixture above exists, fails for the documented reason, and
-SF0 is answered in `DECISIONS.md`. **No production code changes in this phase.**
+**Done when:** every fixture above exists and fails for the documented reason.
+**No production code changes in this phase.** SF0 is already answered — do not
+re-cost it.
 
 ---
 
@@ -579,22 +716,47 @@ under Common Pitfalls with "use the proto `Name` trait" as the fix.
      `gen/xds/core/v3/...` and `convert.rs:27,274` genuinely uses those types,
      but no xuma proto imports xDS, so they are not in the generation graph.
      `buf generate buf.build/cncf/xds --template buf.gen.yaml` produces them
-     (28 files total, ~136K).
-  3. With the types present it reaches real compilation and fails:
-     `pbjson_types::Any` does not implement `Eq`/`Hash` but the generated code
-     derives both. This is a codegen configuration problem. Fix it in
-     `buf.gen.yaml` (prost type attributes) rather than by hand-editing
-     generated files.
+     (28 files, 960K on disk).
+  3. With the types present it reaches real compilation and fails, 4 errors:
+     `pbjson_types::Any` implements neither `Eq` nor `Hash`, but the generated
+     `xds.core.v3` code derives both (`gen/xds/core/v3/xds.core.v3.rs:226`).
 
-  **`rumi/proto/src/gen` is gitignored** — that is the mechanical reason it has
-  never been committed, and it contradicts `protocol-mastery/SKILL.md:53`, which
-  states this project commits generated code (citing cncf/xds and
-  go-control-plane). Remove the ignore rule before anything else in this phase,
-  or the commit silently does nothing. Verify with `git check-ignore -v`.
+  **C1.3 is an open problem, not a task. Budget for it accordingly.** An earlier
+  draft said "fix it in `buf.gen.yaml` (prost type attributes)". **That is not an
+  available move**: `type_attribute` *adds* attributes and nothing in prost-build
+  removes a derive. The derives are emitted by prost-build's own per-message
+  derivability inference, computed against `prost-types`' `Any` — while
+  `rumi/proto/Cargo.toml:22-24` deliberately aliases `pbjson-types` as
+  `prost_types` so generated code gets serde impls. The alias is the root.
 
-  Then commit `rumi/proto/src/gen/` and wire the dep generation into `just gen`
-  so it is reproducible. Add a CI check that `just gen` produces no diff — that
-  makes drift impossible rather than policed.
+  Known options, none free, none yet tried:
+  - `extern_path`-remap `.google.protobuf.Any` to a type that implements both
+  - drop the pbjson alias — **this changes how protojson handles `Any`, which is
+    now the authoring format (D-026), so it is not a local decision**
+  - a post-processing step in `just gen` that strips the derives
+
+  Steel-man before choosing, and record the answer in `DECISIONS.md`. This sits
+  on the M4→M7 chain and is the most likely place to lose a day.
+
+  **`rumi/proto/src/gen` is gitignored (`.gitignore:58`) — and that was a
+  deliberate decision, not an oversight.** Commit `e36dd29` removed 14 previously
+  tracked files with the reason *"Generated proto files are deterministic output
+  of `just gen`. Removing 46K lines of generated code from tracking keeps PRs
+  reviewable."* Note that the same commit added `.gitattributes:2-4`
+  `linguist-generated=true`, which already collapses those diffs for tracked
+  files — so the stated reason is self-defeating, but you must argue with it
+  rather than around it. It contradicts `protocol-mastery/SKILL.md:53`, which
+  states this project commits generated code. Reverse it explicitly in
+  `DECISIONS.md`; do not just delete the line.
+
+  **It is a three-language decision.** `.gitignore:58-60` also ignores
+  `puma/proto/src/gen/` and `bumi/proto/src/gen/`. Both exist on disk (7 and 6
+  files), both untracked, nothing imports either. M5's gate demands `buf generate`
+  be the source of config types **in all three languages**, and the "`just gen`
+  produces no diff" check is vacuous over untracked directories.
+
+  Then commit all three `gen/` trees and wire the dep generation into `just gen`
+  so it is reproducible.
 
 - **C2. Prove the conversion works.** `rumi/proto/src/convert.rs` already
   contains eight end-to-end tests (proto → convert → load → evaluate). Run them.
@@ -605,8 +767,17 @@ under Common Pitfalls with "use the proto `Name` trait" as the fix.
   through the protojson path. This tells you the true size of the migration,
   which nobody currently knows because it has never been carried to completion.
 
-- **C4. Answer the authoring-surface question** from §2 and record it in
-  `DECISIONS.md` before writing migration code.
+- **C4. Settle the `matcher:` fixture dialect.** The one question D-026 left
+  open. 14 of 27 fixtures load through `rumi/ext/test/src/fixture.rs`, which
+  builds `Matcher` values directly and never touches the config path — so
+  protojson does not automatically apply to them. Either migrate them (and delete
+  that loader, with its own `MatcherConfig`/`PredicateConfig`/`OnMatchConfig`
+  types) or keep them as explicit native-construction tests with a comment saying
+  why. **Whichever you pick, reconcile it with A5 and with M5's gate before
+  writing code** — see the note under A5.
+
+  The authoring-surface question that used to live here is **answered**: D-026,
+  and restated in §3 and SF0. Do not re-open it.
 
 - **C5. Retire the hand-written config types.** Rust first — it is the reference
   implementation and `convert.rs`/`any_resolver.rs` already live there. Then
@@ -626,10 +797,38 @@ generated code.
 ### Phase S — Security
 
 **Release-blocking. A full review was run and the verdict was DO NOT SHIP in
-current form.** Three findings were reproduced on-machine. Each fix below has a
-falsifying test in the review; commit those as regression fixtures.
+current form.** The review is at
+`scratch/security-review/2026-08-16-pre-publication.md`. Each fix below has a
+falsifying test **in that file**, several already run and passing; commit them as
+regression fixtures rather than re-deriving them.
 
-**S1 — bumi compiles a regex bomb from 20 characters. BLOCKING.**
+**Numbering map. The review and this plan use different schemes — check which
+document you are in before resolving any bare `F6` or `S3`.**
+
+| This plan | Review | Subject |
+|---|---|---|
+| SEC1 | F-01 | bumi regex compile bomb |
+| SEC2 | F-02 | limits in the loader, not the constructor |
+| SEC3 | F-04 | `session_id` accepted then discarded |
+| 0.1.1 list | F-03 | aggregate regex budget |
+| 0.1.1 list | F-05 | empty rule list compiles to a catch-all |
+| 0.1.1 list | F-06 | compilers never call `validate()` |
+| E7 | S-1 | `publish = false` dependency edges |
+| E4 | S-2 | `rumi-http` default features |
+| 0.1.1 list | S-3 | `serde_yaml` archived |
+| 0.1.1 list | S-4 | CI actions unpinned |
+| E5 | S-5 | package-root LICENSE files, missing http README |
+| **below** | L-1..L-4 | **were dropped from this plan entirely; restored below** |
+
+§4's `F1..F21` are a third scheme and correspond to none of the above.
+
+**The review contains at least one error, so verify before acting on it.** F-04
+states there is no `SessionIdInput`. There is —
+`rumi/core/src/claude/inputs.rs:48`, registered at `claude/mod.rs:72`, present at
+the reviewed commit. The defect is real (`claude/config.rs` has no `session_id`
+field) but SEC3's fix is smaller than written: the input already exists.
+
+**SEC1 — bumi compiles a regex bomb from 20 characters. BLOCKING.**
 `bumi/src/string-matchers.ts:91` calls `RE2JS.compile(pattern)`. `re2js`
 implements neither of C++ RE2's compile-time guards: no `max_mem` program budget
 and no nested-repetition product limit. `MAX_REGEX_PATTERN_LENGTH = 4096` bounds
@@ -650,8 +849,8 @@ Fix: bound it in `RegexMatcher`'s constructor — reject a `{n}` whose operand
 already contains a `{m}`, mirroring RE2's own rule. `re2js` exposes no `max_mem`
 option. Add a conformance fixture asserting all three implementations reject it.
 
-**S2 — every resource limit is enforced in the config loader, not the
-constructor it protects. BLOCKING, and it is the architectural root of S1.**
+**SEC2 — every resource limit is enforced in the config loader, not the
+constructor it protects. BLOCKING, and it is the architectural root of SEC1.**
 `Registry::check_pattern_length` is a *private method on `Registry`*
 (`registry.rs:611`), called from one place. The public constructor it should
 protect — `StringMatchSpec::to_input_matcher()` (`string_match.rs:56`) — checks
@@ -671,7 +870,7 @@ delete `Registry::check_pattern_length` — the loader inherits the guarantee.
 to carry forward: the type that holds the resource owns the limit on that
 resource.**
 
-**S3 — `session_id` is accepted, counted as a constraint, then silently
+**SEC3 — `session_id` is accepted, counted as a constraint, then silently
 discarded. BLOCKING. Total agent-gate bypass.**
 `crusts/python/src/convert.rs:37` includes `session_id.is_none()` in the
 empty-match guard, but core's `HookMatch` (`claude/config.rs:38-49`) **has no
@@ -700,7 +899,8 @@ struct; that catches this whole class.
   assignment: `compile_hook_matches(&[], "allow", Some("deny"))` allows
   everything. The crusts already solved this for the single-rule case with
   `match_all`; extend the same ceremony to the list.
-- `validate()` is never called by either domain compiler (F6 above). The crusts
+- `validate()` is never called by either domain compiler (**review F-06**, not
+  §4's F6, which is `ignore_case` — see the numbering map above). The crusts
   do call it and are currently the only paths enforcing depth on compiler
   output.
 - `serde_yaml` is archived upstream (March 2024) and is a **non-optional runtime
@@ -712,6 +912,41 @@ struct; that catches this whole class.
   holding `CARGO_REGISTRY_TOKEN` and `NPM_TOKEN`. `dtolnay/rust-toolchain@stable`
   is a *branch*. PyPI already uses OIDC trusted publishing; crates.io and npm
   now support it too.
+
+**The review's L findings, which an earlier draft of this plan dropped entirely.**
+They are restored here because §6 requires every review finding to be fixed or
+explicitly accepted, and a finding that is not written down cannot be either.
+
+- **L-1.** The playground's `configToGraph`
+  (`docs/experience/src/.../graph/config-to-graph.ts:42`) calls
+  `parseMatcherConfig` without `loadMatcher`, so it enforces neither
+  `MAX_FIELD_MATCHERS` nor `MAX_DEPTH` — another SEC2 instance. ELK runs on the
+  main thread; ~5,000 field matchers locks the tab. **Self-inflicted only,
+  because there is no share-link and no URL-seeded state.** If a rule builder
+  with export or a share feature ships, this becomes remotely triggerable —
+  re-audit then. Recorded in D-026.
+- **L-2.** `StringMatcher::regex_ignore_case` (`rumi/core/src/input_matcher.rs:373`)
+  builds `format!("(?i){pattern}")`; a pattern starting `(?-i)` neutralizes it.
+  Config-author-controlled, no privilege crossing. Noted so it is not mistaken
+  for a guarantee — which matters more now that SF1 will assert `ignore_case`
+  semantics.
+- **L-3.** `trace_string_match` (`claude/compiler.rs:236-240`) uses
+  `.is_ok_and(...)`, so an **invalid regex traces as "did not match"** while
+  `compile()` returns `Err`. The CLI's `--trace` is not affected — it calls
+  `evaluate_with_trace` on an already-compiled matcher (`cli/src/main.rs:206`) —
+  but `HookMatch::trace()` is public and ships as `HookMatcher.trace()` in the
+  PyO3 wheel (`crusts/python/src/matcher.rs:222`). Trace is what an operator
+  reaches for to answer "why didn't my deny rule fire?", and it gives a different
+  answer than the compiler.
+- **L-4.** `puma/src/xuma/_string_matchers.py:144` catches only `re2.error`; a
+  non-`str` pattern escapes as a raw `TypeError`, outside the `MatcherError`
+  contract.
+
+**Ship criteria, from the review's own verdict.** DO NOT SHIP becomes SHIP WITH
+FIXES when F-01, F-02, F-04, S-1 and S-2 are closed with their falsifying tests
+committed, **and** a comment documents why deferring F-06 (the iterative rewrite)
+is safe. That last clause is easy to lose; it is the only part of the verdict
+this plan does not otherwise cover.
 
 **Controls that are already correct — do not weaken these without knowing what
 they hold up:**
@@ -746,9 +981,11 @@ they hold up:**
 10. No regex metacharacter injection: prefix/suffix/contains/exact use native
     string operations in all three languages.
 
-**Done when:** S1, S2 and S3 are fixed with their falsifying tests committed as
-regression fixtures, and every item under "controls that are correct" has a test
-or a comment naming what it protects.
+**Done when:** SEC1, SEC2 and SEC3 are fixed with their falsifying tests committed
+as regression fixtures; every item under "controls that are correct" has a test or
+a comment naming what it protects; and **every L finding is either fixed or
+explicitly accepted in `DECISIONS.md`** — §6 requires the whole review triaged,
+not just the blocking part.
 
 ---
 
@@ -786,12 +1023,14 @@ gating does not help.
   needing to land before a phase the milestone table placed after it. By the time
   you reach E, the names are settled and this is a mechanical crate split.
 
-- **E3. Remove `rumi-test` from both crusts** (S-5). They declare it with
+- **E3. Remove `rumi-test` from both crusts** (not in the review — this is the plan author's own observation; it was mis-cited as S-5). They declare it with
   `features = ["fixtures"]` — a YAML fixture loader inside a published wheel and
   npm package. They want `rumi-kv`.
 
 - **E4. Split `ext-proc` and set `default = []` on `rumi-http`** (S-2, and it
-  subsumes B2). The feature currently conflates two unrelated things:
+  subsumes the `rumi-http` default-features change; the *current* B2 is a
+  prelude task and is unrelated). The feature currently conflates two unrelated
+  things:
   `k8s-gateway-api` supplies config types the compiler needs;
   `envoy-grpc-ext-proc` supplies data-plane types. Split into `gateway` and
   `ext-proc`. Set `default = []`.
@@ -807,7 +1046,7 @@ gating does not help.
   **Feature defaults are frozen after first publish.** This is the last free
   moment.
 
-- **E5. Package hygiene for every artifact** (S-6). Each package root needs its
+- **E5. Package hygiene for every artifact** (review S-5; there is no S-6). Each package root needs its
   own `LICENSE-MIT` and `LICENSE-APACHE` — the manifests declare
   `MIT OR Apache-2.0` but the files exist only at repo root, outside what gets
   packaged. `rumi/ext/http/README.md` does not exist, so its crates.io page
@@ -838,13 +1077,13 @@ dependency order with no path patching, and no published crate depends on a
 The general lesson from this whole exercise: **what CI does not check is not
 true.** Every false claim found was outside CI's reach.
 
-- **F1.** Add crust jobs. Two of five implementations are never built (F5).
-- **F2.** Add `-p rumi-proto` to the test job.
-- **F3.** A job that runs the README's literal config through every shipped
+- **CI1.** Add crust jobs. Two of five implementations are never built (§4 F5).
+- **CI2.** Add `-p rumi-proto` to the test job, and `just test-full` to CI (see §4 F19).
+- **CI3.** A job that runs the README's literal config through every shipped
   runtime and asserts identical results. The README is the correctness claim;
   make CI enforce it.
-- **F4.** The doc-command smoke test from A4.
-- **F5.** `just gen` produces no diff.
+- **CI4.** The doc-command smoke test from A4.
+- **CI5.** `just gen` produces no diff — for all three `gen/` trees, which requires C1 to have tracked them.
 
 **Done when:** every roadmap ✅ corresponds to something CI executes.
 
@@ -968,15 +1207,21 @@ are lowercase while `value_match: { Exact: … }` is PascalCase — a Rust serde
 enum default leaked into a cross-language wire format. One nested example and one
 sentence about casing.
 
-**Done when:** a colleague with none of the toolchain clones the repo, runs
-`just doctor`, follows `CONTRIBUTING.md`, and has green tests without asking a
-question.
+**Done when:** every item above is either shipped or explicitly deferred with a
+reason. Nothing here blocks 0.1.0; H7's five-minute re-review is the closing
+check, and it is only meaningful against post-migration docs.
+
+(The previous wording here was a verbatim copy of Phase H's done-when, describing
+`just doctor` and `CONTRIBUTING.md` — H1 and H2, neither of which is in this
+phase.)
 
 ---
 
 ### Phase G — Release
 
-Only after A–F are on green PRs and a human has merged them.
+Only after **A, B, SF, C, S, E, F, K, and H1–H3** are on green PRs and a human
+has merged them. (An earlier draft said "A–F", which silently omitted SF, K —
+whose own header says release-blocking — and the H items M2 requires.)
 
 1. Version bump to `0.1.0` across all manifests. The format changed; `0.0.2` is
    not honest.
@@ -991,23 +1236,38 @@ Only after A–F are on green PRs and a human has merged them.
 
 ## 6. Definition of done
 
-Tarmac, concretely, for this project:
+Tarmac, concretely, for this project. **D-026 makes the first item precise for
+the first time** — "one config schema" used to be arguable, because a terse
+authoring dialect lowering into proto could be described either way. It cannot
+now.
 
+- [ ] **One config schema — protojson, generated from proto, in all three
+      languages.** No hand-written config types, no terse dialect, no aliases.
+      `grep -rn "MatcherConfig" rumi puma bumi` returns only generated code —
+      currently **221 hits**, and see C4 for the one legitimate remaining
+      question (the `matcher:` fixture loader)
+- [ ] All three `gen/` trees are **tracked**, and `just gen` produces no diff in
+      CI (F20 — the check is vacuous while they are gitignored)
+- [ ] `rumi-proto` compiles, is in the CI test job, and `just test-full` is green
+      (F1, F19)
 - [ ] Every doc code sample carries a `run` / `compile` / `cli` / `future`
-      marker, and CI enforces each class (no unmarked blocks)
+      marker, CI enforces each class, and the milestone state the `future` check
+      reads from is a real file
 - [ ] Every roadmap ✅ corresponds to something CI runs
-- [ ] One config schema, generated, in all three languages
 - [ ] No path where a config loads clean and returns a wrong answer
-- [ ] `cargo add rumi-core` plus the README example compiles unmodified
-- [ ] `cargo publish --dry-run` passes for every published crate
+- [ ] The README example compiles unmodified outside the workspace; at M7,
+      `cargo add rumi-core` does too
+- [ ] `cargo publish --dry-run` passes for every published crate, in dependency
+      order, with no path patching
 - [ ] All five implementations agree on every fixture, including the SF ones,
       proven by CI
 - [ ] Every §4 finding has become a test, and its row here is struck
 - [ ] Every asymmetry stated plainly in the docs — Claude is Rust-only until it
       is not
 - [ ] `just ci` green, including `cargo audit`
-- [ ] Security review findings triaged, each fixed or explicitly accepted in
-      `DECISIONS.md`
+- [ ] **The whole** security review triaged — F-01..F-06, S-1..S-5 **and
+      L-1..L-4** — each fixed or explicitly accepted in `DECISIONS.md`, plus the
+      F-06 deferral comment the review's ship criteria require
 
 ## 7. As you go
 
