@@ -170,6 +170,17 @@ pub mod prelude {
         StringMatcher,
         SuffixMatcher,
     };
+
+    /// Registry types, so `use rumi::prelude::*` is enough to load a config.
+    ///
+    /// `MatcherConfig` is deliberately absent: the config format is moving to
+    /// protojson and the hand-written type is being retired, so exporting it
+    /// here would add a name in one release and remove it in the next. Import
+    /// it directly as `rumi::MatcherConfig` until the replacement lands.
+    #[cfg(feature = "registry")]
+    pub use crate::{
+        IntoDataInput, IntoInputMatcher, Registry, RegistryBuilder, TypedConfig, UnitConfig,
+    };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

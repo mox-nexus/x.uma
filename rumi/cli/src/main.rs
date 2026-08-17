@@ -94,6 +94,20 @@ fn cmd_check(args: &[String]) -> Result<(), String> {
     let config_path = &rest[0];
     let config = load_config(config_path)?;
 
+    // Summarise before loading: the loaded Matcher erases the config shape, and
+    // this is the information an author wants back — "Config valid" answers a
+    // question nobody asked, and cannot distinguish a rule set from an empty
+    // one, which for a gate is the difference that matters.
+    let rule_count = config.matchers.len();
+    let has_fallback = config.on_no_match.is_some();
+    let mut inputs: Vec<String> = config
+        .matchers
+        .iter()
+        .flat_map(|fm| collect_input_urls(&fm.predicate))
+        .collect();
+    inputs.sort_unstable();
+    inputs.dedup();
+
     match domain {
         Domain::Test => {
             let registry = build_test_registry();
@@ -116,7 +130,39 @@ fn cmd_check(args: &[String]) -> Result<(), String> {
     }
 
     println!("Config valid");
+    println!("  rules:     {rule_count}");
+    println!(
+        "  inputs:    {}",
+        if inputs.is_empty() {
+            "(none)".to_string()
+        } else {
+            inputs.join(", ")
+        }
+    );
+    println!(
+        "  fallback:  {}",
+        if has_fallback {
+            "yes"
+        } else {
+            "none — an unmatched context returns no action"
+        }
+    );
+    if rule_count == 0 {
+        println!("\n  Note: zero rules. Every context will fall through.");
+    }
     Ok(())
+}
+
+/// Collect the input type URLs a predicate tree references, recursively.
+fn collect_input_urls(predicate: &rumi::PredicateConfig) -> Vec<String> {
+    use rumi::PredicateConfig as P;
+    match predicate {
+        P::Single(single) => vec![single.input.type_url.clone()],
+        P::And { predicates } | P::Or { predicates } => {
+            predicates.iter().flat_map(collect_input_urls).collect()
+        }
+        P::Not { predicate } => collect_input_urls(predicate),
+    }
 }
 
 #[allow(clippy::unnecessary_wraps)]
@@ -159,26 +205,58 @@ fn cmd_skill(args: &[String]) -> Result<(), String> {
 }
 
 fn cmd_info(args: &[String]) -> Result<(), String> {
-    let (domain, _) = detect_domain(args);
+    let (domain, rest) = detect_domain(args);
+    let verbose = rest.iter().any(|a| a == "--verbose" || a == "-v");
 
     match domain {
-        Domain::Test => print_registry_info(&build_test_registry()),
-        Domain::Http => print_registry_info(&build_http_registry()),
-        Domain::Claude => print_registry_info(&build_claude_registry()),
+        Domain::Test => print_registry_info(&build_test_registry(), verbose),
+        Domain::Http => print_registry_info(&build_http_registry(), verbose),
+        Domain::Claude => print_registry_info(&build_claude_registry(), verbose),
     }
 
     Ok(())
 }
 
-fn print_registry_info<Ctx: 'static>(registry: &rumi::Registry<Ctx>) {
+/// Print the registry's type URLs, optionally with what each one is and which
+/// config field it takes.
+///
+/// `--verbose` closes the authoring loop: without it a caller knows a type URL
+/// exists but must guess between `name`, `key` and `header` for its config
+/// field. The descriptions come from `skill.rs`, the same source `--skill`
+/// renders from — two copies of that table diverged within hours the last time.
+fn print_registry_info<Ctx: 'static>(registry: &rumi::Registry<Ctx>, verbose: bool) {
     println!("Registered inputs:");
     for url in registry.input_type_urls() {
-        println!("  {url}");
+        if verbose {
+            let cfg = skill::config_key(url)
+                .map_or_else(|| "  (no config)".to_string(), |k| format!("  config.{k}"));
+            let prose = skill::describe(url);
+            if prose.is_empty() {
+                println!("  {url}{cfg}");
+            } else {
+                println!("  {url}{cfg}\n      {prose}");
+            }
+        } else {
+            println!("  {url}");
+        }
     }
 
     println!("\nRegistered matchers:");
     for url in registry.matcher_type_urls() {
-        println!("  {url}");
+        if verbose {
+            let prose = skill::describe(url);
+            if prose.is_empty() {
+                println!("  {url}");
+            } else {
+                println!("  {url}\n      {prose}");
+            }
+        } else {
+            println!("  {url}");
+        }
+    }
+
+    if !verbose {
+        println!("\nRe-run with --verbose for config field names.");
     }
 }
 

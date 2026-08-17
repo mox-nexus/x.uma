@@ -65,7 +65,6 @@ The registry is immutable once built. Register everything before calling
 ```yaml
 input:
   type_url: myapp.v1.RegionInput
-  config: {}
 value_match: { Exact: "eu-west-1" }
 ```
 

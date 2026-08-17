@@ -51,10 +51,10 @@ matchers:
       type: and
       predicates:
         - type: single
-          input: { type_url: "xuma.http.v1.PathInput", config: {} }
+          input: { type_url: "xuma.http.v1.PathInput" }
           value_match: { Prefix: "/api" }
         - type: single
-          input: { type_url: "xuma.http.v1.MethodInput", config: {} }
+          input: { type_url: "xuma.http.v1.MethodInput" }
           value_match: { Exact: "GET" }
     on_match: { type: action, action: "api_read" }
 on_no_match: { type: action, action: "not_found" }

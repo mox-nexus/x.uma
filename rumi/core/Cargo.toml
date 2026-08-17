@@ -13,7 +13,12 @@ categories = ["config", "data-structures"]
 name = "rumi"
 
 [features]
-default = []
+# Config loading is the whole pitch, and it was opt-in behind an undocumented
+# flag: `cargo add rumi-core` then pasting the README example did not compile,
+# because Registry and MatcherConfig are gated. The cost is serde + serde_json
+# in core, which is the price of the advertised feature. Feature defaults freeze
+# at first publish, so this is the last free moment to fix it.
+default = ["registry"]
 serde = ["dep:serde"]
 registry = ["serde", "dep:serde_json"]
 claude = ["serde"]

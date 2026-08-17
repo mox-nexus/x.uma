@@ -195,13 +195,28 @@ fn description(type_url: &str) -> &'static str {
     }
 }
 
+/// The config key an input takes, if it takes one.
+///
+/// Public so `rumi info --verbose` renders from the same source as `--skill`.
+/// Two copies of this table diverged within hours the last time.
+#[must_use]
+pub fn config_key(type_url: &str) -> Option<&'static str> {
+    CONFIG_KEYS
+        .iter()
+        .find(|(url, _)| *url == type_url)
+        .map(|(_, k)| *k)
+}
+
+/// One-line prose for a type URL, or empty if undescribed.
+#[must_use]
+pub fn describe(type_url: &str) -> &'static str {
+    description(type_url)
+}
+
 /// The rendered hint: prose, plus the config key when the input takes one.
 fn hint(type_url: &str) -> String {
     let prose = description(type_url);
-    let key = CONFIG_KEYS
-        .iter()
-        .find(|(url, _)| *url == type_url)
-        .map(|(_, k)| *k);
+    let key = config_key(type_url);
 
     match (prose.is_empty(), key) {
         (true, _) => String::new(),
