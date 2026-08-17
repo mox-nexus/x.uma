@@ -97,10 +97,32 @@ consumers already run Bazel. We publish libraries to a registry. The published
 prost ecosystem — `tonic-health`, `tonic-reflection`, `etcd-client` — lands the
 same way we have, for the same reason.
 
-*Depend on an existing published xDS crate* (e.g. `xds-api`) instead of
-generating the xDS half at all. Not investigated. It would cut the tracked tree
-to our own 175 lines of protos plus their generated output, and it is the option
-most likely to make this decision obsolete. Worth a look before 0.2.
+*Depend on an existing published xDS crate* instead of generating the xDS half at
+all. This would delete 8,478 of the 10,990 tracked lines and one whole codegen
+pass, so it was investigated properly rather than left as a note:
+
+| crate | downloads | prost | protojson / serde | tonic |
+|---|---|---|---|---|
+| `envoy-types` 0.7.6 | 1.4M | **0.14** | **no features at all** | 0.14, non-optional |
+| `xds-api` 0.2.0 | 15.5k | **0.13** ✓ | **`pbjson` feature** ✓ | 0.12, **non-optional** |
+| `xds-types` 0.1.0 | 232 | 0.13 | none | non-optional |
+| `data-plane-api` 0.1.1 | 4.3k | last published 2022 | — | — |
+
+`envoy-types` is the popular one and cannot serve the config path at all: no
+serde or pbjson feature, so no protojson, which D-026 makes the whole point.
+
+**`xds-api` is the near miss** — exactly our prost 0.13, exactly our pbjson 0.7,
+and it ships a `pbjson` feature, which is evidence the approach is sound and that
+someone else needed protojson out of xDS types. It fails on one axis: `tonic` is
+a **non-optional** dependency. After C5 `rumi-proto` is on the critical path for
+every consumer of `rumi-core`, so this would pull tonic, hyper, h2 and tokio into
+a library that never opens a socket — the same 101-crates-against-7 problem E4
+exists to fix, except unavoidable instead of merely a default, and in direct
+conflict with D-027. It is also 17 months without a release.
+
+**The trigger to revisit:** `xds-api` making `tonic` optional, or any crate
+appearing with xDS matcher types, a pbjson feature, and no mandatory transport.
+That is a small enough change upstream to be worth re-checking each release.
 
 **What would overturn this:**
 - `prost-build` bundling `protoc` again, or a zero-cost way to generate at

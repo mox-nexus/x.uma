@@ -7,8 +7,11 @@ name: CI
 on:
   push:
     branches: [main]
+  # Not `branches: [main]`. Phases are developed as stacked PRs (PLAN.md §1,
+  # one PR per phase), and a PR based on another phase branch got ZERO checks
+  # under the narrower filter — observed on #24. A stacked PR is exactly where
+  # CI matters most, since its base is itself unreviewed.
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
