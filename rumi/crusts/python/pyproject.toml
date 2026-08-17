@@ -11,7 +11,12 @@ classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
 ]
+readme = "README.md"
 dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/mox-nexus/x.uma"
+Documentation = "https://mox-nexus.github.io/x.uma/"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]

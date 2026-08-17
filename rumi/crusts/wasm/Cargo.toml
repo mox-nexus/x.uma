@@ -1,5 +1,5 @@
 [package]
-name = "xuma-crust-wasm"
+name = "xuma-crust"   # wasm-pack publishes this name to npm
 description = "TypeScript bindings for rumi via wasm-bindgen"
 publish = false
 version.workspace = true

@@ -18,6 +18,9 @@ use rumi::MatcherConfig;
 use rumi_http::HttpRequest;
 use rumi_test::TestContext;
 
+mod skill;
+mod trace_output;
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
@@ -30,6 +33,7 @@ fn main() {
         "run" => cmd_run(&args[2..]),
         "check" => cmd_check(&args[2..]),
         "info" => cmd_info(&args[2..]),
+        "--skill" => cmd_skill(&args[2..]),
         "--help" | "-h" | "help" => {
             print_usage();
             Ok(())
@@ -116,6 +120,44 @@ fn cmd_check(args: &[String]) -> Result<(), String> {
 }
 
 #[allow(clippy::unnecessary_wraps)]
+/// `rumi --skill [-r NAME]` — emit agent-facing documentation.
+///
+/// Type URL tables come from the live registries, so the document cannot
+/// describe an input that is not actually registered.
+fn cmd_skill(args: &[String]) -> Result<(), String> {
+    if let Some(pos) = args.iter().position(|a| a == "-r" || a == "--reference") {
+        let name = args.get(pos + 1).ok_or_else(|| {
+            format!(
+                "--skill -r requires a reference name (one of: {})",
+                skill::REFERENCE_NAMES.join(", ")
+            )
+        })?;
+        let body = skill::reference(name).ok_or_else(|| {
+            format!(
+                "unknown reference \"{name}\" (one of: {})",
+                skill::REFERENCE_NAMES.join(", ")
+            )
+        })?;
+        print!("{body}");
+        return Ok(());
+    }
+
+    let test = build_test_registry();
+    let http = build_http_registry();
+    let claude = build_claude_registry();
+
+    print!(
+        "{}",
+        skill::skill(
+            &test.input_type_urls(),
+            &test.matcher_type_urls(),
+            &http.input_type_urls(),
+            &claude.input_type_urls(),
+        )
+    );
+    Ok(())
+}
+
 fn cmd_info(args: &[String]) -> Result<(), String> {
     let (domain, _) = detect_domain(args);
 
@@ -144,11 +186,39 @@ fn print_registry_info<Ctx: 'static>(registry: &rumi::Registry<Ctx>) {
 // run: test domain (default)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// True if `--trace` appears anywhere in the args.
+fn wants_trace(args: &[String]) -> bool {
+    args.iter().any(|a| a == "--trace")
+}
+
+/// Strip `--trace` so domain arg parsers never see it.
+fn without_trace(args: &[String]) -> Vec<String> {
+    args.iter().filter(|a| *a != "--trace").cloned().collect()
+}
+
+/// Evaluate, printing either the action or the full trace.
+fn report<Ctx, A: std::fmt::Display + Clone + Send + Sync + 'static>(
+    matcher: &rumi::Matcher<Ctx, A>,
+    ctx: &Ctx,
+    trace: bool,
+) {
+    if trace {
+        trace_output::print(&matcher.evaluate_with_trace(ctx));
+    } else {
+        match matcher.evaluate(ctx) {
+            Some(action) => println!("{action}"),
+            None => println!("(no match)"),
+        }
+    }
+}
+
 fn cmd_run_test(args: &[String]) -> Result<(), String> {
     if args.is_empty() {
         return Err("run requires a config file path".into());
     }
 
+    let trace = wants_trace(args);
+    let args = without_trace(args);
     let config_path = &args[0];
     let context = parse_context_pairs(&args[1..])?;
 
@@ -159,10 +229,7 @@ fn cmd_run_test(args: &[String]) -> Result<(), String> {
         .map_err(|e| format!("config load failed: {e}"))?;
 
     let ctx = build_test_context(&context);
-    match matcher.evaluate(&ctx) {
-        Some(action) => println!("{action}"),
-        None => println!("(no match)"),
-    }
+    report(&matcher, &ctx, trace);
 
     Ok(())
 }
@@ -176,6 +243,8 @@ fn cmd_run_http(args: &[String]) -> Result<(), String> {
         return Err("run http requires a config file path".into());
     }
 
+    let trace = wants_trace(args);
+    let args = without_trace(args);
     let config_path = &args[0];
     let http_args = parse_http_args(&args[1..])?;
 
@@ -186,10 +255,7 @@ fn cmd_run_http(args: &[String]) -> Result<(), String> {
         .map_err(|e| format!("config load failed: {e}"))?;
 
     let ctx = build_http_context(&http_args);
-    match matcher.evaluate(&ctx) {
-        Some(action) => println!("{action}"),
-        None => println!("(no match)"),
-    }
+    report(&matcher, &ctx, trace);
 
     Ok(())
 }
@@ -203,6 +269,8 @@ fn cmd_run_claude(args: &[String]) -> Result<(), String> {
         return Err("run claude requires a config file path".into());
     }
 
+    let trace = wants_trace(args);
+    let args = without_trace(args);
     let config_path = &args[0];
     let claude_args = parse_claude_args(&args[1..])?;
 
@@ -213,10 +281,7 @@ fn cmd_run_claude(args: &[String]) -> Result<(), String> {
         .map_err(|e| format!("config load failed: {e}"))?;
 
     let ctx = build_claude_context(&claude_args)?;
-    match matcher.evaluate(&ctx) {
-        Some(action) => println!("{action}"),
-        None => println!("(no match)"),
-    }
+    report(&matcher, &ctx, trace);
 
     Ok(())
 }
@@ -480,12 +545,16 @@ Commands:
   run [http|claude] <config> [flags]    Run config against context
   check [http|claude] <config>          Validate config
   info [http|claude]                    Print registered type URLs
+  --skill [-r NAME]                     Print agent-facing documentation
   help                                  Show this help
 
 Domains:
   (default)  Test domain (key-value context)
   http       HTTP matching (method, path, headers, query params)
   claude     Claude Code hooks (event, tool, arguments)
+
+Flags (all domains):
+  --trace                               Show why each rule did or did not match
 
 Flags (test domain, default):
   --context key=value...                Context key-value pairs
@@ -785,5 +854,66 @@ mod tests {
 
         let ctx = TestContext::new().with("method", "DELETE");
         assert_eq!(matcher.evaluate(&ctx), Some("fallback".to_string()));
+    }
+    // ─── Skill accuracy ──────────────────────────────────────────────────
+
+    /// Every config key named in `skill::CONFIG_KEYS` must be the key the real
+    /// loader accepts.
+    ///
+    /// This test exists because the hand-written half of `skill.rs` claimed
+    /// `ArgumentInput` reads `config.key` when the struct field is `name`. The
+    /// generated half of that file cannot drift; this half could, and did,
+    /// within hours of being written. A doc claim that CI does not check is not
+    /// a doc claim, it is a guess.
+    #[test]
+    fn skill_hints_name_real_config_keys() {
+        for (type_url, key) in skill::CONFIG_KEYS {
+            let yaml = format!(
+                r#"
+matchers:
+  - predicate:
+      type: single
+      input: {{ type_url: "{type_url}", config: {{ {key}: "x" }} }}
+      value_match: {{ Exact: "y" }}
+    on_match: {{ type: action, action: "a" }}
+"#
+            );
+            let config: MatcherConfig<String> =
+                serde_yaml::from_str(&yaml).unwrap_or_else(|e| panic!("{type_url}: {e}"));
+
+            let loaded = if type_url.starts_with("xuma.http.") {
+                build_http_registry().load_matcher(config).map(|_| ())
+            } else if type_url.starts_with("xuma.claude.") {
+                build_claude_registry().load_matcher(config).map(|_| ())
+            } else {
+                build_test_registry().load_matcher(config).map(|_| ())
+            };
+
+            assert!(
+                loaded.is_ok(),
+                "skill.rs documents `{type_url}` as taking config.{key}, but the \
+                 loader rejected it: {:?}",
+                loaded.err()
+            );
+        }
+    }
+
+    /// A wrong key must actually fail, or the test above proves nothing.
+    #[test]
+    fn skill_hint_test_would_catch_a_wrong_key() {
+        let yaml = r#"
+matchers:
+  - predicate:
+      type: single
+      input: { type_url: "xuma.claude.v1.ArgumentInput", config: { key: "cmd" } }
+      value_match: { Exact: "y" }
+    on_match: { type: action, action: "a" }
+"#;
+        let parsed = serde_yaml::from_str::<MatcherConfig<String>>(yaml)
+            .map(|c| build_claude_registry().load_matcher(c).map(|_| ()));
+        assert!(
+            matches!(parsed, Err(_) | Ok(Err(_))),
+            "the old wrong key `config.key` was accepted — this guard is inert"
+        );
     }
 }
