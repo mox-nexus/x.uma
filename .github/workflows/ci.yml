@@ -184,7 +184,12 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Pinned. The unpinned action resolved to "no release for just matching
+      # version specifier" and failed the job on 2026-08-17. Pinning also makes
+      # CI run the same `just` as a laptop, which is the premise of `just ci`.
       - uses: extractions/setup-just@v2
+        with:
+          just-version: "1.46.0"
 
       # PLAN.md CI5. Generated code is committed (DECISIONS.md D-028), which is
       # only honest if regenerating reproduces it exactly. While gen/ was
