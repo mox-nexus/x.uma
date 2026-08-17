@@ -9,6 +9,25 @@ default:
 # Proto Generation
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Build the PyO3 crust and run its tests.
+#
+# The crusts are outside default-members (extension-module cannot link
+# libpython under plain `cargo test`), so nothing in `just test` touches them.
+# 80 tests here had never run in CI — PLAN.md F5 / CI1.
+crust-py-check:
+    cd rumi/crusts/python && maturin develop --uv
+    cd rumi/crusts/python && uv run pytest tests/ -q \
+        --ignore=tests/test_bench_config.py --ignore=tests/test_bench_crusty.py
+
+# Build the wasm-bindgen crust and run its tests. 80 more, same story.
+crust-wasm-check:
+    cd rumi/crusts/wasm && wasm-pack build --target web
+    cd rumi/crusts/wasm && bun install --frozen-lockfile && bun test
+
+# Both crusts. Not in `just ci`: wasm-pack builds take ~1 minute and the two
+# have separate toolchains, so CI runs them as their own jobs.
+crust-check: crust-py-check crust-wasm-check
+
 # Generate proto code (all three languages) and the xDS dependency types.
 #
 # Two passes are required. `buf generate` only walks the local module graph, and
@@ -67,7 +86,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-fixtures docs-commands docs-links puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-fixtures docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -101,6 +120,12 @@ docs-commands:
 
 # Assert every internal Markdown link resolves to a page the site serves.
 # Every one of them was dead until 2026-08-17; the build reported one, as a 404.
+# Run the README's literal routes.yaml through every runtime and assert they
+# agree. "One config, all runtimes" is the project's central claim; nothing
+# checked it. PLAN.md CI3.
+readme-agreement:
+    node scripts/check-readme-agreement.mjs
+
 docs-links:
     node scripts/check-doc-links.mjs
 
