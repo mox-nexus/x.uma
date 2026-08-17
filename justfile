@@ -18,8 +18,29 @@ default:
 # Order matters: buf.gen.yaml carries `clean: true` and wipes the tree, so it
 # must run first. buf.gen.rust.yaml deliberately has no `clean` — it appends.
 gen:
-    buf generate
-    buf generate buf.build/cncf/xds --template buf.gen.rust.yaml
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Generate BOTH passes into a staging tree, then swap. buf.gen.yaml carries
+    # `clean: true`, so an in-place generate that fails part-way leaves the
+    # committed tree destroyed — and the second pass reaches the network, which
+    # rate-limits. Observed on 2026-08-17.
+    #
+    # Nothing here deletes: the outgoing trees are MOVED into the staging
+    # directory and left for the OS to reap, so a bad swap is recoverable.
+    STAGE=$(mktemp -d)
+    echo "gen: staging in $STAGE"
+    buf generate -o "$STAGE"
+    buf generate buf.build/cncf/xds --template buf.gen.rust.yaml -o "$STAGE"
+    for d in rumi/proto/src/gen puma/proto/src/gen bumi/proto/src/gen; do
+        test -d "$STAGE/$d" || { echo "gen: $d missing from staging, refusing to swap"; exit 1; }
+    done
+    mkdir -p "$STAGE/.outgoing"
+    for d in rumi/proto/src/gen puma/proto/src/gen bumi/proto/src/gen; do
+        if [ -d "$d" ]; then mv "$d" "$STAGE/.outgoing/$(echo "$d" | tr / _)"; fi
+        mkdir -p "$(dirname "$d")"
+        mv "$STAGE/$d" "$d"
+    done
+    echo "gen: ok — previous trees kept in $STAGE/.outgoing"
 
 # Lint proto files
 lint-proto:
