@@ -47,7 +47,7 @@ pub struct HookMatch {
     /// Added 2026-08-17. Both FFI crusts already accepted a `session_id` and
     /// counted it toward the "is this rule empty?" guard, but this struct had no
     /// such field, so the value was dropped on conversion — a rule scoped to one
-    /// session became a catch-all. See `DECISIONS.md` D-029.
+    /// session became a catch-all.
     pub session_id: Option<StringMatch>,
     /// Match on current working directory.
     pub cwd: Option<StringMatch>,

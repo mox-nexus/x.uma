@@ -15,7 +15,6 @@ use rumi::{MatcherError, StringMatchSpec};
 /// regex was silently replaced with an exact match on the *pattern literal*,
 /// so a route the operator believed was live simply never fired. The sibling
 /// Claude compiler already returned `Result`; this removes the asymmetry.
-/// See `DECISIONS.md` D-029.
 pub trait HttpRouteMatchExt {
     /// Compile this `HttpRouteMatch` into a rumi Matcher.
     ///
@@ -93,7 +92,7 @@ fn catch_all() -> Predicate<HttpMessage> {
 ///
 /// Goes through [`StringMatchSpec::to_input_matcher`], which owns the pattern
 /// length limits. Constructing matchers directly here is what let this compiler
-/// bypass every declared limit — see D-029.
+/// bypass every declared limit.
 fn compile_path_match(path_match: &HttpPathMatch) -> Result<Predicate<HttpMessage>, MatcherError> {
     let spec = match path_match {
         HttpPathMatch::Exact { value } => StringMatchSpec::Exact(value.clone()),

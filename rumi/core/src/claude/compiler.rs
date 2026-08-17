@@ -502,9 +502,9 @@ mod tests {
     // scoped to one session became a rule matching every tool call in every
     // session — in an allowlist gate, a total bypass.
     //
-    // The review claimed there was no SessionIdInput. There was, and is:
-    // claude/inputs.rs:48, registered at claude/mod.rs:72. The field was the
-    // only missing piece.
+    // The security review claimed there was no SessionIdInput. There was, and
+    // is: see inputs.rs and the registration in mod.rs. The field was the only
+    // missing piece.
 
     #[test]
     fn session_id_actually_constrains() {
@@ -535,9 +535,9 @@ mod tests {
         // deny_unknown_fields means a typo'd field name is rejected rather than
         // silently producing the catch-all. This asserts the field is spelled
         // the way the config surface expects.
-        // Note the `!Exact` tag: serde_yaml renders externally-tagged enums
-        // as YAML tags, not maps. That spelling is one of the things D-026
-        // retires along with the terse dialect.
+        // Note the `!Exact` tag: serde_yaml renders externally-tagged enums as
+        // YAML tags, not maps. That spelling goes away with the terse dialect
+        // when the config format moves to protojson.
         let yaml = "session_id: !Exact sess-xyz\n";
         let m: HookMatch = serde_yaml::from_str(yaml).expect("session_id must deserialize");
         assert!(m.session_id.is_some());

@@ -10,8 +10,8 @@ use wasm_bindgen::prelude::*;
 ///
 /// Re-exported from core rather than re-declared. Three hand-copied constants
 /// with no compile-time link is how they drift; `rumi::StringMatchSpec` is the
-/// authority and enforces these itself (D-029). The checks here stay only to
-/// produce a boundary-shaped error message before core produces a generic one.
+/// authority and enforces these itself. The checks here stay only to produce a
+/// boundary-shaped error message before core produces a generic one.
 use rumi::MAX_PATTERN_LENGTH;
 
 /// Maximum number of argument matchers per rule.
@@ -111,7 +111,7 @@ pub fn convert_hook_match_from_js(val: &JsValue) -> Result<HookMatch, JsValue> {
         event,
         tool_name,
         arguments,
-        // Computed above and previously dropped on the floor. See D-029 / SEC3.
+        // Computed above and previously dropped on the floor.
         session_id,
         cwd,
         git_branch,

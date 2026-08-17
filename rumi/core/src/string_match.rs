@@ -55,9 +55,8 @@ impl StringMatchSpec {
     /// every caller inherits the guarantee — the registry, both domain
     /// compilers, and anyone constructing a spec by hand.
     ///
-    /// Before 2026-08-17 the limits lived in a private `Registry` method, which
-    /// meant `HookMatch::compile` accepted an 8 MB pattern against an 8192-byte
-    /// limit. See `DECISIONS.md` D-029.
+    /// They lived in a private `Registry` method until 2026-08-17, which meant
+    /// `HookMatch::compile` accepted an 8 MB pattern against an 8192-byte limit.
     ///
     /// # Errors
     ///

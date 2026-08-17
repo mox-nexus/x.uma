@@ -578,8 +578,8 @@ impl<Ctx: 'static> Registry<Ctx> {
             ValueMatchConfig::BuiltIn(ref spec) => {
                 // Enforce pattern length limits before compilation
                 // Length limits live in StringMatchSpec::to_input_matcher, the
-                // constructor that owns the resource — see D-029. The loader
-                // inherits them rather than re-implementing them.
+                // constructor that owns the resource. The loader inherits them
+                // rather than keeping a second copy that can drift.
                 spec.to_input_matcher()?
             }
             ValueMatchConfig::Custom(tc) => {

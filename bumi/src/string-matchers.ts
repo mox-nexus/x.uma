@@ -6,9 +6,8 @@ import { MAX_PATTERN_LENGTH, MAX_REGEX_PATTERN_LENGTH, PatternTooLongError } fro
  * Enforce the literal pattern limit at construction.
  *
  * The limit belongs to the type that holds the pattern, not to the config
- * loader — before 2026-08-17 only the loader checked, so the gateway, direct
+ * loader — until 2026-08-17 only the loader checked, so the gateway, direct
  * construction, and the playground's graph renderer were all unguarded.
- * See `DECISIONS.md` D-029.
  */
 function checkLiteralLength(pattern: string): void {
 	if (pattern.length > MAX_PATTERN_LENGTH) {
@@ -115,7 +114,7 @@ export class RegexMatcher {
 	 * compiled program, not in the config loader. Every caller inherits them —
 	 * the registry, the gateway, and the playground's graph renderer, which
 	 * calls `parseMatcherConfig` without `loadMatcher` and so previously
-	 * inherited nothing. See D-029.
+	 * inherited nothing.
 	 */
 	constructor(readonly pattern: string) {
 		if (pattern.length > MAX_REGEX_PATTERN_LENGTH) {

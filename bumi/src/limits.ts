@@ -4,7 +4,7 @@
  * These live in their own module rather than in `registry.ts` so that
  * `string-matchers.ts` can enforce them in its constructors without importing
  * the registry, which imports it. The limits belong to the types that hold the
- * resource, not to the loader — see `DECISIONS.md` D-029.
+ * resource, not to the loader.
  *
  * `registry.ts` re-exports every name here, so existing imports keep working.
  */

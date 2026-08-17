@@ -2,8 +2,8 @@
 
 These live in their own module rather than in ``_registry`` so the matcher
 constructors can enforce them without importing the registry, which imports
-them. The limits belong to the types that hold the resource, not to the loader
--- see ``DECISIONS.md`` D-029.
+them. The limits belong to the types that hold the resource, not to the
+loader.
 
 ``_registry`` re-exports every name here, so existing imports keep working.
 """

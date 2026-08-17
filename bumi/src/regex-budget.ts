@@ -19,8 +19,6 @@
  *
  * This supplies one, mirroring RE2's own rule: the product of nested repetition
  * counts may not exceed {@link MAX_REPEAT_PRODUCT}.
- *
- * See `DECISIONS.md` D-029 and `reference/security-review-2026-08-16.md` F-01.
  */
 
 /**

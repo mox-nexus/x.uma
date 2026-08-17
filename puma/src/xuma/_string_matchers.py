@@ -26,8 +26,8 @@ def _check_literal_length(pattern: str) -> None:
     """Enforce the literal pattern limit at construction.
 
     The limit belongs to the type that holds the pattern, not to the config
-    loader -- before 2026-08-17 only the loader checked, so the HTTP gateway
-    and direct construction were unguarded. See ``DECISIONS.md`` D-029.
+    loader -- until 2026-08-17 only the loader checked, so the HTTP gateway and
+    direct construction were unguarded.
     """
     if not isinstance(pattern, str):
         msg = f"pattern must be str, got {type(pattern).__name__}"
@@ -161,9 +161,9 @@ class RegexMatcher:
     def __post_init__(self) -> None:
         # The limit is enforced here, in the constructor that owns the compiled
         # program, not in the config loader. Every caller inherits it -- the
-        # registry, the HTTP gateway, and direct construction. Before
-        # 2026-08-17 the loader was the only guarded path, so the gateway
-        # accepted a 40,960-byte regex against this 4,096 limit. See D-029.
+        # registry, the HTTP gateway, and direct construction. Until 2026-08-17
+        # the loader was the only guarded path, so the gateway accepted a
+        # 40,960-byte regex against this 4,096 limit.
         if not isinstance(self.pattern, str):
             # google-re2 raises a bare TypeError for a non-str pattern, which
             # escapes the MatcherError contract callers rely on (review L-4).

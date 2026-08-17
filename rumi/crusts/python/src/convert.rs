@@ -12,8 +12,8 @@ use rumi::claude::{ArgumentMatch, HookEvent, HookMatch, StringMatch};
 ///
 /// Re-exported from core rather than re-declared. Three hand-copied constants
 /// with no compile-time link is how they drift; `rumi::StringMatchSpec` is the
-/// authority and enforces these itself (D-029). The checks here stay only to
-/// produce a boundary-shaped error message before core produces a generic one.
+/// authority and enforces these itself. The checks here stay only to produce a
+/// boundary-shaped error message before core produces a generic one.
 use rumi::MAX_PATTERN_LENGTH;
 
 /// Maximum number of argument matchers per `HookMatch`.
@@ -72,7 +72,7 @@ pub fn convert_hook_match(py_match: &PyHookMatch) -> PyResult<HookMatch> {
         .map(convert_string_match)
         .transpose()?;
     // session_id was counted by the empty-match guard above but never converted,
-    // so a rule scoped only to a session became a catch-all. See D-029 / SEC3.
+    // so a rule scoped only to a session became a catch-all.
     let session_id = py_match
         .session_id
         .as_ref()
