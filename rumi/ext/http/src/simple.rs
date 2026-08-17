@@ -163,7 +163,7 @@ impl DataInput<HttpRequest> for SimpleQueryParamInput {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Configuration for [`SimpleHeaderInput`].
-#[cfg(all(feature = "registry", not(feature = "proto")))]
+#[cfg(feature = "registry")]
 #[derive(serde::Deserialize)]
 pub struct SimpleHeaderInputConfig {
     /// The header name to extract (case-insensitive).
@@ -171,14 +171,14 @@ pub struct SimpleHeaderInputConfig {
 }
 
 /// Configuration for [`SimpleQueryParamInput`].
-#[cfg(all(feature = "registry", not(feature = "proto")))]
+#[cfg(feature = "registry")]
 #[derive(serde::Deserialize)]
 pub struct SimpleQueryParamInputConfig {
     /// The query parameter name to extract.
     pub name: String,
 }
 
-#[cfg(all(feature = "registry", not(feature = "proto")))]
+#[cfg(feature = "registry")]
 impl rumi::IntoDataInput<HttpRequest> for SimplePathInput {
     type Config = rumi::UnitConfig;
 
@@ -189,7 +189,7 @@ impl rumi::IntoDataInput<HttpRequest> for SimplePathInput {
     }
 }
 
-#[cfg(all(feature = "registry", not(feature = "proto")))]
+#[cfg(feature = "registry")]
 impl rumi::IntoDataInput<HttpRequest> for SimpleMethodInput {
     type Config = rumi::UnitConfig;
 
@@ -200,7 +200,7 @@ impl rumi::IntoDataInput<HttpRequest> for SimpleMethodInput {
     }
 }
 
-#[cfg(all(feature = "registry", not(feature = "proto")))]
+#[cfg(feature = "registry")]
 impl rumi::IntoDataInput<HttpRequest> for SimpleHeaderInput {
     type Config = SimpleHeaderInputConfig;
 
@@ -211,7 +211,7 @@ impl rumi::IntoDataInput<HttpRequest> for SimpleHeaderInput {
     }
 }
 
-#[cfg(all(feature = "registry", not(feature = "proto")))]
+#[cfg(feature = "registry")]
 impl rumi::IntoDataInput<HttpRequest> for SimpleQueryParamInput {
     type Config = SimpleQueryParamInputConfig;
 

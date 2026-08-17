@@ -9,9 +9,43 @@ default:
 # Proto Generation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Generate proto code
+# Generate proto code (all three languages) and the xDS dependency types.
+#
+# Two passes are required. `buf generate` only walks the local module graph, and
+# no xuma proto imports xDS, so the xds.* types convert.rs depends on are absent
+# from it. The second pass fetches them explicitly.
+#
+# Order matters: buf.gen.yaml carries `clean: true` and wipes the tree, so it
+# must run first. buf.gen.rust.yaml deliberately has no `clean` — it appends.
 gen:
-    buf generate
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Generate BOTH passes into a staging tree, then swap. buf.gen.yaml carries
+    # `clean: true`, so an in-place generate that fails part-way leaves the
+    # committed tree destroyed — and the second pass reaches the network, which
+    # rate-limits. Observed on 2026-08-17.
+    #
+    # Nothing here deletes: the outgoing trees are MOVED into the staging
+    # directory and left for the OS to reap, so a bad swap is recoverable.
+    STAGE=$(mktemp -d)
+    echo "gen: staging in $STAGE"
+    buf generate -o "$STAGE"
+    # Scoped with --path. `buf generate buf.build/cncf/xds` without it pulls the
+    # WHOLE module — ORCA load-reporting services, annotation metadata, the legacy
+    # udpa namespace — 14 extra files and ~4,500 lines that lib.rs never includes
+    # and nothing compiles. Only these three packages are used.
+    buf generate buf.build/cncf/xds --template buf.gen.rust.yaml -o "$STAGE" \
+        --path xds/core/v3 --path xds/type/v3 --path xds/type/matcher/v3
+    for d in rumi/proto/src/gen puma/proto/src/gen bumi/proto/src/gen; do
+        test -d "$STAGE/$d" || { echo "gen: $d missing from staging, refusing to swap"; exit 1; }
+    done
+    mkdir -p "$STAGE/.outgoing"
+    for d in rumi/proto/src/gen puma/proto/src/gen bumi/proto/src/gen; do
+        if [ -d "$d" ]; then mv "$d" "$STAGE/.outgoing/$(echo "$d" | tr / _)"; fi
+        mkdir -p "$(dirname "$d")"
+        mv "$STAGE/$d" "$d"
+    done
+    echo "gen: ok — previous trees kept in $STAGE/.outgoing"
 
 # Lint proto files
 lint-proto:
@@ -36,6 +70,9 @@ build-full:
 # Run tests
 test:
     cargo test --manifest-path rumi/Cargo.toml
+    # rumi-proto is outside default-members, so the line above never sees it.
+    # It went its whole life uncompiled because nothing ran this (PLAN.md F1).
+    cargo test --manifest-path rumi/Cargo.toml -p rumi-proto
 
 # Run tests with all features
 test-full:

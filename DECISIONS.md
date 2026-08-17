@@ -8,6 +8,132 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-17 · Codegen
+
+### D-028 · Codegen plugins are pinned, and generated code is committed
+
+`rumi-proto` had never compiled. The cause was not what two reviews said it was,
+so the wrong diagnosis is recorded here alongside the right one.
+
+**What it actually was.** `buf.gen.yaml` referenced
+`buf.build/community/neoeinstein-prost` with **no version**. That floating
+reference had moved to v0.5.0+, whose prost-build infers
+`#[derive(Eq, Hash)]` on messages — including `xds.core.v3.TypedExtensionConfig`,
+which holds an `Option<Any>`. Neither `prost-types::Any` nor `pbjson-types::Any`
+implements `Eq` or `Hash`, so the derive cannot compile against any available
+`Any`. Meanwhile `rumi/proto/Cargo.toml` pins `prost = "0.13"`. **Codegen and
+runtime had drifted apart, and nothing checked.**
+
+Measured, generating the same protos with each version:
+
+| plugin | layout | messages with `Eq, Hash` |
+|---|---|---|
+| `neoeinstein-prost:v0.4.0` | flat `gen/<package>.rs` | 0 — compiles |
+| `neoeinstein-prost:v0.5.0` | nested directories | 4 — does not compile |
+
+Pinned to `neoeinstein-prost:v0.4.0` + `neoeinstein-prost-serde:v0.3.0`, the
+pair that matches the `prost = "0.13"` runtime. `rumi-proto` compiles and its 14
+tests pass, three of them end-to-end proto → convert → load → evaluate.
+
+**The wrong diagnosis, recorded so it is not re-derived.** Both an adversarial
+plan review and this session's first writeup said the root was
+`rumi/proto/Cargo.toml`'s aliasing of `pbjson-types` as `prost_types`, and that
+dropping the alias was one of the options. Tested: removing the alias produces
+**16 errors instead of 4** — the same `Eq`/`Hash` pair plus 12 serde failures.
+The alias is load-bearing and orthogonal; it is why protojson works at all.
+Keep it.
+
+**Generated code is now committed**, for all three languages — but the reason
+matters, because the first version of this entry gave the wrong one.
+
+The argument that does *not* carry it: "the ignore made `just gen` produce no
+diff, so drift was undetectable." True, but committing is not the only fix — CI
+could regenerate fresh on every run and store nothing, and then drift is
+impossible because there is nothing to drift from. `protocol-mastery` lists that
+as the alternative (Envoy/Bazel). Nor did the ignore cause `rumi-proto` to go
+uncompiled; the unpinned plugin and a CI job that never ran `-p rumi-proto` did,
+and both are fixed independently.
+
+**The argument that does carry it is publishing.** E1 publishes `rumi-proto` to
+crates.io. `cargo package` follows git tracking, so gitignored generated code
+does not reach the published crate and it would ship broken. Generating at build
+time instead would force every consumer to have `buf` and network access. This is
+why prost-ecosystem crates commit generated code, and it is the reason here.
+
+This reverses `e36dd29`, which excluded generated code because it "keeps PRs
+reviewable". That concern is real and is now handled two ways: the same commit
+already added `.gitattributes linguist-generated=true`, which collapses these
+diffs in review, and the scoping below cuts the tracked tree in half.
+
+**Generate only what is used.** `buf generate buf.build/cncf/xds` without
+`--path` pulls the entire module: ORCA load-reporting messages and services, xDS
+and udpa annotation metadata, the legacy udpa namespace. That is **14 files and
+~4,500 lines that `lib.rs` never includes and nothing compiles** — committed once,
+in a matcher engine, before being caught. `just gen` now scopes to
+`xds/core/v3`, `xds/type/v3`, `xds/type/matcher/v3`. If a fourth package is ever
+needed, add it explicitly rather than removing the scoping.
+
+Three consequences that bit immediately and are worth knowing:
+- **ruff honours `.gitignore`.** Un-ignoring `puma/proto/src/gen/` made ruff
+  start linting generated Python. Excluded explicitly in `pyproject.toml`; the
+  ignore file had been doing lint configuration by accident.
+- **`clean: true` plus a two-pass network generate can destroy the tree.** The
+  second pass fetches from the BSR, which rate-limits; it failed after the first
+  pass had already wiped, leaving 44 files deleted from the working tree. `just
+  gen` now stages both passes and swaps only on success, and deletes nothing —
+  outgoing trees are moved into the staging directory for the OS to reap.
+- **The pin fixes the output layout too.** v0.4.0 emits flat files, v0.5.0 nested.
+  `rumi/proto/src/lib.rs`'s `include!` paths follow the pin, and say so.
+
+**Alternatives considered, so this is not a one-way door.**
+
+*Generate in `build.rs` and track only the `.proto` sources* — the Envoy/Bazel
+shape. Measured: 3,673 tracked lines (175 ours + 3,498 vendored xDS) against
+10,990 generated, and the tracked content would be readable source. Rejected
+because `prost-build` 0.13 does not bundle `protoc`; it needs one in `PATH` or a
+~15 MB vendored-binary dependency, which puts a compiler toolchain between a user
+and `cargo add rumi-core`. Envoy can do this because it is an *application* whose
+consumers already run Bazel. We publish libraries to a registry. The published
+prost ecosystem — `tonic-health`, `tonic-reflection`, `etcd-client` — lands the
+same way we have, for the same reason.
+
+*Depend on an existing published xDS crate* instead of generating the xDS half at
+all. This would delete 8,478 of the 10,990 tracked lines and one whole codegen
+pass, so it was investigated properly rather than left as a note:
+
+| crate | downloads | prost | protojson / serde | tonic |
+|---|---|---|---|---|
+| `envoy-types` 0.7.6 | 1.4M | **0.14** | **no features at all** | 0.14, non-optional |
+| `xds-api` 0.2.0 | 15.5k | **0.13** ✓ | **`pbjson` feature** ✓ | 0.12, **non-optional** |
+| `xds-types` 0.1.0 | 232 | 0.13 | none | non-optional |
+| `data-plane-api` 0.1.1 | 4.3k | last published 2022 | — | — |
+
+`envoy-types` is the popular one and cannot serve the config path at all: no
+serde or pbjson feature, so no protojson, which D-026 makes the whole point.
+
+**`xds-api` is the near miss** — exactly our prost 0.13, exactly our pbjson 0.7,
+and it ships a `pbjson` feature, which is evidence the approach is sound and that
+someone else needed protojson out of xDS types. It fails on one axis: `tonic` is
+a **non-optional** dependency. After C5 `rumi-proto` is on the critical path for
+every consumer of `rumi-core`, so this would pull tonic, hyper, h2 and tokio into
+a library that never opens a socket — the same 101-crates-against-7 problem E4
+exists to fix, except unavoidable instead of merely a default, and in direct
+conflict with D-027. It is also 17 months without a release.
+
+**The trigger to revisit:** `xds-api` making `tonic` optional, or any crate
+appearing with xDS matcher types, a pbjson feature, and no mandatory transport.
+That is a small enough change upstream to be worth re-checking each release.
+
+**What would overturn this:**
+- `prost-build` bundling `protoc` again, or a zero-cost way to generate at
+  consumer build time. Then `build.rs` wins on tracked-line count outright.
+- A published upstream crate supplying the xDS types at a compatible prost
+  version — see `xds-api` above.
+- Wanting a prost 0.14 runtime. Then the plugin pins move with it, and whether
+  `Any` gains `Eq`/`Hash` upstream must be **checked, not assumed**.
+
+---
+
 ## 2026-08-17 · Schema freeze
 
 ### D-026 · protojson is the config format, not a wire format hidden behind a dialect

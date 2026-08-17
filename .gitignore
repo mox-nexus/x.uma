@@ -54,10 +54,13 @@ pkg/
 # Generated
 *.generated.*
 
-# buf-generated proto code (regenerate with `just gen`)
-rumi/proto/src/gen/
-puma/proto/src/gen/
-bumi/proto/src/gen/
+# buf-generated proto code is COMMITTED, not ignored.
+#
+# It was ignored from e36dd29 ("keeps PRs reviewable") until 2026-08-17. That
+# reason is handled by .gitattributes linguist-generated=true, which collapses
+# these diffs already — while ignoring them meant `just gen` produced no diff by
+# construction, so nothing could detect codegen drift, and rumi-proto went its
+# whole life uncompiled without CI noticing. See DECISIONS.md D-028.
 
 # Scratch (working notes, not committed)
 scratch/

@@ -353,7 +353,9 @@ builds and deploys. PR #22 is **merged**; `main` is the baseline now.
 
 | # | Finding | Evidence |
 |---|---|---|
-| F1 | `rumi-proto` has never compiled | Reproduced 2026-08-17: `cargo check -p rumi-proto` → 4 errors, `pbjson_types::Any: Eq`/`Hash`. **Correction to the original evidence:** it is *not* true that `gen/` was never tracked — `935ed9f` added 14 files and `e36dd29` removed them, both ancestors of HEAD. 28 files (960K) sit there untracked today. See C1. |
+| ~~F1~~ | ~~`rumi-proto` has never compiled~~ **RESOLVED** | Fixed 2026-08-17 by pinning the codegen plugins (D-028). Compiles; 14 tests pass, three end-to-end. Its original evidence was also false: `gen/` *was* tracked — `935ed9f` added 14 files, `e36dd29` removed them, both ancestors of HEAD. |
+| ~~F20~~ | ~~generated code gitignored in all three languages~~ **RESOLVED** | All three `gen/` trees are tracked as of 2026-08-17 (D-028). CI5's no-diff check is now meaningful. |
+| F23 | `rumi-http` violates feature additivity | `simple.rs` gated six items `#[cfg(all(feature = "registry", not(feature = "proto")))]` while `register_simple` (gated on `registry` alone) called them — so enabling `proto` **deleted** the `IntoDataInput` impls it needs, with nothing replacing them. `rust-mastery` states features must be strictly additive. Fixed 2026-08-17; only `--all-features` exposed it, which `just ci` never ran. |
 | F2 | `keep_matching` documented as an enforced invariant, not implemented | `CLAUDE.md:213`. **Corrected evidence:** not "zero occurrences" — there are 8, all `keep_matching: false` literals in `rumi/proto/src/convert.rs`'s test module. Zero in `rumi/{core,ext,cli,crusts}`, `puma/src`, `bumi/src`. |
 | F3 | `MatcherTree`/`RadixTree` unreachable from config | No tree variant in `MatcherConfig`; `convert.rs:88` returns "MatcherTree is not yet supported" |
 | F4 | Claude domain is Rust-only | Absent from `puma/src` and `bumi/src`; README presents it as a peer of HTTP |
@@ -371,7 +373,7 @@ builds and deploys. PR #22 is **merged**; `main` is the baseline now.
 | F16 | HTTP compiler swallows invalid regex | `rumi/ext/http/src/compiler.rs:77-81` falls back to exact-matching the pattern literal. Route silently disappears. Sibling Claude compiler returns `Result`. |
 | F17 | `data_type()` defaults to `"string"` | `data_input.rs:60-62`. A custom input returning `Int` that forgets to override passes the compatibility check, loads clean, never matches. |
 | F18 | Docs snippets are invisible to CI | Every Rust block is ```` ```rust,ignore ````; shell blocks are unchecked. This is the root cause of F8. |
-| F19 | **`just test-full` does not compile** | `cargo test --all-features` → the same 4 errors as F1, because `--all-features` enables `rumi-test/proto` → `rumi-proto`. `just ci` passes anyway: `just test` uses `default-members` (`rumi/Cargo.toml:6`) and `justfile:68` hard-codes `--exclude rumi-proto`. A shipped `just` target is red and the gate cannot see it. |
+| F19 | **`just test-full` is red** — *partially resolved* | `cargo test --all-features` → the same 4 errors as F1, because `--all-features` enables `rumi-test/proto` → `rumi-proto`. `just ci` passes anyway: `just test` uses `default-members` (`rumi/Cargo.toml:6`) and `justfile:68` hard-codes `--exclude rumi-proto`. A shipped `just` target is red and the gate cannot see it. **2026-08-17:** both *compile* failures are fixed (D-028, F23). What remains is two failing tests, and they are **F13** — `unknown field 'key', expected 'value'`. F13 is therefore no longer prose: it is a reproducible test failure, which is what SF4 was going to have to write anyway. |
 | F20 | Generated code is gitignored in **all three** languages | `.gitignore:58-60` covers `rumi/proto/src/gen/`, `puma/proto/src/gen/`, `bumi/proto/src/gen/`. All three exist on disk untracked (28 / 7 / 6 files); nothing imports the Python or TypeScript ones. M5's "all three languages" gate and CI5's no-diff check are both vacuous over untracked trees. |
 | F22 | The plan cited files a clone does not contain | `.gitignore:63` ignores `scratch/` wholesale, and §0 told the reader to open `scratch/phase-12/prior-art.md`. Fixed 2026-08-17 by moving both cited artifacts to a tracked `reference/`. Left as a row because the *class* recurs: `just verify-clean-clone` (H1) is the check that would catch the next one. |
 | F21 | Fixtures use **four** dialects, not three | `matcher:` (14), `config:` (7), `http_route_match:` (5), `http_route_matches:` **plural** (1, `spec/tests/05_http/multiple_routes.yaml:5`), each with its own branch in all three loaders. A5 says three. |
@@ -724,25 +726,22 @@ under Common Pitfalls with "use the proto `Name` trait" as the fix.
      `pbjson_types::Any` implements neither `Eq` nor `Hash`, but the generated
      `xds.core.v3` code derives both (`gen/xds/core/v3/xds.core.v3.rs:226`).
 
-  **C1.3 is an open problem, not a task. Budget for it accordingly.** An earlier
-  draft said "fix it in `buf.gen.yaml` (prost type attributes)". **That is not an
-  available move**: `type_attribute` *adds* attributes and nothing in prost-build
-  removes a derive. The derives are emitted by prost-build's own per-message
-  derivability inference, computed against `prost-types`' `Any` — while
-  `rumi/proto/Cargo.toml:22-24` deliberately aliases `pbjson-types` as
-  `prost_types` so generated code gets serde impls. The alias is the root.
+  **C1.3 — SOLVED 2026-08-17. See `DECISIONS.md` D-028.** Root cause was neither
+  of the two things previously written here. `buf.gen.yaml` referenced the
+  `neoeinstein-prost` plugin **with no version**, and that floating reference had
+  moved to v0.5.0+, whose prost-build infers `#[derive(Eq, Hash)]` on messages
+  holding `Any`. Runtime pins `prost = "0.13"`. Codegen and runtime had drifted.
 
-  Known options, none free, none yet tried:
-  - `extern_path`-remap `.google.protobuf.Any` to a type that implements both
-  - drop the pbjson alias — **this changes how protojson handles `Any`, which is
-    now the authoring format (D-026), so it is not a local decision**
-  - a post-processing step in `just gen` that strips the derives
+  Fixed by pinning `neoeinstein-prost:v0.4.0` + `neoeinstein-prost-serde:v0.3.0`.
+  `rumi-proto` compiles; its 14 tests pass, three end-to-end.
 
-  Steel-man before choosing, and record the answer in `DECISIONS.md`. This sits
-  on the M4→M7 chain and is the most likely place to lose a day.
+  **The `pbjson-types`-as-`prost_types` alias is NOT the root and must not be
+  removed.** An adversarial review said it was. Measured: dropping it produces 16
+  errors instead of 4 — the same `Eq`/`Hash` pair plus 12 serde failures. It is
+  what makes protojson work.
 
-  **`rumi/proto/src/gen` is gitignored (`.gitignore:58`) — and that was a
-  deliberate decision, not an oversight.** Commit `e36dd29` removed 14 previously
+  **`rumi/proto/src/gen` was gitignored (`.gitignore:58`) — a deliberate
+  decision, now reversed in D-028.** Commit `e36dd29` removed 14 previously
   tracked files with the reason *"Generated proto files are deterministic output
   of `just gen`. Removing 46K lines of generated code from tracking keeps PRs
   reviewable."* Note that the same commit added `.gitattributes:2-4`

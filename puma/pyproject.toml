@@ -32,6 +32,10 @@ testpaths = ["tests"]
 [tool.ruff]
 target-version = "py312"
 line-length = 99
+# Generated code is not hand-written and is not ours to style. It became visible
+# to ruff on 2026-08-17 when proto/src/gen/ stopped being gitignored (ruff honours
+# .gitignore by default), so the exclusion has to be explicit now.
+extend-exclude = ["proto/src/gen"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "TCH"]

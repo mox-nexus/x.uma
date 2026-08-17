@@ -1,15 +1,32 @@
 version: v2
+
+# Plugin versions are PINNED. Do not float them.
+#
+# neoeinstein-prost v0.5.0 and later use a prost-build that infers
+# `#[derive(Eq, Hash)]` on messages, including messages holding a
+# `google.protobuf.Any` field. Neither `prost-types::Any` nor
+# `pbjson-types::Any` implements those traits, so xds.core.v3's
+# TypedExtensionConfig fails to compile. v0.4.0 matches the `prost = "0.13"`
+# runtime pin in rumi/proto/Cargo.toml and does not emit those derives.
+# See DECISIONS.md D-028.
+#
+# `clean` lives here and NOT in buf.gen.rust.yaml: this template runs first and
+# wipes the tree, then the cncf/xds pass appends to it. Cleaning twice would
+# delete what the first pass just wrote.
+clean: true
+
 managed:
   enabled: true
+
 plugins:
   # Rust (prost)
-  - remote: buf.build/community/neoeinstein-prost
+  - remote: buf.build/community/neoeinstein-prost:v0.4.0
     out: rumi/proto/src/gen
     opt:
       - file_descriptor_set
 
-  # Rust (prost-serde for JSON)
-  - remote: buf.build/community/neoeinstein-prost-serde
+  # Rust (prost-serde for JSON) — v0.3.0 is the pair for prost v0.4.0
+  - remote: buf.build/community/neoeinstein-prost-serde:v0.3.0
     out: rumi/proto/src/gen
 
   # Python (betterproto)
