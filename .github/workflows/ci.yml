@@ -204,3 +204,62 @@ jobs:
             exit 1
           fi
           echo "codegen is byte-identical to what is committed"
+
+  crust-python:
+    name: crust (PyO3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v5
+
+      # PLAN.md F5 / CI1. Two of five shipped implementations were never built
+      # by CI. The PyO3 crust has 80 tests that had never run here, in a wheel
+      # that goes to PyPI.
+      - name: Build and test
+        working-directory: rumi/crusts/python
+        run: |
+          uv sync --all-groups
+          uv run maturin develop --uv
+          uv run pytest tests/ -q \
+            --ignore=tests/test_bench_config.py --ignore=tests/test_bench_crusty.py
+
+  crust-wasm:
+    name: crust (wasm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked --version 0.15.0
+
+      # 80 more tests, in the package that goes to npm.
+      - name: Build and test
+        working-directory: rumi/crusts/wasm
+        run: |
+          wasm-pack build --target web
+          bun install --frozen-lockfile
+          bun test
+
+  agreement:
+    name: runtimes agree with the README
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v5
+      - uses: oven-sh/setup-bun@v2
+
+      # PLAN.md CI3. The README says "one config, all runtimes" and shows three
+      # code blocks. Nothing checked that they return the same answers — the
+      # conformance suite has its own fixtures, and a reader copying from the
+      # README is not running it.
+      - name: Install deps
+        run: |
+          uv sync --project puma --all-groups
+          bun install --frozen-lockfile
+
+      - name: Evaluate the README config everywhere
+        run: node scripts/check-readme-agreement.mjs

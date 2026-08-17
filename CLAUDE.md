@@ -117,9 +117,9 @@ x.uma/
 | 5.1 | puma arch-guild hardening | ✅ Done |
 | 6 | bumi (Bun/TypeScript + HTTP) | ✅ Done |
 | 6.1 | bumi arch-guild hardening | ✅ Done |
-| 7 | xuma-crust: PyO3 Python bindings | ⚠️ Unverified |
+| 7 | xuma-crust: PyO3 Python bindings | ✅ Done |
 | 7.5 | Claude domain: trace + HookMatch compiler (a **feature of `rumi-core`**, not a crate) | ✅ Done |
-| 8 | xuma-crust: wasm-bindgen TypeScript bindings | ⚠️ Unverified |
+| 8 | xuma-crust: wasm-bindgen TypeScript bindings | ✅ Done |
 | 9 | Cross-language benchmarks (all 5 variants) | ⚠️ Unverified |
 | 10 | TypedExtensionConfig Registry (`IntoDataInput`, `RegistryBuilder`) | ✅ Done |
 | 11 | Test audit (removed 18 ineffective tests → 216 total) | ✅ Done |
@@ -144,7 +144,7 @@ What each ⚠️ needs to become ✅:
 
 | Phase | Blocked on |
 |---|---|
-| 7, 8 | CI building both crusts — `PLAN.md` Phase F, CI1 |
+| ~~7, 8~~ | ~~CI building both crusts~~ — done 2026-08-17; both are built and their 160 tests run on every PR |
 | 9, 14 | benchmarks running somewhere that can fail; they are currently manual |
 | 15 | `cargo publish --dry-run` passing without path patching — `PLAN.md` Phase E |
 
