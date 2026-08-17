@@ -27,6 +27,17 @@ target, and an unpinned toolchain is how `just ci` passes on one machine and
 fails on another for reasons unrelated to the change under test — which
 happened twice in one day with unpinned GitHub Actions.
 
+**Pinning has a cost, found immediately.** `rust-toolchain.toml` applies to
+everything cargo does in the repo, including installing CI tooling — the audit
+job failed because `cargo-audit`'s transitive `kstring` requires rustc 1.96 and
+the pin forced 1.95. That job now sets `RUSTUP_TOOLCHAIN=stable`: the pin exists
+to fix what x.uma is *built* with, not to constrain what a tool that only reads
+`Cargo.lock` can be installed with.
+
+Committing the lockfile also removed a step. Both `just audit` and the CI job
+used to run `cargo generate-lockfile` first, which meant they audited a freshly
+resolved graph rather than the one that ships.
+
 **No MSRV is declared.** `rust-version` would be a claim nothing checks, since
 CI builds on one toolchain and no job tests an older one. Declaring one without
 that job is exactly the pattern this plan exists to correct. It can be added the

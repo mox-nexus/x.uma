@@ -163,13 +163,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The workspace lives in rumi/ and Cargo.lock is intentionally not
-      # committed, so resolve the dependency graph before auditing it.
-      # generate-lockfile only reads manifests.
-      - name: Generate lockfile
-        run: cargo generate-lockfile --manifest-path rumi/Cargo.toml
-
+      # Cargo.lock is committed (D-031), so there is nothing to resolve first.
+      #
+      # RUSTUP_TOOLCHAIN overrides rust-toolchain.toml for this job only. The
+      # pin is for building x.uma; it should not constrain what version of a
+      # CI tool can be installed. It did: cargo-audit's transitive kstring
+      # requires rustc 1.96 and the pin forced 1.95, so the job failed to
+      # install its own tool.
       - uses: rustsec/audit-check@v2
+        env:
+          RUSTUP_TOOLCHAIN: stable
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: rumi

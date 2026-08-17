@@ -261,8 +261,9 @@ publish-dry:
     cargo publish --manifest-path rumi/core/Cargo.toml --dry-run
     cargo publish --manifest-path rumi/ext/http/Cargo.toml --dry-run
 
-# Security audit. The workspace is rumi/, and Cargo.lock is gitignored, so the
-# lock is generated first. Mirrors the CI audit job exactly.
+# Security audit against the committed lockfile. Mirrors the CI audit job.
+#
+# No generate-lockfile step: Cargo.lock is committed (D-031), so auditing a
+# freshly resolved graph would audit something other than what ships.
 audit:
-    cargo generate-lockfile --manifest-path rumi/Cargo.toml
     cargo audit --file rumi/Cargo.lock
