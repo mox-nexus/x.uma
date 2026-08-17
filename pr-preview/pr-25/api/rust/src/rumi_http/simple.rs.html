@@ -163,7 +163,7 @@
 <a href=#163 id=163 data-nosnippet>163</a>// ═══════════════════════════════════════════════════════════════════════════════
 <a href=#164 id=164 data-nosnippet>164</a>
 <a href=#165 id=165 data-nosnippet>165</a></span><span class="doccomment">/// Configuration for [`SimpleHeaderInput`].
-<a href=#166 id=166 data-nosnippet>166</a></span><span class="attr">#[cfg(all(feature = <span class="string">"registry"</span>, not(feature = <span class="string">"proto"</span>)))]
+<a href=#166 id=166 data-nosnippet>166</a></span><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
 <a href=#167 id=167 data-nosnippet>167</a>#[derive(serde::Deserialize)]
 <a href=#168 id=168 data-nosnippet>168</a></span><span class="kw">pub struct </span>SimpleHeaderInputConfig {
 <a href=#169 id=169 data-nosnippet>169</a>    <span class="doccomment">/// The header name to extract (case-insensitive).
@@ -171,14 +171,14 @@
 <a href=#171 id=171 data-nosnippet>171</a>}
 <a href=#172 id=172 data-nosnippet>172</a>
 <a href=#173 id=173 data-nosnippet>173</a><span class="doccomment">/// Configuration for [`SimpleQueryParamInput`].
-<a href=#174 id=174 data-nosnippet>174</a></span><span class="attr">#[cfg(all(feature = <span class="string">"registry"</span>, not(feature = <span class="string">"proto"</span>)))]
+<a href=#174 id=174 data-nosnippet>174</a></span><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
 <a href=#175 id=175 data-nosnippet>175</a>#[derive(serde::Deserialize)]
 <a href=#176 id=176 data-nosnippet>176</a></span><span class="kw">pub struct </span>SimpleQueryParamInputConfig {
 <a href=#177 id=177 data-nosnippet>177</a>    <span class="doccomment">/// The query parameter name to extract.
 <a href=#178 id=178 data-nosnippet>178</a>    </span><span class="kw">pub </span>name: String,
 <a href=#179 id=179 data-nosnippet>179</a>}
 <a href=#180 id=180 data-nosnippet>180</a>
-<a href=#181 id=181 data-nosnippet>181</a><span class="attr">#[cfg(all(feature = <span class="string">"registry"</span>, not(feature = <span class="string">"proto"</span>)))]
+<a href=#181 id=181 data-nosnippet>181</a><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
 <a href=#182 id=182 data-nosnippet>182</a></span><span class="kw">impl </span>rumi::IntoDataInput&lt;HttpRequest&gt; <span class="kw">for </span>SimplePathInput {
 <a href=#183 id=183 data-nosnippet>183</a>    <span class="kw">type </span>Config = rumi::UnitConfig;
 <a href=#184 id=184 data-nosnippet>184</a>
@@ -189,7 +189,7 @@
 <a href=#189 id=189 data-nosnippet>189</a>    }
 <a href=#190 id=190 data-nosnippet>190</a>}
 <a href=#191 id=191 data-nosnippet>191</a>
-<a href=#192 id=192 data-nosnippet>192</a><span class="attr">#[cfg(all(feature = <span class="string">"registry"</span>, not(feature = <span class="string">"proto"</span>)))]
+<a href=#192 id=192 data-nosnippet>192</a><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
 <a href=#193 id=193 data-nosnippet>193</a></span><span class="kw">impl </span>rumi::IntoDataInput&lt;HttpRequest&gt; <span class="kw">for </span>SimpleMethodInput {
 <a href=#194 id=194 data-nosnippet>194</a>    <span class="kw">type </span>Config = rumi::UnitConfig;
 <a href=#195 id=195 data-nosnippet>195</a>
@@ -200,7 +200,7 @@
 <a href=#200 id=200 data-nosnippet>200</a>    }
 <a href=#201 id=201 data-nosnippet>201</a>}
 <a href=#202 id=202 data-nosnippet>202</a>
-<a href=#203 id=203 data-nosnippet>203</a><span class="attr">#[cfg(all(feature = <span class="string">"registry"</span>, not(feature = <span class="string">"proto"</span>)))]
+<a href=#203 id=203 data-nosnippet>203</a><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
 <a href=#204 id=204 data-nosnippet>204</a></span><span class="kw">impl </span>rumi::IntoDataInput&lt;HttpRequest&gt; <span class="kw">for </span>SimpleHeaderInput {
 <a href=#205 id=205 data-nosnippet>205</a>    <span class="kw">type </span>Config = SimpleHeaderInputConfig;
 <a href=#206 id=206 data-nosnippet>206</a>
@@ -211,7 +211,7 @@
 <a href=#211 id=211 data-nosnippet>211</a>    }
 <a href=#212 id=212 data-nosnippet>212</a>}
 <a href=#213 id=213 data-nosnippet>213</a>
-<a href=#214 id=214 data-nosnippet>214</a><span class="attr">#[cfg(all(feature = <span class="string">"registry"</span>, not(feature = <span class="string">"proto"</span>)))]
+<a href=#214 id=214 data-nosnippet>214</a><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
 <a href=#215 id=215 data-nosnippet>215</a></span><span class="kw">impl </span>rumi::IntoDataInput&lt;HttpRequest&gt; <span class="kw">for </span>SimpleQueryParamInput {
 <a href=#216 id=216 data-nosnippet>216</a>    <span class="kw">type </span>Config = SimpleQueryParamInputConfig;
 <a href=#217 id=217 data-nosnippet>217</a>

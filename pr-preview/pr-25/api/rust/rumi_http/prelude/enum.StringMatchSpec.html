@@ -24,9 +24,8 @@ runtime <a href="trait.InputMatcher.html" title="trait rumi_http::prelude::Input
 the config loader. This is the only path from a spec to a matcher, so
 every caller inherits the guarantee — the registry, both domain
 compilers, and anyone constructing a spec by hand.</p>
-<p>Before 2026-08-17 the limits lived in a private <code>Registry</code> method, which
-meant <code>HookMatch::compile</code> accepted an 8 MB pattern against an 8192-byte
-limit. See <code>DECISIONS.md</code> D-029.</p>
+<p>They lived in a private <code>Registry</code> method until 2026-08-17, which meant
+<code>HookMatch::compile</code> accepted an 8 MB pattern against an 8192-byte limit.</p>
 <h5 id="errors"><a class="doc-anchor" href="#errors">§</a>Errors</h5>
 <p>Returns <a href="enum.MatcherError.html#variant.PatternTooLong" title="variant rumi_http::prelude::MatcherError::PatternTooLong"><code>MatcherError::PatternTooLong</code></a> if the pattern exceeds
 <a href="crate::MAX_PATTERN_LENGTH"><code>MAX_PATTERN_LENGTH</code></a>, or

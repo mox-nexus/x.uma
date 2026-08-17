@@ -578,8 +578,8 @@
 <a href=#578 id=578 data-nosnippet>578</a>            ValueMatchConfig::BuiltIn(<span class="kw-2">ref </span>spec) =&gt; {
 <a href=#579 id=579 data-nosnippet>579</a>                <span class="comment">// Enforce pattern length limits before compilation
 <a href=#580 id=580 data-nosnippet>580</a>                // Length limits live in StringMatchSpec::to_input_matcher, the
-<a href=#581 id=581 data-nosnippet>581</a>                // constructor that owns the resource — see D-029. The loader
-<a href=#582 id=582 data-nosnippet>582</a>                // inherits them rather than re-implementing them.
+<a href=#581 id=581 data-nosnippet>581</a>                // constructor that owns the resource. The loader inherits them
+<a href=#582 id=582 data-nosnippet>582</a>                // rather than keeping a second copy that can drift.
 <a href=#583 id=583 data-nosnippet>583</a>                </span>spec.to_input_matcher()<span class="question-mark">?
 <a href=#584 id=584 data-nosnippet>584</a>            </span>}
 <a href=#585 id=585 data-nosnippet>585</a>            ValueMatchConfig::Custom(tc) =&gt; {

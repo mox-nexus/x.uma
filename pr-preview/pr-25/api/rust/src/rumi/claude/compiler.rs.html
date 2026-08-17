@@ -502,9 +502,9 @@
 <a href=#502 id=502 data-nosnippet>502</a>    // scoped to one session became a rule matching every tool call in every
 <a href=#503 id=503 data-nosnippet>503</a>    // session — in an allowlist gate, a total bypass.
 <a href=#504 id=504 data-nosnippet>504</a>    //
-<a href=#505 id=505 data-nosnippet>505</a>    // The review claimed there was no SessionIdInput. There was, and is:
-<a href=#506 id=506 data-nosnippet>506</a>    // claude/inputs.rs:48, registered at claude/mod.rs:72. The field was the
-<a href=#507 id=507 data-nosnippet>507</a>    // only missing piece.
+<a href=#505 id=505 data-nosnippet>505</a>    // The security review claimed there was no SessionIdInput. There was, and
+<a href=#506 id=506 data-nosnippet>506</a>    // is: see inputs.rs and the registration in mod.rs. The field was the only
+<a href=#507 id=507 data-nosnippet>507</a>    // missing piece.
 <a href=#508 id=508 data-nosnippet>508</a>
 <a href=#509 id=509 data-nosnippet>509</a>    </span><span class="attr">#[test]
 <a href=#510 id=510 data-nosnippet>510</a>    </span><span class="kw">fn </span>session_id_actually_constrains() {
@@ -535,9 +535,9 @@
 <a href=#535 id=535 data-nosnippet>535</a>        <span class="comment">// deny_unknown_fields means a typo'd field name is rejected rather than
 <a href=#536 id=536 data-nosnippet>536</a>        // silently producing the catch-all. This asserts the field is spelled
 <a href=#537 id=537 data-nosnippet>537</a>        // the way the config surface expects.
-<a href=#538 id=538 data-nosnippet>538</a>        // Note the `!Exact` tag: serde_yaml renders externally-tagged enums
-<a href=#539 id=539 data-nosnippet>539</a>        // as YAML tags, not maps. That spelling is one of the things D-026
-<a href=#540 id=540 data-nosnippet>540</a>        // retires along with the terse dialect.
+<a href=#538 id=538 data-nosnippet>538</a>        // Note the `!Exact` tag: serde_yaml renders externally-tagged enums as
+<a href=#539 id=539 data-nosnippet>539</a>        // YAML tags, not maps. That spelling goes away with the terse dialect
+<a href=#540 id=540 data-nosnippet>540</a>        // when the config format moves to protojson.
 <a href=#541 id=541 data-nosnippet>541</a>        </span><span class="kw">let </span>yaml = <span class="string">"session_id: !Exact sess-xyz\n"</span>;
 <a href=#542 id=542 data-nosnippet>542</a>        <span class="kw">let </span>m: HookMatch = serde_yaml::from_str(yaml).expect(<span class="string">"session_id must deserialize"</span>);
 <a href=#543 id=543 data-nosnippet>543</a>        <span class="macro">assert!</span>(m.session_id.is_some());
