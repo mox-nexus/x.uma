@@ -101,7 +101,7 @@ The compiler is the user-facing API. Instead of manually constructing predicate 
 
 ```rust
 // HTTP: Gateway API config → matcher
-let matcher = compile_route_matches(&routes, "allowed", "denied");
+let matcher = compile_route_matches(&routes, "allowed", Some("denied"))?;
 
 // Claude: hook rules → matcher
 let matcher = rule.compile("block")?;

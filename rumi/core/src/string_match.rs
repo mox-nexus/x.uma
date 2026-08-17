@@ -50,10 +50,23 @@ pub enum StringMatchSpec {
 impl StringMatchSpec {
     /// Compile this spec into a runtime [`InputMatcher`].
     ///
+    /// Pattern length limits are enforced **here**, in the constructor, not in
+    /// the config loader. This is the only path from a spec to a matcher, so
+    /// every caller inherits the guarantee — the registry, both domain
+    /// compilers, and anyone constructing a spec by hand.
+    ///
+    /// Before 2026-08-17 the limits lived in a private `Registry` method, which
+    /// meant `HookMatch::compile` accepted an 8 MB pattern against an 8192-byte
+    /// limit. See `DECISIONS.md` D-029.
+    ///
     /// # Errors
     ///
-    /// Returns [`MatcherError::InvalidPattern`] if the regex is invalid.
+    /// Returns [`MatcherError::PatternTooLong`] if the pattern exceeds
+    /// [`MAX_PATTERN_LENGTH`](crate::MAX_PATTERN_LENGTH), or
+    /// [`MAX_REGEX_PATTERN_LENGTH`](crate::MAX_REGEX_PATTERN_LENGTH) for a
+    /// regex. Returns [`MatcherError::InvalidPattern`] if the regex is invalid.
     pub fn to_input_matcher(&self) -> Result<Box<dyn InputMatcher>, MatcherError> {
+        self.check_length()?;
         match self {
             Self::Exact(v) => Ok(Box::new(ExactMatcher::new(v.as_str()))),
             Self::Prefix(v) => Ok(Box::new(PrefixMatcher::new(v.as_str()))),
@@ -66,6 +79,23 @@ impl StringMatchSpec {
                     source: e.to_string(),
                 }),
         }
+    }
+
+    /// Enforce the pattern length limit for this variant.
+    ///
+    /// Regexes get the tighter [`MAX_REGEX_PATTERN_LENGTH`](crate::MAX_REGEX_PATTERN_LENGTH)
+    /// because compiled program size, not pattern length, drives their cost.
+    fn check_length(&self) -> Result<(), MatcherError> {
+        let (len, max) = match self {
+            Self::Regex(v) => (v.len(), crate::MAX_REGEX_PATTERN_LENGTH),
+            Self::Exact(v) | Self::Prefix(v) | Self::Suffix(v) | Self::Contains(v) => {
+                (v.len(), crate::MAX_PATTERN_LENGTH)
+            }
+        };
+        if len > max {
+            return Err(MatcherError::PatternTooLong { len, max });
+        }
+        Ok(())
     }
 
     /// Compile this spec into a [`Predicate`] with the given [`DataInput`].
@@ -186,5 +216,72 @@ mod tests {
             StringMatchSpec::Regex("^mcp".into()).to_string(),
             r#"Regex("^mcp")"#
         );
+    }
+
+    // ── Regression: SEC2 / review F-02 ──────────────────────────────────────
+    //
+    // Limits used to live in a private Registry method, so every path that did
+    // not go through the JSON/YAML loader was unprotected: both domain
+    // compilers, and anyone building a spec by hand. The review demonstrated
+    // HookMatch::compile accepting an 8 MB pattern against an 8192-byte limit.
+    //
+    // These assert the constructor itself refuses. If someone moves the check
+    // back out to a caller, these fail.
+
+    #[test]
+    fn oversized_literal_is_rejected_by_the_constructor() {
+        let huge = "A".repeat(crate::MAX_PATTERN_LENGTH + 1);
+        for spec in [
+            StringMatchSpec::Exact(huge.clone()),
+            StringMatchSpec::Prefix(huge.clone()),
+            StringMatchSpec::Suffix(huge.clone()),
+            StringMatchSpec::Contains(huge),
+        ] {
+            let err = spec
+                .to_input_matcher()
+                .expect_err("must reject oversized pattern");
+            assert!(
+                matches!(err, MatcherError::PatternTooLong { .. }),
+                "expected PatternTooLong for {spec}, got {err:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn oversized_regex_is_rejected_by_the_constructor() {
+        let huge = "a".repeat(crate::MAX_REGEX_PATTERN_LENGTH + 1);
+        let err = StringMatchSpec::Regex(huge)
+            .to_input_matcher()
+            .expect_err("must reject oversized regex");
+        assert!(
+            matches!(err, MatcherError::PatternTooLong { .. }),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn regex_limit_is_tighter_than_literal_limit() {
+        // A pattern between the two limits: fine as a literal, refused as a
+        // regex. Proves the two are distinct rather than one check reused, and
+        // fails if someone unifies them.
+        let mid = "a".repeat(crate::MAX_REGEX_PATTERN_LENGTH + 1);
+        assert!(
+            mid.len() <= crate::MAX_PATTERN_LENGTH,
+            "test premise: limits differ"
+        );
+        assert!(StringMatchSpec::Exact(mid.clone())
+            .to_input_matcher()
+            .is_ok());
+        assert!(StringMatchSpec::Regex(mid).to_input_matcher().is_err());
+    }
+
+    #[test]
+    fn the_guard_is_not_inert() {
+        // A limit test that only ever asserts rejection passes just as well
+        // against a constructor that rejects everything. This is the other half.
+        let ok = "A".repeat(crate::MAX_PATTERN_LENGTH);
+        assert!(StringMatchSpec::Exact(ok).to_input_matcher().is_ok());
+        let ok_re = "a".repeat(crate::MAX_REGEX_PATTERN_LENGTH);
+        assert!(StringMatchSpec::Regex(ok_re).to_input_matcher().is_ok());
     }
 }

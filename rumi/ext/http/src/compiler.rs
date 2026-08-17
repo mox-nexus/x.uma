@@ -7,30 +7,52 @@ use crate::inputs::{HeaderInput, MethodInput, PathInput, QueryParamInput};
 use crate::message::HttpMessage;
 use k8s_gateway_api::{HttpHeaderMatch, HttpPathMatch, HttpQueryParamMatch, HttpRouteMatch};
 use rumi::prelude::*;
+use rumi::{MatcherError, StringMatchSpec};
 
 /// Extension trait for compiling `HttpRouteMatch` to rumi Matcher.
+///
+/// Both methods return `Result`. Until 2026-08-17 they did not: an invalid
+/// regex was silently replaced with an exact match on the *pattern literal*,
+/// so a route the operator believed was live simply never fired. The sibling
+/// Claude compiler already returned `Result`; this removes the asymmetry.
+/// See `DECISIONS.md` D-029.
 pub trait HttpRouteMatchExt {
     /// Compile this `HttpRouteMatch` into a rumi Matcher.
     ///
     /// The resulting matcher operates on `HttpMessage` and returns
     /// the provided action when all conditions match.
-    fn compile<A: Clone + Send + Sync + 'static>(&self, action: A) -> Matcher<HttpMessage, A>;
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MatcherError::InvalidPattern`] if a regex does not compile, or
+    /// [`MatcherError::PatternTooLong`] if one exceeds the configured limits.
+    fn compile<A: Clone + Send + Sync + 'static>(
+        &self,
+        action: A,
+    ) -> Result<Matcher<HttpMessage, A>, MatcherError>;
 
     /// Compile this `HttpRouteMatch` into a Predicate (without action).
-    fn to_predicate(&self) -> Predicate<HttpMessage>;
+    ///
+    /// # Errors
+    ///
+    /// As [`compile`](Self::compile).
+    fn to_predicate(&self) -> Result<Predicate<HttpMessage>, MatcherError>;
 }
 
 impl HttpRouteMatchExt for HttpRouteMatch {
-    fn compile<A: Clone + Send + Sync + 'static>(&self, action: A) -> Matcher<HttpMessage, A> {
-        Matcher::from_predicate(self.to_predicate(), action, None)
+    fn compile<A: Clone + Send + Sync + 'static>(
+        &self,
+        action: A,
+    ) -> Result<Matcher<HttpMessage, A>, MatcherError> {
+        Ok(Matcher::from_predicate(self.to_predicate()?, action, None))
     }
 
-    fn to_predicate(&self) -> Predicate<HttpMessage> {
+    fn to_predicate(&self) -> Result<Predicate<HttpMessage>, MatcherError> {
         let mut predicates: Vec<Predicate<HttpMessage>> = Vec::new();
 
         // Path matching
         if let Some(path_match) = &self.path {
-            predicates.push(compile_path_match(path_match));
+            predicates.push(compile_path_match(path_match)?);
         }
 
         // Method matching
@@ -44,18 +66,18 @@ impl HttpRouteMatchExt for HttpRouteMatch {
         // Header matching (all headers are ANDed)
         if let Some(headers) = &self.headers {
             for header_match in headers {
-                predicates.push(compile_header_match(header_match));
+                predicates.push(compile_header_match(header_match)?);
             }
         }
 
         // Query param matching (all params are ANDed)
         if let Some(query_params) = &self.query_params {
             for query_match in query_params {
-                predicates.push(compile_query_param_match(query_match));
+                predicates.push(compile_query_param_match(query_match)?);
             }
         }
 
-        Predicate::from_all(predicates, catch_all())
+        Ok(Predicate::from_all(predicates, catch_all()))
     }
 }
 
@@ -68,77 +90,76 @@ fn catch_all() -> Predicate<HttpMessage> {
 }
 
 /// Compile a path match to a predicate.
-fn compile_path_match(path_match: &HttpPathMatch) -> Predicate<HttpMessage> {
-    let input = Box::new(PathInput);
-
-    let matcher: Box<dyn InputMatcher> = match path_match {
-        HttpPathMatch::Exact { value } => Box::new(ExactMatcher::new(value.as_str())),
-        HttpPathMatch::PathPrefix { value } => Box::new(PrefixMatcher::new(value.as_str())),
-        HttpPathMatch::RegularExpression { value } => {
-            Box::new(StringMatcher::regex(value).unwrap_or_else(|_| {
-                // Invalid regex falls back to exact match (fail-safe)
-                StringMatcher::exact(value, false)
-            }))
-        }
+///
+/// Goes through [`StringMatchSpec::to_input_matcher`], which owns the pattern
+/// length limits. Constructing matchers directly here is what let this compiler
+/// bypass every declared limit — see D-029.
+fn compile_path_match(path_match: &HttpPathMatch) -> Result<Predicate<HttpMessage>, MatcherError> {
+    let spec = match path_match {
+        HttpPathMatch::Exact { value } => StringMatchSpec::Exact(value.clone()),
+        HttpPathMatch::PathPrefix { value } => StringMatchSpec::Prefix(value.clone()),
+        HttpPathMatch::RegularExpression { value } => StringMatchSpec::Regex(value.clone()),
     };
-
-    Predicate::Single(SinglePredicate::new(input, matcher))
+    Ok(Predicate::Single(SinglePredicate::new(
+        Box::new(PathInput),
+        spec.to_input_matcher()?,
+    )))
 }
 
 /// Compile a header match to a predicate.
-fn compile_header_match(header_match: &HttpHeaderMatch) -> Predicate<HttpMessage> {
-    match header_match {
-        HttpHeaderMatch::Exact { name, value } => {
-            let input = Box::new(HeaderInput::new(name.as_str()));
-            let matcher = Box::new(ExactMatcher::new(value.as_str()));
-            Predicate::Single(SinglePredicate::new(input, matcher))
-        }
+fn compile_header_match(
+    header_match: &HttpHeaderMatch,
+) -> Result<Predicate<HttpMessage>, MatcherError> {
+    let (name, spec) = match header_match {
+        HttpHeaderMatch::Exact { name, value } => (name, StringMatchSpec::Exact(value.clone())),
         HttpHeaderMatch::RegularExpression { name, value } => {
-            let input = Box::new(HeaderInput::new(name.as_str()));
-            let matcher: Box<dyn InputMatcher> = Box::new(
-                StringMatcher::regex(value).unwrap_or_else(|_| StringMatcher::exact(value, false)),
-            );
-            Predicate::Single(SinglePredicate::new(input, matcher))
+            (name, StringMatchSpec::Regex(value.clone()))
         }
-    }
+    };
+    Ok(Predicate::Single(SinglePredicate::new(
+        Box::new(HeaderInput::new(name.as_str())),
+        spec.to_input_matcher()?,
+    )))
 }
 
 /// Compile a query param match to a predicate.
-fn compile_query_param_match(query_match: &HttpQueryParamMatch) -> Predicate<HttpMessage> {
-    match query_match {
-        HttpQueryParamMatch::Exact { name, value } => {
-            let input = Box::new(QueryParamInput::new(name.as_str()));
-            let matcher = Box::new(ExactMatcher::new(value.as_str()));
-            Predicate::Single(SinglePredicate::new(input, matcher))
-        }
+fn compile_query_param_match(
+    query_match: &HttpQueryParamMatch,
+) -> Result<Predicate<HttpMessage>, MatcherError> {
+    let (name, spec) = match query_match {
+        HttpQueryParamMatch::Exact { name, value } => (name, StringMatchSpec::Exact(value.clone())),
         HttpQueryParamMatch::RegularExpression { name, value } => {
-            let input = Box::new(QueryParamInput::new(name.as_str()));
-            let matcher: Box<dyn InputMatcher> = Box::new(
-                StringMatcher::regex(value).unwrap_or_else(|_| StringMatcher::exact(value, false)),
-            );
-            Predicate::Single(SinglePredicate::new(input, matcher))
+            (name, StringMatchSpec::Regex(value.clone()))
         }
-    }
+    };
+    Ok(Predicate::Single(SinglePredicate::new(
+        Box::new(QueryParamInput::new(name.as_str())),
+        spec.to_input_matcher()?,
+    )))
 }
 
 /// Compile multiple `HttpRouteMatch` entries into a single Matcher.
 ///
 /// Multiple matches are `ORed` together per Gateway API semantics.
+/// # Errors
+///
+/// Returns [`MatcherError::InvalidPattern`] if any regex does not compile, or
+/// [`MatcherError::PatternTooLong`] if any pattern exceeds the limits.
 pub fn compile_route_matches<A: Clone + Send + Sync + 'static>(
     matches: &[HttpRouteMatch],
     action: A,
     on_no_match: Option<A>,
-) -> Matcher<HttpMessage, A> {
+) -> Result<Matcher<HttpMessage, A>, MatcherError> {
     let predicates: Vec<Predicate<HttpMessage>> = matches
         .iter()
         .map(HttpRouteMatchExt::to_predicate)
-        .collect();
+        .collect::<Result<_, _>>()?;
 
-    Matcher::from_predicate(
+    Ok(Matcher::from_predicate(
         Predicate::from_any(predicates, catch_all()),
         action,
         on_no_match,
-    )
+    ))
 }
 
 #[cfg(test)]
@@ -207,7 +228,7 @@ mod tests {
     #[test]
     fn test_compile_empty_match() {
         let route_match = HttpRouteMatch::default();
-        let predicate = route_match.to_predicate();
+        let predicate = route_match.to_predicate().unwrap();
         assert!(matches!(predicate, Predicate::Single(_)));
     }
 
@@ -220,7 +241,7 @@ mod tests {
             ..Default::default()
         };
 
-        let predicate = route_match.to_predicate();
+        let predicate = route_match.to_predicate().unwrap();
         assert!(matches!(predicate, Predicate::Single(_)));
     }
 
@@ -234,7 +255,7 @@ mod tests {
             ..Default::default()
         };
 
-        let predicate = route_match.to_predicate();
+        let predicate = route_match.to_predicate().unwrap();
         assert!(matches!(predicate, Predicate::And(_)));
     }
 
@@ -249,7 +270,7 @@ mod tests {
             ..Default::default()
         };
 
-        let matcher = route_match.compile("api_backend");
+        let matcher = route_match.compile("api_backend").unwrap();
 
         let msg = RequestBuilder::new().path("/api/users").build();
         assert_eq!(matcher.evaluate(&msg), Some("api_backend"));
@@ -273,7 +294,7 @@ mod tests {
             ..Default::default()
         };
 
-        let matcher = route_match.compile("health_check");
+        let matcher = route_match.compile("health_check").unwrap();
 
         let msg = RequestBuilder::new().path("/api/v1/health").build();
         assert_eq!(matcher.evaluate(&msg), Some("health_check"));
@@ -294,7 +315,7 @@ mod tests {
             ..Default::default()
         };
 
-        let matcher = route_match.compile("user_detail");
+        let matcher = route_match.compile("user_detail").unwrap();
 
         let msg = RequestBuilder::new().path("/users/123").build();
         assert_eq!(matcher.evaluate(&msg), Some("user_detail"));
@@ -318,7 +339,7 @@ mod tests {
             ..Default::default()
         };
 
-        let matcher = route_match.compile("write_endpoint");
+        let matcher = route_match.compile("write_endpoint").unwrap();
 
         let msg = RequestBuilder::new().method("POST").path("/").build();
         assert_eq!(matcher.evaluate(&msg), Some("write_endpoint"));
@@ -342,7 +363,7 @@ mod tests {
             ..Default::default()
         };
 
-        let matcher = route_match.compile("v2_api");
+        let matcher = route_match.compile("v2_api").unwrap();
 
         let msg = RequestBuilder::new()
             .path("/")
@@ -370,7 +391,7 @@ mod tests {
             ..Default::default()
         };
 
-        let matcher = route_match.compile("authenticated");
+        let matcher = route_match.compile("authenticated").unwrap();
 
         let msg = RequestBuilder::new()
             .path("/")
@@ -397,7 +418,7 @@ mod tests {
             ..Default::default()
         };
 
-        let matcher = route_match.compile("json_response");
+        let matcher = route_match.compile("json_response").unwrap();
 
         let msg = RequestBuilder::new().path("/data?format=json").build();
         assert_eq!(matcher.evaluate(&msg), Some("json_response"));
@@ -421,7 +442,7 @@ mod tests {
             ..Default::default()
         };
 
-        let matcher = route_match.compile("api_write");
+        let matcher = route_match.compile("api_write").unwrap();
 
         let msg = RequestBuilder::new()
             .method("POST")
@@ -456,7 +477,7 @@ mod tests {
             }]),
         };
 
-        let matcher = route_match.compile("v2_api_dry_run");
+        let matcher = route_match.compile("v2_api_dry_run").unwrap();
 
         let msg = RequestBuilder::new()
             .method("PUT")
@@ -499,7 +520,7 @@ mod tests {
             },
         ];
 
-        let matcher = compile_route_matches(&matches, "health_check", None);
+        let matcher = compile_route_matches(&matches, "health_check", None).unwrap();
 
         let msg = RequestBuilder::new().path("/health").build();
         assert_eq!(matcher.evaluate(&msg), Some("health_check"));
@@ -520,7 +541,8 @@ mod tests {
             ..Default::default()
         }];
 
-        let matcher = compile_route_matches(&matches, "api_backend", Some("default_backend"));
+        let matcher =
+            compile_route_matches(&matches, "api_backend", Some("default_backend")).unwrap();
 
         let msg = RequestBuilder::new().path("/api/users").build();
         assert_eq!(matcher.evaluate(&msg), Some("api_backend"));
@@ -531,7 +553,7 @@ mod tests {
 
     #[test]
     fn e2e_empty_matches_matches_everything() {
-        let matcher = compile_route_matches::<&str>(&[], "catch_all", None);
+        let matcher = compile_route_matches::<&str>(&[], "catch_all", None).unwrap();
 
         let msg = RequestBuilder::new().path("/anything").build();
         assert_eq!(matcher.evaluate(&msg), Some("catch_all"));
@@ -551,7 +573,7 @@ mod tests {
             ..Default::default()
         };
 
-        let matcher = route_match.compile("api_backend");
+        let matcher = route_match.compile("api_backend").unwrap();
 
         let msg = RequestBuilder::new().method("GET").build();
         assert_eq!(matcher.evaluate(&msg), None);
@@ -566,9 +588,104 @@ mod tests {
             ..Default::default()
         };
 
-        let matcher = route_match.compile("test");
+        let matcher = route_match.compile("test").unwrap();
 
         let msg = HttpMessage::from(&ProcessingRequest::default());
         assert_eq!(matcher.evaluate(&msg), None);
+    }
+
+    // ── Regression: SEC2 / review F-02, and PLAN.md F16 ─────────────────────
+    //
+    // This compiler used to construct matchers directly, so it inherited none
+    // of the declared limits — `grep MAX_ rumi/ext/http/src/*.rs` returned
+    // nothing — and an invalid regex was swallowed into an exact match on the
+    // pattern literal, silently deleting the route.
+
+    #[test]
+    fn oversized_regex_is_rejected_not_swallowed() {
+        let huge = "a".repeat(rumi::MAX_REGEX_PATTERN_LENGTH + 1);
+        let route = HttpRouteMatch {
+            path: Some(HttpPathMatch::RegularExpression { value: huge }),
+            ..Default::default()
+        };
+        let err = route
+            .to_predicate()
+            .expect_err("must reject oversized regex");
+        assert!(
+            matches!(err, MatcherError::PatternTooLong { .. }),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn invalid_regex_is_reported_not_turned_into_a_dead_route() {
+        // The old behaviour: "[bad" became ExactMatcher("[bad"), so the route
+        // compiled clean and then matched nothing. An operator reading the
+        // config would believe the route was live.
+        let route = HttpRouteMatch {
+            path: Some(HttpPathMatch::RegularExpression {
+                value: "[bad".into(),
+            }),
+            ..Default::default()
+        };
+        let err = route
+            .to_predicate()
+            .expect_err("must surface the bad pattern");
+        assert!(
+            matches!(err, MatcherError::InvalidPattern { .. }),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn limits_apply_to_headers_and_query_params_too() {
+        let huge = "a".repeat(rumi::MAX_REGEX_PATTERN_LENGTH + 1);
+        let by_header = HttpRouteMatch {
+            headers: Some(vec![HttpHeaderMatch::RegularExpression {
+                name: "x-test".into(),
+                value: huge.clone(),
+            }]),
+            ..Default::default()
+        };
+        assert!(
+            by_header.to_predicate().is_err(),
+            "header regex must be bounded"
+        );
+
+        let by_query = HttpRouteMatch {
+            query_params: Some(vec![HttpQueryParamMatch::RegularExpression {
+                name: "q".into(),
+                value: huge,
+            }]),
+            ..Default::default()
+        };
+        assert!(
+            by_query.to_predicate().is_err(),
+            "query regex must be bounded"
+        );
+    }
+
+    #[test]
+    fn compile_route_matches_propagates_rather_than_dropping() {
+        let matches = vec![HttpRouteMatch {
+            path: Some(HttpPathMatch::RegularExpression {
+                value: "[bad".into(),
+            }),
+            ..Default::default()
+        }];
+        assert!(compile_route_matches(&matches, "backend", None).is_err());
+    }
+
+    #[test]
+    fn the_guard_is_not_inert() {
+        // A valid regex at exactly the limit still compiles, so the tests above
+        // are not passing against a compiler that rejects everything.
+        let ok = HttpRouteMatch {
+            path: Some(HttpPathMatch::RegularExpression {
+                value: "^/api/.*$".into(),
+            }),
+            ..Default::default()
+        };
+        assert!(ok.to_predicate().is_ok());
     }
 }

@@ -6,8 +6,13 @@
 use rumi::claude::{ArgumentMatch, HookEvent, HookMatch, StringMatch};
 use wasm_bindgen::prelude::*;
 
-/// Maximum length for any string pattern (8 KB).
-const MAX_PATTERN_LENGTH: usize = 8192;
+/// Maximum length for any string pattern.
+///
+/// Re-exported from core rather than re-declared. Three hand-copied constants
+/// with no compile-time link is how they drift; `rumi::StringMatchSpec` is the
+/// authority and enforces these itself (D-029). The checks here stay only to
+/// produce a boundary-shaped error message before core produces a generic one.
+use rumi::MAX_PATTERN_LENGTH;
 
 /// Maximum number of argument matchers per rule.
 const MAX_ARGUMENTS: usize = 64;
@@ -15,8 +20,8 @@ const MAX_ARGUMENTS: usize = 64;
 /// Maximum number of rules per `compile()` call.
 pub const MAX_RULES: u32 = 256;
 
-/// Maximum regex pattern length (4 KB).
-const MAX_REGEX_PATTERN_LENGTH: usize = 4096;
+/// Maximum regex pattern length. Re-exported from core — see above.
+use rumi::MAX_REGEX_PATTERN_LENGTH;
 
 /// Extract a field from a JS object, returning `JsValue::UNDEFINED` if absent.
 fn get_field(obj: &JsValue, key: &str) -> JsValue {
@@ -106,6 +111,8 @@ pub fn convert_hook_match_from_js(val: &JsValue) -> Result<HookMatch, JsValue> {
         event,
         tool_name,
         arguments,
+        // Computed above and previously dropped on the floor. See D-029 / SEC3.
+        session_id,
         cwd,
         git_branch,
     })

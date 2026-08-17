@@ -46,8 +46,7 @@ use crate::{
         ValueMatchConfig,
     },
     DataInput, FieldMatcher, InputMatcher, Matcher, MatcherError, OnMatch, Predicate,
-    SinglePredicate, MAX_FIELD_MATCHERS, MAX_PATTERN_LENGTH, MAX_PREDICATES_PER_COMPOUND,
-    MAX_REGEX_PATTERN_LENGTH,
+    SinglePredicate, MAX_FIELD_MATCHERS, MAX_PREDICATES_PER_COMPOUND,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -578,7 +577,9 @@ impl<Ctx: 'static> Registry<Ctx> {
         let matcher = match config.matcher {
             ValueMatchConfig::BuiltIn(ref spec) => {
                 // Enforce pattern length limits before compilation
-                Self::check_pattern_length(spec)?;
+                // Length limits live in StringMatchSpec::to_input_matcher, the
+                // constructor that owns the resource — see D-029. The loader
+                // inherits them rather than re-implementing them.
                 spec.to_input_matcher()?
             }
             ValueMatchConfig::Custom(tc) => {
@@ -605,33 +606,6 @@ impl<Ctx: 'static> Registry<Ctx> {
         }
 
         Ok(SinglePredicate::new(input, matcher))
-    }
-
-    /// Enforce pattern length limits on built-in string match specs.
-    fn check_pattern_length(spec: &crate::StringMatchSpec) -> Result<(), MatcherError> {
-        use crate::StringMatchSpec;
-        match spec {
-            StringMatchSpec::Regex(pattern) => {
-                if pattern.len() > MAX_REGEX_PATTERN_LENGTH {
-                    return Err(MatcherError::PatternTooLong {
-                        len: pattern.len(),
-                        max: MAX_REGEX_PATTERN_LENGTH,
-                    });
-                }
-            }
-            StringMatchSpec::Exact(v)
-            | StringMatchSpec::Prefix(v)
-            | StringMatchSpec::Suffix(v)
-            | StringMatchSpec::Contains(v) => {
-                if v.len() > MAX_PATTERN_LENGTH {
-                    return Err(MatcherError::PatternTooLong {
-                        len: v.len(),
-                        max: MAX_PATTERN_LENGTH,
-                    });
-                }
-            }
-        }
-        Ok(())
     }
 
     fn load_on_match<A>(&self, config: OnMatchConfig<A>) -> Result<OnMatch<Ctx, A>, MatcherError>
