@@ -15,10 +15,26 @@ from typing import TYPE_CHECKING
 
 import re2
 
+from xuma._limits import MAX_PATTERN_LENGTH, MAX_REGEX_PATTERN_LENGTH
 from xuma._matcher import MatcherError
 
 if TYPE_CHECKING:
     from xuma._types import MatchingData
+
+
+def _check_literal_length(pattern: str) -> None:
+    """Enforce the literal pattern limit at construction.
+
+    The limit belongs to the type that holds the pattern, not to the config
+    loader -- until 2026-08-17 only the loader checked, so the HTTP gateway and
+    direct construction were unguarded.
+    """
+    if not isinstance(pattern, str):
+        msg = f"pattern must be str, got {type(pattern).__name__}"
+        raise MatcherError(msg)
+    if len(pattern) > MAX_PATTERN_LENGTH:
+        msg = f"pattern length {len(pattern)} exceeds maximum {MAX_PATTERN_LENGTH}"
+        raise MatcherError(msg)
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +50,7 @@ class ExactMatcher:
     _cmp_value: str = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        _check_literal_length(self.value)
         object.__setattr__(
             self, "_cmp_value", self.value.casefold() if self.ignore_case else self.value
         )
@@ -58,6 +75,7 @@ class PrefixMatcher:
     _cmp_prefix: str = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        _check_literal_length(self.prefix)
         object.__setattr__(
             self, "_cmp_prefix", self.prefix.casefold() if self.ignore_case else self.prefix
         )
@@ -82,6 +100,7 @@ class SuffixMatcher:
     _cmp_suffix: str = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        _check_literal_length(self.suffix)
         object.__setattr__(
             self, "_cmp_suffix", self.suffix.casefold() if self.ignore_case else self.suffix
         )
@@ -107,6 +126,7 @@ class ContainsMatcher:
     _cmp_substring: str = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        _check_literal_length(self.substring)
         object.__setattr__(
             self,
             "_cmp_substring",
@@ -139,10 +159,31 @@ class RegexMatcher:
     _compiled: re2.Pattern[str] = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        # The limit is enforced here, in the constructor that owns the compiled
+        # program, not in the config loader. Every caller inherits it -- the
+        # registry, the HTTP gateway, and direct construction. Until 2026-08-17
+        # the loader was the only guarded path, so the gateway accepted a
+        # 40,960-byte regex against this 4,096 limit.
+        if not isinstance(self.pattern, str):
+            # google-re2 raises a bare TypeError for a non-str pattern, which
+            # escapes the MatcherError contract callers rely on (review L-4).
+            msg = f"regex pattern must be str, got {type(self.pattern).__name__}"
+            raise MatcherError(msg)
+        if len(self.pattern) > MAX_REGEX_PATTERN_LENGTH:
+            msg = (
+                f"pattern length {len(self.pattern)} exceeds maximum "
+                f"{MAX_REGEX_PATTERN_LENGTH}"
+            )
+            raise MatcherError(msg)
         try:
             compiled = re2.compile(self.pattern)
         except re2.error as e:
             msg = f'invalid regex pattern "{self.pattern}": {e}'
+            raise MatcherError(msg) from e
+        except TypeError as e:
+            # google-re2 raises TypeError for a non-str pattern, which escapes
+            # the MatcherError contract callers rely on (review L-4).
+            msg = f"invalid regex pattern {self.pattern!r}: {e}"
             raise MatcherError(msg) from e
         object.__setattr__(self, "_compiled", compiled)
 

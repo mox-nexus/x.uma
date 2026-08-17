@@ -1,6 +1,21 @@
 import { RE2JS } from "re2js";
 
+import { MAX_PATTERN_LENGTH, MAX_REGEX_PATTERN_LENGTH, PatternTooLongError } from "./limits.ts";
+
+/**
+ * Enforce the literal pattern limit at construction.
+ *
+ * The limit belongs to the type that holds the pattern, not to the config
+ * loader — until 2026-08-17 only the loader checked, so the gateway, direct
+ * construction, and the playground's graph renderer were all unguarded.
+ */
+function checkLiteralLength(pattern: string): void {
+	if (pattern.length > MAX_PATTERN_LENGTH) {
+		throw new PatternTooLongError(pattern.length, MAX_PATTERN_LENGTH);
+	}
+}
 import { MatcherError } from "./matcher.ts";
+import { assertRepeatBudget } from "./regex-budget.ts";
 import type { MatchingData } from "./types.ts";
 
 /** Exact string equality. Pre-lowercases at construction when ignore_case. */
@@ -11,6 +26,7 @@ export class ExactMatcher {
 		readonly value: string,
 		readonly ignoreCase: boolean = false,
 	) {
+		checkLiteralLength(value);
 		this.cmpValue = ignoreCase ? value.toLowerCase() : value;
 	}
 
@@ -29,6 +45,7 @@ export class PrefixMatcher {
 		readonly prefix: string,
 		readonly ignoreCase: boolean = false,
 	) {
+		checkLiteralLength(prefix);
 		this.cmpPrefix = ignoreCase ? prefix.toLowerCase() : prefix;
 	}
 
@@ -47,6 +64,7 @@ export class SuffixMatcher {
 		readonly suffix: string,
 		readonly ignoreCase: boolean = false,
 	) {
+		checkLiteralLength(suffix);
 		this.cmpSuffix = ignoreCase ? suffix.toLowerCase() : suffix;
 	}
 
@@ -65,6 +83,7 @@ export class ContainsMatcher {
 		readonly substring: string,
 		readonly ignoreCase: boolean = false,
 	) {
+		checkLiteralLength(substring);
 		this.cmpSubstring = ignoreCase ? substring.toLowerCase() : substring;
 	}
 
@@ -86,7 +105,29 @@ export class ContainsMatcher {
 export class RegexMatcher {
 	private readonly compiled: RE2JS;
 
+	/**
+	 * @throws {PatternTooLongError} if the pattern exceeds the length limit
+	 * @throws {MatcherError} if the repetition budget is exceeded, or the
+	 *   pattern does not compile
+	 *
+	 * Both limits are enforced **here**, in the constructor that owns the
+	 * compiled program, not in the config loader. Every caller inherits them —
+	 * the registry, the gateway, and the playground's graph renderer, which
+	 * calls `parseMatcherConfig` without `loadMatcher` and so previously
+	 * inherited nothing.
+	 */
 	constructor(readonly pattern: string) {
+		if (pattern.length > MAX_REGEX_PATTERN_LENGTH) {
+			throw new PatternTooLongError(pattern.length, MAX_REGEX_PATTERN_LENGTH);
+		}
+		// re2js supplies no compile-time budget of its own — see regex-budget.ts.
+		try {
+			assertRepeatBudget(pattern);
+		} catch (e) {
+			throw new MatcherError(
+				`invalid regex pattern "${pattern}": ${e instanceof Error ? e.message : String(e)}`,
+			);
+		}
 		try {
 			this.compiled = RE2JS.compile(pattern);
 		} catch (e) {

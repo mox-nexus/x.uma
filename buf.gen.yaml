@@ -8,7 +8,6 @@ version: v2
 # `pbjson-types::Any` implements those traits, so xds.core.v3's
 # TypedExtensionConfig fails to compile. v0.4.0 matches the `prost = "0.13"`
 # runtime pin in rumi/proto/Cargo.toml and does not emit those derives.
-# See DECISIONS.md D-028.
 #
 # `clean` lives here and NOT in buf.gen.rust.yaml: this template runs first and
 # wipes the tree, then the cncf/xds pass appends to it. Cleaning twice would

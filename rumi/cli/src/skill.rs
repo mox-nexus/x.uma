@@ -110,7 +110,7 @@ and patterns are length-capped at load.
     section(&mut s, "Inputs — claude domain (`rumi run claude`)", claude);
 
     s.push_str(
-        r#"
+        r"
 ## When a rule does not fire
 
 Work down this list; it is ordered by how often each is the cause.
@@ -134,7 +134,7 @@ load error, never an evaluation failure. Evaluation itself cannot fail.
 | Writing a config from scratch | `rumi --skill -r authoring` |
 
 Full documentation: https://mox-nexus.github.io/x.uma/
-"#,
+",
     );
 
     s

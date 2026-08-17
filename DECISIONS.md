@@ -8,6 +8,97 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-17 · Security
+
+### D-030 · Source comments do not cite `DECISIONS.md`
+
+Nineteen comments across five files were written citing "see `DECISIONS.md`
+D-029" before D-029 existed. That is the same defect as PLAN.md F22 — a citation
+the reader cannot follow — committed inside the security fix that F22 was meant
+to teach.
+
+The deeper problem is not the missing entry. A comment saying *see D-029* couples
+source to a document's numbering scheme, and this repo has already had that
+numbering collide four ways (PLAN.md §4 findings, PLAN.md Phase F tasks, the
+security review's own `F-01..F-06`, and Phase S tasks against the review's
+`S-1..S-5`). A reader who follows such a pointer into a renumbered or
+reorganised file learns nothing and trusts the next comment less.
+
+**A comment carries its own reason.** "Limits live here because a loader-only
+check let `HookMatch::compile` accept 8 MB" survives renumbering, file moves and
+restructuring of the log. "See D-029" does not.
+
+`DECISIONS.md` keeps its job — recording *why* a call was made, for a reader
+asking that question. It is not an index that source code points into.
+
+**What would overturn this:** nothing likely. If a decision needs more context
+than a comment can hold, the comment still states the conclusion, and the log is
+searchable by subject.
+
+### D-029 · Resource limits belong to the type that holds the resource
+
+The security review's F-02: the architectural root of two other findings, and it
+reproduced independently in all three implementations, which is what made it
+structural rather than an oversight.
+
+Every declared limit was enforced in the config loader, so
+`MAX_PATTERN_LENGTH`, `MAX_REGEX_PATTERN_LENGTH`, `MAX_FIELD_MATCHERS` and
+`MAX_PREDICATES_PER_COMPOUND` were advisory on any path that was not the
+JSON/YAML registry loader. Measured: `HookMatch::compile` accepted an **8 MB
+pattern against an 8192-byte limit**, and puma's HTTP gateway accepted a
+**40,960-byte regex against a 4,096 limit**.
+
+The bypasses were not obscure. They were the domain compilers — the "door
+handle" `CLAUDE.md` promotes as the way to use the engine — plus direct
+construction and the docs-site playground's graph renderer.
+
+**The rule: the type that holds the resource owns the limit on that resource.**
+A limit enforced in a loader is advisory to every other caller. Limits now live
+in the constructors — `StringMatchSpec::to_input_matcher`, puma's five
+`__post_init__`, bumi's five constructors — and the loaders inherit them.
+`Registry::check_pattern_length` was deleted rather than kept as a second copy.
+
+Three consequences worth knowing:
+
+- **The HTTP compiler could not report the error.** It never used
+  `StringMatchSpec` at all, and swallowed invalid regexes into an exact match on
+  the *pattern literal* — a comment called that "fail-safe"; it silently deletes
+  the route. `compile_route_matches` and `HttpRouteMatchExt` now return `Result`,
+  matching the Claude compiler, which always did. An API break, free at zero
+  users and expensive after publish.
+- **Both crusts hard-coded their own copies** of the limits. Three constants with
+  no compile-time link is how they drift; they now import core's. The same move
+  in puma and bumi put the limits in `_limits.py` / `limits.ts` so the matchers
+  can enforce without importing the registry that imports them.
+- **bumi needed a second, different limit.** `re2js` implements neither of C++
+  RE2's compile-time guards, and pattern *length* is the wrong axis — cost tracks
+  compiled program size. Measured through bumi's own `RegexMatcher`:
+  `((a{100}){100}){100}`, twenty characters, **282 ms and 286 MB**.
+  `regex-budget.ts` bounds the product of nested repetition counts at 1000, which
+  is C++ RE2's own `kMaxRepeat` — matched rather than invented, so anything
+  accepted here upstream RE2 would also accept.
+
+**A near-miss, recorded because the method matters more than the result.** The
+first probe reported the bomb no longer reproduced. It ran from `/tmp` and
+resolved a different `re2js` than bumi's source does. Run inside `bumi`, it
+reproduced at the review's numbers. A false negative on a blocking finding is
+worse than no check at all, and the whole difference was module resolution:
+reproduce inside the package under test, not next to it.
+
+**One correction to the review itself.** Its F-04 states there is no
+`SessionIdInput`. There is, and there was at the reviewed commit. The
+`session_id` defect was real — both crusts accepted the field, counted it toward
+the guard against accidental catch-alls, and then dropped it because core's
+`HookMatch` had no such field — but the fix was one field and one compiler
+branch, not a new input.
+
+**What would overturn this:** nothing about the rule. If a limit genuinely cannot
+be evaluated at construction — an aggregate budget spanning many matchers, like
+the total regex cost deferred to 0.1.1 — it belongs to whatever type owns the
+aggregate, not back in the loader.
+
+---
+
 ## 2026-08-17 · Codegen
 
 ### D-028 · Codegen plugins are pinned, and generated code is committed

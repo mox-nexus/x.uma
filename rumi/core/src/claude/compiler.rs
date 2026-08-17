@@ -5,7 +5,9 @@
 
 use super::config::{ArgumentMatch, HookMatch, StringMatch};
 use super::context::{HookContext, HookEvent};
-use super::inputs::{ArgumentInput, CwdInput, EventInput, GitBranchInput, ToolNameInput};
+use super::inputs::{
+    ArgumentInput, CwdInput, EventInput, GitBranchInput, SessionIdInput, ToolNameInput,
+};
 use crate::prelude::*;
 
 /// A catch-all predicate that matches any `HookContext`.
@@ -66,6 +68,11 @@ impl HookMatchExt for HookMatch {
             for arg_match in arguments {
                 predicates.push(compile_argument_match(arg_match)?);
             }
+        }
+
+        // Session id matching
+        if let Some(session_match) = &self.session_id {
+            predicates.push(session_match.to_predicate(Box::new(SessionIdInput))?);
         }
 
         // CWD matching
@@ -464,6 +471,7 @@ mod tests {
                 name: "command".into(),
                 value: StringMatch::Contains("rm".into()),
             }]),
+            session_id: Some(StringMatch::Exact("sess-1".into())),
             cwd: Some(StringMatch::Prefix("/home".into())),
             git_branch: Some(StringMatch::Exact("main".into())),
         };
@@ -472,6 +480,7 @@ mod tests {
         // All match
         let ctx = HookContext::pre_tool_use("Bash")
             .with_arg("command", "rm -rf /tmp")
+            .with_session_id("sess-1")
             .with_cwd("/home/user")
             .with_git_branch("main");
         assert_eq!(matcher.evaluate(&ctx), Some("full_match"));
@@ -479,9 +488,64 @@ mod tests {
         // One field doesn't match (wrong branch)
         let ctx = HookContext::pre_tool_use("Bash")
             .with_arg("command", "rm -rf /tmp")
+            .with_session_id("sess-1")
             .with_cwd("/home/user")
             .with_git_branch("develop");
         assert_eq!(matcher.evaluate(&ctx), None);
+    }
+
+    // ── Regression: SEC3 / review F-04 ──────────────────────────────────────
+    //
+    // Both FFI crusts accepted a session_id and counted it toward the guard
+    // that exists to stop accidental catch-alls, but core's HookMatch had no
+    // such field, so conversion dropped it. A rule the operator believed was
+    // scoped to one session became a rule matching every tool call in every
+    // session — in an allowlist gate, a total bypass.
+    //
+    // The security review claimed there was no SessionIdInput. There was, and
+    // is: see inputs.rs and the registration in mod.rs. The field was the only
+    // missing piece.
+
+    #[test]
+    fn session_id_actually_constrains() {
+        let m = HookMatch {
+            session_id: Some(StringMatch::Exact("sess-abc".into())),
+            ..Default::default()
+        };
+        let matcher = m.compile("allow").unwrap();
+
+        let right = HookContext::pre_tool_use("Bash").with_session_id("sess-abc");
+        assert_eq!(matcher.evaluate(&right), Some("allow"));
+
+        // The bug: this used to return Some("allow") because the rule compiled
+        // to an unconstrained catch-all.
+        let wrong = HookContext::pre_tool_use("Bash").with_session_id("sess-other");
+        assert_eq!(matcher.evaluate(&wrong), None, "session_id must constrain");
+
+        let absent = HookContext::pre_tool_use("Bash");
+        assert_eq!(
+            matcher.evaluate(&absent),
+            None,
+            "missing input -> false (INV-1)"
+        );
+    }
+
+    #[test]
+    fn session_id_survives_a_yaml_round_trip() {
+        // deny_unknown_fields means a typo'd field name is rejected rather than
+        // silently producing the catch-all. This asserts the field is spelled
+        // the way the config surface expects.
+        // Note the `!Exact` tag: serde_yaml renders externally-tagged enums as
+        // YAML tags, not maps. That spelling goes away with the terse dialect
+        // when the config format moves to protojson.
+        let yaml = "session_id: !Exact sess-xyz\n";
+        let m: HookMatch = serde_yaml::from_str(yaml).expect("session_id must deserialize");
+        assert!(m.session_id.is_some());
+        let matcher = m.compile("allow").unwrap();
+        assert_eq!(
+            matcher.evaluate(&HookContext::pre_tool_use("Bash").with_session_id("sess-xyz")),
+            Some("allow")
+        );
     }
 
     // ========== E2E: Empty Match ==========

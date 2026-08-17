@@ -123,7 +123,7 @@ let routes = vec![
 ];
 
 // One call compiles all routes into a matcher
-let matcher = compile_route_matches(&routes, "allowed", "denied").unwrap();
+let matcher = compile_route_matches(&routes, "allowed", Some("denied")).unwrap();
 
 let req = HttpRequest::builder().method("GET").path("/api/users").build();
 assert_eq!(matcher.evaluate(&req), Some(&"allowed"));

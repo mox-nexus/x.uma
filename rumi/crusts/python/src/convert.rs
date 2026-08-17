@@ -8,8 +8,13 @@ use pyo3::exceptions::PyValueError;
 use pyo3::PyResult;
 use rumi::claude::{ArgumentMatch, HookEvent, HookMatch, StringMatch};
 
-/// Maximum length for any string pattern (8 KB).
-const MAX_PATTERN_LENGTH: usize = 8192;
+/// Maximum length for any string pattern.
+///
+/// Re-exported from core rather than re-declared. Three hand-copied constants
+/// with no compile-time link is how they drift; `rumi::StringMatchSpec` is the
+/// authority and enforces these itself. The checks here stay only to produce a
+/// boundary-shaped error message before core produces a generic one.
+use rumi::MAX_PATTERN_LENGTH;
 
 /// Maximum number of argument matchers per `HookMatch`.
 const MAX_ARGUMENTS: usize = 64;
@@ -17,8 +22,8 @@ const MAX_ARGUMENTS: usize = 64;
 /// Maximum number of rules per `compile()` call.
 pub const MAX_RULES: usize = 256;
 
-/// Maximum regex pattern length (4 KB).
-const MAX_REGEX_PATTERN_LENGTH: usize = 4096;
+/// Maximum regex pattern length. Re-exported from core — see above.
+use rumi::MAX_REGEX_PATTERN_LENGTH;
 
 /// Convert a Python `PyHookMatch` to a Rust `HookMatch`.
 ///
@@ -66,6 +71,13 @@ pub fn convert_hook_match(py_match: &PyHookMatch) -> PyResult<HookMatch> {
         .as_ref()
         .map(convert_string_match)
         .transpose()?;
+    // session_id was counted by the empty-match guard above but never converted,
+    // so a rule scoped only to a session became a catch-all.
+    let session_id = py_match
+        .session_id
+        .as_ref()
+        .map(convert_string_match)
+        .transpose()?;
     let cwd = py_match
         .cwd
         .as_ref()
@@ -96,6 +108,7 @@ pub fn convert_hook_match(py_match: &PyHookMatch) -> PyResult<HookMatch> {
         event,
         tool_name,
         arguments,
+        session_id,
         cwd,
         git_branch,
     })

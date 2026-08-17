@@ -62,10 +62,13 @@ if TYPE_CHECKING:
 # Limits (matching rumi core constants)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-MAX_FIELD_MATCHERS = 256
-MAX_PREDICATES_PER_COMPOUND = 256
-MAX_PATTERN_LENGTH = 8192
-MAX_REGEX_PATTERN_LENGTH = 4096
+# Defined in _limits so the matcher constructors can enforce them without a
+# circular import. Re-exported here so existing call sites are unaffected.
+# The `X as X` form is an explicit re-export, which mypy strict requires.
+from xuma._limits import MAX_FIELD_MATCHERS as MAX_FIELD_MATCHERS
+from xuma._limits import MAX_PATTERN_LENGTH as MAX_PATTERN_LENGTH
+from xuma._limits import MAX_PREDICATES_PER_COMPOUND as MAX_PREDICATES_PER_COMPOUND
+from xuma._limits import MAX_REGEX_PATTERN_LENGTH as MAX_REGEX_PATTERN_LENGTH
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Error types

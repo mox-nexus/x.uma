@@ -60,7 +60,7 @@ pkg/
 # reason is handled by .gitattributes linguist-generated=true, which collapses
 # these diffs already — while ignoring them meant `just gen` produced no diff by
 # construction, so nothing could detect codegen drift, and rumi-proto went its
-# whole life uncompiled without CI noticing. See DECISIONS.md D-028.
+# whole life uncompiled without CI noticing.
 
 # Scratch (working notes, not committed)
 scratch/
