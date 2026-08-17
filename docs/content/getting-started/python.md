@@ -71,11 +71,11 @@ The pure Python implementation loads the same config:
 ```python
 import yaml
 from xuma import Registry, RegistryBuilder
-from xuma.http import HttpRequest, register_http
+from xuma.http import HttpRequest, register
 
 # Build registry with HTTP inputs
 builder = RegistryBuilder()
-register_http(builder)
+register(builder)
 registry = builder.build()
 
 # Load config

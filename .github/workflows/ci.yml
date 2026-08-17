@@ -60,6 +60,19 @@ jobs:
       - name: Conformance fixtures
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test conformance --features rumi-test/fixtures
 
+      # The Rust snippets in docs/content are compiled by rumi-docs-tests, which
+      # include!s the Markdown so rustdoc sees them. They were all `rust,ignore`
+      # until 2026-08-17, which is how four how-to pages taught APIs that had
+      # never existed.
+      - name: Doc snippets compile
+        run: cargo test --doc --manifest-path rumi/Cargo.toml -p rumi-docs-tests
+
+      - name: Doc commands match --help
+        run: node scripts/check-doc-commands.mjs
+
+      - name: Doc links resolve
+        run: node scripts/check-doc-links.mjs
+
   python:
     name: python (puma)
     runs-on: ubuntu-latest
@@ -171,17 +184,16 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: extractions/setup-just@v2
-
       # PLAN.md CI5. Generated code is committed (DECISIONS.md D-028), which is
       # only honest if regenerating reproduces it exactly. While gen/ was
       # gitignored this check was vacuous by construction, and rumi-proto spent
       # its whole life uncompiled without anything noticing.
       #
-      # `just gen` rather than inlined buf commands, so the recipe stays the
-      # single source of how generation works.
+      # scripts/gen.sh rather than `just gen`, so this job needs no `just` in
+      # CI — the setup action could not resolve a release and failed the job
+      # twice. The justfile recipe calls the same script, so there is one source.
       - name: Regenerate
-        run: just gen
+        run: ./scripts/gen.sh
 
       - name: Assert no drift
         run: |

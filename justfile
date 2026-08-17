@@ -18,34 +18,7 @@ default:
 # Order matters: buf.gen.yaml carries `clean: true` and wipes the tree, so it
 # must run first. buf.gen.rust.yaml deliberately has no `clean` — it appends.
 gen:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Generate BOTH passes into a staging tree, then swap. buf.gen.yaml carries
-    # `clean: true`, so an in-place generate that fails part-way leaves the
-    # committed tree destroyed — and the second pass reaches the network, which
-    # rate-limits. Observed on 2026-08-17.
-    #
-    # Nothing here deletes: the outgoing trees are MOVED into the staging
-    # directory and left for the OS to reap, so a bad swap is recoverable.
-    STAGE=$(mktemp -d)
-    echo "gen: staging in $STAGE"
-    buf generate -o "$STAGE"
-    # Scoped with --path. `buf generate buf.build/cncf/xds` without it pulls the
-    # WHOLE module — ORCA load-reporting services, annotation metadata, the legacy
-    # udpa namespace — 14 extra files and ~4,500 lines that lib.rs never includes
-    # and nothing compiles. Only these three packages are used.
-    buf generate buf.build/cncf/xds --template buf.gen.rust.yaml -o "$STAGE" \
-        --path xds/core/v3 --path xds/type/v3 --path xds/type/matcher/v3
-    for d in rumi/proto/src/gen puma/proto/src/gen bumi/proto/src/gen; do
-        test -d "$STAGE/$d" || { echo "gen: $d missing from staging, refusing to swap"; exit 1; }
-    done
-    mkdir -p "$STAGE/.outgoing"
-    for d in rumi/proto/src/gen puma/proto/src/gen bumi/proto/src/gen; do
-        if [ -d "$d" ]; then mv "$d" "$STAGE/.outgoing/$(echo "$d" | tr / _)"; fi
-        mkdir -p "$(dirname "$d")"
-        mv "$STAGE/$d" "$d"
-    done
-    echo "gen: ok — previous trees kept in $STAGE/.outgoing"
+    ./scripts/gen.sh
 
 # Lint proto files
 lint-proto:
@@ -94,7 +67,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-fixtures puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-fixtures docs-commands docs-links puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -121,6 +94,16 @@ docs-preview:
     cd docs/experience && bun run preview
 
 # Type-check the docs site
+# Assert every `rumi ...` command in docs/content and README matches `rumi --help`.
+# Four how-to pages taught subcommands that never existed; prose cannot fail a build.
+docs-commands:
+    node scripts/check-doc-commands.mjs
+
+# Assert every internal Markdown link resolves to a page the site serves.
+# Every one of them was dead until 2026-08-17; the build reported one, as a 404.
+docs-links:
+    node scripts/check-doc-links.mjs
+
 docs-check:
     cd docs/experience && bun run check
 

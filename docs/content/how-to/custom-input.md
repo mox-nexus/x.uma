@@ -52,7 +52,7 @@ Inputs reach configs through the registry, keyed by type URL:
 
 ```rust
 let registry = RegistryBuilder::new()
-    .register_input("myapp.v1.RegionInput", |_config| Ok(Box::new(RegionInput)))
+    .input::<RegionInput>("myapp.v1.RegionInput")
     .build();
 ```
 

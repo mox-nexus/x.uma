@@ -47,13 +47,16 @@ event_pred = SinglePredicate(input=EventTypeInput(), matcher=ExactMatcher("/api"
 
 **Rust:**
 ```rust,ignore
+// Declaration, shown for shape. `Arc`, not `Box`: the Arc is what makes the
+// `Arc::ptr_eq` identity comparison possible, and `CustomMatchData` carries the
+// `Send + Sync + Debug` bounds the FFI boundary needs.
 pub enum MatchingData {
     None,
     String(String),
     Int(i64),
     Bool(bool),
     Bytes(Vec<u8>),
-    Custom(Box<dyn CustomMatchData>),
+    Custom(Arc<dyn CustomMatchData>),
 }
 ```
 

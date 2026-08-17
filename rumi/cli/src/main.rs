@@ -546,7 +546,7 @@ Commands:
   check [http|claude] <config>          Validate config
   info [http|claude]                    Print registered type URLs
   --skill [-r NAME]                     Print agent-facing documentation
-  help                                  Show this help
+  help, --help, -h                      Show this help
 
 Domains:
   (default)  Test domain (key-value context)
