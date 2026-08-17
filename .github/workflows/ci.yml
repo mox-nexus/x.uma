@@ -60,6 +60,16 @@ jobs:
       - name: Conformance fixtures
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test conformance --features rumi-test/fixtures
 
+      # The Rust snippets in docs/content are compiled by rumi-docs-tests, which
+      # include!s the Markdown so rustdoc sees them. They were all `rust,ignore`
+      # until 2026-08-17, which is how four how-to pages taught APIs that had
+      # never existed.
+      - name: Doc snippets compile
+        run: cargo test --doc --manifest-path rumi/Cargo.toml -p rumi-docs-tests
+
+      - name: Doc commands match --help
+        run: node scripts/check-doc-commands.mjs
+
   python:
     name: python (puma)
     runs-on: ubuntu-latest

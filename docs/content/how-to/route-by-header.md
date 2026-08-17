@@ -51,13 +51,13 @@ order-sensitive to data you do not control.
 ## Matching on part of a value
 
 `Exact` is one of several comparisons. `Prefix`, `Suffix`, `Contains`, and
-`SafeRegex` all work in the same slot:
+`Regex` all work in the same slot:
 
 ```json
 "value_match": { "Prefix": "internal-" }
 ```
 
-Prefer the cheapest comparison that expresses the rule. `SafeRegex` is
+Prefer the cheapest comparison that expresses the rule. `Regex` is
 linear-time and safe against catastrophic backtracking, but it is still the most
 expensive option here, and patterns are length-capped at load time.
 

@@ -94,7 +94,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-fixtures puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-fixtures docs-commands puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -121,6 +121,11 @@ docs-preview:
     cd docs/experience && bun run preview
 
 # Type-check the docs site
+# Assert every `rumi ...` command in docs/content and README matches `rumi --help`.
+# Four how-to pages taught subcommands that never existed; prose cannot fail a build.
+docs-commands:
+    node scripts/check-doc-commands.mjs
+
 docs-check:
     cd docs/experience && bun run check
 

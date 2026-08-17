@@ -57,7 +57,7 @@ assert matcher.evaluate(request) == "api_backend"
 ```
 
 **Rust:**
-```rust,ignore
+```rust,no_run
 use rumi::prelude::*;
 use rumi_http::*;
 
@@ -72,7 +72,7 @@ let matcher: Matcher<HttpRequest, &str> = Matcher::new(
 );
 
 let request = HttpRequest::builder().method("GET").path("/api/users").build();
-assert_eq!(matcher.evaluate(&request), Some(&"api_backend"));
+assert_eq!(matcher.evaluate(&request), Some("api_backend"));
 ```
 
 **TypeScript:**

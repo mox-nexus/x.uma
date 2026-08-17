@@ -25,7 +25,7 @@ for each, and which `on_match` was taken.
 The `rumi` binary does this without writing code:
 
 ```bash
-rumi eval --config routes.yaml --context method=GET --trace
+rumi run config.yaml --context method=GET --trace
 ```
 
 ## What the trace does and does not show
@@ -59,7 +59,7 @@ Loading validates. If a config is structurally wrong, you get an error at load
 time rather than a wrong answer at evaluation time:
 
 ```bash
-rumi validate --config routes.yaml
+rumi check config.yaml
 ```
 
 Evaluation is infallible by design. Anything that can fail, fails at load.

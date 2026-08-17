@@ -7,8 +7,8 @@ A matcher engine implementing the xDS Unified Matcher API across multiple langua
 | Package | Language | Notes |
 |---------|----------|-------|
 | **rumi** | Rust | Core engine (reference implementation) |
-| **puma** | Python | Pure Python implementation (dir: `puma/`) |
-| **bumi** | Bun/TypeScript | Pure TypeScript implementation (dir: `bumi/`) |
+| **puma** | Python | Pure Python implementation (dir: `puma/`, **package `xuma`**) |
+| **bumi** | Bun/TypeScript | Pure TypeScript implementation (dir: `bumi/`, **package `xuma`**) |
 | **xuma-crust** | Python | Rust bindings via PyO3 (from `rumi/crusts/python/`) |
 | **xuma-crust** | TypeScript | Rust bindings via wasm-bindgen (from `rumi/crusts/wasm/`) |
 
@@ -92,9 +92,9 @@ x.uma/
 │   └── tests/                  # conformance test fixtures (YAML)
 ├── rumi/                       # Rust workspace (core + extensions + crusts + proto)
 │   └── proto/src/gen/          # buf-generated Rust types (prost + prost-serde)
-├── puma/                       # Pure Python implementation (package: puma)
+├── puma/                       # Pure Python implementation (package: xuma)
 │   └── proto/src/gen/          # buf-generated Python types (betterproto)
-├── bumi/                       # Pure TypeScript implementation (package: bumi)
+├── bumi/                       # Pure TypeScript implementation (package: xuma)
 │   └── proto/src/gen/          # buf-generated TypeScript types (ts-proto)
 ├── buf.gen.yaml                # Polyglot codegen config (all 3 languages)
 ├── docs/
@@ -117,18 +117,36 @@ x.uma/
 | 5.1 | puma arch-guild hardening | ✅ Done |
 | 6 | bumi (Bun/TypeScript + HTTP) | ✅ Done |
 | 6.1 | bumi arch-guild hardening | ✅ Done |
-| 7 | xuma-crust: PyO3 Python bindings | ✅ Done |
-| 7.5 | rumi-claude: trace + HookMatch compiler | ✅ Done |
-| 8 | xuma-crust: wasm-bindgen TypeScript bindings | ✅ Done |
-| 9 | Cross-language benchmarks (all 5 variants) | ✅ Done |
+| 7 | xuma-crust: PyO3 Python bindings | ⚠️ Unverified |
+| 7.5 | Claude domain: trace + HookMatch compiler (a **feature of `rumi-core`**, not a crate) | ✅ Done |
+| 8 | xuma-crust: wasm-bindgen TypeScript bindings | ⚠️ Unverified |
+| 9 | Cross-language benchmarks (all 5 variants) | ⚠️ Unverified |
 | 10 | TypedExtensionConfig Registry (`IntoDataInput`, `RegistryBuilder`) | ✅ Done |
 | 11 | Test audit (removed 18 ineffective tests → 216 total) | ✅ Done |
 | 12 | Proto Alignment: buf codegen, `rumi-proto`, `AnyResolver`, xDS Matcher loading | ✅ Done |
 | 13 | Config/Registry across all implementations | ✅ Done |
-| 14 | Config-path benchmarks (all 5 variants) | ✅ Done |
-| 15 | Crate restructure + publish prep (0.0.2) | ✅ Done |
+| 14 | Config-path benchmarks (all 5 variants) | ⚠️ Unverified |
+| 15 | Crate restructure + publish prep (0.0.2) | ⚠️ Unverified |
 | — | Semantic matching (cosine similarity via `CustomMatchData`) | Planned |
 | — | RE2 migration: `google-re2` for puma, `re2js` for bumi | ✅ Done |
+
+**Status legend.** ✅ Done means **CI executes something that would fail if it
+regressed**. ⚠️ Unverified means the work exists but nothing checks it, so the
+claim rests on someone's memory.
+
+The general rule, learned the expensive way: **any phase whose subject is
+outside CI's reach is unverified by construction.** Phase 12 sat at ✅ for
+months while `rumi-proto` had never once compiled — nothing ran it, so nothing
+could say otherwise. It is ✅ now because CI runs `-p rumi-proto` and a codegen
+drift check.
+
+What each ⚠️ needs to become ✅:
+
+| Phase | Blocked on |
+|---|---|
+| 7, 8 | CI building both crusts — `PLAN.md` Phase F, CI1 |
+| 9, 14 | benchmarks running somewhere that can fail; they are currently manual |
+| 15 | `cargo publish --dry-run` passing without path patching — `PLAN.md` Phase E |
 
 ## Current Work
 
@@ -210,7 +228,7 @@ From official Envoy xDS proto research:
 | **OnMatch exclusivity** | `oneof { Matcher matcher = 1; Action action = 2; }` | `enum OnMatch<Ctx, A> { Action(A), Matcher(Box<Matcher>) }` |
 | **Nested matcher failure** | If nested matcher returns no-match, parent OnMatch fails | Continue to next field_matcher (no fallback) |
 | **on_no_match** | At Matcher level only, not per-OnMatch | `Matcher.on_no_match: Option<OnMatch>` |
-| **First-match-wins** | `keep_matching: true` records action but returns no-match | INV enforced in Matcher::evaluate() |
+| **First-match-wins** | first match wins; `keep_matching` is **deferred, not implemented** | `Matcher::evaluate()` returns the first match. `keep_matching` appears in the proto and is accepted and ignored — see PLAN.md F2 / SF2 |
 
 **Key insight**: OnMatch is EXCLUSIVE — action XOR nested matcher, never both. Making illegal states unrepresentable at the type level.
 
@@ -241,10 +259,10 @@ Policy lives ABOVE the matcher (Istio pattern), not inside it.
 | **No "Policy" type in core** | The `A` parameter is the composition seam. Core doesn't interpret actions. |
 | **Use "matcher engine" in docs** | Not "policy engine". Align vocabulary with what the code actually does. |
 | **`NamedMatcher` over `Policy`** | If naming metadata is ever needed, use truthful names (Karman). |
-| **Domain compilers own the vocabulary** | rumi-http has `HttpRouteMatch`, rumi-claude has `HookMatch`. |
+| **Domain compilers own the vocabulary** | `rumi-http` has `HttpRouteMatch`; the `claude` feature of `rumi-core` has `HookMatch`. |
 | **Cross-domain = pipeline** | Different `Ctx` types are incomparable. Combine actions, not contexts. |
 
-**Strategic path:** Build domain compilers now. Extract policy abstraction only when a second integration reveals cross-domain pain. See `scratch/arch-guild-reports/policy-deliberation/00-index.md`.
+**Strategic path:** Build domain compilers now. Extract policy abstraction only when a second integration reveals cross-domain pain. The deliberation report is not in the repo; this table is the record of it.
 
 ## Domain Compiler Pattern
 
@@ -257,7 +275,7 @@ Each domain adapter provides a **compiler** that transforms user-friendly config
 
 The compiler is the "door handle" — it makes the matcher engine usable without manual tree construction.
 
-### Claude Domain Compiler (rumi-claude)
+### Claude Domain Compiler (`rumi-core`, feature = "claude")
 
 Types to build (parallel to rumi-http's gateway):
 - `HookMatch` — match conditions for Claude Code hook events
@@ -319,7 +337,7 @@ use rumi_http::{HttpRequest, HeaderInput};
 
 ## Craft Judgment
 
-Principles distilled from 13 elite Rust codebases. Each prevents a form of self-deception about quality. See `scratch/research-synthesis.md` for the full evidence base.
+Principles distilled from 13 elite Rust codebases. Each prevents a form of self-deception about quality. The evidence base is not in the repo; the `rust-mastery` skill carries what survived of it.
 
 | Principle | What You're Fooling Yourself About | Test |
 |-----------|-----------------------------------|------|
@@ -356,7 +374,9 @@ All implementations must pass all fixtures in `spec/tests/`. The fixture suite i
 
 ### Session Start
 
-On new session, read `scratch/next-session.md` and confirm understanding with user before proceeding.
+On new session, read `PLAN.md` top to bottom and confirm understanding with the user before proceeding. It carries the current milestone state, the open findings, and the skills to load first.
+
+`reference/` holds the evidence `PLAN.md` and `DECISIONS.md` cite — the security review and recovered design prior art. Both are tracked; `scratch/` is not.
 
 ### Development Workflow
 

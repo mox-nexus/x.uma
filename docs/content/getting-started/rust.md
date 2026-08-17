@@ -81,9 +81,10 @@ not_found
 
 The same config file works programmatically via the Registry API:
 
-```rust,ignore
+```rust,no_run
 use rumi::prelude::*;
-use rumi_http::{HttpRequest, register_simple};
+use rumi::{MatcherConfig, RegistryBuilder};
+use rumi_http::{register_simple, HttpRequest};
 
 fn main() {
     // Build registry with HTTP inputs
@@ -109,25 +110,34 @@ The registry resolves `type_url` strings to concrete `DataInput` implementations
 
 For type-safe HTTP matching without config files, use the Gateway API compiler:
 
-```rust,ignore
+```rust,no_run
 use rumi::prelude::*;
-use rumi_http::prelude::*;
+use rumi_http::{compile_route_matches, HttpPathMatch, HttpRouteMatch};
 
-// Declarative config
+// Declarative config. Note `PathPrefix`, not `Prefix` — these are the Gateway
+// API's own names, and `method` is a plain String.
 let routes = vec![
     HttpRouteMatch {
-        path: Some(HttpPathMatch::Prefix { value: "/api".into() }),
-        method: Some(HttpMethod::Get),
+        path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+        method: Some("GET".into()),
         ..Default::default()
     },
 ];
 
-// One call compiles all routes into a matcher
+// One call compiles all routes into a matcher. It returns Result: an invalid
+// or oversized regex is reported rather than silently dropping the route.
 let matcher = compile_route_matches(&routes, "allowed", Some("denied")).unwrap();
 
-let req = HttpRequest::builder().method("GET").path("/api/users").build();
-assert_eq!(matcher.evaluate(&req), Some(&"allowed"));
+// `matcher` evaluates against `HttpMessage`, the indexed ext_proc context.
+// See the note below on getting one.
 ```
+
+`compile_route_matches` produces a `Matcher<HttpMessage, _>`, and `HttpMessage`
+is currently only constructible from an ext_proc `ProcessingRequest` — there is
+no public builder. So the Gateway API compiler is usable today from inside an
+ext_proc filter, but not from a scratch program. If you want to experiment
+locally, use the config path above with `HttpRequest`, which does have a
+builder.
 
 This requires `rumi-http` with the `ext-proc` feature (enabled by default).
 

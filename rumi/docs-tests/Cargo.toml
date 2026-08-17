@@ -1,0 +1,17 @@
+[package]
+name = "rumi-docs-tests"
+description = "Compiles the Rust snippets in docs/content so they cannot rot"
+publish = false
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+rumi-core = { workspace = true, features = ["registry", "claude"] }
+rumi-http = { path = "../ext/http", features = ["registry", "ext-proc"], default-features = false }
+serde_yaml.workspace = true
+serde_json.workspace = true
