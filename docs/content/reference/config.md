@@ -204,10 +204,10 @@ matchers:
       type: and
       predicates:
         - type: single
-          input: { type_url: "xuma.http.v1.PathInput", config: {} }
+          input: { type_url: "xuma.http.v1.PathInput" }
           value_match: { Prefix: "/api" }
         - type: single
-          input: { type_url: "xuma.http.v1.MethodInput", config: {} }
+          input: { type_url: "xuma.http.v1.MethodInput" }
           value_match: { Exact: "GET" }
     on_match: { type: action, action: "api_read" }
 
@@ -228,10 +228,10 @@ matchers:
       type: and
       predicates:
         - type: single
-          input: { type_url: "xuma.claude.v1.EventInput", config: {} }
+          input: { type_url: "xuma.claude.v1.EventInput" }
           value_match: { Exact: "PreToolUse" }
         - type: single
-          input: { type_url: "xuma.claude.v1.ToolNameInput", config: {} }
+          input: { type_url: "xuma.claude.v1.ToolNameInput" }
           value_match: { Exact: "Bash" }
         - type: single
           input: { type_url: "xuma.claude.v1.ArgumentInput", config: { name: "command" } }
@@ -240,7 +240,7 @@ matchers:
 
   - predicate:
       type: single
-      input: { type_url: "xuma.claude.v1.EventInput", config: {} }
+      input: { type_url: "xuma.claude.v1.EventInput" }
       value_match: { Exact: "PreToolUse" }
     on_match: { type: action, action: "allow" }
 
