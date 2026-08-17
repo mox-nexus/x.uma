@@ -28,6 +28,16 @@ crust-wasm-check:
 # have separate toolchains, so CI runs them as their own jobs.
 crust-check: crust-py-check crust-wasm-check
 
+# Check every tool this repo needs is installed. First command in CONTRIBUTING.
+doctor:
+    ./scripts/doctor.sh
+
+# Build from `git archive HEAD` — what a clone actually gets — rather than the
+# working tree. `just ci` cannot see a file that exists locally but is untracked
+# or ignored, which is a class that has bitten this repo three times.
+verify-clean-clone:
+    ./scripts/verify-clean-clone.sh
+
 # Generate proto code (all three languages) and the xDS dependency types.
 #
 # Two passes are required. `buf generate` only walks the local module graph, and

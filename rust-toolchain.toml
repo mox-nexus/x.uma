@@ -1,0 +1,9 @@
+# Pin the Rust toolchain so a clone builds with the compiler this repo is
+# developed and tested against, rather than whatever rustup last installed.
+#
+# `channel` is a version rather than "stable" on purpose: "stable" is a moving
+# target, and an unpinned toolchain is how `just ci` can pass on one machine and
+# fail on another for reasons unrelated to the change under test.
+[toolchain]
+channel = "1.95.0"
+components = ["rustfmt", "clippy"]

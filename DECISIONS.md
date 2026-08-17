@@ -8,6 +8,58 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-17 · Reproducibility
+
+### D-031 · Every lockfile is committed, and the toolchain is pinned
+
+D-016 left the lockfile question open, and the repo answered it inconsistently
+in the meantime: `.gitignore` excluded `Cargo.lock` and `bun.lock` while
+`bumi/bun.lock`, `puma/uv.lock`, `rumi/crusts/python/uv.lock` and
+`rumi/crusts/wasm/bun.lock` were all tracked. A rule that half the repo ignores
+is not a rule.
+
+All of them are committed now. A workspace that ships a binary commits its
+lockfile, and reproducible CI wants the rest.
+
+Toolchains are pinned alongside them: `rust-toolchain.toml` (1.95.0),
+`.python-version` (3.12) and `.bun-version` (1.3.12). `stable` is a moving
+target, and an unpinned toolchain is how `just ci` passes on one machine and
+fails on another for reasons unrelated to the change under test — which
+happened twice in one day with unpinned GitHub Actions.
+
+**No MSRV is declared.** `rust-version` would be a claim nothing checks, since
+CI builds on one toolchain and no job tests an older one. Declaring one without
+that job is exactly the pattern this plan exists to correct. It can be added the
+day a job verifies it.
+
+### D-032 · `just doctor` and `just verify-clean-clone`
+
+Two checks, each for a failure mode `just ci` structurally cannot see.
+
+**`just doctor`** lists every required tool and exits non-zero if one is
+missing. A fresh clone needed nine tools and nothing said so. Two defects in one
+week traced to it: the wasm crust had never been built on the machine that
+claimed it worked, and `uv run maturin` failed in CI while passing locally
+because maturin was on one PATH and not the other.
+
+**`just verify-clean-clone`** builds from `git archive HEAD` — what a clone
+actually receives — rather than the working tree. `just ci` runs against the
+working directory, so a file that exists locally but is untracked or ignored is
+invisible to it. That class has bitten this repo three times: seventeen files
+hidden by a bare `lib/` gitignore pattern, a `playground` workspace entry
+pointing at a directory deleted nine commits earlier, and generated proto code
+that was ignored while a crate depended on it.
+
+The middle one was found by this work rather than by reasoning about it: the
+stale workspace entry only fails under `--frozen-lockfile`, so the repo had a
+broken clean install for nine commits and every local `bun install` tolerated it.
+
+**Not in `just ci`.** Both are slower than the gate should be, and
+`verify-clean-clone` needs a commit to archive. They belong before opening a
+pull request, which is what `CONTRIBUTING.md` says.
+
+---
+
 ## 2026-08-17 · Security
 
 ### D-030 · Source comments do not cite `DECISIONS.md`
