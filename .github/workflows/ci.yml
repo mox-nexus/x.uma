@@ -57,6 +57,12 @@ jobs:
       - name: Test rumi-proto
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-proto
 
+      - name: Feature combinations
+        run: ./scripts/check-features.sh
+
+      - name: Publishable
+        run: node scripts/check-publishable.mjs
+
       - name: Conformance fixtures
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test conformance --features rumi-test/fixtures
 
@@ -226,7 +232,7 @@ jobs:
         run: |
           uv sync --all-groups
           uv pip install maturin
-          uv run maturin develop --uv
+          uv run maturin develop --uv --features fixtures
           uv run pytest tests/ -q \
             --ignore=tests/test_bench_config.py --ignore=tests/test_bench_crusty.py
 
@@ -245,7 +251,7 @@ jobs:
       - name: Build and test
         working-directory: rumi/crusts/wasm
         run: |
-          wasm-pack build --target web
+          wasm-pack build --target web -- --features fixtures
           bun install --frozen-lockfile
           bun test
 

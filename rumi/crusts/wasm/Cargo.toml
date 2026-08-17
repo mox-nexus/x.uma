@@ -12,6 +12,12 @@ authors.workspace = true
 name = "xuma_crust"
 crate-type = ["cdylib"]
 
+[features]
+# Off by default, so the published artifact carries no YAML fixture loader.
+# The conformance suite builds with it; consumers never do. PLAN.md E3.
+default = []
+fixtures = ["dep:rumi-test"]
+
 [dependencies]
 wasm-bindgen = "0.2"
 js-sys = "0.3"
@@ -21,7 +27,10 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 rumi-core = { path = "../../core", features = ["registry", "claude"] }
 rumi-http = { path = "../../ext/http", default-features = false, features = ["registry"] }
-rumi-test = { path = "../../ext/test", features = ["registry", "fixtures"] }
+# rumi-kv, not rumi-test: a YAML fixture loader has no business inside a
+# shipped wheel/npm package (PLAN.md E3).
+rumi-kv = { path = "../../ext/kv", features = ["registry"] }
+rumi-test = { path = "../../ext/test", features = ["registry", "fixtures"], optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

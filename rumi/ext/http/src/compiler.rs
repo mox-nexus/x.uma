@@ -164,65 +164,43 @@ pub fn compile_route_matches<A: Clone + Send + Sync + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use envoy_grpc_ext_proc::envoy::{
-        config::core::v3::{HeaderMap, HeaderValue},
-        service::ext_proc::v3::{processing_request::Request, HttpHeaders, ProcessingRequest},
-    };
+    use crate::message::HttpMessageBuilder;
 
-    // ========== Test Helpers ==========
-
-    /// Builder for constructing test requests as `HttpMessage`.
+    // These used to build an ext_proc `ProcessingRequest` to get an
+    // `HttpMessage`, which meant every test of the compiler — a Gateway API
+    // feature — needed the data plane. It also meant the builder these tests
+    // now use, the only construction path a `gateway`-only consumer has, had
+    // no coverage at all.
     struct RequestBuilder {
-        headers: Vec<HeaderValue>,
+        inner: HttpMessageBuilder,
     }
 
     impl RequestBuilder {
         fn new() -> Self {
-            Self { headers: vec![] }
+            Self {
+                inner: HttpMessageBuilder::new(),
+            }
         }
 
         fn path(mut self, path: &str) -> Self {
-            self.headers.push(HeaderValue {
-                key: ":path".into(),
-                value: path.into(),
-                raw_value: vec![],
-            });
+            self.inner = self.inner.path(path);
             self
         }
 
         fn method(mut self, method: &str) -> Self {
-            self.headers.push(HeaderValue {
-                key: ":method".into(),
-                value: method.into(),
-                raw_value: vec![],
-            });
+            self.inner = self.inner.method(method);
             self
         }
 
-        fn header(mut self, name: &str, value: &str) -> Self {
-            self.headers.push(HeaderValue {
-                key: name.to_lowercase(),
-                value: value.into(),
-                raw_value: vec![],
-            });
+        fn header(mut self, key: &str, value: &str) -> Self {
+            self.inner = self.inner.header(key, value);
             self
         }
 
         fn build(self) -> HttpMessage {
-            let req = ProcessingRequest {
-                request: Some(Request::RequestHeaders(HttpHeaders {
-                    headers: Some(HeaderMap {
-                        headers: self.headers,
-                    }),
-                    ..Default::default()
-                })),
-                ..Default::default()
-            };
-            HttpMessage::from(&req)
+            self.inner.build()
         }
     }
-
-    // ========== Predicate Structure Tests ==========
 
     #[test]
     fn test_compile_empty_match() {
@@ -589,7 +567,8 @@ mod tests {
 
         let matcher = route_match.compile("test").unwrap();
 
-        let msg = HttpMessage::from(&ProcessingRequest::default());
+        // An empty message: no transport needed to assert INV-1.
+        let msg = HttpMessageBuilder::new().build();
         assert_eq!(matcher.evaluate(&msg), None);
     }
 

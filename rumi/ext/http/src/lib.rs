@@ -27,14 +27,17 @@
 // Modules always available
 mod simple;
 
-// Modules requiring ext_proc heavy deps
-#[cfg(feature = "ext-proc")]
+// The Gateway API compiler, the indexed context and its inputs. These need
+// Gateway API *config types*, not a data plane — `HttpMessage` is six plain
+// fields, and only its `From<ProcessingRequest>` conversions ever touched
+// ext_proc. Conflating the two is what put tonic on the default path.
+#[cfg(feature = "gateway")]
 mod compiler;
-#[cfg(feature = "ext-proc")]
+#[cfg(feature = "message")]
 mod context;
-#[cfg(feature = "ext-proc")]
+#[cfg(feature = "message")]
 mod inputs;
-#[cfg(feature = "ext-proc")]
+#[cfg(feature = "message")]
 mod message;
 
 // Simple types (always available)
@@ -47,24 +50,24 @@ pub use simple::{
 #[cfg(feature = "registry")]
 pub use simple::register_simple;
 
-// ext_proc types (require ext-proc feature)
-#[cfg(feature = "ext-proc")]
+// Compiler, inputs and the indexed context — available with `gateway` alone.
+#[cfg(feature = "gateway")]
 pub use compiler::*;
-#[cfg(feature = "ext-proc")]
+#[cfg(feature = "message")]
 pub use inputs::*;
-#[cfg(feature = "ext-proc")]
-pub use message::HttpMessage;
+#[cfg(feature = "message")]
+pub use message::{HttpMessage, HttpMessageBuilder};
 
-// Re-export ext_proc types for convenience
+// Gateway API config types.
+#[cfg(feature = "gateway")]
+pub use k8s_gateway_api::{
+    HttpHeaderMatch, HttpMethod, HttpPathMatch, HttpQueryParamMatch, HttpRouteMatch,
+};
+
+// The data plane. Only these actually need envoy-grpc-ext-proc.
 #[cfg(feature = "ext-proc")]
 pub use envoy_grpc_ext_proc::envoy::service::ext_proc::v3::{
     ProcessingRequest, ProcessingResponse,
-};
-
-// Re-export Gateway API types for convenience
-#[cfg(feature = "ext-proc")]
-pub use k8s_gateway_api::{
-    HttpHeaderMatch, HttpMethod, HttpPathMatch, HttpQueryParamMatch, HttpRouteMatch,
 };
 
 /// Prelude for convenient imports.
@@ -79,29 +82,22 @@ pub mod prelude {
         SimpleQueryParamInput,
     };
 
-    // ext_proc types (require ext-proc feature)
-    #[cfg(feature = "ext-proc")]
+    // The domain: indexed context and its DataInputs.
+    #[cfg(feature = "message")]
     pub use super::{
-        // DataInputs for HttpMessage
-        AuthorityInput,
-        HeaderInput,
-        // Re-exports: Gateway API
-        HttpHeaderMatch,
-        // Indexed context
-        HttpMessage,
-        HttpMethod,
-        HttpPathMatch,
-        HttpQueryParamMatch,
-        // Compiler
-        HttpRouteMatchExt,
-        MethodInput,
-        PathInput,
-        // Re-exports: ext_proc
-        ProcessingRequest,
-        ProcessingResponse,
-        QueryParamInput,
-        SchemeInput,
+        AuthorityInput, HeaderInput, HttpMessage, HttpMessageBuilder, MethodInput, PathInput,
+        QueryParamInput, SchemeInput,
     };
+
+    // Gateway API config types and the compiler.
+    #[cfg(feature = "gateway")]
+    pub use super::{
+        HttpHeaderMatch, HttpMethod, HttpPathMatch, HttpQueryParamMatch, HttpRouteMatchExt,
+    };
+
+    // The data-plane types are the only things that need ext_proc.
+    #[cfg(feature = "ext-proc")]
+    pub use super::{ProcessingRequest, ProcessingResponse};
 
     pub use rumi::prelude::*;
 }
@@ -119,7 +115,7 @@ pub use inputs::{HeaderInputConfig, QueryParamInputConfig};
 /// - `xuma.http.v1.QueryParamInput` → [`QueryParamInput`]
 /// - `xuma.http.v1.SchemeInput` → [`SchemeInput`]
 /// - `xuma.http.v1.AuthorityInput` → [`AuthorityInput`]
-#[cfg(all(feature = "ext-proc", feature = "registry"))]
+#[cfg(all(feature = "message", feature = "registry"))]
 #[must_use]
 pub fn register(builder: rumi::RegistryBuilder<HttpMessage>) -> rumi::RegistryBuilder<HttpMessage> {
     rumi::register_core_matchers(builder)
@@ -139,30 +135,17 @@ pub fn register(builder: rumi::RegistryBuilder<HttpMessage>) -> rumi::RegistryBu
 #[cfg(all(test, feature = "proto"))]
 mod proto_tests {
     use super::*;
-    use envoy_grpc_ext_proc::envoy::{
-        config::core::v3::{HeaderMap, HeaderValue},
-        service::ext_proc::v3::{processing_request::Request, HttpHeaders},
-    };
     use rumi::MatcherConfig;
 
+    // Built via HttpMessageBuilder rather than an ext_proc ProcessingRequest.
+    // `proto` is a control-plane feature and has no business requiring the data
+    // plane: it was only reaching `gateway` transitively through `ext-proc`,
+    // which dragged tonic and tokio into a config-loading build.
     fn build_request(headers: Vec<(&str, &str)>) -> HttpMessage {
-        let req = ProcessingRequest {
-            request: Some(Request::RequestHeaders(HttpHeaders {
-                headers: Some(HeaderMap {
-                    headers: headers
-                        .into_iter()
-                        .map(|(k, v)| HeaderValue {
-                            key: k.into(),
-                            value: v.into(),
-                            raw_value: vec![],
-                        })
-                        .collect(),
-                }),
-                ..Default::default()
-            })),
-            ..Default::default()
-        };
-        HttpMessage::from(&req)
+        headers
+            .into_iter()
+            .fold(HttpMessageBuilder::new(), |b, (k, v)| b.header(k, v))
+            .build()
     }
 
     #[test]

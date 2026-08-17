@@ -70,7 +70,7 @@ pub struct SinglePredicateConfig {
     pub value_match: ValueMatchConfig,
 }
 
-/// Input configuration (just a key for `TestContext`)
+/// Input configuration (just a key for `KvContext`)
 #[derive(Debug, Deserialize)]
 pub struct InputConfig {
     pub key: String,
@@ -136,11 +136,11 @@ pub struct TestCase {
 // Builder: Convert config to rumi types
 // ═══════════════════════════════════════════════════════════════════════════════
 
-use crate::{StringInput, TestContext};
+use crate::{KvContext, StringInput};
 
 impl MatcherConfig {
     /// Build a rumi Matcher from this config
-    pub fn build(&self) -> Matcher<TestContext, String> {
+    pub fn build(&self) -> Matcher<KvContext, String> {
         let field_matchers = self
             .matchers
             .iter()
@@ -152,13 +152,13 @@ impl MatcherConfig {
 }
 
 impl FieldMatcherConfig {
-    fn build(&self) -> FieldMatcher<TestContext, String> {
+    fn build(&self) -> FieldMatcher<KvContext, String> {
         FieldMatcher::new(self.predicate.build(), self.on_match.build())
     }
 }
 
 impl PredicateConfig {
-    fn build(&self) -> Predicate<TestContext> {
+    fn build(&self) -> Predicate<KvContext> {
         match self {
             PredicateConfig::Single(s) => Predicate::Single(s.single.build()),
             PredicateConfig::And(a) => {
@@ -173,8 +173,8 @@ impl PredicateConfig {
 }
 
 impl SinglePredicateConfig {
-    fn build(&self) -> SinglePredicate<TestContext> {
-        let input: Box<dyn DataInput<TestContext>> = Box::new(StringInput::new(&self.input.key));
+    fn build(&self) -> SinglePredicate<KvContext> {
+        let input: Box<dyn DataInput<KvContext>> = Box::new(StringInput::new(&self.input.key));
         let matcher: Box<dyn InputMatcher> = self.value_match.build();
         SinglePredicate::new(input, matcher)
     }
@@ -192,7 +192,7 @@ impl ValueMatchConfig {
 }
 
 impl OnMatchConfig {
-    fn build(&self) -> OnMatch<TestContext, String> {
+    fn build(&self) -> OnMatch<KvContext, String> {
         match self {
             OnMatchConfig::Action(a) => OnMatch::Action(a.action.clone()),
             OnMatchConfig::Matcher(m) => OnMatch::Matcher(Box::new(m.matcher.build())),
@@ -201,10 +201,10 @@ impl OnMatchConfig {
 }
 
 impl TestCase {
-    /// Build a `TestContext` from this case's context map
+    /// Build a `KvContext` from this case's context map
     #[must_use]
-    pub fn build_context(&self) -> TestContext {
-        let mut ctx = TestContext::new();
+    pub fn build_context(&self) -> KvContext {
+        let mut ctx = KvContext::new();
         for (k, v) in &self.context {
             ctx = ctx.with(k.clone(), v.clone());
         }

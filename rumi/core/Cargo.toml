@@ -6,6 +6,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+readme = "README.md"
 keywords = ["xds", "matcher", "envoy", "config"]
 categories = ["config", "data-structures"]
 
@@ -29,6 +30,9 @@ serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
+# Dev-only: the config bench needs a concrete domain to measure against.
+# A dev-dependency cycle back onto a dependent crate is allowed by cargo.
+rumi-kv = { path = "../ext/kv", features = ["registry"] }
 divan = "0.1"
 rumi-test = { path = "../ext/test", features = ["registry"] }
 serde.workspace = true

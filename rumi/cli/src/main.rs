@@ -16,7 +16,7 @@ use std::process;
 use rumi::claude::HookContext;
 use rumi::MatcherConfig;
 use rumi_http::HttpRequest;
-use rumi_test::TestContext;
+use rumi_kv::KvContext;
 
 mod skill;
 mod trace_output;
@@ -368,9 +368,9 @@ fn cmd_run_claude(args: &[String]) -> Result<(), String> {
 // Registry assembly (composition root)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn build_test_registry() -> rumi::Registry<TestContext> {
+fn build_test_registry() -> rumi::Registry<KvContext> {
     let builder = rumi::RegistryBuilder::new();
-    rumi_test::register(builder).build()
+    rumi_kv::register(builder).build()
 }
 
 fn build_http_registry() -> rumi::Registry<HttpRequest> {
@@ -387,8 +387,8 @@ fn build_claude_registry() -> rumi::Registry<HookContext> {
 // Context builders
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn build_test_context(pairs: &HashMap<String, String>) -> TestContext {
-    let mut ctx = TestContext::new();
+fn build_test_context(pairs: &HashMap<String, String>) -> KvContext {
+    let mut ctx = KvContext::new();
     for (k, v) in pairs {
         ctx = ctx.with(k, v);
     }
@@ -924,13 +924,13 @@ mod tests {
         let registry = build_test_registry();
         let matcher = registry.load_matcher(config).unwrap();
 
-        let ctx = TestContext::new().with("method", "GET");
+        let ctx = KvContext::new().with("method", "GET");
         assert_eq!(matcher.evaluate(&ctx), Some("route-get".to_string()));
 
-        let ctx = TestContext::new().with("method", "POST");
+        let ctx = KvContext::new().with("method", "POST");
         assert_eq!(matcher.evaluate(&ctx), Some("route-post".to_string()));
 
-        let ctx = TestContext::new().with("method", "DELETE");
+        let ctx = KvContext::new().with("method", "DELETE");
         assert_eq!(matcher.evaluate(&ctx), Some("fallback".to_string()));
     }
     // ─── Skill accuracy ──────────────────────────────────────────────────
