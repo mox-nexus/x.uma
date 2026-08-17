@@ -44,9 +44,10 @@ already states plainly: that this project commits generated code, and that
 **Also read, they are not skills but they are context:**
 `CLAUDE.md` (project), `DECISIONS.md` (D-001 to D-027, newest first — **D-026
 settles the config format and is load-bearing for Phases SF, C and E**),
-`scratch/security-review/2026-08-16-pre-publication.md` (the full security review;
-Phase S depends on it), `scratch/phase-12/prior-art.md` (2025 design
-conversations recovered from memex).
+`reference/security-review-2026-08-16.md` (the full security review; Phase S
+depends on it), `reference/prior-art-2025-design.md` (2025 design conversations
+recovered from memex). Both live in `reference/` and are **tracked** — they used
+to sit under the gitignored `scratch/`, where a fresh clone could not see them.
 
 `CLAUDE.md:359` tells you to read `scratch/next-session.md`. **That file does not
 exist.** Fixing that stale instruction is task A1.
@@ -279,8 +280,9 @@ the same answer in every implementation.
 Zero users. Breaking changes are free right now and expensive the day after
 release. That fact drives the entire ordering below.
 
-Decisions of record are in `DECISIONS.md` (D-001 to D-025). Read it. Prior art
-recovered from 2025 design conversations is in `scratch/phase-12/prior-art.md`.
+Decisions of record are in `DECISIONS.md` (D-001 to D-027). Read it. Prior art
+recovered from 2025 design conversations is in
+`reference/prior-art-2025-design.md`.
 
 ---
 
@@ -371,10 +373,11 @@ builds and deploys. PR #22 is **merged**; `main` is the baseline now.
 | F18 | Docs snippets are invisible to CI | Every Rust block is ```` ```rust,ignore ````; shell blocks are unchecked. This is the root cause of F8. |
 | F19 | **`just test-full` does not compile** | `cargo test --all-features` → the same 4 errors as F1, because `--all-features` enables `rumi-test/proto` → `rumi-proto`. `just ci` passes anyway: `just test` uses `default-members` (`rumi/Cargo.toml:6`) and `justfile:68` hard-codes `--exclude rumi-proto`. A shipped `just` target is red and the gate cannot see it. |
 | F20 | Generated code is gitignored in **all three** languages | `.gitignore:58-60` covers `rumi/proto/src/gen/`, `puma/proto/src/gen/`, `bumi/proto/src/gen/`. All three exist on disk untracked (28 / 7 / 6 files); nothing imports the Python or TypeScript ones. M5's "all three languages" gate and CI5's no-diff check are both vacuous over untracked trees. |
+| F22 | The plan cited files a clone does not contain | `.gitignore:63` ignores `scratch/` wholesale, and §0 told the reader to open `scratch/phase-12/prior-art.md`. Fixed 2026-08-17 by moving both cited artifacts to a tracked `reference/`. Left as a row because the *class* recurs: `just verify-clean-clone` (H1) is the check that would catch the next one. |
 | F21 | Fixtures use **four** dialects, not three | `matcher:` (14), `config:` (7), `http_route_match:` (5), `http_route_matches:` **plural** (1, `spec/tests/05_http/multiple_routes.yaml:5`), each with its own branch in all three loaders. A5 says three. |
 
 **Security review: complete, and now in the repo.**
-`scratch/security-review/2026-08-16-pre-publication.md` — recovered 2026-08-17
+`reference/security-review-2026-08-16.md` — recovered 2026-08-17
 from the session transcript that produced it, having never been written to disk.
 Read it before Phase S; the falsifying tests SEC1–SEC3 need are in it, several
 already run and passing.
@@ -797,8 +800,8 @@ generated code.
 ### Phase S — Security
 
 **Release-blocking. A full review was run and the verdict was DO NOT SHIP in
-current form.** The review is at
-`scratch/security-review/2026-08-16-pre-publication.md`. Each fix below has a
+current form.** The review is at `reference/security-review-2026-08-16.md`.
+Each fix below has a
 falsifying test **in that file**, several already run and passing; commit them as
 regression fixtures rather than re-deriving them.
 
