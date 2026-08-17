@@ -1,5 +1,5 @@
 (function() {
-    const implementors = Object.fromEntries([["rumi",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.97.1/core/hash/trait.Hash.html\" title=\"trait core::hash::Hash\">Hash</a> for <a class=\"enum\" href=\"rumi/claude/enum.HookEvent.html\" title=\"enum rumi::claude::HookEvent\">HookEvent</a>",0]]]]);
+    const implementors = Object.fromEntries([["rumi",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.95.0/core/hash/trait.Hash.html\" title=\"trait core::hash::Hash\">Hash</a> for <a class=\"enum\" href=\"rumi/claude/enum.HookEvent.html\" title=\"enum rumi::claude::HookEvent\">HookEvent</a>",0]]]]);
     if (window.register_implementors) {
         window.register_implementors(implementors);
     } else {
