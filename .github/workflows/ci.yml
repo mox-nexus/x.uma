@@ -152,8 +152,7 @@ jobs:
 
       # The workspace lives in rumi/ and Cargo.lock is intentionally not
       # committed, so resolve the dependency graph before auditing it.
-      # generate-lockfile only reads manifests, so the buf-generated
-      # rumi-proto sources (not checked in) are not needed.
+      # generate-lockfile only reads manifests.
       - name: Generate lockfile
         run: cargo generate-lockfile --manifest-path rumi/Cargo.toml
 
@@ -161,3 +160,35 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: rumi
+
+  codegen:
+    name: codegen is current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: extractions/setup-just@v2
+
+      # PLAN.md CI5. Generated code is committed (DECISIONS.md D-028), which is
+      # only honest if regenerating reproduces it exactly. While gen/ was
+      # gitignored this check was vacuous by construction, and rumi-proto spent
+      # its whole life uncompiled without anything noticing.
+      #
+      # `just gen` rather than inlined buf commands, so the recipe stays the
+      # single source of how generation works.
+      - name: Regenerate
+        run: just gen
+
+      - name: Assert no drift
+        run: |
+          if ! git diff --quiet; then
+            echo "::error::just gen changed tracked files - generated code is stale, or a plugin pin moved"
+            git diff --stat
+            git diff | head -100
+            exit 1
+          fi
+          echo "codegen is byte-identical to what is committed"
