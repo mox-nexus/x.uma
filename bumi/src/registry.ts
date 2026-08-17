@@ -51,10 +51,22 @@ import type { DataInput, InputMatcher } from "./types.ts";
 // Limits (matching rumi core constants)
 // =====================================================================
 
-export const MAX_FIELD_MATCHERS = 256;
-export const MAX_PREDICATES_PER_COMPOUND = 256;
-export const MAX_PATTERN_LENGTH = 8192;
-export const MAX_REGEX_PATTERN_LENGTH = 4096;
+// Defined in ./limits.ts so string-matchers.ts can enforce them without a
+// circular import. Re-exported here so existing call sites are unaffected.
+export {
+	MAX_FIELD_MATCHERS,
+	MAX_PATTERN_LENGTH,
+	MAX_PREDICATES_PER_COMPOUND,
+	MAX_REGEX_PATTERN_LENGTH,
+	PatternTooLongError,
+} from "./limits.ts";
+import {
+	MAX_FIELD_MATCHERS,
+	MAX_PATTERN_LENGTH,
+	MAX_PREDICATES_PER_COMPOUND,
+	MAX_REGEX_PATTERN_LENGTH,
+	PatternTooLongError,
+} from "./limits.ts";
 
 // =====================================================================
 // Error types
@@ -113,19 +125,6 @@ export class TooManyPredicatesError extends MatcherError {
 		super(`too many predicates in compound: ${count} exceeds maximum ${max}`);
 		this.name = "TooManyPredicatesError";
 		this.count = count;
-		this.max = max;
-	}
-}
-
-/** A match pattern exceeds the length limit. */
-export class PatternTooLongError extends MatcherError {
-	readonly length: number;
-	readonly max: number;
-
-	constructor(length: number, max: number) {
-		super(`pattern length ${length} exceeds maximum ${max}`);
-		this.name = "PatternTooLongError";
-		this.length = length;
 		this.max = max;
 	}
 }
