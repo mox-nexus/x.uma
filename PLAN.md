@@ -461,13 +461,55 @@ time.
 
 **SF0. Decide the schema shape. THIS IS A HUMAN DECISION — STOP AND ASK.**
 
-Is protojson the **authoring** surface, or only the **wire** surface?
+**The deployment model, which you need before you can cost this.** x.uma is
+embedded and **never speaks xDS itself**. Verified: no tonic, no
+`DiscoveryRequest`, no subscription anywhere in the tree. The
+`envoy_grpc_ext_proc` imports are type definitions, not a client. Config reaches
+x.uma one of two ways:
+
+```
+human writes routes.yaml ──────────────► x.uma ──► Matcher
+host's xDS client → proto Matcher ─────► x.uma ──► Matcher
+```
+
+The host owns the transport, the subscription, and ECDS. x.uma owns only the
+step from config to matcher. `convert.rs:48` already exposes the right entry
+point for the second path, `load_proto_matcher`; it has just never compiled.
+
+Two consequences that are not up for debate:
+- **No async in core, ever.** There is nothing to await when you never open a
+  socket. This makes an existing judgment call structural.
+- `envoy-grpc-ext-proc` as a *default* dependency pulls 101 crates against 7,
+  including tokio, tonic, hyper and h2, into a library that never makes a
+  network call. It is there for struct definitions. See E4.
+
+**Now the actual question:** is protojson the **authoring** surface, or only the
+**wire** surface?
 
 This is not an implementation detail and an agent must not settle it alone. It
 determines whether every example, fixture, playground preset and `--skill` output
 in the repo becomes nine lines of camelCase with `@type` URLs and actions
 promoted to `TypedExtensionConfig`, and whether puma and bumi each need a
 YAML-lowering layer.
+
+Envoy fuses the two paths into one schema: its YAML *is* protojson, run through
+`JsonStringToMessage`. That is precisely why Envoy YAML is verbose — you are
+hand-writing a wire format. **x.uma has a choice Envoy did not, because it owns
+both loaders**, and the two paths have different audiences: the proto path is
+consumed by a machine that generates it, where verbosity costs nothing; the YAML
+path is typed by a human, where it costs a great deal.
+
+The maintainer's current lean is **wire-only**: proto is the wire schema and the
+validation authority, terse YAML stays the authoring surface and lowers into it.
+The bridge is enforceable rather than asserted — a conformance fixture proves
+terse YAML and its protojson equivalent build an *identical* matcher.
+
+Honest cost of wire-only: two loaders to maintain, and the terse YAML becomes a
+schema x.uma owns and must version.
+
+What would overturn it: a control plane that needs to **emit** config a human
+then hand-edits. Then one format must win and it has to be protojson. Confirm
+that is not the model before committing.
 
 Prepare both options with real costs — convert three representative fixtures each
 way and count lines, concepts, and the diff to the docs — then **stop and put it
