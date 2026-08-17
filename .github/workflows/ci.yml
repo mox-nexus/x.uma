@@ -70,6 +70,9 @@ jobs:
       - name: Doc commands match --help
         run: node scripts/check-doc-commands.mjs
 
+      - name: Doc links resolve
+        run: node scripts/check-doc-links.mjs
+
   python:
     name: python (puma)
     runs-on: ubuntu-latest

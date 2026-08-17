@@ -94,7 +94,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-fixtures docs-commands puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-fixtures docs-commands docs-links puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -125,6 +125,11 @@ docs-preview:
 # Four how-to pages taught subcommands that never existed; prose cannot fail a build.
 docs-commands:
     node scripts/check-doc-commands.mjs
+
+# Assert every internal Markdown link resolves to a page the site serves.
+# Every one of them was dead until 2026-08-17; the build reported one, as a 404.
+docs-links:
+    node scripts/check-doc-links.mjs
 
 docs-check:
     cd docs/experience && bun run check
