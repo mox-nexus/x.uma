@@ -216,10 +216,13 @@ jobs:
       # PLAN.md F5 / CI1. Two of five shipped implementations were never built
       # by CI. The PyO3 crust has 80 tests that had never run here, in a wheel
       # that goes to PyPI.
+      # maturin is a build tool, not a project dependency, so `uv run maturin`
+      # cannot find it — it must be installed into the environment first.
       - name: Build and test
         working-directory: rumi/crusts/python
         run: |
           uv sync --all-groups
+          uv pip install maturin
           uv run maturin develop --uv
           uv run pytest tests/ -q \
             --ignore=tests/test_bench_config.py --ignore=tests/test_bench_crusty.py
