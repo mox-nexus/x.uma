@@ -8,6 +8,61 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-17 · Codegen
+
+### D-028 · Codegen plugins are pinned, and generated code is committed
+
+`rumi-proto` had never compiled. The cause was not what two reviews said it was,
+so the wrong diagnosis is recorded here alongside the right one.
+
+**What it actually was.** `buf.gen.yaml` referenced
+`buf.build/community/neoeinstein-prost` with **no version**. That floating
+reference had moved to v0.5.0+, whose prost-build infers
+`#[derive(Eq, Hash)]` on messages — including `xds.core.v3.TypedExtensionConfig`,
+which holds an `Option<Any>`. Neither `prost-types::Any` nor `pbjson-types::Any`
+implements `Eq` or `Hash`, so the derive cannot compile against any available
+`Any`. Meanwhile `rumi/proto/Cargo.toml` pins `prost = "0.13"`. **Codegen and
+runtime had drifted apart, and nothing checked.**
+
+Measured, generating the same protos with each version:
+
+| plugin | layout | messages with `Eq, Hash` |
+|---|---|---|
+| `neoeinstein-prost:v0.4.0` | flat `gen/<package>.rs` | 0 — compiles |
+| `neoeinstein-prost:v0.5.0` | nested directories | 4 — does not compile |
+
+Pinned to `neoeinstein-prost:v0.4.0` + `neoeinstein-prost-serde:v0.3.0`, the
+pair that matches the `prost = "0.13"` runtime. `rumi-proto` compiles and its 14
+tests pass, three of them end-to-end proto → convert → load → evaluate.
+
+**The wrong diagnosis, recorded so it is not re-derived.** Both an adversarial
+plan review and this session's first writeup said the root was
+`rumi/proto/Cargo.toml`'s aliasing of `pbjson-types` as `prost_types`, and that
+dropping the alias was one of the options. Tested: removing the alias produces
+**16 errors instead of 4** — the same `Eq`/`Hash` pair plus 12 serde failures.
+The alias is load-bearing and orthogonal; it is why protojson works at all.
+Keep it.
+
+**Generated code is now committed**, for all three languages. `.gitignore` had
+excluded it since `e36dd29` on the reason that it "keeps PRs reviewable" — but
+the same commit added `.gitattributes linguist-generated=true`, which already
+collapses those diffs. The exclusion's real effect was that `just gen` produced
+no diff *by construction*, so codegen drift was undetectable, and a crate could
+go its entire life uncompiled without CI noticing. Exactly that happened.
+
+Two consequences that bit immediately and are worth knowing:
+- **ruff honours `.gitignore`.** Un-ignoring `puma/proto/src/gen/` made ruff
+  start linting generated Python. Excluded explicitly in `pyproject.toml`; the
+  ignore file had been doing lint configuration by accident.
+- **The pin fixes the output layout too.** v0.4.0 emits flat files, v0.5.0 nested.
+  `rumi/proto/src/lib.rs`'s `include!` paths follow the pin, and say so.
+
+**What would overturn this:** wanting a prost 0.14 runtime. Then the pins move
+together with it, and whether `Any` gains `Eq`/`Hash` upstream has to be checked
+first — not assumed.
+
+---
+
 ## 2026-08-17 · Schema freeze
 
 ### D-026 · protojson is the config format, not a wire format hidden behind a dialect

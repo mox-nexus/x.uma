@@ -1,11 +1,16 @@
 version: v2
+
+# Second pass: generates xDS dependency types that no local proto imports, so
+# they are absent from `buf generate`'s graph. Pins must match buf.gen.yaml.
+# No `clean` here — see the note in buf.gen.yaml.
+managed:
+  enabled: true
+
 plugins:
-  # Rust (prost)
-  - remote: buf.build/community/neoeinstein-prost
+  - remote: buf.build/community/neoeinstein-prost:v0.4.0
     out: rumi/proto/src/gen
     opt:
       - file_descriptor_set
 
-  # Rust (prost-serde for JSON)
-  - remote: buf.build/community/neoeinstein-prost-serde
+  - remote: buf.build/community/neoeinstein-prost-serde:v0.3.0
     out: rumi/proto/src/gen

@@ -9,9 +9,17 @@ default:
 # Proto Generation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Generate proto code
+# Generate proto code (all three languages) and the xDS dependency types.
+#
+# Two passes are required. `buf generate` only walks the local module graph, and
+# no xuma proto imports xDS, so the xds.* types convert.rs depends on are absent
+# from it. The second pass fetches them explicitly.
+#
+# Order matters: buf.gen.yaml carries `clean: true` and wipes the tree, so it
+# must run first. buf.gen.rust.yaml deliberately has no `clean` — it appends.
 gen:
     buf generate
+    buf generate buf.build/cncf/xds --template buf.gen.rust.yaml
 
 # Lint proto files
 lint-proto:
@@ -36,6 +44,9 @@ build-full:
 # Run tests
 test:
     cargo test --manifest-path rumi/Cargo.toml
+    # rumi-proto is outside default-members, so the line above never sees it.
+    # It went its whole life uncompiled because nothing ran this (PLAN.md F1).
+    cargo test --manifest-path rumi/Cargo.toml -p rumi-proto
 
 # Run tests with all features
 test-full:
