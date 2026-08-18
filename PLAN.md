@@ -38,8 +38,8 @@ retarget children to `main` first.
 half is not. Concretely:
 
 - the four fixture dialects, and the 27 fixtures written in them
-- puma and bumi, which hand-walk protojson (D-038); their config layers
-  (`puma/src/xuma/_config.py`, `bumi/src/config.ts`) still read the terse dialect
+- **bumi** — puma is migrated (`_protojson.py`, and it passes all 23 fixtures).
+  bumi's `src/config.ts` still reads only the terse dialect
 - `MatcherConfig` still derives `Deserialize` — the dialect is still authorable
 - SF3, SF5, SF6 remain; SF1, SF2, SF4, SF7, SF9 and SF8's renames are done
 
@@ -912,9 +912,21 @@ different semantics with no `cfg` involved — `register` strips the query,
 `register_simple` does not, and both crusts use `register_simple`. Feature
 powerset checks cannot see this class. It needs a conformance fixture.
 
-**The fifth fixture key exists, and the 7 `config:` fixtures are through it.**
-22 protojson fixtures run in CI (`spec/tests/07_protojson/`), all listing
-`[rust]`. The migration was done by a mechanical translator rather than by hand,
+**The fifth fixture key exists, the 7 `config:` fixtures are through it, and
+puma passes all of them.** 23 protojson fixtures run in CI
+(`spec/tests/07_protojson/`), every one listing `[rust, python]`. bumi is what
+remains before the four transitional dialects can be deleted.
+
+Two things the ledger caught while puma migrated, both of which a softer
+mechanism would have missed. It fired sixteen times with *"does not list python,
+but python loads it"* — the migration finishing faster than the bookkeeping, and
+exactly the stale-skip class the both-directions rule exists for. And
+`error_contains` turned out to pin implementation-specific wording: Rust said
+"SinglePredicate has no matcher" where puma said "one of 'valueMatch' or
+'customMatch' is required". The fix was not to weaken the assertion but to
+**harmonize the messages** — an error naming the fields tells the author what to
+write, and cross-language agreement on error wording is itself a conformance
+property. The migration was done by a mechanical translator rather than by hand,
 because transcription is where semantics drift — and the translator's one bug
 was caught by a fixture: it used `if/elif` on the `value_match` / `custom_match`
 oneof, silently dropping one half of the fixture whose whole point is that

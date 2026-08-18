@@ -3,6 +3,7 @@ name: on_no_match_fallback
 description: on_no_match provides fallback action when no field matcher matches
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:
@@ -45,6 +46,7 @@ name: no_fallback
 description: Without on_no_match, no-match returns null
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:

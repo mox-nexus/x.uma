@@ -3,6 +3,7 @@ name: both_value_and_custom_match
 description: Setting both value_match AND custom_match is an error (oneof violation)
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:
@@ -27,13 +28,14 @@ proto_matcher:
             '@type': type.googleapis.com/xuma.core.v1.NamedAction
             name: x
 expect_error: true
-error_contains: duplicate field
+error_contains: valueMatch
 
 ---
 name: unknown_input_type_url
 description: Unregistered input type_url produces an error
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:
@@ -59,6 +61,7 @@ name: unknown_matcher_type_url
 description: Unregistered custom_match type_url produces an error
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:
@@ -88,9 +91,9 @@ description: >
   caught this as "neither value_match nor custom_match"; in protojson it is an
   unset oneof, which convert.rs checks explicitly. Either way it must not load
   as a predicate that quietly never fires.
-implementations: [rust]
+implementations: [rust, python]
 expect_error: true
-error_contains: has no matcher
+error_contains: is required
 proto_matcher:
   matcherList:
     matchers:
@@ -116,7 +119,7 @@ description: >
   mistake is a field the schema does not define, and the generated
   deserializer rejects it. That rejection is what extends SECURITY.md control
   #6 across the whole config surface.
-implementations: [rust]
+implementations: [rust, python]
 expect_error: true
 error_contains: unknown field
 proto_matcher:

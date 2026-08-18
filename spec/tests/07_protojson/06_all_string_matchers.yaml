@@ -3,6 +3,7 @@ name: exact_via_config
 description: Exact string match via config loading
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:
@@ -36,6 +37,7 @@ name: prefix_via_config
 description: Prefix string match via config loading
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:
@@ -73,6 +75,7 @@ name: suffix_via_config
 description: Suffix string match via config loading
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:
@@ -106,6 +109,7 @@ name: contains_via_config
 description: Contains string match via config loading
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:
@@ -139,6 +143,7 @@ name: regex_via_config
 description: Regex string match via config loading
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:

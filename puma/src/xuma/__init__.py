@@ -50,6 +50,7 @@ from xuma._predicate import (
     or_predicate,
     predicate_depth,
 )
+from xuma._protojson import parse_protojson
 
 # Registry — see xuma._registry for details
 from xuma._registry import (
@@ -123,6 +124,7 @@ __all__ = [
     "MatcherConfig",
     "ConfigParseError",
     "parse_matcher_config",
+    "parse_protojson",
     # Registry
     "RegistryBuilder",
     "Registry",

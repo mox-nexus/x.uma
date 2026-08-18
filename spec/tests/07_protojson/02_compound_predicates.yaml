@@ -3,6 +3,7 @@ name: and_predicate
 description: 'Compound AND predicate: all conditions must match'
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:
@@ -58,6 +59,7 @@ name: or_predicate
 description: 'Compound OR predicate: any condition must match'
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:
@@ -105,6 +107,7 @@ name: not_predicate
 description: 'NOT predicate: inverts the inner condition'
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:

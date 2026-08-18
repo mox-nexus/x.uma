@@ -50,6 +50,9 @@ class BuiltInMatch:
 
     variant: str
     value: str
+    # xDS StringMatcher.ignore_case. It belongs to the comparison rather than
+    # to the pattern, which is why it sits here and not inside the value.
+    ignore_case: bool = False
 
 
 @dataclass(frozen=True, slots=True)
