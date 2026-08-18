@@ -21,7 +21,7 @@ one worth understanding: a missing input is not an error, it is a non-match.
     {
       "predicate": {
         "type": "single",
-        "input": { "type_url": "xuma.test.v1.StringInput", "config": { "key": "tier" } },
+        "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "tier" } },
         "value_match": { "Exact": "enterprise" }
       },
       "on_match": { "type": "action", "action": "dedicated-pool" }
@@ -29,7 +29,7 @@ one worth understanding: a missing input is not an error, it is a non-match.
     {
       "predicate": {
         "type": "single",
-        "input": { "type_url": "xuma.test.v1.StringInput", "config": { "key": "tier" } },
+        "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "tier" } },
         "value_match": { "Exact": "pro" }
       },
       "on_match": { "type": "action", "action": "shared-pool" }

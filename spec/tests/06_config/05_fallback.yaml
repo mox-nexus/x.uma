@@ -5,7 +5,7 @@ config:
   matchers:
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "status" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "status" } }
         value_match: { Exact: "active" }
       on_match: { type: action, action: "allow" }
   on_no_match: { type: action, action: "deny" }
@@ -31,7 +31,7 @@ config:
   matchers:
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "status" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "status" } }
         value_match: { Exact: "active" }
       on_match: { type: action, action: "allow" }
 

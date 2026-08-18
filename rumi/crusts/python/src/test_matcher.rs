@@ -32,7 +32,7 @@ impl TestMatcher {
     ///
     /// # Supported input type URLs
     ///
-    /// - `xuma.test.v1.StringInput` — string lookup by key (config: `{"key": "..."}`)
+    /// - `xuma.kv.v1.MapInput` — string lookup by key (config: `{"key": "..."}`)
     ///
     /// # Errors
     ///

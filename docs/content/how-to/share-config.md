@@ -12,7 +12,7 @@ in every implementation:
 matchers:
   - predicate:
       type: single
-      input: { type_url: xuma.test.v1.StringInput, config: { key: method } }
+      input: { type_url: xuma.kv.v1.MapInput, config: { key: method } }
       value_match: { Exact: "GET" }
     on_match: { type: action, action: read-handler }
 on_no_match: { type: action, action: reject }

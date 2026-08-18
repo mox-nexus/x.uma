@@ -14,6 +14,10 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.."
 
+# `proto` is deliberately absent: it no longer exists. It used to select
+# between two config vocabularies, which is what made a `not(feature = "proto")`
+# cfg writable in the first place. With one vocabulary there is nothing to
+# select, so the violation is inexpressible rather than merely fixed.
 COMBOS=(
     ""
     "message"
@@ -23,7 +27,7 @@ COMBOS=(
     "registry,message"
     "registry,gateway"
     "registry,ext-proc"
-    "proto"
+    "gateway,ext-proc"
 )
 
 failed=0

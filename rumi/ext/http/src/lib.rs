@@ -102,10 +102,6 @@ pub mod prelude {
     pub use rumi::prelude::*;
 }
 
-// Registry config types (hand-written, only without proto)
-#[cfg(all(feature = "ext-proc", feature = "registry", not(feature = "proto")))]
-pub use inputs::{HeaderInputConfig, QueryParamInputConfig};
-
 /// Register all rumi-http types for [`HttpMessage`] with the given builder.
 ///
 /// Registers core matchers (`BoolMatcher`, `StringMatcher`) and HTTP-domain inputs:
@@ -132,7 +128,7 @@ pub fn register(builder: rumi::RegistryBuilder<HttpMessage>) -> rumi::RegistryBu
 // Verifies: proto config → register() → load_matcher → evaluate on HttpMessage
 // ═══════════════════════════════════════════════════════════════════════════════
 
-#[cfg(all(test, feature = "proto"))]
+#[cfg(all(test, feature = "registry"))]
 mod proto_tests {
     use super::*;
     use rumi::MatcherConfig;

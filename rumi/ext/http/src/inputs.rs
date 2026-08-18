@@ -126,121 +126,49 @@ impl DataInput<HttpMessage> for AuthorityInput {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Registry support (feature = "registry")
-// Hand-written config types — used when proto feature is not enabled.
+// Config loading (feature = "registry")
+//
+// The config types are the generated proto messages, unconditionally. There
+// used to be hand-written `HeaderInputConfig` / `QueryParamInputConfig` here
+// plus six `UnitConfig` impls, all behind
+// `#[cfg(all(feature = "registry", not(feature = "proto")))]`, with proto
+// versions on the other side. Enabling `proto` deleted two public types and
+// replaced six impls — and the replacement made `name` optional where the
+// hand-written one made it required, so `config: {}` went from a load error to
+// a header rule that silently never fired.
+//
+// Features add. They do not replace. With one vocabulary there is nothing left
+// to select between, which is why the `proto` feature no longer exists.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Configuration for [`HeaderInput`].
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-#[derive(serde::Deserialize)]
-pub struct HeaderInputConfig {
-    /// The header name to extract (case-insensitive).
-    pub name: String,
-}
-
-/// Configuration for [`QueryParamInput`].
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-#[derive(serde::Deserialize)]
-pub struct QueryParamInputConfig {
-    /// The query parameter name to extract.
-    pub name: String,
-}
-
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HttpMessage> for PathInput {
-    type Config = rumi::UnitConfig;
-
-    fn from_config(
-        _: rumi::UnitConfig,
-    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-        Ok(Box::new(PathInput))
-    }
-}
-
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HttpMessage> for MethodInput {
-    type Config = rumi::UnitConfig;
-
-    fn from_config(
-        _: rumi::UnitConfig,
-    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-        Ok(Box::new(MethodInput))
-    }
-}
-
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HttpMessage> for HeaderInput {
-    type Config = HeaderInputConfig;
-
-    fn from_config(
-        config: Self::Config,
-    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-        Ok(Box::new(HeaderInput::new(config.name)?))
-    }
-}
-
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HttpMessage> for QueryParamInput {
-    type Config = QueryParamInputConfig;
-
-    fn from_config(
-        config: Self::Config,
-    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-        Ok(Box::new(QueryParamInput::new(config.name)?))
-    }
-}
-
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HttpMessage> for SchemeInput {
-    type Config = rumi::UnitConfig;
-
-    fn from_config(
-        _: rumi::UnitConfig,
-    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-        Ok(Box::new(SchemeInput))
-    }
-}
-
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-impl rumi::IntoDataInput<HttpMessage> for AuthorityInput {
-    type Config = rumi::UnitConfig;
-
-    fn from_config(
-        _: rumi::UnitConfig,
-    ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-        Ok(Box::new(AuthorityInput))
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Proto config types (feature = "proto")
-// Uses proto-generated types as Config, enabling xDS control plane integration.
-// ═══════════════════════════════════════════════════════════════════════════════
-
-#[cfg(feature = "proto")]
-mod proto_configs {
-    use super::*;
+#[cfg(feature = "registry")]
+mod configs {
+    use super::{
+        AuthorityInput, HeaderInput, MethodInput, PathInput, QueryParamInput, SchemeInput,
+    };
+    use crate::message::HttpMessage;
     use rumi_proto::xuma::http::v1 as proto;
 
-    impl rumi::IntoDataInput<HttpMessage> for PathInput {
-        type Config = proto::PathInput;
+    /// Inputs that read a fixed part of the message take no configuration, but
+    /// still need a `Config` type — their proto messages are empty ones.
+    macro_rules! unit_input {
+        ($input:ty, $config:ty) => {
+            impl rumi::IntoDataInput<HttpMessage> for $input {
+                type Config = $config;
 
-        fn from_config(
-            _: proto::PathInput,
-        ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-            Ok(Box::new(PathInput))
-        }
+                fn from_config(
+                    _: $config,
+                ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
+                    Ok(Box::new(<$input>::default()))
+                }
+            }
+        };
     }
 
-    impl rumi::IntoDataInput<HttpMessage> for MethodInput {
-        type Config = proto::MethodInput;
-
-        fn from_config(
-            _: proto::MethodInput,
-        ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-            Ok(Box::new(MethodInput))
-        }
-    }
+    unit_input!(PathInput, proto::PathInput);
+    unit_input!(MethodInput, proto::MethodInput);
+    unit_input!(SchemeInput, proto::SchemeInput);
+    unit_input!(AuthorityInput, proto::AuthorityInput);
 
     impl rumi::IntoDataInput<HttpMessage> for HeaderInput {
         type Config = proto::HeaderInput;
@@ -259,26 +187,6 @@ mod proto_configs {
             config: proto::QueryParamInput,
         ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
             Ok(Box::new(QueryParamInput::new(config.name)?))
-        }
-    }
-
-    impl rumi::IntoDataInput<HttpMessage> for SchemeInput {
-        type Config = proto::SchemeInput;
-
-        fn from_config(
-            _: proto::SchemeInput,
-        ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-            Ok(Box::new(SchemeInput))
-        }
-    }
-
-    impl rumi::IntoDataInput<HttpMessage> for AuthorityInput {
-        type Config = proto::HostInput;
-
-        fn from_config(
-            _: proto::HostInput,
-        ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-            Ok(Box::new(AuthorityInput))
         }
     }
 }

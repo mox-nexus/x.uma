@@ -63,7 +63,7 @@ This IS the port. Adapters are concrete types registered at runtime.
 | Package | Purpose |
 |---------|---------|
 | `xuma.core.v1` | Base types, registry traits |
-| `xuma.test.v1` | Conformance testing (StringInput, MapInput) |
+| `xuma.kv.v1` | Conformance testing (StringInput, MapInput) |
 | `xuma.http.v1` | HTTP matching (HeaderInput, PathInput) |
 | `xuma.claude.v1` | Claude Code hooks (HookContext, ToolUseInput) |
 

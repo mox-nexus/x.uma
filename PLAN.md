@@ -9,7 +9,7 @@ Read this block first; the rest of the file was written before any of it was don
 | **M1** repo stops asserting what it cannot show | **met** — PR #26 |
 | **M2** a stranger can start | **met** — PR #27 (DX), #29 (reproducibility) |
 | **M3** nothing loads clean and lies | **met** — PR #25, all three blocking security findings fixed |
-| **M4/M5** schema freeze → one schema | **not started.** SF0 is *decided* (D-026); the fixtures and the migration are not written |
+| **M4/M5** schema freeze → one schema | **in progress.** SF0 decided (D-026); the schema itself is frozen and the two config vocabularies are down to one (#32, #33). The fixture dialects and the puma/bumi loaders are what remain; the fixtures and the migration are not written |
 | **M6** everything is publishable | **most of the way** — Phase E done, gate needs restating, see below |
 | **M7** released | yours. Publishing is irreversible |
 
@@ -405,10 +405,10 @@ builds and deploys. PR #22 is **merged**; `main` is the baseline now.
 |---|---|---|
 | ~~F1~~ | ~~`rumi-proto` has never compiled~~ **RESOLVED** | Fixed 2026-08-17 by pinning the codegen plugins (D-028). Compiles; 14 tests pass, three end-to-end. Its original evidence was also false: `gen/` *was* tracked — `935ed9f` added 14 files, `e36dd29` removed them, both ancestors of HEAD. |
 | ~~F20~~ | ~~generated code gitignored in all three languages~~ **RESOLVED** | All three `gen/` trees are tracked as of 2026-08-17 (D-028). CI5's no-diff check is now meaningful. |
-| F25 | **`rumi-http/src/inputs.rs` has 8 more additivity violations, and one is fail-open** | Same `#[cfg(all(feature = "registry", not(feature = "proto")))]` pattern as F23, unfixed: two public config types deleted and six `IntoDataInput` impls replaced when `proto` is on. Not benign — the hand-written `HeaderInputConfig` makes `name` **required**, so `config: {}` is a load error; the proto version does `unwrap_or_default()`, so `config: {}` silently becomes `HeaderInput::new("")` → `None` → predicate false. **A deny rule keyed on a header stops firing, and nothing reports it.** Fail-open produced by a feature flag. Same for `QueryParamInput`. Found by Dijkstra 2026-08-17. |
+| ~~F25~~ | ~~**`rumi-http/src/inputs.rs` has 8 more additivity violations, and one is fail-open**~~ **RESOLVED** (#33) | **Fixed by deleting the `proto` feature (D-037).** Same `#[cfg(all(feature = "registry", not(feature = "proto")))]` pattern as F23, unfixed: two public config types deleted and six `IntoDataInput` impls replaced when `proto` is on. Not benign — the hand-written `HeaderInputConfig` makes `name` **required**, so `config: {}` is a load error; the proto version does `unwrap_or_default()`, so `config: {}` silently becomes `HeaderInput::new("")` → `None` → predicate false. **A deny rule keyed on a header stops firing, and nothing reports it.** Fail-open produced by a feature flag. Same for `QueryParamInput`. Found by Dijkstra 2026-08-17. |
 | F26 | **F14 is misdiagnosed — Rust disagrees with itself, no `cfg` involved** | The plan says puma strips the query string and Rust does not. The sharper defect is that `xuma.http.v1.PathInput` is bound to **two different semantics in Rust**: via `register` it is `PathInput` → `ctx.path()` → query stripped; via `register_simple` it is `SimplePathInput` → verbatim. Both crusts call `register_simple`, so `/admin?x=1` against `{Exact: "/admin"}` matches natively and does **not** match through the wheel or the npm package. For a path-prefix gate that is fail-open on a query-string suffix. Found by Dijkstra 2026-08-17. |
-| F27 | `rumi-test`'s `proto` feature is dead | `rumi/ext/test/Cargo.toml` declares `proto = ["registry", "dep:rumi-proto"]`, but no source file under `ext/test` references `rumi_proto`, and it does not forward to `rumi-kv/proto`. It links a dependency and does nothing. |
-| F24 | **F13 is a feature-additivity violation, not just a name mismatch** | `rumi-kv/src/lib.rs` carries two mutually-exclusive `IntoDataInput` impls, selected by `#[cfg(all(feature = "registry", not(feature = "proto")))]`. Without `proto` the config field is `key`; with `proto` it is `value`. So the same crate reads a different config key depending on a feature — which is why F13 presents as "the proto says `value`, the code uses `key`". Both are true, in different builds. `rust-mastery`: features must be strictly additive. Found 2026-08-17 when a dev-dependency omitted `proto` and three end-to-end tests started failing with `missing field 'key'`. SF4's fixture should pin one answer. |
+| ~~F27~~ | ~~`rumi-test`'s `proto` feature is dead~~ **RESOLVED** (#33) | **Fixed** — the dead feature is gone (D-037). `rumi/ext/test/Cargo.toml` declares `proto = ["registry", "dep:rumi-proto"]`, but no source file under `ext/test` references `rumi_proto`, and it does not forward to `rumi-kv/proto`. It links a dependency and does nothing. |
+| ~~F24~~ | ~~**F13 is a feature-additivity violation, not just a name mismatch**~~ **RESOLVED** (#33) | **Fixed by deleting the `proto` feature (D-037).** `rumi-kv/src/lib.rs` carries two mutually-exclusive `IntoDataInput` impls, selected by `#[cfg(all(feature = "registry", not(feature = "proto")))]`. Without `proto` the config field is `key`; with `proto` it is `value`. So the same crate reads a different config key depending on a feature — which is why F13 presents as "the proto says `value`, the code uses `key`". Both are true, in different builds. `rust-mastery`: features must be strictly additive. Found 2026-08-17 when a dev-dependency omitted `proto` and three end-to-end tests started failing with `missing field 'key'`. SF4's fixture should pin one answer. |
 | ~~F23~~ | ~~`rumi-http` violates feature additivity~~ **RESOLVED** (#24), and `check-features.sh` now builds all ten combinations | `simple.rs` gated six items `#[cfg(all(feature = "registry", not(feature = "proto")))]` while `register_simple` (gated on `registry` alone) called them — so enabling `proto` **deleted** the `IntoDataInput` impls it needs, with nothing replacing them. `rust-mastery` states features must be strictly additive. Fixed 2026-08-17; only `--all-features` exposed it, which `just ci` never ran. |
 | F2 | `keep_matching` documented as an enforced invariant, not implemented | `CLAUDE.md:213`. **Corrected evidence:** not "zero occurrences" — there are 8, all `keep_matching: false` literals in `rumi/proto/src/convert.rs`'s test module. Zero in `rumi/{core,ext,cli,crusts}`, `puma/src`, `bumi/src`. |
 | F3 | `MatcherTree`/`RadixTree` unreachable from config | No tree variant in `MatcherConfig`; `convert.rs:88` returns "MatcherTree is not yet supported" |
@@ -421,13 +421,13 @@ builds and deploys. PR #22 is **merged**; `main` is the baseline now.
 | ~~F10~~ | ~~`rumi-http` cannot be published~~ **RESOLVED** (Phase E) — `rumi-proto` is publishable | `proto` feature depends on `rumi-proto`, `publish = false` |
 | F11 | `xuma.core.v1.StringMatcher` names a message that does not exist | `registry.rs:263`; `proto/xuma/core/v1/` contains only `action.proto` |
 | F12 | `register_core_matchers` is a no-op in Python, absent in TypeScript | `puma/src/xuma/_registry.py:181-190` returns the builder unchanged |
-| F13 | `xuma.test.v1.StringInput.value` is used as a lookup key | `proto/.../test/v1/inputs.proto:11-14` vs `rumi/ext/test/src/lib.rs:119-121`. Under protojson, every example in the repo breaks. |
+| ~~F13~~ | ~~`xuma.kv.v1.MapInput.value` is used as a lookup key~~ **RESOLVED** (#33) | **Fixed** — the message is now `xuma.kv.v1.MapInput` with a field named `key` (D-036). `proto/.../test/v1/inputs.proto:11-14` vs `rumi/ext/test/src/lib.rs:119-121`. Under protojson, every example in the repo breaks. |
 | F14 | Query-string handling diverges between Python and Rust | puma strips query from path; Rust stores path verbatim. Same config, same input, different answer. |
 | ~~F15~~ | ~~`CLAUDE.md` calls the packages `puma`/`bumi`~~ **RESOLVED** (#26) | They are `xuma`. `CLAUDE.md:10-11, 95, 98` |
 | ~~F16~~ | ~~HTTP compiler swallows invalid regex~~ **RESOLVED** (#25) — returns `Result`, with regression tests | `rumi/ext/http/src/compiler.rs:77-81` falls back to exact-matching the pattern literal. Route silently disappears. Sibling Claude compiler returns `Result`. |
 | F17 | `data_type()` defaults to `"string"` | `data_input.rs:60-62`. A custom input returning `Int` that forgets to override passes the compatibility check, loads clean, never matches. |
 | ~~F18~~ | ~~Docs snippets are invisible to CI~~ **RESOLVED** (#26) — `rumi-docs-tests` compiles them; it caught four broken snippets immediately | Every Rust block is ```` ```rust,ignore ````; shell blocks are unchecked. This is the root cause of F8. |
-| F19 | **`just test-full` is red** — *partially resolved* | `cargo test --all-features` → the same 4 errors as F1, because `--all-features` enables `rumi-test/proto` → `rumi-proto`. `just ci` passes anyway: `just test` uses `default-members` (`rumi/Cargo.toml:6`) and `justfile:68` hard-codes `--exclude rumi-proto`. A shipped `just` target is red and the gate cannot see it. **2026-08-17:** both *compile* failures are fixed (D-028, F23). What remains is two failing tests, and they are **F13** — `unknown field 'key', expected 'value'`. F13 is therefore no longer prose: it is a reproducible test failure, which is what SF4 was going to have to write anyway. |
+| ~~F19~~ | ~~**`just test-full` is red** — *partially resolved*~~ **RESOLVED** (#33) | **Fixed** — `just test-full` is green and is now in `just ci` and in CI. `cargo test --all-features` → the same 4 errors as F1, because `--all-features` enables `rumi-test/proto` → `rumi-proto`. `just ci` passes anyway: `just test` uses `default-members` (`rumi/Cargo.toml:6`) and `justfile:68` hard-codes `--exclude rumi-proto`. A shipped `just` target is red and the gate cannot see it. **2026-08-17:** both *compile* failures are fixed (D-028, F23). What remains is two failing tests, and they are **F13** — `unknown field 'key', expected 'value'`. F13 is therefore no longer prose: it is a reproducible test failure, which is what SF4 was going to have to write anyway. |
 | F20 | Generated code is gitignored in **all three** languages | `.gitignore:58-60` covers `rumi/proto/src/gen/`, `puma/proto/src/gen/`, `bumi/proto/src/gen/`. All three exist on disk untracked (28 / 7 / 6 files); nothing imports the Python or TypeScript ones. M5's "all three languages" gate and CI5's no-diff check are both vacuous over untracked trees. |
 | ~~F22~~ | ~~plan cited files a clone does not contain~~ **RESOLVED** (#26) — moved to tracked `reference/` | `.gitignore:63` ignores `scratch/` wholesale, and §0 told the reader to open `scratch/phase-12/prior-art.md`. Fixed 2026-08-17 by moving both cited artifacts to a tracked `reference/`. Left as a row because the *class* recurs: `just verify-clean-clone` (H1) is the check that would catch the next one. |
 | F21 | Fixtures use **four** dialects, not three | `matcher:` (14), `config:` (7), `http_route_match:` (5), `http_route_matches:` **plural** (1, `spec/tests/05_http/multiple_routes.yaml:5`), each with its own branch in all three loaders. A5 says three. |
@@ -653,10 +653,10 @@ matchers:
       type: and
       predicates:
         - type: single
-          input: { type_url: "xuma.test.v1.StringInput", config: { key: "role" } }
+          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } }
           value_match: { Exact: "admin" }
         - type: single
-          input: { type_url: "xuma.test.v1.StringInput", config: { key: "org" } }
+          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "org" } }
           value_match: { Prefix: "acme" }
     on_match: { type: action, action: "admin_acme" }
 ```
@@ -673,7 +673,7 @@ matcherList:
                 input:
                   name: role-input
                   typedConfig:
-                    "@type": type.googleapis.com/xuma.test.v1.MapInput
+                    "@type": type.googleapis.com/xuma.kv.v1.MapInput
                     key: role
                 valueMatch:
                   exact: admin
@@ -681,7 +681,7 @@ matcherList:
                 input:
                   name: org-input
                   typedConfig:
-                    "@type": type.googleapis.com/xuma.test.v1.MapInput
+                    "@type": type.googleapis.com/xuma.kv.v1.MapInput
                     key: org
                 valueMatch:
                   prefix: acme
@@ -709,6 +709,15 @@ Three things that example exposes, each of which is a task below:
 
 **This example is hand-derived and unexecuted** — `rumi-proto` does not compile
 (C1). Treat it as schema-correct and runtime-unverified until C2 runs.
+
+**Before you start SF: five findings were one defect — and it is now fixed.**
+
+**Resolved 2026-08-18 in #33.** The `proto` feature is deleted from `rumi-kv`,
+`rumi-http` and `rumi-test`; the generated proto types are the only config
+types; `cargo test --all-features` and `just test-full` are green for the first
+time and both now run in CI. F13, F24, F25 and F27 are struck above. What
+follows is the original diagnosis, kept because the reasoning is what makes the
+fix legible.
 
 **Before you start SF: five findings are one defect.**
 
@@ -759,7 +768,7 @@ powerset checks cannot see this class. It needs a conformance fixture.
 
 **SF8. Fold in the renames that freeze with the schema.** Type-URL names are
 frozen by publishing, so they must be decided here, not in Phase E:
-- `xuma.test.v1.*` → `xuma.kv.v1.*`, with the crate split described in E2. The
+- `xuma.kv.v1.*` → `xuma.kv.v1.*`, with the crate split described in E2. The
   concept was never "test"; it is the CLI's default domain.
 - ~~Whether type URLs carry the `type.googleapis.com/` prefix.~~ **Settled by
   D-026.** protojson requires the full URL in `@type`, so the bare names the code
@@ -1109,7 +1118,7 @@ gating does not help.
   - **`rumi-test`** — YAML fixture loading for the conformance suite only.
     Stays `publish = false`. Nothing user-facing depends on it.
 
-  **The type-URL rename `xuma.test.v1.*` → `xuma.kv.v1.*` is decided in SF8, not
+  **The type-URL rename `xuma.kv.v1.*` → `xuma.kv.v1.*` is decided in SF8, not
   here** — names freeze with the schema, and an earlier draft had this task
   needing to land before a phase the milestone table placed after it. By the time
   you reach E, the names are settled and this is a mechanical crate split.
@@ -1281,7 +1290,7 @@ two cannot diverge.
 **H10 — Give Claude a door.** The docs-site quadrants have no Claude entry;
 Claude hooks live inside the *Rust* getting-started page and are findable only by
 grep. The playground's `ModeTabs` offers Config and HTTP only, and its
-Claude-flavoured "Block rm -rf" preset is emulated with `xuma.test.v1.StringInput`
+Claude-flavoured "Block rm -rf" preset is emulated with `xuma.kv.v1.MapInput`
 keys — copy it into `rumi run claude` and it fails at load. Add a Claude mode, or
 relabel the preset so it does not teach a config that cannot work.
 

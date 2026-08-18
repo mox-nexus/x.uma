@@ -36,7 +36,7 @@ describe("RegistryBuilder", () => {
 		register(builder);
 		const registry = builder.build();
 
-		expect(registry.containsInput("xuma.test.v1.StringInput")).toBe(true);
+		expect(registry.containsInput("xuma.kv.v1.MapInput")).toBe(true);
 	});
 
 	test("introspection type URLs", () => {
@@ -65,7 +65,7 @@ describe("loadMatcher", () => {
 					predicate: {
 						type: "single",
 						input: {
-							type_url: "xuma.test.v1.StringInput",
+							type_url: "xuma.kv.v1.MapInput",
 							config: { key: "name" },
 						},
 						value_match: { Exact: "alice" },
@@ -92,7 +92,7 @@ describe("loadMatcher", () => {
 							{
 								type: "single",
 								input: {
-									type_url: "xuma.test.v1.StringInput",
+									type_url: "xuma.kv.v1.MapInput",
 									config: { key: "role" },
 								},
 								value_match: { Exact: "admin" },
@@ -100,7 +100,7 @@ describe("loadMatcher", () => {
 							{
 								type: "single",
 								input: {
-									type_url: "xuma.test.v1.StringInput",
+									type_url: "xuma.kv.v1.MapInput",
 									config: { key: "org" },
 								},
 								value_match: { Prefix: "acme" },
@@ -125,7 +125,7 @@ describe("loadMatcher", () => {
 					predicate: {
 						type: "single",
 						input: {
-							type_url: "xuma.test.v1.StringInput",
+							type_url: "xuma.kv.v1.MapInput",
 							config: { key: "tier" },
 						},
 						value_match: { Prefix: "" },
@@ -138,7 +138,7 @@ describe("loadMatcher", () => {
 									predicate: {
 										type: "single",
 										input: {
-											type_url: "xuma.test.v1.StringInput",
+											type_url: "xuma.kv.v1.MapInput",
 											config: { key: "tier" },
 										},
 										value_match: { Exact: "premium" },
@@ -179,7 +179,7 @@ describe("loadMatcher", () => {
 						predicate: {
 							type: "single",
 							input: {
-								type_url: "xuma.test.v1.StringInput",
+								type_url: "xuma.kv.v1.MapInput",
 								config: { key: "key" },
 							},
 							value_match: { [variant]: pattern },
@@ -247,8 +247,8 @@ describe("registry errors", () => {
 		} catch (e) {
 			expect(e).toBeInstanceOf(UnknownTypeUrlError);
 			if (e instanceof UnknownTypeUrlError) {
-				expect(e.available).toContain("xuma.test.v1.StringInput");
-				expect(e.message).toContain("xuma.test.v1.StringInput");
+				expect(e.available).toContain("xuma.kv.v1.MapInput");
+				expect(e.message).toContain("xuma.kv.v1.MapInput");
 			}
 		}
 	});
@@ -264,7 +264,7 @@ describe("registry errors", () => {
 					predicate: {
 						type: "single",
 						input: {
-							type_url: "xuma.test.v1.StringInput",
+							type_url: "xuma.kv.v1.MapInput",
 							config: { key: "x" },
 						},
 						custom_match: { type_url: "unknown.Matcher", config: {} },
@@ -296,7 +296,7 @@ describe("registry errors", () => {
 					predicate: {
 						type: "single",
 						input: {
-							type_url: "xuma.test.v1.StringInput",
+							type_url: "xuma.kv.v1.MapInput",
 							config: { wrong_field: 42 },
 						},
 						value_match: { Exact: "x" },
@@ -323,7 +323,7 @@ describe("width limits", () => {
 			predicate: {
 				type: "single",
 				input: {
-					type_url: "xuma.test.v1.StringInput",
+					type_url: "xuma.kv.v1.MapInput",
 					config: { key: "x" },
 				},
 				value_match: { Exact: "x" },
@@ -350,7 +350,7 @@ describe("width limits", () => {
 		const single = {
 			type: "single",
 			input: {
-				type_url: "xuma.test.v1.StringInput",
+				type_url: "xuma.kv.v1.MapInput",
 				config: { key: "x" },
 			},
 			value_match: { Exact: "x" },
@@ -375,7 +375,7 @@ describe("width limits", () => {
 		const single = {
 			type: "single",
 			input: {
-				type_url: "xuma.test.v1.StringInput",
+				type_url: "xuma.kv.v1.MapInput",
 				config: { key: "x" },
 			},
 			value_match: { Exact: "x" },
@@ -404,7 +404,7 @@ describe("width limits", () => {
 					predicate: {
 						type: "single",
 						input: {
-							type_url: "xuma.test.v1.StringInput",
+							type_url: "xuma.kv.v1.MapInput",
 							config: { key: "x" },
 						},
 						value_match: { Exact: longPattern },
@@ -434,7 +434,7 @@ describe("width limits", () => {
 					predicate: {
 						type: "single",
 						input: {
-							type_url: "xuma.test.v1.StringInput",
+							type_url: "xuma.kv.v1.MapInput",
 							config: { key: "x" },
 						},
 						value_match: { Regex: longRegex },
@@ -456,7 +456,7 @@ describe("width limits", () => {
 					predicate: {
 						type: "single",
 						input: {
-							type_url: "xuma.test.v1.StringInput",
+							type_url: "xuma.kv.v1.MapInput",
 							config: { key: "x" },
 						},
 						value_match: { Exact: pattern },
@@ -476,7 +476,7 @@ describe("width limits", () => {
 			predicate: {
 				type: "single",
 				input: {
-					type_url: "xuma.test.v1.StringInput",
+					type_url: "xuma.kv.v1.MapInput",
 					config: { key: "x" },
 				},
 				value_match: { Exact: "x" },

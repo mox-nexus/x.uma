@@ -34,14 +34,15 @@ gateway = ["message", "dep:k8s-gateway-api", "dep:k8s-openapi"]
 # same conflation this split exists to remove.
 ext-proc = ["message", "dep:envoy-grpc-ext-proc"]
 
-registry = ["message", "rumi-core/registry", "serde"]
-
-# xDS control-plane config loading. It names `message` explicitly: `proto_configs`
-# lives inside `mod inputs`, and until 2026-08-17 `proto` reached it only by
-# accident, transitively through `ext-proc`. That both dragged the data plane
-# into a control-plane feature and meant trimming ext-proc off proto would have
-# silently deleted the impls with no error.
-proto = ["registry", "message", "dep:rumi-proto"]
+# Config loading, from the generated proto types and nothing else.
+#
+# There used to be a separate `proto` feature that swapped the config types out
+# from under `registry`. It was not additive — enabling it deleted two public
+# config types and replaced six impls, and one replacement turned a required
+# field into `unwrap_or_default()`, so a header deny rule silently stopped
+# firing. There is now one vocabulary and no feature that selects a vocabulary,
+# which is what makes the violation inexpressible rather than merely absent.
+registry = ["message", "rumi-core/registry", "serde", "dep:rumi-proto"]
 
 [dependencies]
 rumi-core.workspace = true

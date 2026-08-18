@@ -228,24 +228,22 @@ mod tests {
     #[test]
     fn resolve_short_type_url() {
         let resolver = AnyResolverBuilder::new()
-            .register::<crate::xuma::test::v1::StringInput>("xuma.test.v1.StringInput")
+            .register::<crate::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
             .build();
 
-        let input = crate::xuma::test::v1::StringInput {
-            value: "key".into(),
-        };
+        let input = crate::xuma::kv::v1::MapInput { key: "key".into() };
 
         let config = crate::xds::core::v3::TypedExtensionConfig {
             name: "test".into(),
             typed_config: Some(prost_types::Any {
-                type_url: "xuma.test.v1.StringInput".into(),
+                type_url: "xuma.kv.v1.MapInput".into(),
                 value: input.encode_to_vec().into(),
             }),
         };
 
         let typed = resolver.resolve(&config).unwrap();
-        assert_eq!(typed.type_url, "xuma.test.v1.StringInput");
-        assert_eq!(typed.config["value"], "key");
+        assert_eq!(typed.type_url, "xuma.kv.v1.MapInput");
+        assert_eq!(typed.config["key"], "key");
     }
 
     #[test]

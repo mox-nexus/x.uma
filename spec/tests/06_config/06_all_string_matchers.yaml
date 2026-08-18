@@ -5,7 +5,7 @@ config:
   matchers:
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "v" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "v" } }
         value_match: { Exact: "hello" }
       on_match: { type: action, action: "hit" }
 
@@ -25,7 +25,7 @@ config:
   matchers:
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "v" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "v" } }
         value_match: { Prefix: "/api" }
       on_match: { type: action, action: "hit" }
 
@@ -48,7 +48,7 @@ config:
   matchers:
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "v" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "v" } }
         value_match: { Suffix: ".rs" }
       on_match: { type: action, action: "hit" }
 
@@ -68,7 +68,7 @@ config:
   matchers:
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "v" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "v" } }
         value_match: { Contains: "error" }
       on_match: { type: action, action: "hit" }
 
@@ -88,7 +88,7 @@ config:
   matchers:
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "v" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "v" } }
         value_match: { Regex: "^user-\\d+$" }
       on_match: { type: action, action: "hit" }
 

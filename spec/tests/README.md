@@ -41,10 +41,10 @@ config:
         type: and
         predicates:
           - type: single
-            input: { type_url: "xuma.test.v1.StringInput", config: { key: "role" } }
+            input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } }
             value_match: { Exact: "admin" }
           - type: single
-            input: { type_url: "xuma.test.v1.StringInput", config: { key: "org" } }
+            input: { type_url: "xuma.kv.v1.MapInput", config: { key: "org" } }
             value_match: { Prefix: "acme" }
       on_match: { type: action, action: "admin_acme" }
 

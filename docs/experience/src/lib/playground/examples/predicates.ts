@@ -16,7 +16,7 @@ export const branchProtection: Preset = {
               {
                 type: "single",
                 input: {
-                  type_url: "xuma.test.v1.StringInput",
+                  type_url: "xuma.kv.v1.MapInput",
                   config: { key: "event" },
                 },
                 value_match: { Exact: "PreToolUse" },
@@ -24,7 +24,7 @@ export const branchProtection: Preset = {
               {
                 type: "single",
                 input: {
-                  type_url: "xuma.test.v1.StringInput",
+                  type_url: "xuma.kv.v1.MapInput",
                   config: { key: "tool_name" },
                 },
                 value_match: { Exact: "Write" },
@@ -32,7 +32,7 @@ export const branchProtection: Preset = {
               {
                 type: "single",
                 input: {
-                  type_url: "xuma.test.v1.StringInput",
+                  type_url: "xuma.kv.v1.MapInput",
                   config: { key: "git_branch" },
                 },
                 value_match: { Exact: "main" },

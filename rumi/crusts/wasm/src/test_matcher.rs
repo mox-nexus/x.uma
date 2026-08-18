@@ -27,7 +27,7 @@ impl TestMatcher {
     ///
     /// # Supported input type URLs
     ///
-    /// - `xuma.test.v1.StringInput` — string lookup by key (config: `{"key": "..."}`)
+    /// - `xuma.kv.v1.MapInput` — string lookup by key (config: `{"key": "..."}`)
     #[wasm_bindgen(js_name = "fromConfig")]
     pub fn from_config(json_config: &str) -> Result<TestMatcher, JsValue> {
         let config: rumi::MatcherConfig<String> = serde_json::from_str(json_config)
