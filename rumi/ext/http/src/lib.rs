@@ -27,14 +27,18 @@
 // Modules always available
 mod simple;
 
+// Three pure string functions and nothing else. They are ungated because both
+// HTTP contexts must split a path the same way, and `simple` is ungated while
+// `message` is not — a copy in each would be two answers to one question, which
+// is the defect this shares them to remove.
+mod context;
+
 // The Gateway API compiler, the indexed context and its inputs. These need
 // Gateway API *config types*, not a data plane — `HttpMessage` is six plain
 // fields, and only its `From<ProcessingRequest>` conversions ever touched
 // ext_proc. Conflating the two is what put tonic on the default path.
 #[cfg(feature = "gateway")]
 mod compiler;
-#[cfg(feature = "message")]
-mod context;
 #[cfg(feature = "message")]
 mod inputs;
 #[cfg(feature = "message")]

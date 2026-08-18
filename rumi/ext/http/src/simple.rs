@@ -2,6 +2,7 @@
 //!
 //! This is a lightweight context for when you don't need full `ext_proc`.
 
+use crate::context::{get_query_param, parse_path_only, parse_query_string};
 use rumi::prelude::*;
 use std::collections::HashMap;
 
@@ -30,9 +31,23 @@ impl HttpRequest {
         &self.method
     }
 
-    /// Get the request path.
+    /// Get the request path, without any query string.
+    ///
+    /// Splits at the first `?`, the same way [`HttpMessage`](crate::HttpMessage)
+    /// does, and through the same function — so the two HTTP contexts cannot
+    /// disagree about what a path is. They did: this returned the raw value, so
+    /// `/admin?x=1` matched `Exact("/admin")` on one context and not the other,
+    /// under the same `xuma.http.v1.PathInput` type URL. Both crusts use this
+    /// one, so a path gate behaved differently in the wheel and the npm package
+    /// than it did natively.
     #[must_use]
     pub fn path(&self) -> &str {
+        parse_path_only(&self.path)
+    }
+
+    /// Get the path exactly as it was set, query string included.
+    #[must_use]
+    pub fn raw_path(&self) -> &str {
         &self.path
     }
 
@@ -43,9 +58,16 @@ impl HttpRequest {
     }
 
     /// Get a query parameter by name.
+    ///
+    /// Parameters set explicitly on the builder win; otherwise the path's own
+    /// query string is parsed, so a request built as `path("/a?x=1")` answers
+    /// the same question as one built with `query_param("x", "1")`.
     #[must_use]
     pub fn query_param(&self, name: &str) -> Option<&str> {
-        self.query_params.get(name).map(String::as_str)
+        self.query_params
+            .get(name)
+            .map(String::as_str)
+            .or_else(|| parse_query_string(&self.path).and_then(|q| get_query_param(q, name)))
     }
 }
 
@@ -111,7 +133,7 @@ pub struct SimplePathInput;
 
 impl DataInput<HttpRequest> for SimplePathInput {
     fn get(&self, ctx: &HttpRequest) -> MatchingData {
-        MatchingData::String(ctx.path.clone())
+        MatchingData::String(ctx.path().to_string())
     }
 }
 
@@ -247,6 +269,45 @@ pub fn register_simple(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// One type URL, one meaning.
+    ///
+    /// `xuma.http.v1.PathInput` resolves to `PathInput` through `register` and
+    /// to `SimplePathInput` through `register_simple`. They disagreed about the
+    /// query string, and both crusts use the second — so a path gate that held
+    /// natively did not hold through the wheel or the npm package.
+    ///
+    /// This compares the two directly rather than asserting each against a
+    /// literal, so it fails if either drifts, whichever way it drifts.
+    #[test]
+    #[cfg(feature = "message")]
+    fn both_http_contexts_agree_on_what_a_path_is() {
+        use crate::inputs::PathInput;
+        use crate::message::HttpMessageBuilder;
+
+        for raw in ["/admin", "/admin?x=1", "/admin?", "/a/b/c?q=1&r=2", "/", ""] {
+            let simple = HttpRequest::builder().path(raw).build();
+            let message = HttpMessageBuilder::new().path(raw).build();
+
+            assert_eq!(
+                SimplePathInput.get(&simple),
+                PathInput.get(&message),
+                "the two HTTP contexts disagree about {raw:?}"
+            );
+        }
+    }
+
+    /// The query string is reachable from a path that carries one, so the two
+    /// contexts also agree about parameters, not only about the path.
+    #[test]
+    fn a_query_string_in_the_path_is_parsed() {
+        let req = HttpRequest::builder().path("/api?page=2&limit=10").build();
+        assert_eq!(req.query_param("page"), Some("2"));
+        assert_eq!(req.query_param("limit"), Some("10"));
+        assert_eq!(req.query_param("missing"), None);
+        assert_eq!(req.path(), "/api");
+        assert_eq!(req.raw_path(), "/api?page=2&limit=10");
+    }
 
     #[test]
     fn test_http_request_builder() {
