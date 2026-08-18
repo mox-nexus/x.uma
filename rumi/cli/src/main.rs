@@ -801,7 +801,7 @@ mod tests {
     #[test]
     fn build_test_registry_has_expected_types() {
         let registry = build_test_registry();
-        assert!(registry.contains_input("xuma.test.v1.StringInput"));
+        assert!(registry.contains_input("xuma.kv.v1.MapInput"));
         assert!(registry.contains_matcher("xuma.core.v1.StringMatcher"));
         assert!(registry.contains_matcher("xuma.core.v1.BoolMatcher"));
     }

@@ -34,7 +34,7 @@ The concept was never "test". It is a general-purpose domain, a peer of
 
 | Type URL | Reads |
 |---|---|
-| `xuma.test.v1.StringInput` | one key from the context map |
+| `xuma.kv.v1.MapInput` | one key from the context map |
 
 The URL still says `test`. Type URLs are part of the config schema and freeze at
 first publish, so renaming them belongs with the schema migration rather than

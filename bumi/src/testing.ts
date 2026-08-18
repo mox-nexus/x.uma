@@ -18,7 +18,7 @@ export class DictInput {
 export function register(
 	builder: RegistryBuilder<Record<string, string>>,
 ): RegistryBuilder<Record<string, string>> {
-	builder.input("xuma.test.v1.StringInput", (config) => {
+	builder.input("xuma.kv.v1.MapInput", (config) => {
 		const key = config.key;
 		if (typeof key !== "string") {
 			throw new Error("StringInput config requires 'key' (string)");

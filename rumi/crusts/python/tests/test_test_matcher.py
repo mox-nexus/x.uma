@@ -34,7 +34,7 @@ class TestBasicMatching:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.test.v1.StringInput",
+                        "type_url": "xuma.kv.v1.MapInput",
                         "config": {"key": "role"},
                     },
                     "value_match": {"Exact": "admin"},
@@ -54,7 +54,7 @@ class TestBasicMatching:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.test.v1.StringInput",
+                        "type_url": "xuma.kv.v1.MapInput",
                         "config": {"key": "email"},
                     },
                     "value_match": {"Suffix": "@acme.com"},
@@ -72,7 +72,7 @@ class TestBasicMatching:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.test.v1.StringInput",
+                        "type_url": "xuma.kv.v1.MapInput",
                         "config": {"key": "version"},
                     },
                     "value_match": {"Regex": r"^v\d+\.\d+"},
@@ -102,7 +102,7 @@ class TestCompoundPredicates:
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.test.v1.StringInput",
+                                "type_url": "xuma.kv.v1.MapInput",
                                 "config": {"key": "role"},
                             },
                             "value_match": {"Exact": "admin"},
@@ -110,7 +110,7 @@ class TestCompoundPredicates:
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.test.v1.StringInput",
+                                "type_url": "xuma.kv.v1.MapInput",
                                 "config": {"key": "org"},
                             },
                             "value_match": {"Prefix": "acme"},
@@ -134,7 +134,7 @@ class TestCompoundPredicates:
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.test.v1.StringInput",
+                                "type_url": "xuma.kv.v1.MapInput",
                                 "config": {"key": "role"},
                             },
                             "value_match": {"Exact": "admin"},
@@ -142,7 +142,7 @@ class TestCompoundPredicates:
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.test.v1.StringInput",
+                                "type_url": "xuma.kv.v1.MapInput",
                                 "config": {"key": "role"},
                             },
                             "value_match": {"Exact": "superadmin"},
@@ -165,7 +165,7 @@ class TestCompoundPredicates:
                     "predicate": {
                         "type": "single",
                         "input": {
-                            "type_url": "xuma.test.v1.StringInput",
+                            "type_url": "xuma.kv.v1.MapInput",
                             "config": {"key": "env"},
                         },
                         "value_match": {"Exact": "prod"},
@@ -194,7 +194,7 @@ class TestNesting:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.test.v1.StringInput",
+                        "type_url": "xuma.kv.v1.MapInput",
                         "config": {"key": "tier"},
                     },
                     "value_match": {"Exact": "premium"},
@@ -207,7 +207,7 @@ class TestNesting:
                                 "predicate": {
                                     "type": "single",
                                     "input": {
-                                        "type_url": "xuma.test.v1.StringInput",
+                                        "type_url": "xuma.kv.v1.MapInput",
                                         "config": {"key": "region"},
                                     },
                                     "value_match": {"Exact": "us-east"},
@@ -218,7 +218,7 @@ class TestNesting:
                                 "predicate": {
                                     "type": "single",
                                     "input": {
-                                        "type_url": "xuma.test.v1.StringInput",
+                                        "type_url": "xuma.kv.v1.MapInput",
                                         "config": {"key": "region"},
                                     },
                                     "value_match": {"Exact": "eu-west"},
@@ -292,7 +292,7 @@ class TestErrors:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.test.v1.StringInput",
+                        "type_url": "xuma.kv.v1.MapInput",
                         "config": {"key": "name"},
                     },
                     "value_match": {"Regex": "[invalid"},
@@ -318,7 +318,7 @@ class TestTrace:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.test.v1.StringInput",
+                        "type_url": "xuma.kv.v1.MapInput",
                         "config": {"key": "role"},
                     },
                     "value_match": {"Exact": "admin"},
@@ -338,7 +338,7 @@ class TestTrace:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.test.v1.StringInput",
+                        "type_url": "xuma.kv.v1.MapInput",
                         "config": {"key": "role"},
                     },
                     "value_match": {"Exact": "admin"},
@@ -367,7 +367,7 @@ class TestDeveloperExperience:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.test.v1.StringInput",
+                        "type_url": "xuma.kv.v1.MapInput",
                         "config": {"key": "x"},
                     },
                     "value_match": {"Exact": "y"},

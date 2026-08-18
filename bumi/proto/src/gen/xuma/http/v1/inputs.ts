@@ -29,8 +29,13 @@ export interface QueryParamInput {
   name: string;
 }
 
-/** Extracts the HTTP host/authority. */
-export interface HostInput {
+/**
+ * Extracts the HTTP authority — the :authority pseudo-header, or Host in
+ * HTTP/1. Named for what the code registers: this message was `HostInput`
+ * while the registry advertised `xuma.http.v1.AuthorityInput`, so the schema
+ * and the type URL named different things.
+ */
+export interface AuthorityInput {
 }
 
 /** Extracts the HTTP scheme (http/https). */
@@ -239,19 +244,19 @@ export const QueryParamInput: MessageFns<QueryParamInput> = {
   },
 };
 
-function createBaseHostInput(): HostInput {
+function createBaseAuthorityInput(): AuthorityInput {
   return {};
 }
 
-export const HostInput: MessageFns<HostInput> = {
-  encode(_: HostInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const AuthorityInput: MessageFns<AuthorityInput> = {
+  encode(_: AuthorityInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): HostInput {
+  decode(input: BinaryReader | Uint8Array, length?: number): AuthorityInput {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseHostInput();
+    const message = createBaseAuthorityInput();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -264,20 +269,20 @@ export const HostInput: MessageFns<HostInput> = {
     return message;
   },
 
-  fromJSON(_: any): HostInput {
+  fromJSON(_: any): AuthorityInput {
     return {};
   },
 
-  toJSON(_: HostInput): unknown {
+  toJSON(_: AuthorityInput): unknown {
     const obj: any = {};
     return obj;
   },
 
-  create(base?: DeepPartial<HostInput>): HostInput {
-    return HostInput.fromPartial(base ?? {});
+  create(base?: DeepPartial<AuthorityInput>): AuthorityInput {
+    return AuthorityInput.fromPartial(base ?? {});
   },
-  fromPartial(_: DeepPartial<HostInput>): HostInput {
-    const message = createBaseHostInput();
+  fromPartial(_: DeepPartial<AuthorityInput>): AuthorityInput {
+    const message = createBaseAuthorityInput();
     return message;
   },
 };

@@ -25,5 +25,5 @@ version = "0.7"
 
 [dev-dependencies]
 # Dev-only: convert.rs's end-to-end tests evaluate against the kv domain.
-rumi-kv = { path = "../ext/kv", features = ["registry", "proto"] }
-rumi-test = { path = "../ext/test", features = ["proto", "fixtures"] }
+rumi-kv = { path = "../ext/kv", features = ["registry"] }
+rumi-test = { path = "../ext/test", features = ["fixtures"] }

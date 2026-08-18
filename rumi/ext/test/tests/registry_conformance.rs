@@ -65,7 +65,7 @@ fn convert_predicate(pred: &fixture::PredicateConfig) -> PredicateConfig {
 fn convert_single(single: &fixture::SinglePredicateConfig) -> SinglePredicateConfig {
     SinglePredicateConfig {
         input: TypedConfig {
-            type_url: "xuma.test.v1.StringInput".to_string(),
+            type_url: "xuma.kv.v1.MapInput".to_string(),
             config: serde_json::json!({ "key": single.input.key }),
         },
         matcher: ValueMatchConfig::BuiltIn(convert_value_match(&single.value_match)),

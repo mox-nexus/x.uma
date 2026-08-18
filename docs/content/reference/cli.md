@@ -20,7 +20,7 @@ The CLI supports three matching domains. Each domain has its own registry of typ
 
 | Domain | Context | Description |
 |--------|---------|-------------|
-| *(default)* | Key-value pairs | Test domain (`xuma.test.v1.*`) |
+| *(default)* | Key-value pairs | Test domain (`xuma.kv.v1.*`) |
 | `http` | HTTP request | Method, path, headers, query params (`xuma.http.v1.*`) |
 | `claude` | Hook event | Claude Code hook events (`xuma.claude.v1.*`) |
 
@@ -95,7 +95,7 @@ List all registered type URLs for a domain:
 ```bash
 $ rumi info
 Registered inputs:
-  xuma.test.v1.StringInput
+  xuma.kv.v1.MapInput
 
 Registered matchers:
   xuma.core.v1.StringMatcher

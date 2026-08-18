@@ -37,8 +37,13 @@ class QueryParamInput(betterproto.Message):
 
 
 @dataclass
-class HostInput(betterproto.Message):
-    """Extracts the HTTP host/authority."""
+class AuthorityInput(betterproto.Message):
+    """
+    Extracts the HTTP authority — the :authority pseudo-header, or Host in
+    HTTP/1. Named for what the code registers: this message was `HostInput`
+    while the registry advertised `xuma.http.v1.AuthorityInput`, so the schema
+    and the type URL named different things.
+    """
 
     pass
 

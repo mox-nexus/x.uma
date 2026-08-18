@@ -5,17 +5,17 @@ config:
   matchers:
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "path" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "path" } }
         value_match: { Exact: "/health" }
       on_match: { type: action, action: "health_check" }
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "path" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "path" } }
         value_match: { Prefix: "/api" }
       on_match: { type: action, action: "api_backend" }
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "path" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "path" } }
         value_match: { Prefix: "/" }
       on_match: { type: action, action: "default_backend" }
 

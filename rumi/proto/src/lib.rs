@@ -167,9 +167,9 @@ pub mod xuma {
             include!("gen/xuma.claude.v1.rs");
         }
     }
-    pub mod test {
+    pub mod kv {
         pub mod v1 {
-            include!("gen/xuma.test.v1.rs");
+            include!("gen/xuma.kv.v1.rs");
         }
     }
 }

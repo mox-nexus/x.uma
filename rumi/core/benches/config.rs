@@ -18,7 +18,7 @@ const SIMPLE_CONFIG: &str = r#"{
     "matchers": [{
         "predicate": {
             "type": "single",
-            "input": { "type_url": "xuma.test.v1.StringInput", "config": { "key": "role" } },
+            "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "role" } },
             "value_match": { "Exact": "admin" }
         },
         "on_match": { "type": "action", "action": "matched" }
@@ -33,12 +33,12 @@ const COMPOUND_CONFIG: &str = r#"{
             "predicates": [
                 {
                     "type": "single",
-                    "input": { "type_url": "xuma.test.v1.StringInput", "config": { "key": "role" } },
+                    "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "role" } },
                     "value_match": { "Exact": "admin" }
                 },
                 {
                     "type": "single",
-                    "input": { "type_url": "xuma.test.v1.StringInput", "config": { "key": "org" } },
+                    "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "org" } },
                     "value_match": { "Prefix": "acme" }
                 }
             ]
@@ -51,7 +51,7 @@ const NESTED_CONFIG: &str = r#"{
     "matchers": [{
         "predicate": {
             "type": "single",
-            "input": { "type_url": "xuma.test.v1.StringInput", "config": { "key": "tier" } },
+            "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "tier" } },
             "value_match": { "Exact": "premium" }
         },
         "on_match": {
@@ -60,7 +60,7 @@ const NESTED_CONFIG: &str = r#"{
                 "matchers": [{
                     "predicate": {
                         "type": "single",
-                        "input": { "type_url": "xuma.test.v1.StringInput", "config": { "key": "region" } },
+                        "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "region" } },
                         "value_match": { "Exact": "us" }
                     },
                     "on_match": { "type": "action", "action": "premium_us" }

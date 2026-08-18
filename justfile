@@ -99,7 +99,12 @@ test:
     # It went its whole life uncompiled because nothing ran this (PLAN.md F1).
     cargo test --manifest-path rumi/Cargo.toml -p rumi-proto
 
-# Run tests with all features
+# Run tests with all features.
+#
+# This was red for months and nothing noticed, because `just ci` ran `test`
+# (default features, default-members) instead. What it was reporting was real:
+# two config vocabularies fighting over one associated type. It is in `ci` now
+# so it cannot go quiet again.
 test-full:
     cargo test --manifest-path rumi/Cargo.toml --all-features
 
@@ -119,7 +124,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-fixtures features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-full test-fixtures features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
