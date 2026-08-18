@@ -93,7 +93,16 @@ pub enum PredicateConfig {
 #[derive(Debug, Clone)]
 pub enum ValueMatchConfig {
     /// Built-in string matching (exact, prefix, suffix, contains, regex).
-    BuiltIn(StringMatchSpec),
+    BuiltIn {
+        /// The pattern and how to apply it.
+        spec: StringMatchSpec,
+        /// Case-insensitive matching — xDS `StringMatcher.ignore_case`.
+        ///
+        /// Carried here rather than inside `StringMatchSpec` because it is a
+        /// property of the comparison, not of the pattern. The proto path used
+        /// to drop it on the floor.
+        ignore_case: bool,
+    },
     /// Custom matcher resolved via the registry's matcher factories.
     Custom(TypedConfig),
 }
@@ -138,7 +147,12 @@ impl<'de> Deserialize<'de> for SinglePredicateConfig {
 
         let helper = Helper::deserialize(deserializer)?;
         let matcher = match (helper.value_match, helper.custom_match) {
-            (Some(spec), None) => ValueMatchConfig::BuiltIn(spec),
+            // The terse dialect has no `ignore_case` sibling and never had
+            // one; protojson carries it on the StringMatcher itself.
+            (Some(spec), None) => ValueMatchConfig::BuiltIn {
+                spec,
+                ignore_case: false,
+            },
             (None, Some(tc)) => ValueMatchConfig::Custom(tc),
             (Some(_), Some(_)) => {
                 return Err(serde::de::Error::custom(

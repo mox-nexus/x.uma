@@ -10,10 +10,7 @@
 //!
 //! The `Spec` suffix makes the ontological distinction clear (Karman: guild review).
 
-use crate::{
-    ContainsMatcher, DataInput, ExactMatcher, InputMatcher, MatcherError, Predicate, PrefixMatcher,
-    SinglePredicate, StringMatcher, SuffixMatcher,
-};
+use crate::{DataInput, InputMatcher, MatcherError, Predicate, SinglePredicate, StringMatcher};
 use std::fmt;
 
 /// A string match specification from user configuration.
@@ -65,21 +62,70 @@ impl StringMatchSpec {
     /// [`MAX_REGEX_PATTERN_LENGTH`](crate::MAX_REGEX_PATTERN_LENGTH) for a
     /// regex. Returns [`MatcherError::InvalidPattern`] if the regex is invalid.
     pub fn to_input_matcher(&self) -> Result<Box<dyn InputMatcher>, MatcherError> {
+        self.to_input_matcher_with_case(false)
+    }
+
+    /// Compile this spec, optionally matching case-insensitively.
+    ///
+    /// This is xDS `StringMatcher.ignore_case`. The flag was read from the
+    /// proto and thrown away until 2026-08-18, under a comment asserting the
+    /// registry handled it — a rule that read case-insensitive and was not.
+    ///
+    /// # Errors
+    ///
+    /// As [`to_input_matcher`](Self::to_input_matcher), plus
+    /// [`MatcherError::InvalidPattern`] when `ignore_case` is set on a regex
+    /// that countermands it inline — see [`disables_case_insensitivity`].
+    pub fn to_input_matcher_with_case(
+        &self,
+        ignore_case: bool,
+    ) -> Result<Box<dyn InputMatcher>, MatcherError> {
         self.check_length()?;
+
+        let boxed = |sm: StringMatcher| Box::new(sm) as Box<dyn InputMatcher>;
         match self {
-            Self::Exact(v) => Ok(Box::new(ExactMatcher::new(v.as_str()))),
-            Self::Prefix(v) => Ok(Box::new(PrefixMatcher::new(v.as_str()))),
-            Self::Suffix(v) => Ok(Box::new(SuffixMatcher::new(v.as_str()))),
-            Self::Contains(v) => Ok(Box::new(ContainsMatcher::new(v.as_str()))),
-            Self::Regex(v) => StringMatcher::regex(v)
-                .map(|sm| Box::new(sm) as Box<dyn InputMatcher>)
-                .map_err(|e| MatcherError::InvalidPattern {
-                    pattern: v.clone(),
-                    source: e.to_string(),
-                }),
+            Self::Exact(v) => Ok(boxed(StringMatcher::exact(v.clone(), ignore_case))),
+            Self::Prefix(v) => Ok(boxed(StringMatcher::prefix(v.clone(), ignore_case))),
+            Self::Suffix(v) => Ok(boxed(StringMatcher::suffix(v.clone(), ignore_case))),
+            Self::Contains(v) => Ok(boxed(StringMatcher::contains(v.clone(), ignore_case))),
+            Self::Regex(v) => {
+                if ignore_case && disables_case_insensitivity(v) {
+                    return Err(MatcherError::InvalidPattern {
+                        pattern: v.clone(),
+                        source: "ignore_case is set, but the pattern turns case-insensitivity \
+                                 off inline with a (?-i) flag. An inline flag wins, so this \
+                                 rule would read case-insensitive and not be. Remove one of \
+                                 the two."
+                            .into(),
+                    });
+                }
+                let compiled = if ignore_case {
+                    StringMatcher::regex_ignore_case(v)
+                } else {
+                    StringMatcher::regex(v)
+                };
+                compiled
+                    .map(boxed)
+                    .map_err(|e| MatcherError::InvalidPattern {
+                        pattern: v.clone(),
+                        source: e.to_string(),
+                    })
+            }
         }
     }
 
+    /// Does this pattern turn case-insensitivity off with an inline flag?
+    ///
+    /// `ignore_case` is implemented by asking the regex engine for a
+    /// case-insensitive match, and an inline `(?-i)` overrides that — measured
+    /// both ways on 2026-08-18: `(?i)(?-i)admin` and
+    /// `RegexBuilder::case_insensitive(true)` on `(?-i)admin` both fail to
+    /// match `ADMIN`. That is correct regex semantics and not something a
+    /// different construction can fix, so the combination is rejected instead.
+    ///
+    /// Scans flag groups — `(?` followed by flag letters, then `)` or `:` — and
+    /// reports any that clear `i`. A group with no `-` cannot clear anything,
+    /// and `(?i-s)` clears `s`, not `i`.
     /// Enforce the pattern length limit for this variant.
     ///
     /// Regexes get the tighter [`MAX_REGEX_PATTERN_LENGTH`](crate::MAX_REGEX_PATTERN_LENGTH)
@@ -282,5 +328,121 @@ mod tests {
         assert!(StringMatchSpec::Exact(ok).to_input_matcher().is_ok());
         let ok_re = "a".repeat(crate::MAX_REGEX_PATTERN_LENGTH);
         assert!(StringMatchSpec::Regex(ok_re).to_input_matcher().is_ok());
+    }
+}
+
+/// Does this pattern clear the `i` flag with an inline group?
+///
+/// `ignore_case` asks the regex engine for a case-insensitive match, and an
+/// inline `(?-i)` overrides that. Measured both ways on 2026-08-18:
+/// `(?i)(?-i)admin` and `RegexBuilder::case_insensitive(true)` applied to
+/// `(?-i)admin` both fail to match `ADMIN`. That is correct regex semantics, so
+/// no choice of construction fixes it — the combination has to be rejected.
+///
+/// Scans flag groups: `(?` followed by flag letters, terminated by `)` or `:`.
+/// A group clears `i` only if an `i` appears after a `-` within it, so `(?i-s)`
+/// is fine and `(?-si)` is not. Escaped `\(` is not a group.
+fn disables_case_insensitivity(pattern: &str) -> bool {
+    let bytes = pattern.as_bytes();
+    let mut i = 0;
+
+    while i + 1 < bytes.len() {
+        if bytes[i] == b'\\' {
+            i += 2;
+            continue;
+        }
+        if bytes[i] != b'(' || bytes[i + 1] != b'?' {
+            i += 1;
+            continue;
+        }
+
+        // Walk the flag letters. `-` switches from setting to clearing.
+        let mut j = i + 2;
+        let mut clearing = false;
+        while j < bytes.len() {
+            match bytes[j] {
+                b'-' => clearing = true,
+                b'i' if clearing => return true,
+                b'i' | b'm' | b's' | b'u' | b'x' | b'U' => {}
+                // `)` and `:` end a flag group; anything else means this was
+                // some other `(?` construct — a named group, a lookaround.
+                _ => break,
+            }
+            j += 1;
+        }
+        i = j.max(i + 2);
+    }
+
+    false
+}
+
+#[cfg(test)]
+mod ignore_case_tests {
+    use super::*;
+    use crate::MatchingData;
+
+    fn matches(spec: &StringMatchSpec, ignore_case: bool, input: &str) -> bool {
+        spec.to_input_matcher_with_case(ignore_case)
+            .unwrap()
+            .matches(&MatchingData::String(input.into()))
+    }
+
+    /// The flag was read from the proto and discarded, so a rule that read
+    /// case-insensitive matched case-sensitively.
+    #[test]
+    fn ignore_case_reaches_every_literal_variant() {
+        for spec in [
+            StringMatchSpec::Exact("admin".into()),
+            StringMatchSpec::Prefix("admin".into()),
+            StringMatchSpec::Suffix("admin".into()),
+            StringMatchSpec::Contains("admin".into()),
+        ] {
+            assert!(matches(&spec, true, "ADMIN"), "{spec:?} with ignore_case");
+            assert!(!matches(&spec, false, "ADMIN"), "{spec:?} without");
+        }
+    }
+
+    #[test]
+    fn ignore_case_reaches_regex() {
+        let spec = StringMatchSpec::Regex("^admin$".into());
+        assert!(matches(&spec, true, "ADMIN"));
+        assert!(!matches(&spec, false, "ADMIN"));
+    }
+
+    /// An inline `(?-i)` beats the engine's case-insensitive setting, whichever
+    /// way that setting is applied. So the pair is refused rather than silently
+    /// producing a rule that reads one way and behaves another.
+    #[test]
+    fn ignore_case_with_an_inline_off_switch_is_rejected() {
+        for pattern in ["(?-i)admin", "a(?-i)dmin", "(?-si)admin", "(?s-i)admin"] {
+            let spec = StringMatchSpec::Regex(pattern.into());
+            let err = spec.to_input_matcher_with_case(true).unwrap_err();
+            assert!(
+                matches!(err, MatcherError::InvalidPattern { .. }),
+                "{pattern} should be rejected, got {err:?}"
+            );
+            // Without ignore_case there is nothing to contradict.
+            assert!(spec.to_input_matcher_with_case(false).is_ok(), "{pattern}");
+        }
+    }
+
+    /// The guard must not reject patterns that clear some *other* flag, or that
+    /// merely contain the characters somewhere harmless.
+    #[test]
+    fn the_inline_flag_guard_does_not_overreach() {
+        for pattern in [
+            "(?i-s)admin",     // clears s, not i
+            "(?s)admin",       // sets s
+            r"\(?-i\)admin",   // escaped, not a group
+            "admin-i",         // no group at all
+            "(?:admin)",       // non-capturing group
+            "(?P<name>admin)", // named group
+        ] {
+            let spec = StringMatchSpec::Regex(pattern.into());
+            assert!(
+                spec.to_input_matcher_with_case(true).is_ok(),
+                "{pattern} should be accepted"
+            );
+        }
     }
 }

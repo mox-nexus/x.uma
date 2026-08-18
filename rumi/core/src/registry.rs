@@ -575,12 +575,14 @@ impl<Ctx: 'static> Registry<Ctx> {
 
         // Resolve matcher: built-in StringMatchSpec or custom via factory
         let matcher = match config.matcher {
-            ValueMatchConfig::BuiltIn(ref spec) => {
-                // Enforce pattern length limits before compilation
-                // Length limits live in StringMatchSpec::to_input_matcher, the
-                // constructor that owns the resource. The loader inherits them
-                // rather than keeping a second copy that can drift.
-                spec.to_input_matcher()?
+            ValueMatchConfig::BuiltIn {
+                ref spec,
+                ignore_case,
+            } => {
+                // Length limits, and now the case-insensitivity flag, live in
+                // the constructor that owns the resource. The loader inherits
+                // them rather than keeping a second copy that can drift.
+                spec.to_input_matcher_with_case(ignore_case)?
             }
             ValueMatchConfig::Custom(tc) => {
                 let matcher_factory =
