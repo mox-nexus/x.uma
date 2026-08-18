@@ -1,0 +1,498 @@
+---
+name: none_returns_false
+description: 'Tests critical invariant: DataInput returning None causes predicate to be false'
+implementations:
+- rust
+- python
+- typescript
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: missing_key
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: missing_key
+          valueMatch:
+            exact: any_value
+      onMatch:
+        action:
+          name: should_never_match
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: should_never_match
+  onNoMatch:
+    action:
+      name: correctly_no_match
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: correctly_no_match
+cases:
+- name: missing_key_returns_none
+  context:
+    other_key: value
+  expect: correctly_no_match
+- name: empty_context
+  context: {}
+  expect: correctly_no_match
+
+---
+name: empty_and_or
+description: Tests empty AND (vacuous truth) and empty OR (vacuous false)
+implementations:
+- rust
+- python
+- typescript
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        andMatcher:
+          predicate: []
+      onMatch:
+        action:
+          name: empty_and_matched
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: empty_and_matched
+  onNoMatch:
+    action:
+      name: should_not_reach
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: should_not_reach
+cases:
+- name: empty_and_is_true
+  context:
+    anything: value
+  expect: empty_and_matched
+
+---
+name: empty_or
+description: Empty OR is vacuously false
+implementations:
+- rust
+- python
+- typescript
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        orMatcher:
+          predicate: []
+      onMatch:
+        action:
+          name: should_not_match
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: should_not_match
+  onNoMatch:
+    action:
+      name: empty_or_is_false
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: empty_or_is_false
+cases:
+- name: empty_or_is_false
+  context:
+    anything: value
+  expect: empty_or_is_false
+
+---
+name: nested_predicates
+description: Tests deeply nested predicate composition
+implementations:
+- rust
+- python
+- typescript
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        andMatcher:
+          predicate:
+          - orMatcher:
+              predicate:
+              - singlePredicate:
+                  input:
+                    name: role
+                    typedConfig:
+                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      key: role
+                  valueMatch:
+                    exact: admin
+              - singlePredicate:
+                  input:
+                    name: role
+                    typedConfig:
+                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      key: role
+                  valueMatch:
+                    exact: superuser
+          - singlePredicate:
+              input:
+                name: status
+                typedConfig:
+                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  key: status
+              valueMatch:
+                exact: active
+      onMatch:
+        action:
+          name: elevated_active
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: elevated_active
+  onNoMatch:
+    action:
+      name: denied
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: denied
+cases:
+- name: admin_active
+  context:
+    role: admin
+    status: active
+  expect: elevated_active
+- name: superuser_active
+  context:
+    role: superuser
+    status: active
+  expect: elevated_active
+- name: admin_inactive
+  context:
+    role: admin
+    status: inactive
+  expect: denied
+- name: user_active
+  context:
+    role: user
+    status: active
+  expect: denied
+- name: user_inactive
+  context:
+    role: user
+    status: inactive
+  expect: denied
+
+---
+name: multiple_rules_routing
+description: Tests realistic routing with multiple rules
+implementations:
+- rust
+- python
+- typescript
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: path
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: path
+          valueMatch:
+            prefix: /api/v2/
+      onMatch:
+        action:
+          name: api_v2
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: api_v2
+    - predicate:
+        singlePredicate:
+          input:
+            name: path
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: path
+          valueMatch:
+            prefix: /api/v1/
+      onMatch:
+        action:
+          name: api_v1
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: api_v1
+    - predicate:
+        singlePredicate:
+          input:
+            name: path
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: path
+          valueMatch:
+            prefix: /api/
+      onMatch:
+        action:
+          name: api_legacy
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: api_legacy
+    - predicate:
+        orMatcher:
+          predicate:
+          - singlePredicate:
+              input:
+                name: path
+                typedConfig:
+                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  key: path
+              valueMatch:
+                suffix: .js
+          - singlePredicate:
+              input:
+                name: path
+                typedConfig:
+                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  key: path
+              valueMatch:
+                suffix: .css
+          - singlePredicate:
+              input:
+                name: path
+                typedConfig:
+                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  key: path
+              valueMatch:
+                suffix: .png
+      onMatch:
+        action:
+          name: static
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: static
+    - predicate:
+        singlePredicate:
+          input:
+            name: path
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: path
+          valueMatch:
+            exact: /health
+      onMatch:
+        action:
+          name: health
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: health
+  onNoMatch:
+    action:
+      name: default
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: default
+cases:
+- name: api_v2
+  context:
+    path: /api/v2/users
+  expect: api_v2
+- name: api_v1
+  context:
+    path: /api/v1/users
+  expect: api_v1
+- name: api_legacy
+  context:
+    path: /api/old/endpoint
+  expect: api_legacy
+- name: static_js
+  context:
+    path: /assets/app.js
+  expect: static
+- name: static_css
+  context:
+    path: /styles/main.css
+  expect: static
+- name: static_png
+  context:
+    path: /images/logo.png
+  expect: static
+- name: health
+  context:
+    path: /health
+  expect: health
+- name: default_html
+  context:
+    path: /index.html
+  expect: default
+- name: default_root
+  context:
+    path: /
+  expect: default
+
+---
+name: nested_matcher_success
+description: Tests nested matcher that successfully matches
+implementations:
+- rust
+- python
+- typescript
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: tier
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: tier
+          valueMatch:
+            exact: premium
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+            - predicate:
+                singlePredicate:
+                  input:
+                    name: feature
+                    typedConfig:
+                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      key: feature
+                  valueMatch:
+                    exact: analytics
+              onMatch:
+                action:
+                  name: premium_analytics
+                  typedConfig:
+                    '@type': type.googleapis.com/xuma.core.v1.NamedAction
+                    name: premium_analytics
+            - predicate:
+                singlePredicate:
+                  input:
+                    name: feature
+                    typedConfig:
+                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      key: feature
+                  valueMatch:
+                    exact: export
+              onMatch:
+                action:
+                  name: premium_export
+                  typedConfig:
+                    '@type': type.googleapis.com/xuma.core.v1.NamedAction
+                    name: premium_export
+          onNoMatch:
+            action:
+              name: premium_default
+              typedConfig:
+                '@type': type.googleapis.com/xuma.core.v1.NamedAction
+                name: premium_default
+    - predicate:
+        singlePredicate:
+          input:
+            name: tier
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: tier
+          valueMatch:
+            exact: free
+      onMatch:
+        action:
+          name: free_tier
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: free_tier
+  onNoMatch:
+    action:
+      name: unknown_tier
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: unknown_tier
+cases:
+- name: nested_analytics
+  context:
+    tier: premium
+    feature: analytics
+  expect: premium_analytics
+- name: nested_export
+  context:
+    tier: premium
+    feature: export
+  expect: premium_export
+- name: nested_fallback
+  context:
+    tier: premium
+    feature: other
+  expect: premium_default
+- name: free_tier
+  context:
+    tier: free
+    feature: analytics
+  expect: free_tier
+- name: unknown_tier
+  context:
+    tier: enterprise
+  expect: unknown_tier
+
+---
+name: nested_matcher_failure_propagates
+description: Tests that nested matcher failure propagates to next field_matcher
+implementations:
+- rust
+- python
+- typescript
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: tier
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: tier
+          valueMatch:
+            exact: premium
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+            - predicate:
+                singlePredicate:
+                  input:
+                    name: feature
+                    typedConfig:
+                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      key: feature
+                  valueMatch:
+                    exact: analytics
+              onMatch:
+                action:
+                  name: premium_analytics
+                  typedConfig:
+                    '@type': type.googleapis.com/xuma.core.v1.NamedAction
+                    name: premium_analytics
+    - predicate:
+        singlePredicate:
+          input:
+            name: tier
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: tier
+          valueMatch:
+            exact: premium
+      onMatch:
+        action:
+          name: premium_fallback
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: premium_fallback
+cases:
+- name: nested_matches
+  context:
+    tier: premium
+    feature: analytics
+  expect: premium_analytics
+- name: nested_fails_continues_to_next
+  context:
+    tier: premium
+    feature: export
+  expect: premium_fallback
+

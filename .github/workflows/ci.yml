@@ -71,9 +71,6 @@ jobs:
       - name: Proto field types round-trip
         run: node scripts/check-proto-field-types.mjs
 
-      - name: Conformance fixtures
-        run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test conformance --features rumi-test/fixtures
-
       # The protojson fixtures, and the ledger of which implementations are
       # expected to run them. Strict in both directions — see proto_fixture.rs.
       - name: Conformance fixtures (protojson)

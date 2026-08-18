@@ -38,10 +38,11 @@ retarget children to `main` first.
 half is not. Concretely:
 
 - the four fixture dialects, and the 27 fixtures written in them
-- **deleting the four transitional dialects and their loaders.** All three
-  implementations now read protojson and pass all 23 fixtures; the old
-  `config:`, `matcher:` and `http_route_match(es):` fixtures and the loaders
-  behind them are what is left to remove
+- **the user-facing surface.** `MatcherConfig` still derives `Deserialize` in
+  all three implementations, so the terse dialect is still *authorable* even
+  though no fixture uses it — and the README, the docs pages, the playground
+  presets and `rumi run` all still show it. That is the last of "one schema"
+- **HTTP and Claude protojson fixtures.** The coverage check reports the number
 - `MatcherConfig` still derives `Deserialize` — the dialect is still authorable
 - SF3, SF5, SF6 remain; SF1, SF2, SF4, SF7, SF9 and SF8's renames are done
 
@@ -914,10 +915,17 @@ different semantics with no `cfg` involved — `register` strips the query,
 `register_simple` does not, and both crusts use `register_simple`. Feature
 powerset checks cannot see this class. It needs a conformance fixture.
 
-**All three implementations read protojson and pass all 23 fixtures.** They run
+**Three of the four transitional dialects are gone.** `config:` and the
+native `matcher:` shape are deleted, with their loaders — `fixture.rs`,
+`config_fixture.rs`, puma's core-fixture loader, bumi's `loadCoreFixtures`, and
+the three conformance runners over them. `http_route_match(es):` stays: it feeds
+the Gateway API *compiler*, which is not a config format and which D-026 does
+not touch.
+
+**All three implementations read protojson and pass all 30 fixtures.** They run
 in CI (`spec/tests/07_protojson/`), every fixture listing
-`[rust, python, typescript]` — which is the ledger's end state, and means the
-`implementations:` field can be deleted once the old dialects are gone.
+`[rust, python, typescript]` — the ledger's end state, so the
+`implementations:` field can be deleted whenever nothing needs it.
 
 None of the three carries a protobuf runtime. Rust generates types because
 prost-serde rejects unknown fields; puma and bumi hand-walk protojson because
