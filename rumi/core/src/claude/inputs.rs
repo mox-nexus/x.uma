@@ -31,8 +31,21 @@ pub struct ArgumentInput {
 
 impl ArgumentInput {
     /// Create a new argument input extractor.
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into() }
+    ///
+    /// # Errors
+    ///
+    /// [`MatcherError::EmptyIdentifier`](crate::MatcherError::EmptyIdentifier)
+    /// if `name` is empty. This input names which tool argument to read, and
+    /// this is the path that gates agent tool calls — an empty name reads
+    /// nothing, so the rule stops firing and the call proceeds.
+    pub fn new(name: impl Into<String>) -> Result<Self, crate::MatcherError> {
+        let name = name.into();
+        if name.is_empty() {
+            return Err(crate::MatcherError::EmptyIdentifier {
+                what: "tool argument name",
+            });
+        }
+        Ok(Self { name })
     }
 }
 
@@ -115,7 +128,7 @@ impl crate::IntoDataInput<HookContext> for ArgumentInput {
     fn from_config(
         config: Self::Config,
     ) -> Result<Box<dyn crate::DataInput<HookContext>>, crate::MatcherError> {
-        Ok(Box::new(ArgumentInput::new(config.name)))
+        Ok(Box::new(ArgumentInput::new(config.name)?))
     }
 }
 
@@ -155,6 +168,17 @@ impl crate::IntoDataInput<HookContext> for GitBranchInput {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// This is the input that names which tool argument a gate reads. Empty, it
+    /// reads nothing, the rule stops firing, and the tool call proceeds.
+    #[test]
+    fn an_empty_argument_name_is_rejected() {
+        let err = ArgumentInput::new("").unwrap_err();
+        assert!(
+            matches!(err, crate::MatcherError::EmptyIdentifier { .. }),
+            "{err:?}"
+        );
+    }
     #[test]
     fn event_input_returns_event_string() {
         let ctx = HookContext::pre_tool_use("Bash");
@@ -204,7 +228,7 @@ mod tests {
     fn argument_input_returns_value() {
         let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "ls");
         assert_eq!(
-            ArgumentInput::new("command").get(&ctx),
+            ArgumentInput::new("command").unwrap().get(&ctx),
             MatchingData::String("ls".into())
         );
     }
@@ -212,7 +236,10 @@ mod tests {
     #[test]
     fn argument_input_returns_none_for_missing() {
         let ctx = HookContext::pre_tool_use("Bash");
-        assert_eq!(ArgumentInput::new("command").get(&ctx), MatchingData::None);
+        assert_eq!(
+            ArgumentInput::new("command").unwrap().get(&ctx),
+            MatchingData::None
+        );
     }
 
     #[test]

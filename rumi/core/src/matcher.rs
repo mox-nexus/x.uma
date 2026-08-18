@@ -265,16 +265,30 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
         1 + field_depth.max(no_match_depth)
     }
 
-    /// Validate this matcher against safety constraints.
+    /// Validate this matcher against every structural safety limit.
     ///
-    /// Checks:
-    /// - Nesting depth does not exceed [`MAX_DEPTH`]
+    /// Checks, over the whole tree including nested matchers and `on_no_match`
+    /// chains:
+    /// - nesting depth against [`MAX_DEPTH`]
+    /// - rules per matcher against [`MAX_FIELD_MATCHERS`](crate::MAX_FIELD_MATCHERS)
+    /// - children per `and`/`or` against
+    ///   [`MAX_PREDICATES_PER_COMPOUND`](crate::MAX_PREDICATES_PER_COMPOUND)
     ///
-    /// Call this at config load time to catch errors early.
+    /// The width limits used to live in the registry, which meant a matcher
+    /// built by a domain compiler or across the FFI carried none of them. They
+    /// belong here, on the type that holds the rules, so that whatever builds a
+    /// matcher — in any language, through any adapter — inherits the same
+    /// guarantees rather than reimplementing them.
+    ///
+    /// Pattern-length limits are not here: a compiled pattern is held by
+    /// [`StringMatchSpec`](crate::StringMatchSpec), which enforces its own in
+    /// its constructor, for the same reason.
     ///
     /// # Errors
     ///
-    /// Returns [`MatcherError::DepthExceeded`] if nesting is too deep.
+    /// - [`MatcherError::DepthExceeded`] if nesting is too deep
+    /// - [`MatcherError::TooManyFieldMatchers`] if one matcher holds too many rules
+    /// - [`MatcherError::TooManyPredicates`] if one compound holds too many children
     pub fn validate(&self) -> Result<(), MatcherError> {
         let depth = self.depth();
         if depth > MAX_DEPTH {
@@ -283,6 +297,31 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
                 max: MAX_DEPTH,
             });
         }
+        self.validate_widths()
+    }
+
+    /// The width half of [`validate`](Self::validate), recursing through nested
+    /// matchers. Depth is checked once at the root because `depth()` is already
+    /// a whole-tree measure.
+    fn validate_widths(&self) -> Result<(), MatcherError> {
+        if self.matcher_list.len() > crate::MAX_FIELD_MATCHERS {
+            return Err(MatcherError::TooManyFieldMatchers {
+                count: self.matcher_list.len(),
+                max: crate::MAX_FIELD_MATCHERS,
+            });
+        }
+
+        for fm in &self.matcher_list {
+            fm.predicate.validate()?;
+            if let OnMatch::Matcher(nested) = &fm.on_match {
+                nested.validate_widths()?;
+            }
+        }
+
+        if let Some(OnMatch::Matcher(nested)) = &self.on_no_match {
+            nested.validate_widths()?;
+        }
+
         Ok(())
     }
 }

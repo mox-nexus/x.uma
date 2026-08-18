@@ -3,7 +3,7 @@
 //! These fixtures use the **same config format** across all implementations:
 //! rumi (Rust), puma (Python), bumi (TypeScript), and both crusty bindings.
 //!
-//! Run with: cargo test -p rumi-test --test config_conformance --features rumi-test/registry,rumi-test/fixtures
+//! Run with: cargo test -p rumi-test --test `config_conformance` --features rumi-test/registry,rumi-test/fixtures
 
 #![cfg(all(feature = "fixtures", feature = "registry"))]
 

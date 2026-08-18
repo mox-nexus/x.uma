@@ -53,6 +53,14 @@ features:
 publishable:
     node scripts/check-publishable.mjs
 
+# Every xuma proto field must round-trip through binary as the identity.
+#
+# The config path encodes JSON to protobuf to fill an Any and decodes it back.
+# That is lossless only for a specific set of field types; the script says which
+# and why.
+proto-field-types:
+    node scripts/check-proto-field-types.mjs
+
 # Generate proto code (all three languages) and the xDS dependency types.
 #
 # Two passes are required. `buf generate` only walks the local module graph, and
@@ -111,7 +119,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-fixtures features publishable docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-fixtures features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:

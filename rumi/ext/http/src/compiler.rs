@@ -116,7 +116,7 @@ fn compile_header_match(
         }
     };
     Ok(Predicate::Single(SinglePredicate::new(
-        Box::new(HeaderInput::new(name.as_str())),
+        Box::new(HeaderInput::new(name.as_str())?),
         spec.to_input_matcher()?,
     )))
 }
@@ -132,7 +132,7 @@ fn compile_query_param_match(
         }
     };
     Ok(Predicate::Single(SinglePredicate::new(
-        Box::new(QueryParamInput::new(name.as_str())),
+        Box::new(QueryParamInput::new(name.as_str())?),
         spec.to_input_matcher()?,
     )))
 }
@@ -154,17 +154,43 @@ pub fn compile_route_matches<A: Clone + Send + Sync + 'static>(
         .map(HttpRouteMatchExt::to_predicate)
         .collect::<Result<_, _>>()?;
 
-    Ok(Matcher::from_predicate(
+    let matcher = Matcher::from_predicate(
         Predicate::from_any(predicates, catch_all()),
         action,
         on_no_match,
-    ))
+    );
+
+    // The compiler is the door handle this project tells people to use, so it
+    // owes the same structural guarantees the config loader gives. Without this
+    // it returned a matcher that had passed no check at all.
+    matcher.validate()?;
+    Ok(matcher)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::message::HttpMessageBuilder;
+
+    /// The width limits used to live only in the registry, so this — the path
+    /// CLAUDE.md calls the door handle — accepted a matcher of any width.
+    #[test]
+    fn compiler_rejects_more_routes_than_the_limit() {
+        let routes: Vec<HttpRouteMatch> = (0..=rumi::MAX_PREDICATES_PER_COMPOUND)
+            .map(|i| HttpRouteMatch {
+                path: Some(HttpPathMatch::Exact {
+                    value: format!("/r{i}"),
+                }),
+                ..Default::default()
+            })
+            .collect();
+
+        let err = compile_route_matches(&routes, "hit", None).unwrap_err();
+        assert!(
+            matches!(err, MatcherError::TooManyPredicates { .. }),
+            "{err:?}"
+        );
+    }
 
     // These used to build an ext_proc `ProcessingRequest` to get an
     // `HttpMessage`, which meant every test of the compiler — a Gateway API

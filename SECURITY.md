@@ -37,14 +37,26 @@ inherit the same guarantees. A limit enforced only in a loader is advisory to
 every other caller — that was a real defect, and it let a domain compiler accept
 an 8 MB pattern against an 8 KB limit.
 
-| Limit | Value | Bounds |
-|---|---|---|
-| `MAX_DEPTH` | 32 | nested matcher depth, enforced at `validate()` |
-| `MAX_FIELD_MATCHERS` | 256 | rules in one matcher list |
-| `MAX_PREDICATES_PER_COMPOUND` | 256 | children of one `and`/`or` |
-| `MAX_PATTERN_LENGTH` | 8192 | a literal match pattern |
-| `MAX_REGEX_PATTERN_LENGTH` | 4096 | a regex pattern's source |
-| repetition product (TypeScript) | 1000 | nested `{n}` counts, matching RE2's own `kMaxRepeat` |
+| Limit | Value | Bounds | Enforced by |
+|---|---|---|---|
+| `MAX_DEPTH` | 32 | nested matcher depth | `Matcher::validate()` |
+| `MAX_FIELD_MATCHERS` | 256 | rules in one matcher | `Matcher::validate()` |
+| `MAX_PREDICATES_PER_COMPOUND` | 256 | children of one `and`/`or` | `Predicate::validate()` |
+| `MAX_PATTERN_LENGTH` | 8192 | a literal match pattern | `StringMatchSpec` constructor |
+| `MAX_REGEX_PATTERN_LENGTH` | 4096 | a regex pattern's source | `StringMatchSpec` constructor |
+| repetition product (TypeScript) | 1000 | nested `{n}` counts, matching RE2's own `kMaxRepeat` | the regex budget |
+| config nesting | 128 | JSON/YAML object depth before a matcher exists | both parsers, and the protojson walk |
+
+The two width limits used to be enforced in the config loader alone, which meant
+a matcher produced by a domain compiler carried neither — including the compiler
+that gates agent tool calls. Both compilers now call `validate()` before
+returning, so every construction route inherits the same guarantees.
+
+**Empty identifiers are rejected at construction.** A header name, query
+parameter name, tool argument name or map key says *where* to read a value.
+Empty, it reads nothing, so the predicate is false and a rule keyed on it stops
+firing — a deny rule that never denies. proto3 cannot express "required", so the
+schema cannot carry this; the constructor does.
 
 **Regex is linear-time in every implementation** — Rust's `regex` crate,
 `google-re2` in Python, `re2js` in TypeScript. None can backtrack, so evaluation
@@ -66,7 +78,9 @@ a stronger guarantee than it is.
   CPU, with every declared limit respected.
 - **Evaluation is recursive**, with `MAX_DEPTH` holding the line rather than an
   explicit stack. What actually prevents config-borne stack exhaustion today is
-  `serde`'s own 128-level recursion limit, not `MAX_DEPTH`.
+  the parsers' own 128-level recursion limit, not `MAX_DEPTH`. Measured
+  2026-08-18: `serde_json` and `serde_yaml` both accept 128 levels and reject
+  129, so neither front end can hand a deeper document to anything downstream.
 - **An empty rule list compiles to a catch-all.** Its polarity depends entirely
   on how the caller assigns actions.
 

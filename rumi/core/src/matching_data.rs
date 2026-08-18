@@ -495,10 +495,10 @@ mod tests {
     /// Integration test: Full extension story with custom types
     ///
     /// This test proves that users can extend the system without touching core:
-    /// 1. Custom domain type (GeoLocation)
-    /// 2. Custom context (GeoRequest)
-    /// 3. Custom DataInput (LocationInput)
-    /// 4. Custom InputMatcher (WithinRadiusMatcher)
+    /// 1. Custom domain type (`GeoLocation`)
+    /// 2. Custom context (`GeoRequest`)
+    /// 3. Custom `DataInput` (`LocationInput`)
+    /// 4. Custom `InputMatcher` (`WithinRadiusMatcher`)
     /// 5. Full Matcher pipeline with actions
     mod integration {
         use super::*;

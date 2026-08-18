@@ -32,11 +32,28 @@ matchers:
     on_match: { type: action, action: "deny" }
 "#;
 
+/// Write a config to a path no other test can be writing at the same time.
+///
+/// The name used to be derived from the body's length, so every test using
+/// `CONFIG` raced on one file: a spawned child could read it mid-write, get an
+/// invalid config, and block. The fail-closed behaviour was correct — the test
+/// harness was not. Observed in CI on 2026-08-18; it passed locally every time,
+/// which is what a write race looks like.
+///
+/// Each call gets its own file, and the write is atomic: the child either sees
+/// a complete config or no file at all, never half of one.
 fn write_config(body: &str) -> std::path::PathBuf {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+
     let dir = std::env::temp_dir().join(format!("rumi-hook-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join(format!("cfg-{}.yaml", body.len()));
-    std::fs::write(&path, body).unwrap();
+
+    let n = NEXT.fetch_add(1, Ordering::Relaxed);
+    let staging = dir.join(format!("cfg-{n}.yaml.partial"));
+    let path = dir.join(format!("cfg-{n}.yaml"));
+    std::fs::write(&staging, body).unwrap();
+    std::fs::rename(&staging, &path).unwrap();
     path
 }
 

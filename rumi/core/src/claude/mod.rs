@@ -120,7 +120,7 @@ mod tests {
     fn test_argument_input() {
         let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "echo hello");
 
-        let input = ArgumentInput::new("command");
+        let input = ArgumentInput::new("command").unwrap();
         assert_eq!(input.get(&ctx), MatchingData::String("echo hello".into()));
     }
 
@@ -137,7 +137,7 @@ mod tests {
                         Box::new(ExactMatcher::new("Bash")),
                     )),
                     Predicate::Single(SinglePredicate::new(
-                        Box::new(ArgumentInput::new("command")),
+                        Box::new(ArgumentInput::new("command").unwrap()),
                         Box::new(ContainsMatcher::new("rm -rf")),
                     )),
                 ]),

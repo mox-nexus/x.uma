@@ -26,7 +26,7 @@
 //!     .with("name", "alice")
 //!     .with("role", "admin");
 //!
-//! let input = StringInput::new("role");
+//! let input = StringInput::new("role").unwrap();
 //! assert_eq!(input.get(&ctx), MatchingData::String("admin".into()));
 //! ```
 
@@ -71,8 +71,18 @@ pub struct StringInput {
 
 impl StringInput {
     /// Create a new string input extractor.
-    pub fn new(key: impl Into<String>) -> Self {
-        Self { key: key.into() }
+    ///
+    /// # Errors
+    ///
+    /// [`MatcherError::EmptyIdentifier`](rumi::MatcherError::EmptyIdentifier)
+    /// if `key` is empty. The key names which entry to read; an empty one reads
+    /// nothing, so the predicate is always false.
+    pub fn new(key: impl Into<String>) -> Result<Self, rumi::MatcherError> {
+        let key = key.into();
+        if key.is_empty() {
+            return Err(rumi::MatcherError::EmptyIdentifier { what: "map key" });
+        }
+        Ok(Self { key })
     }
 }
 
@@ -109,7 +119,7 @@ impl rumi::IntoDataInput<KvContext> for StringInput {
     fn from_config(
         config: Self::Config,
     ) -> Result<Box<dyn rumi::DataInput<KvContext>>, rumi::MatcherError> {
-        Ok(Box::new(StringInput::new(config.key)))
+        Ok(Box::new(StringInput::new(config.key)?))
     }
 }
 
@@ -132,7 +142,7 @@ mod proto_configs {
         fn from_config(
             config: proto::StringInput,
         ) -> Result<Box<dyn rumi::DataInput<KvContext>>, rumi::MatcherError> {
-            Ok(Box::new(StringInput::new(config.value)))
+            Ok(Box::new(StringInput::new(config.value)?))
         }
     }
 }
@@ -152,6 +162,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn an_empty_key_is_rejected() {
+        let err = StringInput::new("").unwrap_err();
+        assert!(
+            matches!(err, rumi::MatcherError::EmptyIdentifier { .. }),
+            "{err:?}"
+        );
+    }
+
+    #[test]
     fn test_context_builder() {
         let ctx = KvContext::new().with("foo", "bar").with("baz", "qux");
 
@@ -163,7 +182,7 @@ mod tests {
     #[test]
     fn test_string_input() {
         let ctx = KvContext::new().with("name", "alice");
-        let input = StringInput::new("name");
+        let input = StringInput::new("name").unwrap();
 
         assert_eq!(input.get(&ctx), MatchingData::String("alice".into()));
     }
@@ -171,7 +190,7 @@ mod tests {
     #[test]
     fn test_string_input_missing_key() {
         let ctx = KvContext::new();
-        let input = StringInput::new("missing");
+        let input = StringInput::new("missing").unwrap();
 
         assert_eq!(input.get(&ctx), MatchingData::None);
     }
@@ -183,7 +202,7 @@ mod tests {
         let matcher: Matcher<KvContext, &str> = Matcher::new(
             vec![FieldMatcher::new(
                 Predicate::Single(SinglePredicate::new(
-                    Box::new(StringInput::new("role")),
+                    Box::new(StringInput::new("role").unwrap()),
                     Box::new(ExactMatcher::new("admin")),
                 )),
                 OnMatch::Action("allowed"),

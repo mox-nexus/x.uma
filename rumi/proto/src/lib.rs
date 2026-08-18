@@ -13,6 +13,8 @@
 //! - [`xds`] — Upstream xDS types (Matcher, StringMatcher, TypedExtensionConfig)
 //! - [`xuma`] — x.uma extension types (domain inputs, contexts, actions)
 //! - [`any_resolver`] — Decodes `Any` payloads into `TypedConfig` for registry use
+//! - [`protojson`] — Supplies the one part of canonical protojson that static
+//!   codegen cannot: `@type` expansion for `Any`
 //! - [`convert`] — Converts proto `Matcher` to `MatcherConfig<TypedConfig>`
 
 #![allow(
@@ -26,6 +28,7 @@
 
 pub mod any_resolver;
 pub mod convert;
+pub mod protojson;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Upstream xDS types

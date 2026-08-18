@@ -103,7 +103,7 @@ fn compile_argument_match(
 ) -> Result<Predicate<HookContext>, MatcherError> {
     arg_match
         .value
-        .to_predicate(Box::new(ArgumentInput::new(&arg_match.name)))
+        .to_predicate(Box::new(ArgumentInput::new(&arg_match.name)?))
 }
 
 /// Compile multiple `HookMatch` entries into a single `Matcher`.
@@ -124,7 +124,13 @@ pub fn compile_hook_matches<A: Clone + Send + Sync + 'static>(
         .collect::<Result<_, _>>()?;
 
     let or_pred = Predicate::from_any(predicates, catch_all());
-    Ok(Matcher::from_predicate(or_pred, action, on_no_match))
+    let matcher = Matcher::from_predicate(or_pred, action, on_no_match);
+
+    // See the note in rumi-http's compiler: a compiled matcher must carry the
+    // same guarantees as a loaded one, and this is the path that gates agent
+    // tool calls.
+    matcher.validate()?;
+    Ok(matcher)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

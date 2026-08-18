@@ -1,4 +1,4 @@
-//! ReDoS safety demonstration.
+//! `ReDoS` safety demonstration.
 //!
 //! Proves that Rust's `regex` crate (linear time, RE2 semantics) is immune
 //! to catastrophic backtracking on pathological patterns.
@@ -16,7 +16,7 @@ fn main() {
     divan::main();
 }
 
-/// The classic ReDoS pattern: nested quantifier with anchor.
+/// The classic `ReDoS` pattern: nested quantifier with anchor.
 const REDOS_PATTERN: &str = r"(a+)+$";
 
 /// Build a pathological input: N 'a's followed by 'X' (forces full backtrack attempt).

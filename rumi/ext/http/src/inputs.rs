@@ -42,8 +42,23 @@ pub struct HeaderInput {
 
 impl HeaderInput {
     /// Create a new header input extractor.
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into() }
+    ///
+    /// # Errors
+    ///
+    /// [`MatcherError::EmptyIdentifier`](rumi::MatcherError::EmptyIdentifier)
+    /// if `name` is empty. An empty header name reads no header, so the
+    /// predicate is always false and a rule keyed on it silently stops firing
+    /// — a deny rule that never denies. Rejecting it here rather than in the
+    /// config loader means every route inherits the check: the proto config
+    /// path, the compiler, the FFI bindings and direct construction.
+    pub fn new(name: impl Into<String>) -> Result<Self, rumi::MatcherError> {
+        let name = name.into();
+        if name.is_empty() {
+            return Err(rumi::MatcherError::EmptyIdentifier {
+                what: "header name",
+            });
+        }
+        Ok(Self { name })
     }
 }
 
@@ -64,8 +79,20 @@ pub struct QueryParamInput {
 
 impl QueryParamInput {
     /// Create a new query parameter input extractor.
-    pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into() }
+    ///
+    /// # Errors
+    ///
+    /// [`MatcherError::EmptyIdentifier`](rumi::MatcherError::EmptyIdentifier)
+    /// if `name` is empty — see [`HeaderInput::new`] for why this is a
+    /// constructor's job.
+    pub fn new(name: impl Into<String>) -> Result<Self, rumi::MatcherError> {
+        let name = name.into();
+        if name.is_empty() {
+            return Err(rumi::MatcherError::EmptyIdentifier {
+                what: "query parameter name",
+            });
+        }
+        Ok(Self { name })
     }
 }
 
@@ -148,7 +175,7 @@ impl rumi::IntoDataInput<HttpMessage> for HeaderInput {
     fn from_config(
         config: Self::Config,
     ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-        Ok(Box::new(HeaderInput::new(config.name)))
+        Ok(Box::new(HeaderInput::new(config.name)?))
     }
 }
 
@@ -159,7 +186,7 @@ impl rumi::IntoDataInput<HttpMessage> for QueryParamInput {
     fn from_config(
         config: Self::Config,
     ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-        Ok(Box::new(QueryParamInput::new(config.name)))
+        Ok(Box::new(QueryParamInput::new(config.name)?))
     }
 }
 
@@ -221,7 +248,7 @@ mod proto_configs {
         fn from_config(
             config: proto::HeaderInput,
         ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-            Ok(Box::new(HeaderInput::new(config.name)))
+            Ok(Box::new(HeaderInput::new(config.name)?))
         }
     }
 
@@ -231,7 +258,7 @@ mod proto_configs {
         fn from_config(
             config: proto::QueryParamInput,
         ) -> Result<Box<dyn rumi::DataInput<HttpMessage>>, rumi::MatcherError> {
-            Ok(Box::new(QueryParamInput::new(config.name)))
+            Ok(Box::new(QueryParamInput::new(config.name)?))
         }
     }
 
@@ -260,6 +287,28 @@ mod proto_configs {
 mod tests {
     use super::*;
     use crate::message::HttpMessageBuilder;
+
+    /// An empty header name reads no header, so every predicate keyed on it is
+    /// false and a deny rule silently stops denying. Rejected at construction
+    /// so the config path, the compiler, the FFI and direct callers all inherit
+    /// it — a check in the loader alone would be advisory to the other three.
+    #[test]
+    fn an_empty_header_name_is_rejected() {
+        let err = HeaderInput::new("").unwrap_err();
+        assert!(
+            matches!(err, rumi::MatcherError::EmptyIdentifier { .. }),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn an_empty_query_param_name_is_rejected() {
+        let err = QueryParamInput::new("").unwrap_err();
+        assert!(
+            matches!(err, rumi::MatcherError::EmptyIdentifier { .. }),
+            "{err:?}"
+        );
+    }
 
     // These test DataInput behaviour on HttpMessage, which is domain, not
     // transport — so they build via the public builder rather than assembling
@@ -367,7 +416,7 @@ mod tests {
         let msg = ProcessingRequestBuilder::new()
             .header("content-type", "application/json")
             .build();
-        let input = HeaderInput::new("content-type");
+        let input = HeaderInput::new("content-type").unwrap();
         assert_eq!(
             input.get(&msg),
             MatchingData::String("application/json".into())
@@ -380,7 +429,7 @@ mod tests {
             .header("x-custom-header", "value123")
             .build();
 
-        let input = HeaderInput::new("X-Custom-Header");
+        let input = HeaderInput::new("X-Custom-Header").unwrap();
         assert_eq!(input.get(&msg), MatchingData::String("value123".into()));
     }
 
@@ -389,7 +438,7 @@ mod tests {
         let msg = ProcessingRequestBuilder::new()
             .header("content-type", "text/plain")
             .build();
-        let input = HeaderInput::new("authorization");
+        let input = HeaderInput::new("authorization").unwrap();
         assert_eq!(input.get(&msg), MatchingData::None);
     }
 
@@ -398,7 +447,7 @@ mod tests {
         let msg = ProcessingRequestBuilder::new()
             .header("authorization", "Bearer token123")
             .build();
-        let input = HeaderInput::new("authorization");
+        let input = HeaderInput::new("authorization").unwrap();
         assert_eq!(
             input.get(&msg),
             MatchingData::String("Bearer token123".into())
@@ -412,7 +461,7 @@ mod tests {
         let msg = ProcessingRequestBuilder::new()
             .path("/search?q=rust")
             .build();
-        let input = QueryParamInput::new("q");
+        let input = QueryParamInput::new("q").unwrap();
         assert_eq!(input.get(&msg), MatchingData::String("rust".into()));
     }
 
@@ -423,15 +472,15 @@ mod tests {
             .build();
 
         assert_eq!(
-            QueryParamInput::new("page").get(&msg),
+            QueryParamInput::new("page").unwrap().get(&msg),
             MatchingData::String("1".into())
         );
         assert_eq!(
-            QueryParamInput::new("limit").get(&msg),
+            QueryParamInput::new("limit").unwrap().get(&msg),
             MatchingData::String("10".into())
         );
         assert_eq!(
-            QueryParamInput::new("sort").get(&msg),
+            QueryParamInput::new("sort").unwrap().get(&msg),
             MatchingData::String("name".into())
         );
     }
@@ -439,21 +488,21 @@ mod tests {
     #[test]
     fn query_param_input_returns_none_when_missing() {
         let msg = ProcessingRequestBuilder::new().path("/api?page=1").build();
-        let input = QueryParamInput::new("limit");
+        let input = QueryParamInput::new("limit").unwrap();
         assert_eq!(input.get(&msg), MatchingData::None);
     }
 
     #[test]
     fn query_param_input_returns_none_when_no_query_string() {
         let msg = ProcessingRequestBuilder::new().path("/api").build();
-        let input = QueryParamInput::new("page");
+        let input = QueryParamInput::new("page").unwrap();
         assert_eq!(input.get(&msg), MatchingData::None);
     }
 
     #[test]
     fn query_param_input_returns_none_when_no_path() {
         let msg = ProcessingRequestBuilder::new().method("GET").build();
-        let input = QueryParamInput::new("page");
+        let input = QueryParamInput::new("page").unwrap();
         assert_eq!(input.get(&msg), MatchingData::None);
     }
 
@@ -534,19 +583,19 @@ mod tests {
             MatchingData::String("api.example.com".into())
         );
         assert_eq!(
-            QueryParamInput::new("page").get(&msg),
+            QueryParamInput::new("page").unwrap().get(&msg),
             MatchingData::String("1".into())
         );
         assert_eq!(
-            QueryParamInput::new("limit").get(&msg),
+            QueryParamInput::new("limit").unwrap().get(&msg),
             MatchingData::String("20".into())
         );
         assert_eq!(
-            HeaderInput::new("content-type").get(&msg),
+            HeaderInput::new("content-type").unwrap().get(&msg),
             MatchingData::String("application/json".into())
         );
         assert_eq!(
-            HeaderInput::new("authorization").get(&msg),
+            HeaderInput::new("authorization").unwrap().get(&msg),
             MatchingData::String("Bearer abc123".into())
         );
     }
@@ -560,7 +609,13 @@ mod tests {
         assert_eq!(MethodInput.get(&msg), MatchingData::None);
         assert_eq!(SchemeInput.get(&msg), MatchingData::None);
         assert_eq!(AuthorityInput.get(&msg), MatchingData::None);
-        assert_eq!(HeaderInput::new("any").get(&msg), MatchingData::None);
-        assert_eq!(QueryParamInput::new("any").get(&msg), MatchingData::None);
+        assert_eq!(
+            HeaderInput::new("any").unwrap().get(&msg),
+            MatchingData::None
+        );
+        assert_eq!(
+            QueryParamInput::new("any").unwrap().get(&msg),
+            MatchingData::None
+        );
     }
 }

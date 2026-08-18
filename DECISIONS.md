@@ -8,6 +8,82 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-18 · The protojson load path
+
+### D-035 · Invariants that hold a limit are enforced by the type that holds the resource — including width, and including identity
+
+D-029 said limits belong to the type holding the resource, and then only the
+pattern-length limits actually moved. `MAX_FIELD_MATCHERS` and
+`MAX_PREDICATES_PER_COMPOUND` stayed in `Registry::load_*`, so a matcher built
+by a domain compiler — the path `CLAUDE.md` calls the door handle — carried
+neither. Both are now checked in `Matcher::validate()` and `Predicate::validate()`,
+and both domain compilers call `validate()` before returning. A hundred-thousand
+-child `and` is one level deep, so depth never covered it.
+
+The same rule extends to identity. A header name, a query parameter name, a tool
+argument name and a map key all say *where* to read a value. Empty, they read
+nothing, the predicate is false, and a deny rule silently stops denying. proto3
+cannot express "required", so the schema cannot carry this — the constructor
+must. `HeaderInput::new`, `QueryParamInput::new`, `ArgumentInput::new` and
+`rumi_kv::StringInput::new` now return `Result` and reject an empty identifier.
+
+Enforcing it in the config loader instead would have covered one of five routes.
+The constructor covers the config path, both compilers, both crusts and direct
+construction at once, and a fixture becomes a regression test rather than the
+enforcement.
+
+**Revisit if** a legitimate caller needs an empty identifier to mean "any". It
+does not today: `ctx.header("")` returns `None`, not every header.
+
+### D-034 · Canonical protojson is packed into `Any` before deserialization, by the registry that already unpacks it
+
+Measured 2026-08-18: `pbjson-types`'s `Any` does not implement protojson's
+`@type` expansion. A canonical document fails with ``unknown field `@type` ``.
+It cannot implement it — expanding an `Any` needs the payload's schema at
+deserialization time, and static codegen has no descriptor pool to look it up
+in. D-026 chose protojson as the authoring surface, so the gap is ours to close.
+
+`AnyResolver::pack` closes it: walk the document, encode each `@type` object to
+binary, replace it with the `{typeUrl, value}` form the generated impls read.
+Both directions are installed by the same `register::<T>()` call, so a type that
+can be read but not written is unrepresentable rather than merely unlikely.
+
+**The round trip through binary is deliberate.** It costs a JSON→bytes→JSON hop
+at load time and buys the file path and the control-plane path meeting at the
+same proto value, sharing one conversion walk. The alternative — a second walk
+reading JSON straight into config types — is two implementations of one
+semantics, free to disagree. This repo has already shipped that bug once.
+
+**The walk stops at `@type` and requires a string there.** Neither is defensive
+tidiness; both are correctness. Descending into payload bodies would corrupt a
+rule whose `NamedAction.metadata` used `@type` as a key, and treating a
+non-string `@type` as a type URL would break a `MatcherTree` match key spelled
+`@type`. Those are the schema's only two user-controlled key positions, and both
+are pinned by tests.
+
+**Revisit if** an `xuma.*` message gains an `Any` field — nested expansion is
+unsupported, and would then need a descriptor-directed walk. It fails closed
+until then.
+
+### D-033 · `proto/xuma/**` field types are restricted to what round-trips as the identity
+
+`scripts/check-proto-field-types.mjs` fails the build on any field outside
+`{string, bool, bytes, map<string, string>, message in the same file}`.
+
+The JSON→bytes→JSON hop in D-034 is lossless *because the surface is small*.
+`int64` round-trips as a JSON string, enums as names, floats turn NaN into a
+string, and `optional` carries explicit presence the hop erases. None of those
+is unusable — each just makes the round trip a transform rather than an
+identity, at which point the reasoning above has to be redone.
+
+Proof by inspection decays silently on the first field somebody adds. This
+converts it to proof by construction. The check was falsified against six banned
+types before being wired in; it caught five, and the miss — `optional` slipping
+past a skip pattern written as `option` — is why it was tested at all.
+
+**Revisit** by deleting a ban and adding the round-trip fixture that replaces
+the proof for that type.
+
 ## 2026-08-17 · Reproducibility
 
 ### D-031 · Every lockfile is committed, and the toolchain is pinned
