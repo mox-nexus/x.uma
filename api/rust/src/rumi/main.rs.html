@@ -801,7 +801,7 @@
 <a href=#801 id=801 data-nosnippet>801</a>    </span><span class="attr">#[test]
 <a href=#802 id=802 data-nosnippet>802</a>    </span><span class="kw">fn </span>build_test_registry_has_expected_types() {
 <a href=#803 id=803 data-nosnippet>803</a>        <span class="kw">let </span>registry = build_test_registry();
-<a href=#804 id=804 data-nosnippet>804</a>        <span class="macro">assert!</span>(registry.contains_input(<span class="string">"xuma.test.v1.StringInput"</span>));
+<a href=#804 id=804 data-nosnippet>804</a>        <span class="macro">assert!</span>(registry.contains_input(<span class="string">"xuma.kv.v1.MapInput"</span>));
 <a href=#805 id=805 data-nosnippet>805</a>        <span class="macro">assert!</span>(registry.contains_matcher(<span class="string">"xuma.core.v1.StringMatcher"</span>));
 <a href=#806 id=806 data-nosnippet>806</a>        <span class="macro">assert!</span>(registry.contains_matcher(<span class="string">"xuma.core.v1.BoolMatcher"</span>));
 <a href=#807 id=807 data-nosnippet>807</a>    }

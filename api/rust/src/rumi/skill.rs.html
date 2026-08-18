@@ -61,7 +61,7 @@
 <a href=#61 id=61 data-nosnippet>61</a>matchers:
 <a href=#62 id=62 data-nosnippet>62</a>  - predicate:
 <a href=#63 id=63 data-nosnippet>63</a>      type: single
-<a href=#64 id=64 data-nosnippet>64</a>      input: { type_url: "xuma.test.v1.StringInput", config: { key: "method" } }
+<a href=#64 id=64 data-nosnippet>64</a>      input: { type_url: "xuma.kv.v1.MapInput", config: { key: "method" } }
 <a href=#65 id=65 data-nosnippet>65</a>      value_match: { Exact: "GET" }
 <a href=#66 id=66 data-nosnippet>66</a>    on_match: { type: action, action: "read-handler" }
 <a href=#67 id=67 data-nosnippet>67</a>
@@ -163,7 +163,7 @@
 <a href=#163 id=163 data-nosnippet>163</a>/// doc comment claims these tables cannot drift. The generated half could not.
 <a href=#164 id=164 data-nosnippet>164</a>/// This half could, and did.
 <a href=#165 id=165 data-nosnippet>165</a></span><span class="kw">pub const </span>CONFIG_KEYS: <span class="kw-2">&amp;</span>[(<span class="kw-2">&amp;</span>str, <span class="kw-2">&amp;</span>str)] = <span class="kw-2">&amp;</span>[
-<a href=#166 id=166 data-nosnippet>166</a>    (<span class="string">"xuma.test.v1.StringInput"</span>, <span class="string">"key"</span>),
+<a href=#166 id=166 data-nosnippet>166</a>    (<span class="string">"xuma.kv.v1.MapInput"</span>, <span class="string">"key"</span>),
 <a href=#167 id=167 data-nosnippet>167</a>    (<span class="string">"xuma.http.v1.HeaderInput"</span>, <span class="string">"name"</span>),
 <a href=#168 id=168 data-nosnippet>168</a>    (<span class="string">"xuma.http.v1.QueryParamInput"</span>, <span class="string">"name"</span>),
 <a href=#169 id=169 data-nosnippet>169</a>    (<span class="string">"xuma.claude.v1.ArgumentInput"</span>, <span class="string">"name"</span>),
@@ -176,7 +176,7 @@
 <a href=#176 id=176 data-nosnippet>176</a>/// extension appears immediately even before it is described here.
 <a href=#177 id=177 data-nosnippet>177</a></span><span class="kw">fn </span>description(type_url: <span class="kw-2">&amp;</span>str) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str {
 <a href=#178 id=178 data-nosnippet>178</a>    <span class="kw">match </span>type_url {
-<a href=#179 id=179 data-nosnippet>179</a>        <span class="string">"xuma.test.v1.StringInput" </span>=&gt; <span class="string">"reads the context map"</span>,
+<a href=#179 id=179 data-nosnippet>179</a>        <span class="string">"xuma.kv.v1.MapInput" </span>=&gt; <span class="string">"reads the context map"</span>,
 <a href=#180 id=180 data-nosnippet>180</a>        <span class="string">"xuma.core.v1.StringMatcher" </span>=&gt; <span class="string">"Exact / Prefix / Suffix / Contains / Regex"</span>,
 <a href=#181 id=181 data-nosnippet>181</a>        <span class="string">"xuma.core.v1.BoolMatcher" </span>=&gt; <span class="string">"matches a boolean value"</span>,
 <a href=#182 id=182 data-nosnippet>182</a>        <span class="string">"xuma.http.v1.PathInput" </span>=&gt; <span class="string">"request path, without query string"</span>,
