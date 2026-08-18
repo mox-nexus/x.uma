@@ -12,15 +12,17 @@
 <a href=#12 id=12 data-nosnippet>12</a></span><span class="kw">pub mod </span>config_fixture;
 <a href=#13 id=13 data-nosnippet>13</a><span class="attr">#[cfg(feature = <span class="string">"fixtures"</span>)]
 <a href=#14 id=14 data-nosnippet>14</a></span><span class="kw">pub mod </span>fixture;
-<a href=#15 id=15 data-nosnippet>15</a>
-<a href=#16 id=16 data-nosnippet>16</a><span class="comment">// The conformance suite refers to the domain by these names, so they are
-<a href=#17 id=17 data-nosnippet>17</a>// re-exported rather than duplicated. `rumi-kv` is the single definition.
-<a href=#18 id=18 data-nosnippet>18</a></span><span class="kw">pub use </span>rumi_kv::{KvContext, StringInput};
-<a href=#19 id=19 data-nosnippet>19</a>
-<a href=#20 id=20 data-nosnippet>20</a><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
-<a href=#21 id=21 data-nosnippet>21</a></span><span class="kw">pub use </span>rumi_kv::register;
-<a href=#22 id=22 data-nosnippet>22</a>
-<a href=#23 id=23 data-nosnippet>23</a><span class="kw">pub mod </span>prelude {
-<a href=#24 id=24 data-nosnippet>24</a>    <span class="kw">pub use </span>rumi_kv::prelude::<span class="kw-2">*</span>;
-<a href=#25 id=25 data-nosnippet>25</a>}
+<a href=#15 id=15 data-nosnippet>15</a><span class="attr">#[cfg(all(feature = <span class="string">"fixtures"</span>, feature = <span class="string">"registry"</span>))]
+<a href=#16 id=16 data-nosnippet>16</a></span><span class="kw">pub mod </span>proto_fixture;
+<a href=#17 id=17 data-nosnippet>17</a>
+<a href=#18 id=18 data-nosnippet>18</a><span class="comment">// The conformance suite refers to the domain by these names, so they are
+<a href=#19 id=19 data-nosnippet>19</a>// re-exported rather than duplicated. `rumi-kv` is the single definition.
+<a href=#20 id=20 data-nosnippet>20</a></span><span class="kw">pub use </span>rumi_kv::{KvContext, StringInput};
+<a href=#21 id=21 data-nosnippet>21</a>
+<a href=#22 id=22 data-nosnippet>22</a><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
+<a href=#23 id=23 data-nosnippet>23</a></span><span class="kw">pub use </span>rumi_kv::register;
+<a href=#24 id=24 data-nosnippet>24</a>
+<a href=#25 id=25 data-nosnippet>25</a><span class="kw">pub mod </span>prelude {
+<a href=#26 id=26 data-nosnippet>26</a>    <span class="kw">pub use </span>rumi_kv::prelude::<span class="kw-2">*</span>;
+<a href=#27 id=27 data-nosnippet>27</a>}
 </code></pre></div></section></main></body></html>
