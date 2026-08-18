@@ -213,3 +213,6 @@ class BoolMatcher:
 
     def matches(self, value: MatchingData, /) -> bool:
         return isinstance(value, bool) and value == self.expected
+
+    def supported_types(self) -> tuple[str, ...]:
+        return ("bool",)

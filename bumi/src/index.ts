@@ -56,6 +56,7 @@ export {
 
 // Registry
 export {
+	IncompatibleTypesError,
 	InvalidConfigError,
 	MAX_FIELD_MATCHERS,
 	MAX_PATTERN_LENGTH,

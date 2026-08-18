@@ -127,6 +127,22 @@ class TooManyPredicatesError(MatcherError):
         )
 
 
+class IncompatibleTypesError(MatcherError):
+    """An input's data type is not one the matcher can compare.
+
+    Caught at load time rather than at evaluation, where the mismatch would
+    look like a rule that simply never fires.
+    """
+
+    def __init__(self, input_type: str, matcher_types: tuple[str, ...]) -> None:
+        self.input_type = input_type
+        self.matcher_types = matcher_types
+        super().__init__(
+            f'input produces "{input_type}" data but matcher supports '
+            f"{list(matcher_types)}"
+        )
+
+
 class PatternTooLongError(MatcherError):
     """A match pattern exceeds the length limit."""
 
@@ -332,6 +348,16 @@ class Registry[Ctx]:
 
         # Resolve matcher: built-in or custom
         matcher = self._load_value_match(config.matcher)
+
+        # Type compatibility, checked at load rather than discovered at
+        # evaluation. rumi has done this since the beginning; puma and bumi did
+        # not, so a config pairing a string input with a boolean matcher was a
+        # load error in one implementation and a rule that silently never fired
+        # in the other two -- DECISIONS.md D-040.
+        data_type = getattr(data_input, "data_type", lambda: "string")()
+        supported = getattr(matcher, "supported_types", lambda: ("string",))()
+        if data_type not in supported:
+            raise IncompatibleTypesError(data_type, tuple(supported))
         return SinglePredicate(input=data_input, matcher=matcher)
 
     def _load_value_match(self, config: ValueMatchConfig) -> InputMatcher:
