@@ -139,7 +139,7 @@ matcher = compile_route_matches(routes, "api", "not_found")
   "matcher_list": [{
     "predicate": {
       "single": {
-        "input": { "type_url": "xuma.test.v1.StringInput", "config": { "key": "method" } },
+        "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "method" } },
         "matcher": { "type_url": "xuma.core.v1.StringMatcher", "config": { "exact": "GET" } }
       }
     },

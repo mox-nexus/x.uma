@@ -13,7 +13,7 @@ export const tieredRouting: Preset = {
           predicate: {
             type: "single",
             input: {
-              type_url: "xuma.test.v1.StringInput",
+              type_url: "xuma.kv.v1.MapInput",
               config: { key: "tier" },
             },
             value_match: { Exact: "premium" },
@@ -26,7 +26,7 @@ export const tieredRouting: Preset = {
                   predicate: {
                     type: "single",
                     input: {
-                      type_url: "xuma.test.v1.StringInput",
+                      type_url: "xuma.kv.v1.MapInput",
                       config: { key: "region" },
                     },
                     value_match: { Exact: "us-east" },
@@ -40,7 +40,7 @@ export const tieredRouting: Preset = {
                   predicate: {
                     type: "single",
                     input: {
-                      type_url: "xuma.test.v1.StringInput",
+                      type_url: "xuma.kv.v1.MapInput",
                       config: { key: "region" },
                     },
                     value_match: { Exact: "eu-west" },

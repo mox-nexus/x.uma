@@ -45,7 +45,7 @@ Extract a value and match it:
 ```json
 {
   "type": "single",
-  "input": { "type_url": "xuma.test.v1.StringInput", "config": { "key": "method" } },
+  "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "method" } },
   "value_match": { "Exact": "GET" }
 }
 ```
@@ -127,7 +127,7 @@ Action XOR matcher -- never both. This enforces OnMatch exclusivity from the xDS
 Reference to a registered type:
 
 ```json
-{ "type_url": "xuma.test.v1.StringInput", "config": { "key": "method" } }
+{ "type_url": "xuma.kv.v1.MapInput", "config": { "key": "method" } }
 ```
 
 | Field | Type | Required | Description |
@@ -172,7 +172,7 @@ Registered by `register_core_matchers()` in all implementations:
 
 | Type URL | Config | Extracts |
 |----------|--------|----------|
-| `xuma.test.v1.StringInput` | `{ "key": "method" }` | Value for key from test context |
+| `xuma.kv.v1.MapInput` | `{ "key": "method" }` | Value for key from test context |
 
 ### HTTP Domain
 
@@ -255,16 +255,16 @@ matchers:
       type: and
       predicates:
         - type: single
-          input: { type_url: "xuma.test.v1.StringInput", config: { key: "method" } }
+          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "method" } }
           value_match: { Exact: "GET" }
         - type: single
-          input: { type_url: "xuma.test.v1.StringInput", config: { key: "path" } }
+          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "path" } }
           value_match: { Prefix: "/api" }
     on_match: { type: action, action: "api_get" }
 
   - predicate:
       type: single
-      input: { type_url: "xuma.test.v1.StringInput", config: { key: "path" } }
+      input: { type_url: "xuma.kv.v1.MapInput", config: { key: "path" } }
       value_match: { Exact: "/health" }
     on_match: { type: action, action: "health" }
 

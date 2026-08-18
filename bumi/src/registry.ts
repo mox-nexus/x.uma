@@ -12,7 +12,7 @@
  * Example:
  *
  *   const builder = new RegistryBuilder<Record<string, string>>();
- *   builder.input("xuma.test.v1.StringInput", (cfg) => new DictInput(cfg.key as string));
+ *   builder.input("xuma.kv.v1.MapInput", (cfg) => new DictInput(cfg.key as string));
  *   const registry = builder.build();
  *
  *   const config = parseMatcherConfig(jsonData);

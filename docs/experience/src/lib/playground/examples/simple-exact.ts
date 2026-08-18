@@ -16,7 +16,7 @@ export const blockDangerousCommands: Preset = {
               {
                 type: "single",
                 input: {
-                  type_url: "xuma.test.v1.StringInput",
+                  type_url: "xuma.kv.v1.MapInput",
                   config: { key: "event" },
                 },
                 value_match: { Exact: "PreToolUse" },
@@ -24,7 +24,7 @@ export const blockDangerousCommands: Preset = {
               {
                 type: "single",
                 input: {
-                  type_url: "xuma.test.v1.StringInput",
+                  type_url: "xuma.kv.v1.MapInput",
                   config: { key: "tool_name" },
                 },
                 value_match: { Exact: "Bash" },
@@ -32,7 +32,7 @@ export const blockDangerousCommands: Preset = {
               {
                 type: "single",
                 input: {
-                  type_url: "xuma.test.v1.StringInput",
+                  type_url: "xuma.kv.v1.MapInput",
                   config: { key: "argument.command" },
                 },
                 value_match: { Contains: "rm -rf" },

@@ -9,13 +9,13 @@
 //! could not be published either, despite only ever wanting this half. The
 //! concept was never "test"; the misleading name is what hid the blocker.
 //!
-//! # Type URLs, and why they still say `test`
+//! # Type URL
 //!
-//! This crate registers `xuma.test.v1.StringInput`, not `xuma.kv.v1.*`. Type
-//! URLs are part of the config schema and freeze at first publish, so renaming
-//! them is a schema decision that belongs with the protojson migration, not
-//! with a crate split. Doing it here would break all 27 conformance fixtures
-//! for no gain. See `PLAN.md` SF8.
+//! This crate registers `xuma.kv.v1.MapInput`. It used to be
+//! `xuma.test.v1.StringInput`, whose only proto field was named `value` while
+//! the code used it as a lookup key — so the schema and the config disagreed
+//! about what the field meant, and which one you got depended on a feature
+//! flag. The concept was never "test" and it was never a value.
 //!
 //! # Example
 //!
@@ -100,21 +100,18 @@ pub mod prelude {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Registry support (feature = "registry")
-// Hand-written config types — used when proto feature is not enabled.
+// Config loading (feature = "registry")
+//
+// The config type is the generated proto message, unconditionally. There used
+// to be a hand-written `StringInputConfig { key }` here selected by
+// `#[cfg(all(feature = "registry", not(feature = "proto")))]`, with the proto
+// type on the other side of the cfg — so the same crate read a different config
+// key depending on a feature. Features add; they do not replace.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Configuration for [`StringInput`].
-#[cfg(all(feature = "registry", not(feature = "proto")))]
-#[derive(serde::Deserialize)]
-pub struct StringInputConfig {
-    /// The key to extract from the test context.
-    pub key: String,
-}
-
-#[cfg(all(feature = "registry", not(feature = "proto")))]
+#[cfg(feature = "registry")]
 impl rumi::IntoDataInput<KvContext> for StringInput {
-    type Config = StringInputConfig;
+    type Config = rumi_proto::xuma::kv::v1::MapInput;
 
     fn from_config(
         config: Self::Config,
@@ -123,38 +120,14 @@ impl rumi::IntoDataInput<KvContext> for StringInput {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Proto config types (feature = "proto")
-// Uses proto-generated types as Config, enabling xDS control plane integration.
-// ═══════════════════════════════════════════════════════════════════════════════
-
-#[cfg(feature = "proto")]
-mod proto_configs {
-    use super::*;
-    use rumi_proto::xuma::test::v1 as proto;
-
-    /// Proto `StringInput.value` maps to domain `StringInput.key`.
-    /// The proto field is named "value" (the extracted string value),
-    /// while the domain field is named "key" (the lookup key in test context).
-    impl rumi::IntoDataInput<KvContext> for StringInput {
-        type Config = proto::StringInput;
-
-        fn from_config(
-            config: proto::StringInput,
-        ) -> Result<Box<dyn rumi::DataInput<KvContext>>, rumi::MatcherError> {
-            Ok(Box::new(StringInput::new(config.value)?))
-        }
-    }
-}
-
-/// Register all rumi-test types with the given builder.
+/// Register the key-value domain with the given builder.
 ///
 /// Registers core matchers (`BoolMatcher`, `StringMatcher`) and test-domain inputs:
-/// - `xuma.test.v1.StringInput` → [`StringInput`]
+/// - `xuma.kv.v1.MapInput` → [`StringInput`]
 #[cfg(feature = "registry")]
 #[must_use]
 pub fn register(builder: rumi::RegistryBuilder<KvContext>) -> rumi::RegistryBuilder<KvContext> {
-    rumi::register_core_matchers(builder).input::<StringInput>("xuma.test.v1.StringInput")
+    rumi::register_core_matchers(builder).input::<StringInput>("xuma.kv.v1.MapInput")
 }
 
 #[cfg(test)]
@@ -215,12 +188,12 @@ mod tests {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Proto registry integration tests
-// Verifies the full pipeline: proto config → registry → DataInput → evaluate
+// Config-path integration tests
+// Verifies the full pipeline: config → registry → DataInput → evaluate
 // ═══════════════════════════════════════════════════════════════════════════════
 
-#[cfg(all(test, feature = "proto"))]
-mod proto_tests {
+#[cfg(all(test, feature = "registry"))]
+mod config_tests {
     use super::*;
     use rumi::MatcherConfig;
 
@@ -229,23 +202,22 @@ mod proto_tests {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
         // Core matchers + 1 test input
-        assert!(registry.contains_input("xuma.test.v1.StringInput"));
+        assert!(registry.contains_input("xuma.kv.v1.MapInput"));
         assert!(registry.contains_matcher("xuma.core.v1.StringMatcher"));
         assert!(registry.contains_matcher("xuma.core.v1.BoolMatcher"));
     }
 
     #[test]
-    fn load_matcher_with_proto_string_input() {
+    fn load_matcher_with_map_input() {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
-        // Proto StringInput config uses "value" field (maps to lookup key)
         let json = serde_json::json!({
             "matchers": [{
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.test.v1.StringInput",
-                        "config": { "value": "role" }
+                        "type_url": "xuma.kv.v1.MapInput",
+                        "config": { "key": "role" }
                     },
                     "value_match": { "Exact": "admin" }
                 },
@@ -276,16 +248,16 @@ mod proto_tests {
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.test.v1.StringInput",
-                                "config": { "value": "role" }
+                                "type_url": "xuma.kv.v1.MapInput",
+                                "config": { "key": "role" }
                             },
                             "value_match": { "Exact": "admin" }
                         },
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.test.v1.StringInput",
-                                "config": { "value": "org" }
+                                "type_url": "xuma.kv.v1.MapInput",
+                                "config": { "key": "org" }
                             },
                             "value_match": { "Prefix": "acme" }
                         }

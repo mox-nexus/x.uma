@@ -42,10 +42,10 @@ def register(
 ) -> RegistryBuilder[dict[str, str]]:
     """Register the test-domain DictInput type.
 
-    Type URL: xuma.test.v1.StringInput (matches rumi-test convention).
+    Type URL: xuma.kv.v1.MapInput (matches rumi-test convention).
     Config field: { "key": "field_name" }
     """
-    return builder.input("xuma.test.v1.StringInput", _dict_input_factory)
+    return builder.input("xuma.kv.v1.MapInput", _dict_input_factory)
 
 
 def _dict_input_factory(config: dict[str, Any]) -> DictInput:

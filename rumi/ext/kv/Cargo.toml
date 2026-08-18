@@ -12,9 +12,14 @@ readme = "README.md"
 
 [features]
 default = []
-registry = ["rumi-core/registry", "serde"]
+
+# Config loading. There is exactly one config vocabulary — the generated proto
+# types — so `registry` pulls them directly. There is deliberately no `proto`
+# feature: a feature that chose between two vocabularies is what made
+# `#[cfg(all(feature = "registry", not(feature = "proto")))]` writable, and the
+# fix is to leave nothing for it to choose between.
+registry = ["rumi-core/registry", "serde", "dep:rumi-proto"]
 serde = ["dep:serde"]
-proto = ["registry", "dep:rumi-proto"]
 
 [dependencies]
 rumi-core.workspace = true

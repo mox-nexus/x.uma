@@ -11,7 +11,7 @@ Architecture mirrors rumi's registry.rs:
 Example::
 
     builder = RegistryBuilder()
-    builder.input("xuma.test.v1.StringInput", lambda cfg: DictInput(cfg["key"]))
+    builder.input("xuma.kv.v1.MapInput", lambda cfg: DictInput(cfg["key"]))
     registry = builder.build()
 
     config = parse_matcher_config(json_data)

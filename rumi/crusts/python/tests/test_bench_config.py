@@ -40,7 +40,7 @@ SIMPLE_CONFIG = json.dumps(
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.test.v1.StringInput",
+                        "type_url": "xuma.kv.v1.MapInput",
                         "config": {"key": "role"},
                     },
                     "value_match": {"Exact": "admin"},
@@ -62,7 +62,7 @@ COMPOUND_CONFIG = json.dumps(
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.test.v1.StringInput",
+                                "type_url": "xuma.kv.v1.MapInput",
                                 "config": {"key": "role"},
                             },
                             "value_match": {"Exact": "admin"},
@@ -70,7 +70,7 @@ COMPOUND_CONFIG = json.dumps(
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.test.v1.StringInput",
+                                "type_url": "xuma.kv.v1.MapInput",
                                 "config": {"key": "org"},
                             },
                             "value_match": {"Prefix": "acme"},

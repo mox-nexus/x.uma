@@ -290,7 +290,7 @@ mod tests {
 
     fn test_resolver() -> AnyResolver {
         AnyResolverBuilder::new()
-            .register::<crate::xuma::test::v1::StringInput>("xuma.test.v1.StringInput")
+            .register::<crate::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
             .register::<crate::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
             .build()
     }
@@ -300,9 +300,7 @@ mod tests {
         let resolver = test_resolver();
 
         // Build proto: StringInput → Exact("hello") → NamedAction("hit")
-        let input_config = crate::xuma::test::v1::StringInput {
-            value: "role".into(),
-        };
+        let input_config = crate::xuma::kv::v1::MapInput { key: "role".into() };
         let action_config = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "allow".into(),
@@ -317,7 +315,7 @@ mod tests {
                             match_type: Some(
                                 proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                                     proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                                        input: Some(make_ext("input", "xuma.test.v1.StringInput", &input_config)),
+                                        input: Some(make_ext("input", "xuma.kv.v1.MapInput", &input_config)),
                                         matcher: Some(
                                             proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                                 proto_matcher::StringMatcher {
@@ -352,8 +350,8 @@ mod tests {
         // Check the predicate has our input
         match &config.matchers[0].predicate {
             PredicateConfig::Single(sp) => {
-                assert_eq!(sp.input.type_url, "xuma.test.v1.StringInput");
-                assert_eq!(sp.input.config["value"], "role");
+                assert_eq!(sp.input.type_url, "xuma.kv.v1.MapInput");
+                assert_eq!(sp.input.config["key"], "role");
             }
             other => panic!("expected Single, got {other:?}"),
         }
@@ -372,9 +370,7 @@ mod tests {
     fn convert_with_on_no_match() {
         let resolver = test_resolver();
 
-        let input_config = crate::xuma::test::v1::StringInput {
-            value: "key".into(),
-        };
+        let input_config = crate::xuma::kv::v1::MapInput { key: "key".into() };
         let hit_action = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "hit".into(),
@@ -398,7 +394,7 @@ mod tests {
                             match_type: Some(
                                 proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                                     proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                                        input: Some(make_ext("input", "xuma.test.v1.StringInput", &input_config)),
+                                        input: Some(make_ext("input", "xuma.kv.v1.MapInput", &input_config)),
                                         matcher: Some(
                                             proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                                 proto_matcher::StringMatcher {
@@ -438,23 +434,19 @@ mod tests {
     fn convert_and_predicate() {
         let resolver = test_resolver();
 
-        let input1 = crate::xuma::test::v1::StringInput {
-            value: "role".into(),
-        };
-        let input2 = crate::xuma::test::v1::StringInput {
-            value: "org".into(),
-        };
+        let input1 = crate::xuma::kv::v1::MapInput { key: "role".into() };
+        let input2 = crate::xuma::kv::v1::MapInput { key: "org".into() };
         let action = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "both".into(),
         };
 
-        let make_single = |input: &crate::xuma::test::v1::StringInput, pattern: &str| {
+        let make_single = |input: &crate::xuma::kv::v1::MapInput, pattern: &str| {
             proto_matcher::matcher::matcher_list::Predicate {
                 match_type: Some(
                     proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                         proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                            input: Some(make_ext("in", "xuma.test.v1.StringInput", input)),
+                            input: Some(make_ext("in", "xuma.kv.v1.MapInput", input)),
                             matcher: Some(
                                 proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                     proto_matcher::StringMatcher {
@@ -543,14 +535,12 @@ mod tests {
     #[test]
     fn e2e_proto_to_evaluate_exact_match() {
         // Setup: registry with test domain, action registry, resolver
-        let registry = rumi_test::register(rumi::RegistryBuilder::new()).build();
+        let registry = rumi_kv::register(rumi::RegistryBuilder::new()).build();
         let actions = test_action_registry();
         let resolver = test_resolver();
 
         // Build proto: StringInput("role") → Exact("admin") → NamedAction("allow")
-        let input_config = crate::xuma::test::v1::StringInput {
-            value: "role".into(),
-        };
+        let input_config = crate::xuma::kv::v1::MapInput { key: "role".into() };
         let action_config = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "allow".into(),
@@ -565,7 +555,7 @@ mod tests {
                             match_type: Some(
                                 proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                                     proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                                        input: Some(make_ext("input", "xuma.test.v1.StringInput", &input_config)),
+                                        input: Some(make_ext("input", "xuma.kv.v1.MapInput", &input_config)),
                                         matcher: Some(
                                             proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                                 proto_matcher::StringMatcher {
@@ -603,13 +593,11 @@ mod tests {
 
     #[test]
     fn e2e_proto_with_on_no_match_fallback() {
-        let registry = rumi_test::register(rumi::RegistryBuilder::new()).build();
+        let registry = rumi_kv::register(rumi::RegistryBuilder::new()).build();
         let actions = test_action_registry();
         let resolver = test_resolver();
 
-        let input_config = crate::xuma::test::v1::StringInput {
-            value: "role".into(),
-        };
+        let input_config = crate::xuma::kv::v1::MapInput { key: "role".into() };
         let hit_action = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "allow".into(),
@@ -633,7 +621,7 @@ mod tests {
                             match_type: Some(
                                 proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                                     proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                                        input: Some(make_ext("input", "xuma.test.v1.StringInput", &input_config)),
+                                        input: Some(make_ext("input", "xuma.kv.v1.MapInput", &input_config)),
                                         matcher: Some(
                                             proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                                 proto_matcher::StringMatcher {
@@ -672,27 +660,23 @@ mod tests {
 
     #[test]
     fn e2e_proto_and_predicate() {
-        let registry = rumi_test::register(rumi::RegistryBuilder::new()).build();
+        let registry = rumi_kv::register(rumi::RegistryBuilder::new()).build();
         let actions = test_action_registry();
         let resolver = test_resolver();
 
-        let input_role = crate::xuma::test::v1::StringInput {
-            value: "role".into(),
-        };
-        let input_org = crate::xuma::test::v1::StringInput {
-            value: "org".into(),
-        };
+        let input_role = crate::xuma::kv::v1::MapInput { key: "role".into() };
+        let input_org = crate::xuma::kv::v1::MapInput { key: "org".into() };
         let action = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "admin_acme".into(),
         };
 
-        let make_single = |input: &crate::xuma::test::v1::StringInput, pattern: &str| {
+        let make_single = |input: &crate::xuma::kv::v1::MapInput, pattern: &str| {
             proto_matcher::matcher::matcher_list::Predicate {
                 match_type: Some(
                     proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                         proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                            input: Some(make_ext("in", "xuma.test.v1.StringInput", input)),
+                            input: Some(make_ext("in", "xuma.kv.v1.MapInput", input)),
                             matcher: Some(
                                 proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                     proto_matcher::StringMatcher {

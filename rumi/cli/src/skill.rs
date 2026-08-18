@@ -61,7 +61,7 @@ config never silently returns a wrong answer.
 matchers:
   - predicate:
       type: single
-      input: { type_url: "xuma.test.v1.StringInput", config: { key: "method" } }
+      input: { type_url: "xuma.kv.v1.MapInput", config: { key: "method" } }
       value_match: { Exact: "GET" }
     on_match: { type: action, action: "read-handler" }
 
@@ -163,7 +163,7 @@ fn section(s: &mut String, title: &str, urls: &[&str]) {
 /// doc comment claims these tables cannot drift. The generated half could not.
 /// This half could, and did.
 pub const CONFIG_KEYS: &[(&str, &str)] = &[
-    ("xuma.test.v1.StringInput", "key"),
+    ("xuma.kv.v1.MapInput", "key"),
     ("xuma.http.v1.HeaderInput", "name"),
     ("xuma.http.v1.QueryParamInput", "name"),
     ("xuma.claude.v1.ArgumentInput", "name"),
@@ -176,7 +176,7 @@ pub const CONFIG_KEYS: &[(&str, &str)] = &[
 /// extension appears immediately even before it is described here.
 fn description(type_url: &str) -> &'static str {
     match type_url {
-        "xuma.test.v1.StringInput" => "reads the context map",
+        "xuma.kv.v1.MapInput" => "reads the context map",
         "xuma.core.v1.StringMatcher" => "Exact / Prefix / Suffix / Contains / Regex",
         "xuma.core.v1.BoolMatcher" => "matches a boolean value",
         "xuma.http.v1.PathInput" => "request path, without query string",

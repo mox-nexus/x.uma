@@ -5,7 +5,7 @@ config:
   matchers:
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "name" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "name" } }
         value_match: { Exact: "alice" }
       on_match: { type: action, action: "matched" }
   on_no_match: { type: action, action: "default" }

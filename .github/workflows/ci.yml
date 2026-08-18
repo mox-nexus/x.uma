@@ -57,6 +57,11 @@ jobs:
       - name: Test rumi-proto
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-proto
 
+      # Red for months while `just ci` ran default features instead. What it
+      # reported was real — see PLAN.md F19.
+      - name: Test (all features)
+        run: cargo test --manifest-path rumi/Cargo.toml --all-features
+
       - name: Feature combinations
         run: ./scripts/check-features.sh
 

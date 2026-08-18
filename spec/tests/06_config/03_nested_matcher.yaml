@@ -5,7 +5,7 @@ config:
   matchers:
     - predicate:
         type: single
-        input: { type_url: "xuma.test.v1.StringInput", config: { key: "tier" } }
+        input: { type_url: "xuma.kv.v1.MapInput", config: { key: "tier" } }
         value_match: { Exact: "premium" }
       on_match:
         type: matcher
@@ -13,12 +13,12 @@ config:
           matchers:
             - predicate:
                 type: single
-                input: { type_url: "xuma.test.v1.StringInput", config: { key: "region" } }
+                input: { type_url: "xuma.kv.v1.MapInput", config: { key: "region" } }
                 value_match: { Exact: "us-east" }
               on_match: { type: action, action: "premium_us_east" }
             - predicate:
                 type: single
-                input: { type_url: "xuma.test.v1.StringInput", config: { key: "region" } }
+                input: { type_url: "xuma.kv.v1.MapInput", config: { key: "region" } }
                 value_match: { Exact: "eu-west" }
               on_match: { type: action, action: "premium_eu_west" }
           on_no_match: { type: action, action: "premium_default" }

@@ -41,7 +41,7 @@ class TestRegistryBuilder:
         builder = register(builder)
         registry = builder.build()
 
-        assert registry.contains_input("xuma.test.v1.StringInput")
+        assert registry.contains_input("xuma.kv.v1.MapInput")
 
     def test_introspection_type_urls(self) -> None:
         builder = RegistryBuilder()
@@ -69,7 +69,7 @@ class TestLoadMatcher:
                     "predicate": {
                         "type": "single",
                         "input": {
-                            "type_url": "xuma.test.v1.StringInput",
+                            "type_url": "xuma.kv.v1.MapInput",
                             "config": {"key": "name"},
                         },
                         "value_match": {"Exact": "alice"},
@@ -96,7 +96,7 @@ class TestLoadMatcher:
                             {
                                 "type": "single",
                                 "input": {
-                                    "type_url": "xuma.test.v1.StringInput",
+                                    "type_url": "xuma.kv.v1.MapInput",
                                     "config": {"key": "role"},
                                 },
                                 "value_match": {"Exact": "admin"},
@@ -104,7 +104,7 @@ class TestLoadMatcher:
                             {
                                 "type": "single",
                                 "input": {
-                                    "type_url": "xuma.test.v1.StringInput",
+                                    "type_url": "xuma.kv.v1.MapInput",
                                     "config": {"key": "org"},
                                 },
                                 "value_match": {"Prefix": "acme"},
@@ -129,7 +129,7 @@ class TestLoadMatcher:
                     "predicate": {
                         "type": "single",
                         "input": {
-                            "type_url": "xuma.test.v1.StringInput",
+                            "type_url": "xuma.kv.v1.MapInput",
                             "config": {"key": "tier"},
                         },
                         "value_match": {"Prefix": ""},
@@ -142,7 +142,7 @@ class TestLoadMatcher:
                                     "predicate": {
                                         "type": "single",
                                         "input": {
-                                            "type_url": "xuma.test.v1.StringInput",
+                                            "type_url": "xuma.kv.v1.MapInput",
                                             "config": {"key": "tier"},
                                         },
                                         "value_match": {"Exact": "premium"},
@@ -185,7 +185,7 @@ class TestLoadMatcher:
                         "predicate": {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.test.v1.StringInput",
+                                "type_url": "xuma.kv.v1.MapInput",
                                 "config": {"key": "key"},
                             },
                             "value_match": {variant: pattern},
@@ -246,8 +246,8 @@ class TestRegistryErrors:
         config = parse_matcher_config(data)
         with pytest.raises(UnknownTypeUrlError) as exc_info:
             registry.load_matcher(config)
-        assert "xuma.test.v1.StringInput" in exc_info.value.available
-        assert "xuma.test.v1.StringInput" in str(exc_info.value)
+        assert "xuma.kv.v1.MapInput" in exc_info.value.available
+        assert "xuma.kv.v1.MapInput" in str(exc_info.value)
 
     def test_unknown_matcher_type_url(self) -> None:
         builder = RegistryBuilder()
@@ -260,7 +260,7 @@ class TestRegistryErrors:
                     "predicate": {
                         "type": "single",
                         "input": {
-                            "type_url": "xuma.test.v1.StringInput",
+                            "type_url": "xuma.kv.v1.MapInput",
                             "config": {"key": "x"},
                         },
                         "custom_match": {"type_url": "unknown.Matcher", "config": {}},
@@ -286,7 +286,7 @@ class TestRegistryErrors:
                     "predicate": {
                         "type": "single",
                         "input": {
-                            "type_url": "xuma.test.v1.StringInput",
+                            "type_url": "xuma.kv.v1.MapInput",
                             "config": {"wrong_field": 42},
                         },
                         "value_match": {"Exact": "x"},
@@ -314,7 +314,7 @@ class TestWidthLimits:
             "predicate": {
                 "type": "single",
                 "input": {
-                    "type_url": "xuma.test.v1.StringInput",
+                    "type_url": "xuma.kv.v1.MapInput",
                     "config": {"key": "x"},
                 },
                 "value_match": {"Exact": "x"},
@@ -333,7 +333,7 @@ class TestWidthLimits:
         single = {
             "type": "single",
             "input": {
-                "type_url": "xuma.test.v1.StringInput",
+                "type_url": "xuma.kv.v1.MapInput",
                 "config": {"key": "x"},
             },
             "value_match": {"Exact": "x"},
@@ -358,7 +358,7 @@ class TestWidthLimits:
         single = {
             "type": "single",
             "input": {
-                "type_url": "xuma.test.v1.StringInput",
+                "type_url": "xuma.kv.v1.MapInput",
                 "config": {"key": "x"},
             },
             "value_match": {"Exact": "x"},
@@ -387,7 +387,7 @@ class TestWidthLimits:
                     "predicate": {
                         "type": "single",
                         "input": {
-                            "type_url": "xuma.test.v1.StringInput",
+                            "type_url": "xuma.kv.v1.MapInput",
                             "config": {"key": "x"},
                         },
                         "value_match": {"Exact": long_pattern},
@@ -411,7 +411,7 @@ class TestWidthLimits:
                     "predicate": {
                         "type": "single",
                         "input": {
-                            "type_url": "xuma.test.v1.StringInput",
+                            "type_url": "xuma.kv.v1.MapInput",
                             "config": {"key": "x"},
                         },
                         "value_match": {"Regex": long_regex},
@@ -433,7 +433,7 @@ class TestWidthLimits:
                     "predicate": {
                         "type": "single",
                         "input": {
-                            "type_url": "xuma.test.v1.StringInput",
+                            "type_url": "xuma.kv.v1.MapInput",
                             "config": {"key": "x"},
                         },
                         "value_match": {"Exact": pattern},
@@ -452,7 +452,7 @@ class TestWidthLimits:
             "predicate": {
                 "type": "single",
                 "input": {
-                    "type_url": "xuma.test.v1.StringInput",
+                    "type_url": "xuma.kv.v1.MapInput",
                     "config": {"key": "x"},
                 },
                 "value_match": {"Exact": "x"},

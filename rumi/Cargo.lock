@@ -1284,7 +1284,6 @@ version = "0.0.2"
 dependencies = [
  "rumi-core",
  "rumi-kv",
- "rumi-proto",
  "serde",
  "serde_json",
  "serde_yaml",

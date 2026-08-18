@@ -10,7 +10,7 @@
     {
       "predicate": {
         "type": "single",
-        "input": { "type_url": "xuma.test.v1.StringInput",
+        "input": { "type_url": "xuma.kv.v1.MapInput",
                    "config": { "key": "method" } },
         "value_match": { "Exact": "GET" }
       },
@@ -19,7 +19,7 @@
     {
       "predicate": {
         "type": "single",
-        "input": { "type_url": "xuma.test.v1.StringInput",
+        "input": { "type_url": "xuma.kv.v1.MapInput",
                    "config": { "key": "method" } },
         "value_match": { "Exact": "POST" }
       },

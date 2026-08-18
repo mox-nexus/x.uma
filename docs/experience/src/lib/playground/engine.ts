@@ -15,7 +15,7 @@ const httpRegistry = registerHttp(new RegistryBuilder<HttpRequest>()).build();
 
 /**
  * Evaluate a MatcherConfig JSON against key-value context.
- * Uses the test domain registry (xuma.test.v1.StringInput).
+ * Uses the test domain registry (xuma.kv.v1.MapInput).
  */
 export function evaluateConfig(
   configJson: string,
