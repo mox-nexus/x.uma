@@ -68,7 +68,10 @@ fn convert_single(single: &fixture::SinglePredicateConfig) -> SinglePredicateCon
             type_url: "xuma.kv.v1.MapInput".to_string(),
             config: serde_json::json!({ "key": single.input.key }),
         },
-        matcher: ValueMatchConfig::BuiltIn(convert_value_match(&single.value_match)),
+        matcher: ValueMatchConfig::BuiltIn {
+            spec: convert_value_match(&single.value_match),
+            ignore_case: false,
+        },
     }
 }
 

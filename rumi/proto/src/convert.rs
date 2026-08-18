@@ -200,7 +200,10 @@ fn convert_single_predicate(
     let matcher = match matcher_oneof {
         ProtoMatcher::ValueMatch(string_matcher) => {
             let spec = convert_string_matcher(string_matcher)?;
-            ValueMatchConfig::BuiltIn(spec)
+            ValueMatchConfig::BuiltIn {
+                spec,
+                ignore_case: string_matcher.ignore_case,
+            }
         }
         ProtoMatcher::CustomMatch(ext) => {
             let typed = resolver.resolve(ext)?;
@@ -223,10 +226,10 @@ fn convert_string_matcher(
             source: "StringMatcher has no match_pattern".into(),
         })?;
 
-    // Note: ignore_case is not directly supported by StringMatchSpec.
-    // The runtime StringMatcher handles case sensitivity at construction time.
-    // For proto → config conversion, we emit the pattern as-is and rely on
-    // the registry's StringMatcher to handle ignore_case when applicable.
+    // `ignore_case` is not read here: it belongs to the comparison, not the
+    // pattern, so the caller carries it on ValueMatchConfig::BuiltIn. A comment
+    // in this spot used to claim the registry handled it. It did not, and the
+    // flag was dropped — a rule that read case-insensitive and was not.
 
     match pattern {
         MatchPattern::Exact(s) => Ok(StringMatchSpec::Exact(s.clone())),
@@ -245,6 +248,22 @@ fn convert_on_match(
     resolver: &AnyResolver,
 ) -> Result<OnMatchConfig<TypedConfig>, MatcherError> {
     use proto_matcher::matcher::on_match::OnMatch as ProtoOnMatch;
+
+    // `keep_matching` is one keystroke from being set and, until 2026-08-18,
+    // did nothing. In xDS it records the action and continues evaluating, which
+    // is a different answer from first-match-wins — so accepting it and
+    // ignoring it means a config that reads one way behaves another. It is
+    // deferred, not implemented (CLAUDE.md), so it is refused rather than
+    // silently reinterpreted. Rejecting is reversible; a wrong answer is not.
+    if om.keep_matching {
+        return Err(MatcherError::InvalidConfig {
+            source: "keep_matching is not implemented. In xDS it records the action and \
+                     continues evaluating; this engine returns the first match. Accepting \
+                     the field would give a different answer than the config asks for, so \
+                     it is refused. Remove it, or restructure the rule."
+                .into(),
+        });
+    }
 
     let on_match = om
         .on_match
@@ -532,6 +551,90 @@ mod tests {
             .build()
     }
 
+    /// `ignoreCase` survives the whole proto path.
+    ///
+    /// It used to be read from the proto and discarded in
+    /// `convert_string_matcher`, under a comment claiming the registry handled
+    /// it. The registry never saw it. A config that said `ignoreCase: true`
+    /// matched case-sensitively, and nothing reported that.
+    ///
+    /// The conformance suite cannot express this yet — the terse `config:`
+    /// dialect has no `ignore_case` field — so this is where SF1 is pinned
+    /// until the fixtures move to protojson.
+    #[test]
+    fn e2e_ignore_case_survives_the_proto_path() {
+        let registry = rumi_kv::register(rumi::RegistryBuilder::new()).build();
+        let actions = test_action_registry();
+        let resolver = test_resolver();
+
+        let build = |ignore_case: bool| {
+            let input_config = crate::xuma::kv::v1::MapInput { key: "role".into() };
+            let action_config = crate::xuma::core::v1::NamedAction {
+                metadata: Default::default(),
+                name: "allow".into(),
+            };
+            let proto = proto_matcher::Matcher {
+                on_no_match: None,
+                matcher_type: Some(proto_matcher::matcher::MatcherType::MatcherList(
+                    proto_matcher::matcher::MatcherList {
+                        matchers: vec![proto_matcher::matcher::matcher_list::FieldMatcher {
+                            predicate: Some(proto_matcher::matcher::matcher_list::Predicate {
+                                match_type: Some(
+                                    proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
+                                        proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
+                                            input: Some(make_ext(
+                                                "input",
+                                                "xuma.kv.v1.MapInput",
+                                                &input_config,
+                                            )),
+                                            matcher: Some(
+                                                proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
+                                                    proto_matcher::StringMatcher {
+                                                        ignore_case,
+                                                        match_pattern: Some(
+                                                            proto_matcher::string_matcher::MatchPattern::Exact(
+                                                                "admin".into(),
+                                                            ),
+                                                        ),
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            }),
+                            on_match: Some(proto_matcher::matcher::OnMatch {
+                                keep_matching: false,
+                                on_match: Some(
+                                    proto_matcher::matcher::on_match::OnMatch::Action(make_ext(
+                                        "action",
+                                        "xuma.core.v1.NamedAction",
+                                        &action_config,
+                                    )),
+                                ),
+                            }),
+                        }],
+                    },
+                )),
+            };
+            load_proto_matcher::<rumi_kv::KvContext, String>(&registry, &actions, &resolver, &proto)
+                .unwrap()
+        };
+
+        let shouting = rumi_kv::KvContext::new().with("role", "ADMIN");
+
+        assert_eq!(
+            build(true).evaluate(&shouting),
+            Some("allow".to_string()),
+            "ignoreCase: true must match ADMIN"
+        );
+        assert_eq!(
+            build(false).evaluate(&shouting),
+            None,
+            "without the flag it must stay case-sensitive"
+        );
+    }
+
     #[test]
     fn e2e_proto_to_evaluate_exact_match() {
         // Setup: registry with test domain, action registry, resolver
@@ -740,5 +843,79 @@ mod tests {
             .with("role", "viewer")
             .with("org", "other");
         assert_eq!(matcher.evaluate(&ctx), None);
+    }
+}
+
+#[cfg(test)]
+mod keep_matching_tests {
+    use super::*;
+    use crate::any_resolver::AnyResolverBuilder;
+    use crate::protojson::parse_matcher_str;
+
+    fn resolver() -> AnyResolver {
+        AnyResolverBuilder::new()
+            .register::<crate::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+            .register::<crate::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
+            .build()
+    }
+
+    fn doc(keep_matching: &str) -> String {
+        format!(
+            r#"{{
+              "matcherList": {{
+                "matchers": [{{
+                  "predicate": {{
+                    "singlePredicate": {{
+                      "input": {{
+                        "name": "role",
+                        "typedConfig": {{
+                          "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                          "key": "role"
+                        }}
+                      }},
+                      "valueMatch": {{ "exact": "admin" }}
+                    }}
+                  }},
+                  "onMatch": {{
+                    {keep_matching}
+                    "action": {{
+                      "name": "allow",
+                      "typedConfig": {{
+                        "@type": "type.googleapis.com/xuma.core.v1.NamedAction",
+                        "name": "allow"
+                      }}
+                    }}
+                  }}
+                }}]
+              }}
+            }}"#
+        )
+    }
+
+    /// Refused, not ignored. xDS `keep_matching` records the action and keeps
+    /// evaluating; this engine returns the first match. Accepting the field
+    /// silently would answer a different question than the config asked.
+    #[test]
+    fn keep_matching_is_refused_rather_than_ignored() {
+        let r = resolver();
+        let proto = parse_matcher_str(&r, &doc(r#""keepMatching": true,"#)).unwrap();
+        let err = convert_matcher(&proto, &r).unwrap_err();
+        match err {
+            MatcherError::InvalidConfig { ref source } => {
+                assert!(source.contains("keep_matching"), "{source}");
+            }
+            other => panic!("expected InvalidConfig, got {other:?}"),
+        }
+    }
+
+    /// The refusal must be about the flag being *set*, not about the field
+    /// existing — an explicit `false` is the same config as omitting it.
+    #[test]
+    fn keep_matching_false_and_absent_both_load() {
+        let r = resolver();
+        for variant in ["", r#""keepMatching": false,"#] {
+            let proto = parse_matcher_str(&r, &doc(variant)).unwrap();
+            assert!(convert_matcher(&proto, &r).is_ok(), "variant {variant:?}");
+        }
     }
 }
