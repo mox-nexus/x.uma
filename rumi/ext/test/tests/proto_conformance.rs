@@ -51,7 +51,9 @@ impl rumi::IntoAction<String> for NamedActionFactory {
 }
 
 /// Build the matcher a fixture describes, or say why it could not be built.
-fn build(fixture: &ProtoFixture) -> Result<rumi::Matcher<KvContext, String>, rumi::MatcherError> {
+fn build_matcher(
+    fixture: &ProtoFixture,
+) -> Result<rumi::Matcher<KvContext, String>, rumi::MatcherError> {
     let resolver = resolver();
     let registry = rumi_test::register(rumi::RegistryBuilder::new()).build();
     let actions = rumi::ActionRegistryBuilder::new()
@@ -68,7 +70,7 @@ fn run(fixture: &ProtoFixture) {
     // starts failing — it means the list is reporting on work already done.
     if !fixture.expects(ME) {
         assert!(
-            build(fixture).is_err(),
+            build_matcher(fixture).is_err(),
             "fixture '{}' does not list rust, but rust loads it. Add rust to \
              `implementations` — a stale exception hides a finished migration.",
             fixture.name
@@ -78,7 +80,7 @@ fn run(fixture: &ProtoFixture) {
     }
 
     if fixture.expect_error {
-        let err = build(fixture).err().unwrap_or_else(|| {
+        let err = build_matcher(fixture).err().unwrap_or_else(|| {
             panic!(
                 "fixture '{}' expected a load error, but it loaded",
                 fixture.name
@@ -96,8 +98,8 @@ fn run(fixture: &ProtoFixture) {
         return;
     }
 
-    let matcher =
-        build(fixture).unwrap_or_else(|e| panic!("fixture '{}' failed to load: {e}", fixture.name));
+    let matcher = build_matcher(fixture)
+        .unwrap_or_else(|e| panic!("fixture '{}' failed to load: {e}", fixture.name));
 
     for case in &fixture.cases {
         let ctx = case
@@ -139,4 +141,120 @@ fn protojson_conformance() {
         "no protojson fixtures found — the runner is inert"
     );
     println!("protojson conformance: {count} fixtures");
+}
+
+/// SF9 — the same rule in YAML and in JSON builds the same matcher.
+///
+/// Both syntaxes are accepted (`rumi/cli/src/main.rs` sniffs on extension), and
+/// D-026 makes that a guarantee rather than an accident, so it needs a test.
+///
+/// It holds by construction rather than by care: both front ends parse to a
+/// `serde_json::Value` and meet at `parse_matcher`. This asserts the
+/// construction has not been routed around — a second parser that reads YAML
+/// straight into the proto would pass every other test in this file and fail
+/// this one.
+#[test]
+fn yaml_and_json_build_the_same_matcher() {
+    const YAML: &str = r#"
+matcherList:
+  matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: role
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: role
+          valueMatch:
+            exact: admin
+      onMatch:
+        action:
+          name: allow
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: allow
+onNoMatch:
+  action:
+    name: deny
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: deny
+"#;
+
+    const JSON: &str = r#"{
+      "matcherList": {
+        "matchers": [{
+          "predicate": {
+            "singlePredicate": {
+              "input": {
+                "name": "role",
+                "typedConfig": {
+                  "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                  "key": "role"
+                }
+              },
+              "valueMatch": { "exact": "admin" }
+            }
+          },
+          "onMatch": {
+            "action": {
+              "name": "allow",
+              "typedConfig": {
+                "@type": "type.googleapis.com/xuma.core.v1.NamedAction",
+                "name": "allow"
+              }
+            }
+          }
+        }]
+      },
+      "onNoMatch": {
+        "action": {
+          "name": "deny",
+          "typedConfig": {
+            "@type": "type.googleapis.com/xuma.core.v1.NamedAction",
+            "name": "deny"
+          }
+        }
+      }
+    }"#;
+
+    let from_yaml: serde_json::Value =
+        serde_yaml::from_str(YAML).expect("the YAML form should parse");
+    let from_json: serde_json::Value =
+        serde_json::from_str(JSON).expect("the JSON form should parse");
+
+    assert_eq!(
+        from_yaml, from_json,
+        "the two syntaxes must reach the same document"
+    );
+
+    // And the document must reach the same behaviour, not merely the same
+    // shape — a matcher that never fires would satisfy the assert above.
+    let build = |doc: serde_json::Value| {
+        let fixture = ProtoFixture {
+            name: "sf9".into(),
+            description: String::new(),
+            proto_matcher: doc,
+            implementations: rumi_test::proto_fixture::ALL.to_vec(),
+            cases: Vec::new(),
+            expect_error: false,
+            error_contains: None,
+        };
+        build_matcher(&fixture).expect("should load")
+    };
+
+    let (a, b) = (build(from_yaml), build(from_json));
+    for role in ["admin", "viewer", ""] {
+        let ctx = KvContext::new().with("role", role);
+        assert_eq!(
+            a.evaluate(&ctx),
+            b.evaluate(&ctx),
+            "the two syntaxes disagree on role={role:?}"
+        );
+    }
+    assert_eq!(
+        a.evaluate(&KvContext::new().with("role", "admin")),
+        Some("allow".to_string()),
+        "and the rule must actually fire, or this test proves nothing"
+    );
 }

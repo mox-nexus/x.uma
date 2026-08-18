@@ -40,7 +40,7 @@ half is not. Concretely:
 - the four fixture dialects, and the 27 fixtures written in them
 - puma and bumi, neither of which has xDS types generated at all
 - `MatcherConfig` still derives `Deserialize` — the dialect is still authorable
-- SF3, SF5, SF6, SF9 remain; SF1, SF2, SF4, SF7 and SF8's renames are done
+- SF3, SF5, SF6 remain; SF1, SF2, SF4, SF7, SF9 and SF8's renames are done
 
 The next section is what the work so far established, and it changes several
 things this plan says further down. Read it before starting.
@@ -959,10 +959,16 @@ frozen by publishing, so they must be decided here, not in Phase E:
 - ~~The PascalCase `Exact` / lowercase `type:` inconsistency.~~ **Deleted by
   D-026**, since the dialect that carried it is retired. Confirm with a grep at
   the end of Phase C rather than assuming.
-- **SF9 (new).** A fixture asserting the same rule, written as protojson-in-YAML
-  and as protojson-in-JSON, builds an identical matcher. Both syntaxes are
-  already accepted (`main.rs:379-381`); D-026 makes that a supported guarantee
-  rather than an accident, so it needs a test.
+- ~~**SF9.**~~ **DONE.** `yaml_and_json_build_the_same_matcher` asserts both
+  syntaxes reach the same document *and* the same behaviour. It holds by
+  construction — both front ends parse to a `serde_json::Value` and meet at
+  `parse_matcher` — so the test's real job is catching a second parser that
+  routes around that, which would pass every other test and fail this one.
+
+  *(Original wording: a fixture asserting the same rule, written as
+  protojson-in-YAML and as protojson-in-JSON, builds an identical matcher. Both
+  syntaxes are already accepted; D-026 made that a supported guarantee rather
+  than an accident, so it needed a test.)*
 
 **Done when:** every fixture above exists and fails for the documented reason.
 **No production code changes in this phase.** SF0 is already answered — do not
