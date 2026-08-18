@@ -1,0 +1,71 @@
+---
+name: first_match_wins
+description: 'Multiple field matchers: first match wins, later matchers are not evaluated'
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: path
+          valueMatch:
+            exact: /health
+      onMatch:
+        action:
+          name: health_check
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: health_check
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: path
+          valueMatch:
+            prefix: /api
+      onMatch:
+        action:
+          name: api_backend
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: api_backend
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: path
+          valueMatch:
+            prefix: /
+      onMatch:
+        action:
+          name: default_backend
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: default_backend
+cases:
+- name: first_rule_wins
+  context:
+    path: /health
+  expect: health_check
+- name: second_rule
+  context:
+    path: /api/users
+  expect: api_backend
+- name: third_rule_catchall
+  context:
+    path: /about
+  expect: default_backend
+- name: no_match_no_fallback
+  context:
+    other: x
+  expect: null
+

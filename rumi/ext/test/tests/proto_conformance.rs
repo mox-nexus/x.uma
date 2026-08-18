@@ -84,6 +84,14 @@ fn run(fixture: &ProtoFixture) {
                 fixture.name
             )
         });
+        if let Some(needle) = &fixture.error_contains {
+            let text = err.to_string();
+            assert!(
+                text.contains(needle),
+                "fixture '{}' failed for the wrong reason.\n  wanted: {needle}\n  got:    {text}",
+                fixture.name
+            );
+        }
         println!("  {} -> load error (expected): {err}", fixture.name);
         return;
     }
