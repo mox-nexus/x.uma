@@ -922,7 +922,12 @@ the three conformance runners over them. `http_route_match(es):` stays: it feeds
 the Gateway API *compiler*, which is not a config format and which D-026 does
 not touch.
 
-**All three implementations read protojson and pass all 30 fixtures.** They run
+**All five implementations read protojson.** Not three — the crusts run the
+same fixtures through the same reader, in a `fixtures.rs` that is byte-identical
+between them, so the wheel and the npm package cannot diverge from each other or
+from rumi. That was found by CI rather than by design: `just ci` does not build
+the crusts (they need maturin and wasm-pack), so deleting the old dialect broke
+them silently on this machine. They run
 in CI (`spec/tests/07_protojson/`), every fixture listing
 `[rust, python, typescript]` — the ledger's end state, so the
 `implementations:` field can be deleted whenever nothing needs it.

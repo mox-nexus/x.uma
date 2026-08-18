@@ -11,6 +11,8 @@
 
 mod config;
 mod convert;
+#[cfg(feature = "fixtures")]
+mod fixtures;
 mod http_matcher;
 pub(crate) mod matcher;
 mod test_matcher;
