@@ -40,7 +40,7 @@ half is not. Concretely:
 - the four fixture dialects, and the 27 fixtures written in them
 - puma and bumi, neither of which has xDS types generated at all
 - `MatcherConfig` still derives `Deserialize` — the dialect is still authorable
-- SF1, SF2, SF3, SF5, SF6, SF9 remain; SF4, SF7 and SF8's renames are done
+- SF3, SF5, SF6, SF9 remain; SF1, SF2, SF4, SF7 and SF8's renames are done
 
 The next section is what the work so far established, and it changes several
 things this plan says further down. Read it before starting.
@@ -910,6 +910,15 @@ immune this way: it has no `proto` feature at all.
 different semantics with no `cfg` involved — `register` strips the query,
 `register_simple` does not, and both crusts use `register_simple`. Feature
 powerset checks cannot see this class. It needs a conformance fixture.
+
+**The fifth fixture key exists.** `proto_matcher:` is live, with a runner in CI
+and four fixtures through it — `spec/tests/07_protojson/`, and
+`rumi/ext/test/src/proto_fixture.rs` for the mechanism. Each fixture carries an
+`implementations:` ledger that CI enforces **in both directions**: a listed
+implementation that fails is a failure, and an unlisted one that *succeeds* is
+also a failure, because a stale exception hides a finished migration. The
+migration is done when every fixture lists all three and the field can be
+deleted. Verified by flipping a fixture to `[python]` and watching Rust fail.
 
 **SF1–SF7. Write these fixtures. All must be red at the end of this phase.**
 
