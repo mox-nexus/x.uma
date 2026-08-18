@@ -27,6 +27,8 @@ from xuma import (
     RegistryBuilder,
     parse_protojson,
 )
+from xuma.http import HttpRequest
+from xuma.http import register as register_http
 from xuma.testing import register
 
 ME = "python"
@@ -50,10 +52,28 @@ FIXTURES = _load()
 
 
 def _build(fixture: dict[str, Any]):  # noqa: ANN202
-    """Load the fixture's matcher, or raise saying why it could not be built."""
-    builder = register(RegistryBuilder())
-    registry = builder.build()
-    return registry.load_matcher(parse_protojson(fixture["proto_matcher"]))
+    """Load the fixture's matcher, or raise saying why it could not be built.
+
+    The matcher config is domain-agnostic; only the registry differs.
+    """
+    domain = fixture.get("domain", "kv")
+    builder = register_http(RegistryBuilder()) if domain == "http" else register(RegistryBuilder())
+    return builder.build().load_matcher(parse_protojson(fixture["proto_matcher"]))
+
+
+def _context(fixture: dict[str, Any], case: dict[str, Any]):  # noqa: ANN202
+    """Build the context a case evaluates against, for its fixture's domain."""
+    if fixture.get("domain", "kv") == "http":
+        spec = case.get("http_request")
+        if spec is None:
+            msg = f"case {case.get('name')!r} is in the http domain but has no http_request"
+            raise AssertionError(msg)
+        return HttpRequest(
+            method=spec.get("method", ""),
+            raw_path=spec.get("path", ""),
+            headers=dict(spec.get("headers", {})),
+        )
+    return dict(case.get("context", {}))
 
 
 def _ids() -> list[str]:
@@ -93,7 +113,7 @@ def test_protojson_fixture(fixture: dict[str, Any]) -> None:
 
     matcher = _build(fixture)
     for case in fixture.get("cases", []):
-        actual = matcher.evaluate(dict(case.get("context", {})))
+        actual = matcher.evaluate(_context(fixture, case))
         assert actual == case.get("expect"), (
             f"fixture {name!r} case {case.get('name')!r}: "
             f"expected {case.get('expect')!r}, got {actual!r}"

@@ -1,0 +1,186 @@
+name: "http_config_path_all_inputs"
+description: >
+  Every HTTP input, reached through the config path rather than the Gateway API
+  compiler.
+
+  `spec/tests/05_http` already covers this domain cross-language, but it feeds
+  `compile_route_matches` — a different entry point with a different config
+  shape. This is the same domain through `parseProtojson` -> registry, which is
+  what a user writes.
+
+  It also pins the six `xuma.http.v1.*` type URLs to their meanings in all three
+  implementations. `PathInput` in particular: it strips the query string, which
+  puma and bumi always did and Rust's simple context did not until F26.
+
+domain: http
+
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          andMatcher:
+            predicate:
+              - singlePredicate:
+                  input:
+                    name: method
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.http.v1.MethodInput
+                  valueMatch:
+                    exact: GET
+              - singlePredicate:
+                  input:
+                    name: path
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.http.v1.PathInput
+                  valueMatch:
+                    prefix: /api
+              - singlePredicate:
+                  input:
+                    name: accept
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.http.v1.HeaderInput
+                      name: accept
+                  valueMatch:
+                    contains: json
+        onMatch:
+          action:
+            name: api_read_json
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: api_read_json
+
+      - predicate:
+          singlePredicate:
+            input:
+              name: page
+              typedConfig:
+                "@type": type.googleapis.com/xuma.http.v1.QueryParamInput
+                name: page
+            valueMatch:
+              exact: "2"
+        onMatch:
+          action:
+            name: second_page
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: second_page
+
+  onNoMatch:
+    action:
+      name: not_found
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: not_found
+
+cases:
+  - name: "all_three_conditions_hold"
+    http_request:
+      method: GET
+      path: /api/users
+      headers: { accept: application/json }
+    expect: "api_read_json"
+
+  - name: "path_matches_despite_a_query_string"
+    http_request:
+      method: GET
+      path: /api/users?page=1
+      headers: { accept: application/json }
+    expect: "api_read_json"
+
+  - name: "wrong_method_falls_to_the_next_rule"
+    http_request:
+      method: POST
+      path: /api/users
+      headers: { accept: application/json }
+    expect: "not_found"
+
+  - name: "a_query_parameter_is_read_from_the_target"
+    http_request:
+      method: POST
+      path: /other?page=2
+    expect: "second_page"
+
+  - name: "a_missing_header_is_false_not_an_error"
+    http_request:
+      method: GET
+      path: /api/users
+    expect: "not_found"
+
+  - name: "nothing_matches"
+    http_request:
+      method: DELETE
+      path: /
+    expect: "not_found"
+
+---
+name: "http_authority_and_scheme"
+description: >
+  The two pseudo-header inputs, which the main HTTP fixture does not reach.
+
+  `AuthorityInput` is the one worth a fixture: its proto message was named
+  `HostInput` while the registry advertised `xuma.http.v1.AuthorityInput`, so
+  the schema and the type URL named different things until 2026-08-18.
+
+domain: http
+
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          andMatcher:
+            predicate:
+              - singlePredicate:
+                  input:
+                    name: authority
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.http.v1.AuthorityInput
+                  valueMatch:
+                    suffix: .internal
+              - singlePredicate:
+                  input:
+                    name: scheme
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.http.v1.SchemeInput
+                  valueMatch:
+                    exact: https
+        onMatch:
+          action:
+            name: internal_tls
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: internal_tls
+
+  onNoMatch:
+    action:
+      name: rejected
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: rejected
+
+cases:
+  - name: "both_pseudo_headers_hold"
+    http_request:
+      method: GET
+      path: /
+      headers: { ":authority": svc.internal, ":scheme": https }
+    expect: "internal_tls"
+
+  - name: "plaintext_is_rejected"
+    http_request:
+      method: GET
+      path: /
+      headers: { ":authority": svc.internal, ":scheme": http }
+    expect: "rejected"
+
+  - name: "an_external_authority_is_rejected"
+    http_request:
+      method: GET
+      path: /
+      headers: { ":authority": example.com, ":scheme": https }
+    expect: "rejected"
+
+  - name: "absent_pseudo_headers_are_false_not_an_error"
+    http_request:
+      method: GET
+      path: /
+    expect: "rejected"

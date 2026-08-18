@@ -32,6 +32,17 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 
+/// Which domain a fixture's contexts belong to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Domain {
+    /// A string-to-string map. The default.
+    #[default]
+    Kv,
+    /// An HTTP request.
+    Http,
+}
+
 /// An implementation that may be expected to run a fixture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -75,6 +86,14 @@ pub struct ProtoFixture {
     #[serde(default)]
     pub cases: Vec<ProtoTestCase>,
 
+    /// Which domain's context this fixture evaluates against.
+    ///
+    /// `kv` (the default) reads a string map; `http` builds an `HttpRequest`.
+    /// The matcher config itself is domain-agnostic — only the context and the
+    /// registry differ.
+    #[serde(default)]
+    pub domain: Domain,
+
     /// The config must fail to load. `cases` is then ignored.
     #[serde(default)]
     pub expect_error: bool,
@@ -100,11 +119,33 @@ fn all_implementations() -> Vec<Implementation> {
 pub struct ProtoTestCase {
     /// Case name, used in failure messages.
     pub name: String,
-    /// The context to evaluate against.
+    /// A key-value context, for fixtures in the `kv` domain.
     #[serde(default)]
     pub context: HashMap<String, String>,
+    /// An HTTP request, for fixtures in the `http` domain.
+    #[serde(default)]
+    pub http_request: Option<HttpRequestSpec>,
     /// The expected action, or `None` for no match.
     pub expect: Option<String>,
+}
+
+/// One HTTP request a fixture evaluates against.
+///
+/// Shaped like `spec/tests/05_http`'s `http_request:` so the two dialects
+/// describe a request the same way — they exercise different code paths (the
+/// compiler there, the config path here) and there is no reason for the input
+/// to look different.
+#[derive(Debug, Deserialize)]
+pub struct HttpRequestSpec {
+    /// Request method.
+    #[serde(default)]
+    pub method: String,
+    /// Request target, query string included.
+    #[serde(default)]
+    pub path: String,
+    /// Request headers.
+    #[serde(default)]
+    pub headers: HashMap<String, String>,
 }
 
 impl ProtoFixture {
