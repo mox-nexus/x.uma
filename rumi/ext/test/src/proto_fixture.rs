@@ -78,6 +78,17 @@ pub struct ProtoFixture {
     /// The config must fail to load. `cases` is then ignored.
     #[serde(default)]
     pub expect_error: bool,
+
+    /// A substring the load error must contain.
+    ///
+    /// Without this an `expect_error` fixture passes on *any* failure, so one
+    /// that starts failing earlier — a type URL nobody registered, a typo in
+    /// the fixture itself — still looks green while no longer testing what it
+    /// was written for. That happened here: a fixture meant to prove a
+    /// both-set oneof is rejected was instead failing on an unregistered type,
+    /// and passing.
+    #[serde(default)]
+    pub error_contains: Option<String>,
 }
 
 fn all_implementations() -> Vec<Implementation> {

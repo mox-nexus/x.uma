@@ -1,0 +1,75 @@
+---
+name: on_no_match_fallback
+description: on_no_match provides fallback action when no field matcher matches
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: status
+          valueMatch:
+            exact: active
+      onMatch:
+        action:
+          name: allow
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: allow
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+cases:
+- name: match_returns_action
+  context:
+    status: active
+  expect: allow
+- name: no_match_returns_fallback
+  context:
+    status: suspended
+  expect: deny
+- name: missing_key_returns_fallback
+  context: {}
+  expect: deny
+
+---
+name: no_fallback
+description: Without on_no_match, no-match returns null
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: status
+          valueMatch:
+            exact: active
+      onMatch:
+        action:
+          name: allow
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: allow
+cases:
+- name: match_returns_action
+  context:
+    status: active
+  expect: allow
+- name: no_match_returns_null
+  context:
+    status: suspended
+  expect: null
+

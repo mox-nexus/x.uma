@@ -1,0 +1,170 @@
+---
+name: exact_via_config
+description: Exact string match via config loading
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: v
+          valueMatch:
+            exact: hello
+      onMatch:
+        action:
+          name: hit
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: hit
+cases:
+- name: exact_hit
+  context:
+    v: hello
+  expect: hit
+- name: exact_miss
+  context:
+    v: Hello
+  expect: null
+
+---
+name: prefix_via_config
+description: Prefix string match via config loading
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: v
+          valueMatch:
+            prefix: /api
+      onMatch:
+        action:
+          name: hit
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: hit
+cases:
+- name: prefix_hit
+  context:
+    v: /api/users
+  expect: hit
+- name: prefix_exact
+  context:
+    v: /api
+  expect: hit
+- name: prefix_miss
+  context:
+    v: /other
+  expect: null
+
+---
+name: suffix_via_config
+description: Suffix string match via config loading
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: v
+          valueMatch:
+            suffix: .rs
+      onMatch:
+        action:
+          name: hit
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: hit
+cases:
+- name: suffix_hit
+  context:
+    v: main.rs
+  expect: hit
+- name: suffix_miss
+  context:
+    v: main.py
+  expect: null
+
+---
+name: contains_via_config
+description: Contains string match via config loading
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: v
+          valueMatch:
+            contains: error
+      onMatch:
+        action:
+          name: hit
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: hit
+cases:
+- name: contains_hit
+  context:
+    v: an error occurred
+  expect: hit
+- name: contains_miss
+  context:
+    v: all good
+  expect: null
+
+---
+name: regex_via_config
+description: Regex string match via config loading
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: v
+          valueMatch:
+            safeRegex:
+              regex: ^user-\d+$
+      onMatch:
+        action:
+          name: hit
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: hit
+cases:
+- name: regex_hit
+  context:
+    v: user-123
+  expect: hit
+- name: regex_miss
+  context:
+    v: user-abc
+  expect: null
+

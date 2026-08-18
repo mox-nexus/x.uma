@@ -1,0 +1,133 @@
+---
+name: both_value_and_custom_match
+description: Setting both value_match AND custom_match is an error (oneof violation)
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: x
+          valueMatch:
+            exact: a
+          customMatch:
+            name: custom
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: x
+      onMatch:
+        action:
+          name: x
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: x
+expect_error: true
+error_contains: duplicate field
+
+---
+name: unknown_input_type_url
+description: Unregistered input type_url produces an error
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: NoSuchInput
+            typedConfig:
+              '@type': type.googleapis.com/unknown.NoSuchInput
+          valueMatch:
+            exact: x
+      onMatch:
+        action:
+          name: x
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: x
+expect_error: true
+error_contains: unknown.NoSuchInput
+
+---
+name: unknown_matcher_type_url
+description: Unregistered custom_match type_url produces an error
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: x
+          customMatch:
+            name: custom
+            typedConfig:
+              '@type': type.googleapis.com/unknown.NoSuchMatcher
+      onMatch:
+        action:
+          name: x
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: x
+expect_error: true
+error_contains: unknown.NoSuchMatcher
+---
+name: a_predicate_with_no_matcher_is_rejected
+description: >
+  A singlePredicate names an input but no way to match it. The terse dialect
+  caught this as "neither value_match nor custom_match"; in protojson it is an
+  unset oneof, which convert.rs checks explicitly. Either way it must not load
+  as a predicate that quietly never fires.
+implementations: [rust]
+expect_error: true
+error_contains: has no matcher
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          singlePredicate:
+            input:
+              name: MapInput
+              typedConfig:
+                '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                key: role
+        onMatch:
+          action:
+            name: allow
+            typedConfig:
+              '@type': type.googleapis.com/xuma.core.v1.NamedAction
+              name: allow
+
+---
+name: an_unknown_predicate_kind_is_rejected
+description: >
+  The terse dialect's version of this used `type: xor`. protojson has no `type`
+  discriminator — the predicate kind IS the field name — so the equivalent
+  mistake is a field the schema does not define, and the generated
+  deserializer rejects it. That rejection is what extends SECURITY.md control
+  #6 across the whole config surface.
+implementations: [rust]
+expect_error: true
+error_contains: unknown field
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          xorMatcher:
+            predicate: []
+        onMatch:
+          action:
+            name: allow
+            typedConfig:
+              '@type': type.googleapis.com/xuma.core.v1.NamedAction
+              name: allow

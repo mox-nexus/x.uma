@@ -911,6 +911,22 @@ different semantics with no `cfg` involved — `register` strips the query,
 `register_simple` does not, and both crusts use `register_simple`. Feature
 powerset checks cannot see this class. It needs a conformance fixture.
 
+**The fifth fixture key exists, and the 7 `config:` fixtures are through it.**
+22 protojson fixtures run in CI (`spec/tests/07_protojson/`), all listing
+`[rust]`. The migration was done by a mechanical translator rather than by hand,
+because transcription is where semantics drift — and the translator's one bug
+was caught by a fixture: it used `if/elif` on the `value_match` / `custom_match`
+oneof, silently dropping one half of the fixture whose whole point is that
+setting both is illegal. A negative fixture had quietly become a passing
+positive one.
+
+That is also why `error_contains:` exists. An `expect_error` fixture passes on
+*any* failure, so one that starts failing earlier still looks green while no
+longer testing what it was written for. `both_value_and_custom_match` was doing
+exactly that — failing on an unregistered `xuma.core.v1.StringMatcher` (F11)
+rather than on the duplicate oneof. It now pins the reason, and pbjson's
+duplicate-field rejection is confirmed to be what fires.
+
 **The fifth fixture key exists.** `proto_matcher:` is live, with a runner in CI
 and four fixtures through it — `spec/tests/07_protojson/`, and
 `rumi/ext/test/src/proto_fixture.rs` for the mechanism. Each fixture carries an

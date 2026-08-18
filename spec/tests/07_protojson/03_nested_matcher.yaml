@@ -1,0 +1,89 @@
+---
+name: nested_matcher
+description: 'OnMatch::Matcher nesting: outer match delegates to inner matcher'
+implementations:
+- rust
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: MapInput
+            typedConfig:
+              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              key: tier
+          valueMatch:
+            exact: premium
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+            - predicate:
+                singlePredicate:
+                  input:
+                    name: MapInput
+                    typedConfig:
+                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      key: region
+                  valueMatch:
+                    exact: us-east
+              onMatch:
+                action:
+                  name: premium_us_east
+                  typedConfig:
+                    '@type': type.googleapis.com/xuma.core.v1.NamedAction
+                    name: premium_us_east
+            - predicate:
+                singlePredicate:
+                  input:
+                    name: MapInput
+                    typedConfig:
+                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      key: region
+                  valueMatch:
+                    exact: eu-west
+              onMatch:
+                action:
+                  name: premium_eu_west
+                  typedConfig:
+                    '@type': type.googleapis.com/xuma.core.v1.NamedAction
+                    name: premium_eu_west
+          onNoMatch:
+            action:
+              name: premium_default
+              typedConfig:
+                '@type': type.googleapis.com/xuma.core.v1.NamedAction
+                name: premium_default
+  onNoMatch:
+    action:
+      name: free_tier
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: free_tier
+cases:
+- name: premium_us_east
+  context:
+    tier: premium
+    region: us-east
+  expect: premium_us_east
+- name: premium_eu_west
+  context:
+    tier: premium
+    region: eu-west
+  expect: premium_eu_west
+- name: premium_unknown_region
+  context:
+    tier: premium
+    region: ap-south
+  expect: premium_default
+- name: free_tier
+  context:
+    tier: free
+    region: us-east
+  expect: free_tier
+- name: missing_tier
+  context:
+    region: us-east
+  expect: free_tier
+
