@@ -1,0 +1,48 @@
+name: "http_path_exact_ignores_query"
+description: >
+  A query string is not part of the path. Exact path matching must ignore it,
+  and every implementation must agree that it does.
+
+  This is the case that discriminates: prefix matching succeeds either way, so
+  the existing prefix fixture could not tell a query-stripping implementation
+  from one that compares the raw target. Rust's simple HTTP context did compare
+  the raw target — and that is the context both crusts use, so a path gate held
+  natively and did not hold through the wheel or the npm package.
+
+http_route_match:
+  path:
+    type: Exact
+    value: "/admin"
+
+action: "admin_panel"
+
+cases:
+  - name: "exact_matches_bare_path"
+    http_request:
+      method: GET
+      path: /admin
+    expect: "admin_panel"
+
+  - name: "exact_matches_despite_query"
+    http_request:
+      method: GET
+      path: /admin?debug=1
+    expect: "admin_panel"
+
+  - name: "exact_matches_despite_empty_query"
+    http_request:
+      method: GET
+      path: /admin?
+    expect: "admin_panel"
+
+  - name: "exact_does_not_match_a_subpath"
+    http_request:
+      method: GET
+      path: /admin/users
+    expect: null
+
+  - name: "the_query_is_not_smuggled_into_the_path"
+    http_request:
+      method: GET
+      path: /other?path=/admin
+    expect: null
