@@ -256,10 +256,18 @@ impl<Ctx: 'static> Default for RegistryBuilder<Ctx> {
 /// ```
 #[must_use]
 pub fn register_core_matchers<Ctx: 'static>(builder: RegistryBuilder<Ctx>) -> RegistryBuilder<Ctx> {
-    use crate::{BoolMatcher, StringMatcher};
-    builder
-        .matcher::<BoolMatcher>("xuma.core.v1.BoolMatcher")
-        .matcher::<StringMatcher>("xuma.core.v1.StringMatcher")
+    use crate::BoolMatcher;
+
+    // `xuma.core.v1.StringMatcher` used to be registered here too. It was a
+    // second way to say what `valueMatch` already says — xDS's own
+    // `StringMatcher`, on the `singlePredicate` — and `customMatch` exists for
+    // comparisons that oneof cannot express, not for duplicating it. It also
+    // had no proto message, so no config could name it: `rumi info` advertised
+    // a type URL that failed to load.
+    //
+    // `BoolMatcher` is the case that justifies the seam. `valueMatch` compares
+    // strings only, so a boolean has nowhere else to go.
+    builder.matcher::<BoolMatcher>("xuma.core.v1.BoolMatcher")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -715,9 +723,9 @@ mod tests {
             .build();
 
         assert_eq!(registry.input_count(), 1);
-        assert_eq!(registry.matcher_count(), 2);
+        assert_eq!(registry.matcher_count(), 1);
         assert!(registry.contains_matcher("xuma.core.v1.BoolMatcher"));
-        assert!(registry.contains_matcher("xuma.core.v1.StringMatcher"));
+        assert!(!registry.contains_matcher("xuma.core.v1.StringMatcher"));
     }
 
     #[test]
@@ -814,8 +822,14 @@ mod tests {
 
     #[test]
     fn load_custom_match_string_matcher() {
+        // StringMatcher is registered here rather than by
+        // `register_core_matchers`, which is what a custom domain does: the
+        // shipped registration was removed because `valueMatch` already says
+        // this. The `customMatch` seam itself is what this test covers, and it
+        // still works for anyone who wants it.
         let registry = register_core_matchers(RegistryBuilder::<TestCtx>::new())
             .input::<ValueInput>("test.ValueInput")
+            .matcher::<crate::StringMatcher>("xuma.core.v1.StringMatcher")
             .build();
 
         let json = serde_json::json!({
@@ -1332,9 +1346,9 @@ mod tests {
         let registry = register_core_matchers(RegistryBuilder::<TestCtx>::new()).build();
 
         let urls = registry.matcher_type_urls();
-        assert_eq!(urls.len(), 2);
+        assert_eq!(urls.len(), 1);
         assert!(urls.contains(&"xuma.core.v1.BoolMatcher"));
-        assert!(urls.contains(&"xuma.core.v1.StringMatcher"));
+        assert!(!urls.contains(&"xuma.core.v1.StringMatcher"));
     }
 
     #[test]

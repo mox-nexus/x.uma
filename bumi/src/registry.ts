@@ -39,6 +39,7 @@ import type { OnMatch } from "./matcher.ts";
 import { And, Not, Or, SinglePredicate } from "./predicate.ts";
 import type { Predicate } from "./predicate.ts";
 import {
+	BoolMatcher,
 	ContainsMatcher,
 	ExactMatcher,
 	PrefixMatcher,
@@ -403,4 +404,25 @@ function compileBuiltIn(variant: string, value: string, ignoreCase = false): Inp
 		default:
 			throw new InvalidConfigError(`unknown built-in match variant: "${variant}"`);
 	}
+}
+
+/**
+ * Register core built-in matchers.
+ *
+ * Call this in domain `register()` functions to avoid duplicating core matcher
+ * registrations.
+ *
+ * bumi had no equivalent of this until 2026-08-18, so `xuma.core.v1.BoolMatcher`
+ * resolved in rumi and not here — a cross-language divergence in what a config
+ * may name, which is exactly what the conformance suite exists to prevent.
+ *
+ * `xuma.core.v1.StringMatcher` is deliberately absent: it was a second way to
+ * say what `valueMatch` already says, and `customMatch` exists for comparisons
+ * that oneof cannot express, not for duplicating it.
+ */
+export function registerCoreMatchers<Ctx>(builder: RegistryBuilder<Ctx>): RegistryBuilder<Ctx> {
+	builder.matcher("xuma.core.v1.BoolMatcher", (config) => {
+		return new BoolMatcher(Boolean(config.expected));
+	});
+	return builder;
 }

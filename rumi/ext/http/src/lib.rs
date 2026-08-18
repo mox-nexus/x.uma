@@ -158,7 +158,6 @@ mod proto_tests {
         assert!(registry.contains_input("xuma.http.v1.QueryParamInput"));
         assert!(registry.contains_input("xuma.http.v1.SchemeInput"));
         assert!(registry.contains_input("xuma.http.v1.AuthorityInput"));
-        assert!(registry.contains_matcher("xuma.core.v1.StringMatcher"));
     }
 
     #[test]

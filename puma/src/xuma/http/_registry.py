@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from xuma._registry import register_core_matchers
 from xuma.http._inputs import HeaderInput, MethodInput, PathInput, QueryParamInput
 
 if TYPE_CHECKING:
@@ -27,7 +28,8 @@ def register(
     - xuma.http.v1.QueryParamInput
     """
     return (
-        builder.input("xuma.http.v1.PathInput", _path_factory)
+        register_core_matchers(builder)
+        .input("xuma.http.v1.PathInput", _path_factory)
         .input("xuma.http.v1.MethodInput", _method_factory)
         .input("xuma.http.v1.HeaderInput", _header_factory)
         .input("xuma.http.v1.QueryParamInput", _query_param_factory)

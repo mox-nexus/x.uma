@@ -63,6 +63,7 @@ export {
 	MAX_REGEX_PATTERN_LENGTH,
 	PatternTooLongError,
 	Registry,
+	registerCoreMatchers,
 	RegistryBuilder,
 	TooManyFieldMatchersError,
 	TooManyPredicatesError,

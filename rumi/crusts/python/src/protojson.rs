@@ -28,6 +28,7 @@ pub fn resolver() -> AnyResolver {
         .register::<xuma::http::v1::QueryParamInput>("xuma.http.v1.QueryParamInput")
         .register::<xuma::http::v1::AuthorityInput>("xuma.http.v1.AuthorityInput")
         .register::<xuma::http::v1::SchemeInput>("xuma.http.v1.SchemeInput")
+        .register::<xuma::core::v1::BoolMatcher>("xuma.core.v1.BoolMatcher")
         .register::<xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
         .build()
 }

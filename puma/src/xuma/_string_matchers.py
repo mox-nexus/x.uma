@@ -191,3 +191,25 @@ class RegexMatcher:
         if not isinstance(value, str):
             return False
         return self._compiled.search(value) is not None
+
+
+@dataclass(frozen=True, slots=True)
+class BoolMatcher:
+    """Matches a boolean value.
+
+    Reachable through ``custom_match``, which is the seam for comparisons xDS's
+    own ``StringMatcher`` cannot express — a boolean is one, since
+    ``value_match`` only compares strings.
+
+    No input x.uma ships produces a boolean; this exists for a custom domain
+    whose ``DataInput`` returns one. It is registered by
+    :func:`~xuma._registry.register_core_matchers` so that
+    ``xuma.core.v1.BoolMatcher`` resolves in all implementations rather than in
+    some — that function previously registered nothing at all while its
+    docstring said it did.
+    """
+
+    expected: bool
+
+    def matches(self, value: MatchingData, /) -> bool:
+        return isinstance(value, bool) and value == self.expected

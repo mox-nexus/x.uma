@@ -8,6 +8,58 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-18 · The core matcher registrations
+
+### D-041 · `xuma.core.v1.StringMatcher` is not registered; `BoolMatcher` is, and now exists
+
+`rumi info` advertised two matcher type URLs that **no config could load**.
+Neither had a proto message, so `AnyResolver` could not resolve either, and a
+`customMatch` naming one failed with "unknown type URL" — while the CLI listed
+it as available. That is the advertises-what-it-cannot-do class this repo has
+spent the release cycle removing, sitting in the tool's own `info` output.
+
+They are resolved differently, because they are not the same mistake.
+
+**`StringMatcher` is deregistered.** It was a second way to say what
+`valueMatch` already says — xDS's own `StringMatcher`, on the
+`singlePredicate` itself. `customMatch` is the seam for comparisons the oneof
+*cannot* express; duplicating one it can is how a schema grows two spellings
+for one thing. A custom domain that wants it can still register it, and
+`load_custom_match_string_matcher` now does exactly that, which keeps the seam
+tested while removing the shipped redundancy.
+
+**`BoolMatcher` gets its message.** `valueMatch` compares strings only, so a
+boolean genuinely has nowhere else to go — it is the case that justifies
+`customMatch` existing. `proto/xuma/core/v1/matchers.proto` defines it, and
+every resolver registers it.
+
+**Three implementations disagreed about this, three different ways.** rumi
+registered both; puma's `register_core_matchers` returned the builder unchanged
+under a docstring claiming otherwise (PLAN.md F12); bumi had no such function
+at all. And in puma neither domain called it, so fixing the body alone would
+have changed nothing. All three now register `BoolMatcher`, from every domain.
+
+**Revisit if** an input that produces `MatchingData::Bool` ships. That would
+make a positive conformance fixture expressible, which today it is not.
+
+### D-040 · Type-compatibility validation exists in Rust only — recorded, not fixed
+
+Found while fixturing the above. `rumi` rejects an incompatible input/matcher
+pair at load: a `MapInput` (string) against a `BoolMatcher` (bool) gives
+*"input produces \"string\" data but matcher supports [\"bool\"]"*. puma loads
+the same config and returns `None` at evaluation. bumi has no check either.
+
+This is `CLAUDE.md`'s "validate extension points at construction" constraint,
+implemented once. It is a genuine cross-language divergence and it is written
+into the fixture-coverage gap list rather than papered over, because the only
+fixture that would exercise `BoolMatcher` in the kv domain is precisely the one
+the divergence affects.
+
+**Not fixed here** because adding `supported_types` to puma and bumi is a new
+cross-language feature, not a translation, and this session's remit was the
+format migration. It is the next thing that makes the suite able to close its
+own gap.
+
 ## 2026-08-18 · How Python and TypeScript read protojson
 
 ### D-039 · `CLAUDE.md`'s "Pure Python" is false for puma and true for bumi
