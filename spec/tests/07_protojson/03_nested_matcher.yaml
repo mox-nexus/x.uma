@@ -4,6 +4,7 @@ description: 'OnMatch::Matcher nesting: outer match delegates to inner matcher'
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:

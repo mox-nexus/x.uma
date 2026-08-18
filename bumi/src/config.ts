@@ -35,6 +35,11 @@ export class BuiltInMatch {
 	constructor(
 		readonly variant: string,
 		readonly value: string,
+		/**
+		 * xDS StringMatcher.ignore_case. It belongs to the comparison rather
+		 * than to the pattern, which is why it sits here and not in the value.
+		 */
+		readonly ignoreCase: boolean = false,
 	) {}
 }
 

@@ -38,8 +38,10 @@ retarget children to `main` first.
 half is not. Concretely:
 
 - the four fixture dialects, and the 27 fixtures written in them
-- **bumi** — puma is migrated (`_protojson.py`, and it passes all 23 fixtures).
-  bumi's `src/config.ts` still reads only the terse dialect
+- **deleting the four transitional dialects and their loaders.** All three
+  implementations now read protojson and pass all 23 fixtures; the old
+  `config:`, `matcher:` and `http_route_match(es):` fixtures and the loaders
+  behind them are what is left to remove
 - `MatcherConfig` still derives `Deserialize` — the dialect is still authorable
 - SF3, SF5, SF6 remain; SF1, SF2, SF4, SF7, SF9 and SF8's renames are done
 
@@ -912,10 +914,14 @@ different semantics with no `cfg` involved — `register` strips the query,
 `register_simple` does not, and both crusts use `register_simple`. Feature
 powerset checks cannot see this class. It needs a conformance fixture.
 
-**The fifth fixture key exists, the 7 `config:` fixtures are through it, and
-puma passes all of them.** 23 protojson fixtures run in CI
-(`spec/tests/07_protojson/`), every one listing `[rust, python]`. bumi is what
-remains before the four transitional dialects can be deleted.
+**All three implementations read protojson and pass all 23 fixtures.** They run
+in CI (`spec/tests/07_protojson/`), every fixture listing
+`[rust, python, typescript]` — which is the ledger's end state, and means the
+`implementations:` field can be deleted once the old dialects are gone.
+
+None of the three carries a protobuf runtime. Rust generates types because
+prost-serde rejects unknown fields; puma and bumi hand-walk protojson because
+neither betterproto nor ts-proto does (D-038).
 
 Two things the ledger caught while puma migrated, both of which a softer
 mechanism would have missed. It fired sixteen times with *"does not list python,

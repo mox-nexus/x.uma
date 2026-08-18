@@ -4,6 +4,7 @@ description: Setting both value_match AND custom_match is an error (oneof violat
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:
@@ -36,6 +37,7 @@ description: Unregistered input type_url produces an error
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:
@@ -62,6 +64,7 @@ description: Unregistered custom_match type_url produces an error
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:
@@ -91,7 +94,7 @@ description: >
   caught this as "neither value_match nor custom_match"; in protojson it is an
   unset oneof, which convert.rs checks explicitly. Either way it must not load
   as a predicate that quietly never fires.
-implementations: [rust, python]
+implementations: [rust, python, typescript]
 expect_error: true
 error_contains: is required
 proto_matcher:
@@ -119,7 +122,7 @@ description: >
   mistake is a field the schema does not define, and the generated
   deserializer rejects it. That rejection is what extends SECURITY.md control
   #6 across the whole config surface.
-implementations: [rust, python]
+implementations: [rust, python, typescript]
 expect_error: true
 error_contains: unknown field
 proto_matcher:

@@ -4,6 +4,7 @@ description: on_no_match provides fallback action when no field matcher matches
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:
@@ -47,6 +48,7 @@ description: Without on_no_match, no-match returns null
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:

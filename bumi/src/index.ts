@@ -69,3 +69,6 @@ export {
 	TooManyPredicatesError,
 	UnknownTypeUrlError,
 } from "./registry.ts";
+
+export { namedAction, parseProtojson } from "./protojson.ts";
+export type { ActionReader } from "./protojson.ts";

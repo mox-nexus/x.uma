@@ -4,6 +4,7 @@ description: Single field matcher with exact string match via config loading
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:
