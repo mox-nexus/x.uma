@@ -4,6 +4,7 @@ description: 'Multiple field matchers: first match wins, later matchers are not 
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:

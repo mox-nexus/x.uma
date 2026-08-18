@@ -4,6 +4,7 @@ description: Exact string match via config loading
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:
@@ -38,6 +39,7 @@ description: Prefix string match via config loading
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:
@@ -76,6 +78,7 @@ description: Suffix string match via config loading
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:
@@ -110,6 +113,7 @@ description: Contains string match via config loading
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:
@@ -144,6 +148,7 @@ description: Regex string match via config loading
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:

@@ -4,6 +4,7 @@ description: 'Compound AND predicate: all conditions must match'
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:
@@ -60,6 +61,7 @@ description: 'Compound OR predicate: any condition must match'
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:
@@ -108,6 +110,7 @@ description: 'NOT predicate: inverts the inner condition'
 implementations:
 - rust
 - python
+- typescript
 proto_matcher:
   matcherList:
     matchers:

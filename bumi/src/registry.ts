@@ -294,7 +294,7 @@ export class Registry<Ctx> {
 
 	private loadValueMatch(config: ValueMatchConfig): InputMatcher {
 		if (config instanceof BuiltInMatch) {
-			return compileBuiltIn(config.variant, config.value);
+			return compileBuiltIn(config.variant, config.value, config.ignoreCase);
 		}
 		if (config instanceof CustomMatch) {
 			const factory = this.matcherFactories.get(config.typedConfig.typeUrl);
@@ -338,21 +338,63 @@ function checkPatternLength(variant: string, value: string): void {
 	}
 }
 
-function compileBuiltIn(variant: string, value: string): InputMatcher {
+/**
+ * Does this pattern clear the `i` flag with an inline group?
+ *
+ * ignoreCase asks the engine for a case-insensitive match, and an inline
+ * `(?-i)` overrides that — measured in Rust both ways on 2026-08-18, and it is
+ * correct regex semantics rather than an engine quirk, so no choice of
+ * construction fixes it. The combination is refused instead.
+ *
+ * Scans flag groups: `(?` followed by flag letters, ended by `)` or `:`. A
+ * group clears `i` only if an `i` follows a `-` inside it, so `(?i-s)` is fine
+ * and `(?-si)` is not. An escaped `\(` is not a group.
+ */
+function disablesCaseInsensitivity(pattern: string): boolean {
+	let i = 0;
+	while (i + 1 < pattern.length) {
+		if (pattern[i] === "\\") {
+			i += 2;
+			continue;
+		}
+		if (pattern[i] !== "(" || pattern[i + 1] !== "?") {
+			i += 1;
+			continue;
+		}
+		let j = i + 2;
+		let clearing = false;
+		while (j < pattern.length) {
+			const c = pattern[j] as string;
+			if (c === "-") clearing = true;
+			else if (c === "i" && clearing) return true;
+			else if (!"imsuxU".includes(c)) break;
+			j += 1;
+		}
+		i = Math.max(j, i + 2);
+	}
+	return false;
+}
+
+function compileBuiltIn(variant: string, value: string, ignoreCase = false): InputMatcher {
 	checkPatternLength(variant, value);
 
 	switch (variant) {
 		case "Exact":
-			return new ExactMatcher(value);
+			return new ExactMatcher(value, ignoreCase);
 		case "Prefix":
-			return new PrefixMatcher(value);
+			return new PrefixMatcher(value, ignoreCase);
 		case "Suffix":
-			return new SuffixMatcher(value);
+			return new SuffixMatcher(value, ignoreCase);
 		case "Contains":
-			return new ContainsMatcher(value);
+			return new ContainsMatcher(value, ignoreCase);
 		case "Regex":
+			if (ignoreCase && disablesCaseInsensitivity(value)) {
+				throw new InvalidConfigError(
+					`ignore_case is set, but the pattern "${value}" turns case-insensitivity off inline with a (?-i) flag. An inline flag wins, so this rule would read case-insensitive and not be. Remove one of the two.`,
+				);
+			}
 			try {
-				return new RegexMatcher(value);
+				return new RegexMatcher(ignoreCase ? `(?i)${value}` : value);
 			} catch (e) {
 				throw new InvalidConfigError(
 					`invalid regex pattern: ${e instanceof Error ? e.message : String(e)}`,
