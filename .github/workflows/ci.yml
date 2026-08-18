@@ -74,6 +74,11 @@ jobs:
       - name: Conformance fixtures
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test conformance --features rumi-test/fixtures
 
+      # The protojson fixtures, and the ledger of which implementations are
+      # expected to run them. Strict in both directions — see proto_fixture.rs.
+      - name: Conformance fixtures (protojson)
+        run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test proto_conformance --features rumi-test/registry,rumi-test/fixtures
+
       # The Rust snippets in docs/content are compiled by rumi-docs-tests, which
       # include!s the Markdown so rustdoc sees them. They were all `rust,ignore`
       # until 2026-08-17, which is how four how-to pages taught APIs that had

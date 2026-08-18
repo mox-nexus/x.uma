@@ -12,6 +12,8 @@
 pub mod config_fixture;
 #[cfg(feature = "fixtures")]
 pub mod fixture;
+#[cfg(all(feature = "fixtures", feature = "registry"))]
+pub mod proto_fixture;
 
 // The conformance suite refers to the domain by these names, so they are
 // re-exported rather than duplicated. `rumi-kv` is the single definition.

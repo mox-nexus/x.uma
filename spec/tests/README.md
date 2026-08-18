@@ -4,7 +4,63 @@ YAML fixtures every x.uma implementation must pass. The suite is the source of
 truth for correctness: Rust, Python and TypeScript all run the same files and
 must produce the same answers.
 
-## Read this first: there are four dialects, not one
+## Read this first: there are five dialects, and four of them are going away
+
+`proto_matcher:` is the one to write. It is canonical protojson — protobuf's own
+JSON mapping of `xds.type.matcher.v3.Matcher` — which is the format x.uma
+implements and the one `DECISIONS.md` D-026 settled on. The other four are
+transitional and are being retired.
+
+```yaml
+name: "protojson_simple_exact"
+implementations: [rust]          # who is expected to run this, see below
+
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          singlePredicate:
+            input:
+              name: role
+              typedConfig:
+                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                key: role
+            valueMatch:
+              exact: admin
+        onMatch:
+          action:
+            name: allow
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: allow
+
+cases:
+  - name: "matches"
+    context: { role: admin }
+    expect: "allow"
+```
+
+### `implementations:` is a ledger, not a convenience
+
+Omit it and every implementation must run the fixture — that is the end state.
+A shorter list is an **expiring exception** saying the others have not been
+migrated yet, and CI holds it in *both* directions: a listed implementation that
+fails is a failure, and an implementation that is *not* listed but succeeds is
+**also** a failure.
+
+The second half is the one that matters. A skip that quietly starts working
+means the ledger is reporting on work somebody already finished, and a suite
+that lies about its own coverage is worse than one that is red.
+
+The property this protects is not "the suite is green". It is that **for every
+fixture, every pair of implementations reaches the same verdict** — so a
+disagreement still means something while the migration is in flight. The
+migration is done when every fixture lists all three and the field can be
+deleted.
+
+---
+
+## The four transitional dialects
 
 The top-level key of a fixture selects which loader reads it, and the four are
 **not interchangeable**. An earlier version of this file documented only the
@@ -12,6 +68,7 @@ first one, which is the one no user can write.
 
 | Top-level key | Fixtures | What it exercises | Can a user write this? |
 |---|---|---|---|
+| `proto_matcher:` | 4 | **Canonical protojson — the shipping format.** Loads through `parse_matcher` and the same conversion the control-plane path uses | **Yes, and this is the one to write** |
 | `config:` | 7 | The **shipping config format** — what a user actually authors and what `rumi run` loads | **Yes** |
 | `matcher:` | 14 | Native construction. Builds `Matcher` values directly, bypassing the config layer entirely | No |
 | `http_route_match:` | 5 | One Gateway API route through the HTTP compiler | Via the compiler API, not config |

@@ -1,0 +1,143 @@
+name: "protojson_simple_exact"
+description: >
+  The smallest canonical protojson matcher: one predicate, one action.
+
+  This is the format x.uma actually implements — protobuf's canonical JSON
+  mapping of xds.type.matcher.v3.Matcher — rather than a dialect that exists
+  nowhere but this repo. See DECISIONS.md D-026.
+
+implementations: [rust]
+
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          singlePredicate:
+            input:
+              name: role
+              typedConfig:
+                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                key: role
+            valueMatch:
+              exact: admin
+        onMatch:
+          action:
+            name: allow
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: allow
+
+cases:
+  - name: "matches"
+    context: { role: admin }
+    expect: "allow"
+  - name: "does_not_match"
+    context: { role: viewer }
+    expect: null
+  - name: "absent_input_is_false_not_an_error"
+    context: {}
+    expect: null
+
+---
+name: "protojson_ignore_case"
+description: >
+  ignoreCase reaches the matcher. It was read from the proto and discarded
+  until 2026-08-18, so a rule that read case-insensitive matched
+  case-sensitively — PLAN.md F6 / SF1.
+
+implementations: [rust]
+
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          singlePredicate:
+            input:
+              name: role
+              typedConfig:
+                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                key: role
+            valueMatch:
+              exact: admin
+              ignoreCase: true
+        onMatch:
+          action:
+            name: allow
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: allow
+
+cases:
+  - name: "matches_exact"
+    context: { role: admin }
+    expect: "allow"
+  - name: "matches_shouting"
+    context: { role: ADMIN }
+    expect: "allow"
+  - name: "matches_mixed"
+    context: { role: AdMiN }
+    expect: "allow"
+  - name: "still_does_not_match_a_different_value"
+    context: { role: viewer }
+    expect: null
+
+---
+name: "protojson_rejects_an_unknown_field"
+description: >
+  A typo'd field is a load error, not a silently ignored one. The hand-written
+  config types carried no deny_unknown_fields, so a misspelled key in a deny
+  rule produced a rule that never fired. Every generated deserializer rejects
+  unknown fields, which extends SECURITY.md control #6 to the whole config
+  surface.
+
+implementations: [rust]
+expect_error: true
+
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          singlePredicate:
+            input:
+              name: role
+              typedConfig:
+                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                kye: role
+            valueMatch:
+              exact: admin
+        onMatch:
+          action:
+            name: allow
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: allow
+
+---
+name: "protojson_refuses_keep_matching"
+description: >
+  keep_matching records the action and continues evaluating in xDS; this engine
+  returns the first match. Accepting the field and ignoring it answers a
+  different question than the config asked — PLAN.md F2 / SF2.
+
+implementations: [rust]
+expect_error: true
+
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          singlePredicate:
+            input:
+              name: role
+              typedConfig:
+                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                key: role
+            valueMatch:
+              exact: admin
+        onMatch:
+          keepMatching: true
+          action:
+            name: allow
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: allow
