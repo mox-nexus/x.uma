@@ -9,7 +9,6 @@
 //! in `crusts/python` and `crusts/wasm` so a divergence between the wheel and
 //! the npm package cannot start here.
 
-use rumi_proto::any_resolver::{AnyResolver, AnyResolverBuilder};
 use rumi_proto::convert::load_proto_matcher;
 use rumi_proto::protojson::parse_matcher;
 use rumi_test::proto_fixture::ProtoFixture;
@@ -18,39 +17,14 @@ use rumi_test::KvContext;
 /// One line of the report: fixture, case, passed, detail.
 pub type FixtureResult = (String, String, bool, String);
 
-fn resolver() -> AnyResolver {
-    AnyResolverBuilder::new()
-        .register::<rumi_proto::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
-        .register::<rumi_proto::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
-        .build()
-}
-
-/// `NamedAction` → `String`, refusing an empty name.
-///
-/// Every other empty identifier makes a predicate false — no decision. An empty
-/// action name would make the rule *fire* and return `""`, leaving the polarity
-/// to whatever the host does with it.
-struct NamedActionFactory;
-
-impl rumi::IntoAction<String> for NamedActionFactory {
-    type Config = rumi_proto::xuma::core::v1::NamedAction;
-
-    fn from_config(config: Self::Config) -> Result<String, rumi::MatcherError> {
-        if config.name.is_empty() {
-            return Err(rumi::MatcherError::EmptyIdentifier {
-                what: "action name",
-            });
-        }
-        Ok(config.name)
-    }
-}
+// The resolver and action registry are shared with `from_config` — see
+// `crate::protojson`. Fixtures must exercise exactly the same door a real
+// caller uses, or a passing suite proves nothing about the FFI surface.
 
 fn build(fixture: &ProtoFixture) -> Result<rumi::Matcher<KvContext, String>, rumi::MatcherError> {
-    let resolver = resolver();
+    let resolver = crate::protojson::resolver();
     let registry = rumi_test::register(rumi::RegistryBuilder::new()).build();
-    let actions = rumi::ActionRegistryBuilder::new()
-        .action::<NamedActionFactory>("xuma.core.v1.NamedAction")
-        .build();
+    let actions = crate::protojson::actions();
 
     let proto = parse_matcher(&resolver, fixture.proto_matcher.clone())?;
     load_proto_matcher(&registry, &actions, &resolver, &proto)

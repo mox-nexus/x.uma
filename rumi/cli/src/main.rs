@@ -14,9 +14,12 @@ use std::collections::HashMap;
 use std::process;
 
 use rumi::claude::HookContext;
-use rumi::MatcherConfig;
+use rumi::{MatcherConfig, TypedConfig};
 use rumi_http::HttpRequest;
 use rumi_kv::KvContext;
+use rumi_proto::any_resolver::{AnyResolver, AnyResolverBuilder};
+use rumi_proto::convert::convert_matcher;
+use rumi_proto::protojson::parse_matcher;
 
 mod hook;
 mod skill;
@@ -304,7 +307,7 @@ fn cmd_run_test(args: &[String]) -> Result<(), String> {
     let config = load_config(config_path)?;
     let registry = build_test_registry();
     let matcher = registry
-        .load_matcher(config)
+        .load_typed_matcher(config, &build_actions())
         .map_err(|e| format!("config load failed: {e}"))?;
 
     let ctx = build_test_context(&context);
@@ -330,7 +333,7 @@ fn cmd_run_http(args: &[String]) -> Result<(), String> {
     let config = load_config(config_path)?;
     let registry = build_http_registry();
     let matcher = registry
-        .load_matcher(config)
+        .load_typed_matcher(config, &build_actions())
         .map_err(|e| format!("config load failed: {e}"))?;
 
     let ctx = build_http_context(&http_args);
@@ -363,7 +366,7 @@ fn cmd_run_claude(args: &[String]) -> Result<(), String> {
     let config = load_config(config_path)?;
     let registry = build_claude_registry();
     let matcher = registry
-        .load_matcher(config)
+        .load_typed_matcher(config, &build_actions())
         .map_err(|e| format!("config load failed: {e}"))?;
 
     let ctx = build_claude_context(&claude_args)?;
@@ -407,7 +410,7 @@ fn run_claude_hook(args: &[String]) -> ! {
         Err(e) => block("could not load the hook config", &e),
     };
 
-    let matcher = match build_claude_registry().load_matcher(config) {
+    let matcher = match build_claude_registry().load_typed_matcher(config, &build_actions()) {
         Ok(m) => m,
         Err(e) => block("hook config is invalid", &e.to_string()),
     };
@@ -542,7 +545,72 @@ fn build_claude_context(args: &ClaudeArgs) -> Result<HookContext, String> {
 // Config loading
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn load_config(path: &str) -> Result<MatcherConfig<String>, String> {
+/// Everything a config can name, in one resolver.
+///
+/// An `AnyResolver` decodes `Any` payloads; it never touches a matching
+/// context, so one resolver serves every domain. That is why `check` can
+/// inspect a config without first knowing whether it is HTTP or Claude.
+fn build_resolver() -> AnyResolver {
+    use rumi_proto::xuma;
+
+    AnyResolverBuilder::new()
+        .register::<xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+        .register::<xuma::http::v1::HeaderInput>("xuma.http.v1.HeaderInput")
+        .register::<xuma::http::v1::PathInput>("xuma.http.v1.PathInput")
+        .register::<xuma::http::v1::MethodInput>("xuma.http.v1.MethodInput")
+        .register::<xuma::http::v1::QueryParamInput>("xuma.http.v1.QueryParamInput")
+        .register::<xuma::http::v1::AuthorityInput>("xuma.http.v1.AuthorityInput")
+        .register::<xuma::http::v1::SchemeInput>("xuma.http.v1.SchemeInput")
+        .register::<xuma::claude::v1::EventTypeInput>("xuma.claude.v1.EventTypeInput")
+        .register::<xuma::claude::v1::ToolNameInput>("xuma.claude.v1.ToolNameInput")
+        .register::<xuma::claude::v1::ToolArgInput>("xuma.claude.v1.ToolArgInput")
+        .register::<xuma::claude::v1::SessionIdInput>("xuma.claude.v1.SessionIdInput")
+        .register::<xuma::claude::v1::CwdInput>("xuma.claude.v1.CwdInput")
+        .register::<xuma::claude::v1::GitBranchInput>("xuma.claude.v1.GitBranchInput")
+        .register::<xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
+        .build()
+}
+
+/// `NamedAction` -> the string the engine returns.
+///
+/// An empty name is refused. Every other empty identifier makes a predicate
+/// false — no decision. This one makes the rule *fire* and return `""`, and for
+/// a CLI that gates tool calls the caller then decides polarity by accident.
+struct NamedActionFactory;
+
+impl rumi::IntoAction<String> for NamedActionFactory {
+    type Config = rumi_proto::xuma::core::v1::NamedAction;
+
+    fn from_config(config: Self::Config) -> Result<String, rumi::MatcherError> {
+        if config.name.is_empty() {
+            return Err(rumi::MatcherError::EmptyIdentifier {
+                what: "action name",
+            });
+        }
+        Ok(config.name)
+    }
+}
+
+fn build_actions() -> rumi::ActionRegistry<String> {
+    rumi::ActionRegistryBuilder::new()
+        .action::<NamedActionFactory>("xuma.core.v1.NamedAction")
+        .build()
+}
+
+/// Read a config file as canonical protojson.
+///
+/// YAML and JSON are both accepted and both parse to the same document before
+/// anything interprets it, so the two syntaxes cannot mean different things.
+#[cfg(test)]
+fn load_config_str(yaml: &str) -> Result<MatcherConfig<TypedConfig>, String> {
+    let document: serde_json::Value =
+        serde_yaml::from_str(yaml).map_err(|e| format!("YAML parse error: {e}"))?;
+    let resolver = build_resolver();
+    let proto = parse_matcher(&resolver, document).map_err(|e| format!("{e}"))?;
+    convert_matcher(&proto, &resolver).map_err(|e| format!("{e}"))
+}
+
+fn load_config(path: &str) -> Result<MatcherConfig<TypedConfig>, String> {
     let content =
         std::fs::read_to_string(path).map_err(|e| format!("failed to read \"{path}\": {e}"))?;
 
@@ -550,11 +618,15 @@ fn load_config(path: &str) -> Result<MatcherConfig<String>, String> {
         .extension()
         .is_some_and(|ext| ext.eq_ignore_ascii_case("json"));
 
-    if is_json {
-        serde_json::from_str(&content).map_err(|e| format!("JSON parse error: {e}"))
+    let document: serde_json::Value = if is_json {
+        serde_json::from_str(&content).map_err(|e| format!("JSON parse error: {e}"))?
     } else {
-        serde_yaml::from_str(&content).map_err(|e| format!("YAML parse error: {e}"))
-    }
+        serde_yaml::from_str(&content).map_err(|e| format!("YAML parse error: {e}"))?
+    };
+
+    let resolver = build_resolver();
+    let proto = parse_matcher(&resolver, document).map_err(|e| format!("{e}"))?;
+    convert_matcher(&proto, &resolver).map_err(|e| format!("{e}"))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -819,9 +891,9 @@ mod tests {
     #[test]
     fn build_claude_registry_has_expected_types() {
         let registry = build_claude_registry();
-        assert!(registry.contains_input("xuma.claude.v1.EventInput"));
+        assert!(registry.contains_input("xuma.claude.v1.EventTypeInput"));
         assert!(registry.contains_input("xuma.claude.v1.ToolNameInput"));
-        assert!(registry.contains_input("xuma.claude.v1.ArgumentInput"));
+        assert!(registry.contains_input("xuma.claude.v1.ToolArgInput"));
         assert!(registry.contains_input("xuma.claude.v1.SessionIdInput"));
         assert!(registry.contains_input("xuma.claude.v1.CwdInput"));
         assert!(registry.contains_input("xuma.claude.v1.GitBranchInput"));
@@ -1027,7 +1099,9 @@ mod tests {
     fn eval_yaml_config() {
         let config = load_config(&fixture_path()).unwrap();
         let registry = build_test_registry();
-        let matcher = registry.load_matcher(config).unwrap();
+        let matcher = registry
+            .load_typed_matcher(config, &build_actions())
+            .unwrap();
 
         let ctx = KvContext::new().with("method", "GET");
         assert_eq!(matcher.evaluate(&ctx), Some("route-get".to_string()));
@@ -1044,39 +1118,65 @@ mod tests {
     /// loader accepts.
     ///
     /// This test exists because the hand-written half of `skill.rs` claimed
-    /// `ArgumentInput` reads `config.key` when the struct field is `name`. The
+    /// `ToolArgInput` reads `config.key` when the struct field is `name`. The
     /// generated half of that file cannot drift; this half could, and did,
     /// within hours of being written. A doc claim that CI does not check is not
     /// a doc claim, it is a guess.
     #[test]
     fn skill_hints_name_real_config_keys() {
         for (type_url, key) in skill::CONFIG_KEYS {
+            // NamedAction is an action, not an input — it has no predicate to
+            // sit inside. Every other case's `onMatch.action` already
+            // exercises it, below.
+            if *type_url == "xuma.core.v1.NamedAction" {
+                continue;
+            }
+
             let yaml = format!(
                 r#"
-matchers:
-  - predicate:
-      type: single
-      input: {{ type_url: "{type_url}", config: {{ {key}: "x" }} }}
-      value_match: {{ Exact: "y" }}
-    on_match: {{ type: action, action: "a" }}
+matcherList:
+  matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: x
+            typedConfig:
+              "@type": "type.googleapis.com/{type_url}"
+              {key}: "x"
+          valueMatch:
+            exact: "y"
+      onMatch:
+        action:
+          name: a
+          typedConfig:
+            "@type": "type.googleapis.com/xuma.core.v1.NamedAction"
+            name: a
 "#
             );
-            let config: MatcherConfig<String> =
-                serde_yaml::from_str(&yaml).unwrap_or_else(|e| panic!("{type_url}: {e}"));
 
-            let loaded = if type_url.starts_with("xuma.http.") {
-                build_http_registry().load_matcher(config).map(|_| ())
-            } else if type_url.starts_with("xuma.claude.") {
-                build_claude_registry().load_matcher(config).map(|_| ())
-            } else {
-                build_test_registry().load_matcher(config).map(|_| ())
-            };
+            let loaded = load_config_str(&yaml).and_then(|config| {
+                if type_url.starts_with("xuma.http.") {
+                    build_http_registry()
+                        .load_typed_matcher(config, &build_actions())
+                        .map(|_| ())
+                        .map_err(|e| e.to_string())
+                } else if type_url.starts_with("xuma.claude.") {
+                    build_claude_registry()
+                        .load_typed_matcher(config, &build_actions())
+                        .map(|_| ())
+                        .map_err(|e| e.to_string())
+                } else {
+                    build_test_registry()
+                        .load_typed_matcher(config, &build_actions())
+                        .map(|_| ())
+                        .map_err(|e| e.to_string())
+                }
+            });
 
             assert!(
                 loaded.is_ok(),
-                "skill.rs documents `{type_url}` as taking config.{key}, but the \
-                 loader rejected it: {:?}",
-                loaded.err()
+                "skill.rs documents `{type_url}` as taking payload field `{key}`, but the \
+                 loader rejected it: {loaded:?}"
             );
         }
     }
@@ -1085,18 +1185,32 @@ matchers:
     #[test]
     fn skill_hint_test_would_catch_a_wrong_key() {
         let yaml = r#"
-matchers:
-  - predicate:
-      type: single
-      input: { type_url: "xuma.claude.v1.ArgumentInput", config: { key: "cmd" } }
-      value_match: { Exact: "y" }
-    on_match: { type: action, action: "a" }
+matcherList:
+  matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: x
+            typedConfig:
+              "@type": "type.googleapis.com/xuma.claude.v1.ToolArgInput"
+              key: "cmd"
+          valueMatch:
+            exact: "y"
+      onMatch:
+        action:
+          name: a
+          typedConfig:
+            "@type": "type.googleapis.com/xuma.core.v1.NamedAction"
+            name: a
 "#;
-        let parsed = serde_yaml::from_str::<MatcherConfig<String>>(yaml)
-            .map(|c| build_claude_registry().load_matcher(c).map(|_| ()));
+        let loaded = load_config_str(yaml).and_then(|c| {
+            build_claude_registry()
+                .load_typed_matcher(c, &build_actions())
+                .map_err(|e| e.to_string())
+        });
         assert!(
-            matches!(parsed, Err(_) | Ok(Err(_))),
-            "the old wrong key `config.key` was accepted — this guard is inert"
+            loaded.is_err(),
+            "the wrong field `key` (real field is `name`) was accepted — this guard is inert"
         );
     }
 }

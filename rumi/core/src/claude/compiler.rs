@@ -6,14 +6,14 @@
 use super::config::{ArgumentMatch, HookMatch, StringMatch};
 use super::context::{HookContext, HookEvent};
 use super::inputs::{
-    ArgumentInput, CwdInput, EventInput, GitBranchInput, SessionIdInput, ToolNameInput,
+    CwdInput, EventTypeInput, GitBranchInput, SessionIdInput, ToolArgInput, ToolNameInput,
 };
 use crate::prelude::*;
 
 /// A catch-all predicate that matches any `HookContext`.
 fn catch_all() -> Predicate<HookContext> {
     Predicate::Single(SinglePredicate::new(
-        Box::new(EventInput),
+        Box::new(EventTypeInput),
         Box::new(PrefixMatcher::new("")), // matches any event string
     ))
 }
@@ -92,7 +92,7 @@ impl HookMatchExt for HookMatch {
 /// Compile an event match to a predicate (always exact).
 fn compile_event_match(event: HookEvent) -> Predicate<HookContext> {
     Predicate::Single(SinglePredicate::new(
-        Box::new(EventInput),
+        Box::new(EventTypeInput),
         Box::new(ExactMatcher::new(event.as_str())),
     ))
 }
@@ -103,7 +103,7 @@ fn compile_argument_match(
 ) -> Result<Predicate<HookContext>, MatcherError> {
     arg_match
         .value
-        .to_predicate(Box::new(ArgumentInput::new(&arg_match.name)?))
+        .to_predicate(Box::new(ToolArgInput::new(&arg_match.name)?))
 }
 
 /// Compile multiple `HookMatch` entries into a single `Matcher`.

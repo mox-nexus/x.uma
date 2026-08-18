@@ -14,7 +14,7 @@ Example::
     builder.input("xuma.kv.v1.MapInput", lambda cfg: DictInput(cfg["key"]))
     registry = builder.build()
 
-    config = parse_matcher_config(json_data)
+    config = parse_protojson(json_data)  # from xuma._protojson
     matcher = registry.load_matcher(config)
 """
 

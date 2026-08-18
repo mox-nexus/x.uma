@@ -114,9 +114,9 @@ Registered matchers:
 
 $ rumi info claude
 Registered inputs:
-  xuma.claude.v1.EventInput
+  xuma.claude.v1.EventTypeInput
   xuma.claude.v1.ToolNameInput
-  xuma.claude.v1.ArgumentInput
+  xuma.claude.v1.ToolArgInput
   xuma.claude.v1.SessionIdInput
   xuma.claude.v1.CwdInput
   xuma.claude.v1.GitBranchInput

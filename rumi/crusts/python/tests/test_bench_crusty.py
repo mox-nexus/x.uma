@@ -43,7 +43,7 @@ class HookCtx:
     command: str | None = None
 
 
-class EventInput(DataInput["HookCtx"]):
+class EventTypeInput(DataInput["HookCtx"]):
     def get(self, ctx: HookCtx) -> str | None:
         return ctx.event
 
@@ -77,7 +77,7 @@ def test_bench_puma_compile_simple(benchmark):
         return Matcher(
             matcher_list=(
                 FieldMatcher(
-                    predicate=SinglePredicate(input=EventInput(), matcher=ExactMatcher("PreToolUse")),
+                    predicate=SinglePredicate(input=EventTypeInput(), matcher=ExactMatcher("PreToolUse")),
                     on_match=Action("matched"),
                 ),
             ),
@@ -117,7 +117,7 @@ def test_bench_puma_compile_complex(benchmark):
                 FieldMatcher(
                     predicate=And(
                         predicates=(
-                            SinglePredicate(input=EventInput(), matcher=ExactMatcher("PreToolUse")),
+                            SinglePredicate(input=EventTypeInput(), matcher=ExactMatcher("PreToolUse")),
                             SinglePredicate(
                                 input=ToolNameInput(),
                                 matcher=RegexMatcher(r"^(Write|Edit|Bash)$"),
@@ -150,7 +150,7 @@ def puma_exact():
     return Matcher(
         matcher_list=(
             FieldMatcher(
-                predicate=SinglePredicate(input=EventInput(), matcher=ExactMatcher("PreToolUse")),
+                predicate=SinglePredicate(input=EventTypeInput(), matcher=ExactMatcher("PreToolUse")),
                 on_match=Action("matched"),
             ),
         ),
@@ -256,7 +256,7 @@ def puma_complex():
             FieldMatcher(
                 predicate=And(
                     predicates=(
-                        SinglePredicate(input=EventInput(), matcher=ExactMatcher("PreToolUse")),
+                        SinglePredicate(input=EventTypeInput(), matcher=ExactMatcher("PreToolUse")),
                         SinglePredicate(input=ToolNameInput(), matcher=PrefixMatcher("mcp__")),
                         SinglePredicate(input=CommandInput(), matcher=ContainsMatcher("drop")),
                     )

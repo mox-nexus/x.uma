@@ -113,7 +113,7 @@ export class RegexMatcher {
 	 * Both limits are enforced **here**, in the constructor that owns the
 	 * compiled program, not in the config loader. Every caller inherits them —
 	 * the registry, the gateway, and the playground's graph renderer, which
-	 * calls `parseMatcherConfig` without `loadMatcher` and so previously
+	 * calls `parseProtojson` without `loadMatcher` and so previously
 	 * inherited nothing.
 	 */
 	constructor(readonly pattern: string) {

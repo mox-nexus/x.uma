@@ -58,44 +58,64 @@ config never silently returns a wrong answer.
 ## Config shape
 
 ```yaml
-matchers:
-  - predicate:
-      type: single
-      input: { type_url: "xuma.kv.v1.MapInput", config: { key: "method" } }
-      value_match: { Exact: "GET" }
-    on_match: { type: action, action: "read-handler" }
+matcherList:
+  matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: method
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: method
+          valueMatch:
+            exact: GET
+      onMatch:
+        action:
+          name: read-handler
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: read-handler
 
-on_no_match: { type: action, action: "fallback" }
+onNoMatch:
+  action:
+    name: fallback
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: fallback
 ```
 
-`type_url` selects which input reads the context. `config` is that input's own
-settings. `value_match` is how the extracted value is compared.
+This is canonical protojson — protobuf's own JSON mapping of
+`xds.type.matcher.v3.Matcher`. `@type` selects which input reads the context;
+its sibling fields are that input's own settings. `valueMatch` is how the
+extracted value is compared. An action is a `NamedAction`: its own `name`
+carries the value the engine returns.
 
-Predicates compose: `single`, `and`, `or`, `not`.
+Predicates compose: `singlePredicate`, `andMatcher`, `orMatcher`, `notMatcher`.
 
 ```yaml
 predicate:
-  type: and
-  predicates:
-    - { type: single, input: {...}, value_match: { Exact: "GET" } }
-    - { type: single, input: {...}, value_match: { Prefix: "/api" } }
+  andMatcher:
+    predicate:
+      - { singlePredicate: { input: {...}, valueMatch: { exact: "GET" } } }
+      - { singlePredicate: { input: {...}, valueMatch: { prefix: "/api" } } }
 ```
 
-`on_match` is exclusive: it is either an action or a nested matcher, never both.
+`onMatch` is exclusive: it is either an action or a nested matcher, never both.
 
 ```yaml
-on_match: { type: matcher, matcher: { matchers: [ ... ] } }
+onMatch: { matcher: { matcherList: { matchers: [ ... ] } } }
 ```
 
 ## Value matches
 
 | Form | Meaning |
 |---|---|
-| `{ Exact: "GET" }` | equal |
-| `{ Prefix: "/api" }` | starts with |
-| `{ Suffix: ".json" }` | ends with |
-| `{ Contains: "admin" }` | substring |
-| `{ Regex: "^/v[0-9]+/" }` | regular expression, linear time |
+| `{ exact: "GET" }` | equal |
+| `{ prefix: "/api" }` | starts with |
+| `{ suffix: ".json" }` | ends with |
+| `{ contains: "admin" }` | substring |
+| `{ safeRegex: { regex: "^/v[0-9]+/" } }` | regular expression, linear time |
+| `ignoreCase: true` | sibling of any of the above; case-insensitive comparison |
 
 Prefer the cheapest form that expresses the rule. `Regex` is RE2-class and safe
 against catastrophic backtracking, but it is still the most expensive option,
@@ -159,14 +179,15 @@ fn section(s: &mut String, title: &str, urls: &[&str]) {
 /// loads. A wrong key fails the test rather than shipping in the skill.
 ///
 /// This exists because the first version of this file was hand-written and was
-/// wrong about `ArgumentInput` on the day it was written, inside a module whose
+/// wrong about `ToolArgInput` on the day it was written, inside a module whose
 /// doc comment claims these tables cannot drift. The generated half could not.
 /// This half could, and did.
 pub const CONFIG_KEYS: &[(&str, &str)] = &[
     ("xuma.kv.v1.MapInput", "key"),
     ("xuma.http.v1.HeaderInput", "name"),
     ("xuma.http.v1.QueryParamInput", "name"),
-    ("xuma.claude.v1.ArgumentInput", "name"),
+    ("xuma.claude.v1.ToolArgInput", "name"),
+    ("xuma.core.v1.NamedAction", "name"),
 ];
 
 /// Prose describing each input, WITHOUT its config key.
@@ -185,9 +206,9 @@ fn description(type_url: &str) -> &'static str {
         "xuma.http.v1.QueryParamInput" => "one query parameter",
         "xuma.http.v1.AuthorityInput" => "`:authority` pseudo-header",
         "xuma.http.v1.SchemeInput" => "`:scheme` pseudo-header",
-        "xuma.claude.v1.EventInput" => "hook event name, e.g. PreToolUse",
+        "xuma.claude.v1.EventTypeInput" => "hook event name, e.g. PreToolUse",
         "xuma.claude.v1.ToolNameInput" => "tool being invoked, e.g. Bash",
-        "xuma.claude.v1.ArgumentInput" => "one tool argument",
+        "xuma.claude.v1.ToolArgInput" => "one tool argument",
         "xuma.claude.v1.CwdInput" => "working directory",
         "xuma.claude.v1.GitBranchInput" => "current git branch",
         "xuma.claude.v1.SessionIdInput" => "session identifier",
@@ -220,7 +241,7 @@ fn hint(type_url: &str) -> String {
 
     match (prose.is_empty(), key) {
         (true, _) => String::new(),
-        (false, Some(k)) => format!(" — {prose}, `config.{k}`"),
+        (false, Some(k)) => format!(" — {prose}, payload field `{k}`"),
         (false, None) => format!(" — {prose}"),
     }
 }
@@ -239,64 +260,99 @@ pub const REFERENCE_NAMES: &[&str] = &["config", "authoring"];
 
 const CONFIG_REFERENCE: &str = r#"# Config format
 
+Canonical protojson: protobuf's own JSON mapping of
+`xds.type.matcher.v3.Matcher`. Field names may be written `lowerCamelCase` (the
+canonical form) or the proto's own `snake_case` — both are accepted, a third
+spelling is a load error, and so is a field the schema does not define. That is
+deliberate: a typo in a deny rule must not become a rule that silently never
+fires.
+
 ## Top level
 
 ```yaml
-matchers:      # ordered list, first match wins
-  - predicate: ...
-    on_match: ...
-on_no_match:   # optional, used when no rule matched
+matcherList:            # ordered list, first match wins
+  matchers:
+    - predicate: ...
+      onMatch: ...
+onNoMatch:               # optional, used when no rule matched
 ```
 
 ## Predicates
 
 ```yaml
-# single: read one input, compare it
+# singlePredicate: read one input, compare it
 predicate:
-  type: single
-  input: { type_url: "...", config: { ... } }
-  value_match: { Exact: "..." }
+  singlePredicate:
+    input: { name: "...", typedConfig: { "@type": "...", ... } }
+    valueMatch: { exact: "..." }
 
-# and: every child must match
+# andMatcher: every child must match
 predicate:
-  type: and
-  predicates: [ ..., ... ]
+  andMatcher:
+    predicate: [ ..., ... ]
 
-# or: any child matches
+# orMatcher: any child matches
 predicate:
-  type: or
-  predicates: [ ..., ... }
+  orMatcher:
+    predicate: [ ..., ... ]
 
-# not: inverts one child
+# notMatcher: inverts one child
 predicate:
-  type: not
-  predicate: { ... }
+  notMatcher: { ... }
 ```
 
 Compound predicates evaluate every child even once the outcome is decided. That
 is deliberate: it keeps `--trace` output complete.
 
-## on_match
+## An input's config, and `@type`
+
+`typedConfig` carries an `Any`: `@type` names the message, written as the full
+`type.googleapis.com/xuma.*` URL, and its sibling fields are that message's own.
+A bare name without the prefix is refused, matching what protojson requires
+everywhere else.
+
+```yaml
+input:
+  name: role
+  typedConfig:
+    "@type": type.googleapis.com/xuma.kv.v1.MapInput
+    key: role
+```
+
+## onMatch
 
 Exclusive. An action or a nested matcher, never both.
 
 ```yaml
-on_match: { type: action, action: "some-name" }
+onMatch:
+  action:
+    name: some-name
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: some-name
 
-on_match:
-  type: matcher
+onMatch:
   matcher:
-    matchers: [ ... ]
-    on_no_match: { type: action, action: "inner-fallback" }
+    matcherList:
+      matchers: [ ... ]
+    onNoMatch:
+      action: { name: inner-fallback, typedConfig: { "@type": "...", name: inner-fallback } }
 ```
 
 A nested matcher that fails to match does NOT fall back to the parent's next
 rule with a match recorded — the parent continues to its next field matcher.
 
+`keepMatching: true` is a sibling of `action`/`matcher` in xDS. It is not
+implemented — it would record the action and keep evaluating, and this engine
+returns the first match — so it is a load error rather than a silently ignored
+field.
+
 ## Actions
 
-An action is an opaque value handed back on match. The engine does not
-interpret it. Mapping an action to behaviour is the caller's job.
+`xuma.core.v1.NamedAction` is the action type this engine ships: its `name` is
+the opaque value handed back on match. The engine does not interpret it, and an
+empty name is a load error rather than a rule that fires and returns nothing.
+Mapping an action to behaviour is the caller's job.
 "#;
 
 const AUTHORING_REFERENCE: &str = r#"# Writing a config from scratch
@@ -322,12 +378,14 @@ Copy the `type_url` exactly. A wrong URL is a load error, not a silent miss.
 Order is significant. A broad rule placed first shadows everything after it.
 
 ```yaml
-matchers:
-  - predicate: { type: single, input: {...}, value_match: { Exact: "/api/admin" } }
-    on_match: { type: action, action: "admin" }
-  - predicate: { type: single, input: {...}, value_match: { Prefix: "/api" } }
-    on_match: { type: action, action: "api" }
-on_no_match: { type: action, action: "not-found" }
+matcherList:
+  matchers:
+    - predicate: { singlePredicate: { input: {...}, valueMatch: { exact: "/api/admin" } } }
+      onMatch: { action: { name: admin, typedConfig: { "@type": "...", name: admin } } }
+    - predicate: { singlePredicate: { input: {...}, valueMatch: { prefix: "/api" } } }
+      onMatch: { action: { name: api, typedConfig: { "@type": "...", name: api } } }
+onNoMatch:
+  action: { name: not-found, typedConfig: { "@type": "...", name: not-found } }
 ```
 
 Reversed, `/api/admin` would never be reached.

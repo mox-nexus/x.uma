@@ -15,7 +15,7 @@
  *   builder.input("xuma.kv.v1.MapInput", (cfg) => new DictInput(cfg.key as string));
  *   const registry = builder.build();
  *
- *   const config = parseMatcherConfig(jsonData);
+ *   const config = parseProtojson(jsonData); // from ./protojson.ts
  *   const matcher = registry.loadMatcher(config);
  */
 

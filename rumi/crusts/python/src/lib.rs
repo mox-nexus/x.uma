@@ -15,6 +15,7 @@ mod convert;
 mod fixtures;
 mod http_matcher;
 pub(crate) mod matcher;
+mod protojson;
 mod test_matcher;
 
 use pyo3::prelude::*;

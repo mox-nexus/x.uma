@@ -1,4 +1,4 @@
-import { RegistryBuilder, parseMatcherConfig } from "xuma";
+import { RegistryBuilder, parseProtojson } from "xuma";
 import { register as registerTest } from "xuma/testing";
 import {
   register as registerHttp,
@@ -14,7 +14,7 @@ const testRegistry = registerTest(new RegistryBuilder()).build();
 const httpRegistry = registerHttp(new RegistryBuilder<HttpRequest>()).build();
 
 /**
- * Evaluate a MatcherConfig JSON against key-value context.
+ * Evaluate a protojson matcher config against key-value context.
  * Uses the test domain registry (xuma.kv.v1.MapInput).
  */
 export function evaluateConfig(
@@ -23,7 +23,7 @@ export function evaluateConfig(
 ): EvalResult {
   try {
     const parsed = JSON.parse(configJson);
-    const config = parseMatcherConfig(parsed);
+    const config = parseProtojson(parsed);
     const matcher = testRegistry.loadMatcher(config);
     const result = matcher.evaluate(context);
     return result !== null
@@ -75,7 +75,7 @@ export function evaluateHttp(
 }
 
 /**
- * Evaluate a MatcherConfig JSON against an HTTP request.
+ * Evaluate a protojson matcher config against an HTTP request.
  * Uses the HTTP domain registry (xuma.http.v1.* type URLs).
  */
 export function evaluateHttpConfig(
@@ -86,7 +86,7 @@ export function evaluateHttpConfig(
 ): EvalResult {
   try {
     const parsed = JSON.parse(configJson);
-    const config = parseMatcherConfig(parsed);
+    const config = parseProtojson(parsed);
     const matcher = httpRegistry.loadMatcher(config);
     const req = new HttpRequest(method, path, headers);
     const result = matcher.evaluate(req);

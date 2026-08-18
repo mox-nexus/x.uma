@@ -5,9 +5,9 @@ use crate::prelude::*;
 
 /// Extracts the hook event type as a string.
 #[derive(Debug, Clone)]
-pub struct EventInput;
+pub struct EventTypeInput;
 
-impl DataInput<HookContext> for EventInput {
+impl DataInput<HookContext> for EventTypeInput {
     fn get(&self, ctx: &HookContext) -> MatchingData {
         MatchingData::String(ctx.event().as_str().to_string())
     }
@@ -25,11 +25,11 @@ impl DataInput<HookContext> for ToolNameInput {
 
 /// Extracts a tool argument by name.
 #[derive(Debug, Clone)]
-pub struct ArgumentInput {
+pub struct ToolArgInput {
     name: String,
 }
 
-impl ArgumentInput {
+impl ToolArgInput {
     /// Create a new argument input extractor.
     ///
     /// # Errors
@@ -49,7 +49,7 @@ impl ArgumentInput {
     }
 }
 
-impl DataInput<HookContext> for ArgumentInput {
+impl DataInput<HookContext> for ToolArgInput {
     fn get(&self, ctx: &HookContext) -> MatchingData {
         ctx.argument(&self.name)
             .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
@@ -91,22 +91,22 @@ impl DataInput<HookContext> for GitBranchInput {
 // Registry support (feature = "registry")
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Configuration for [`ArgumentInput`].
+/// Configuration for [`ToolArgInput`].
 #[cfg(feature = "registry")]
 #[derive(serde::Deserialize)]
-pub struct ArgumentInputConfig {
+pub struct ToolArgInputConfig {
     /// The argument name to extract.
     pub name: String,
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for EventInput {
+impl crate::IntoDataInput<HookContext> for EventTypeInput {
     type Config = crate::UnitConfig;
 
     fn from_config(
         _: crate::UnitConfig,
     ) -> Result<Box<dyn crate::DataInput<HookContext>>, crate::MatcherError> {
-        Ok(Box::new(EventInput))
+        Ok(Box::new(EventTypeInput))
     }
 }
 
@@ -122,13 +122,13 @@ impl crate::IntoDataInput<HookContext> for ToolNameInput {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for ArgumentInput {
-    type Config = ArgumentInputConfig;
+impl crate::IntoDataInput<HookContext> for ToolArgInput {
+    type Config = ToolArgInputConfig;
 
     fn from_config(
         config: Self::Config,
     ) -> Result<Box<dyn crate::DataInput<HookContext>>, crate::MatcherError> {
-        Ok(Box::new(ArgumentInput::new(config.name)?))
+        Ok(Box::new(ToolArgInput::new(config.name)?))
     }
 }
 
@@ -173,7 +173,7 @@ mod tests {
     /// reads nothing, the rule stops firing, and the tool call proceeds.
     #[test]
     fn an_empty_argument_name_is_rejected() {
-        let err = ArgumentInput::new("").unwrap_err();
+        let err = ToolArgInput::new("").unwrap_err();
         assert!(
             matches!(err, crate::MatcherError::EmptyIdentifier { .. }),
             "{err:?}"
@@ -183,7 +183,7 @@ mod tests {
     fn event_input_returns_event_string() {
         let ctx = HookContext::pre_tool_use("Bash");
         assert_eq!(
-            EventInput.get(&ctx),
+            EventTypeInput.get(&ctx),
             MatchingData::String("PreToolUse".into())
         );
     }
@@ -202,9 +202,9 @@ mod tests {
             ("Notification", HookContext::notification()),
         ] {
             assert_eq!(
-                EventInput.get(&ctx),
+                EventTypeInput.get(&ctx),
                 MatchingData::String(event_name.into()),
-                "EventInput failed for {event_name}"
+                "EventTypeInput failed for {event_name}"
             );
         }
     }
@@ -228,7 +228,7 @@ mod tests {
     fn argument_input_returns_value() {
         let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "ls");
         assert_eq!(
-            ArgumentInput::new("command").unwrap().get(&ctx),
+            ToolArgInput::new("command").unwrap().get(&ctx),
             MatchingData::String("ls".into())
         );
     }
@@ -237,7 +237,7 @@ mod tests {
     fn argument_input_returns_none_for_missing() {
         let ctx = HookContext::pre_tool_use("Bash");
         assert_eq!(
-            ArgumentInput::new("command").unwrap().get(&ctx),
+            ToolArgInput::new("command").unwrap().get(&ctx),
             MatchingData::None
         );
     }

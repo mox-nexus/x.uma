@@ -17,5 +17,6 @@ rumi-core = { workspace = true, features = ["registry", "claude"] }
 # ext-proc, which unified it into every workspace build and masked the fact
 # that a gateway-only build did not compile.
 rumi-http = { path = "../ext/http", features = ["registry", "gateway"], default-features = false }
+rumi-proto = { path = "../proto" }
 serde_yaml.workspace = true
 serde_json.workspace = true

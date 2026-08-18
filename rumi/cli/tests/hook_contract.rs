@@ -16,20 +16,39 @@ const ALLOW: i32 = 0;
 const BLOCK: i32 = 2;
 
 const CONFIG: &str = r#"
-matchers:
-  - predicate:
-      type: and
-      predicates:
-        - type: single
-          input: { type_url: "xuma.claude.v1.EventInput" }
-          value_match: { Exact: "PreToolUse" }
-        - type: single
-          input: { type_url: "xuma.claude.v1.ToolNameInput" }
-          value_match: { Exact: "Bash" }
-        - type: single
-          input: { type_url: "xuma.claude.v1.ArgumentInput", config: { name: "command" } }
-          value_match: { Contains: "rm -rf" }
-    on_match: { type: action, action: "deny" }
+matcherList:
+  matchers:
+    - predicate:
+        andMatcher:
+          predicate:
+            - singlePredicate:
+                input:
+                  name: event
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.claude.v1.EventTypeInput
+                valueMatch:
+                  exact: PreToolUse
+            - singlePredicate:
+                input:
+                  name: tool
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.claude.v1.ToolNameInput
+                valueMatch:
+                  exact: Bash
+            - singlePredicate:
+                input:
+                  name: command
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.claude.v1.ToolArgInput
+                    name: command
+                valueMatch:
+                  contains: "rm -rf"
+      onMatch:
+        action:
+          name: deny
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: deny
 "#;
 
 /// Write a config to a path no other test can be writing at the same time.

@@ -6,6 +6,7 @@
  */
 
 import { beforeAll, describe, expect, test } from "bun:test";
+import { pj } from "./_terse_to_protojson.ts";
 // @ts-expect-error — generated WASM package has no TS project reference
 import init, { HttpMatcher } from "../pkg/xuma_crust.js";
 
@@ -19,7 +20,7 @@ beforeAll(async () => {
 
 describe("Basic Matching", () => {
   test("path exact match", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -28,14 +29,14 @@ describe("Basic Matching", () => {
         },
         on_match: { type: "action", action: "users" },
       }],
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     expect(matcher.evaluate({ method: "GET", path: "/api/users" })).toBe("users");
     expect(matcher.evaluate({ method: "GET", path: "/api/posts" })).toBeUndefined();
   });
 
   test("path prefix match", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -44,14 +45,14 @@ describe("Basic Matching", () => {
         },
         on_match: { type: "action", action: "api" },
       }],
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     expect(matcher.evaluate({ method: "GET", path: "/api/users" })).toBe("api");
     expect(matcher.evaluate({ method: "GET", path: "/health" })).toBeUndefined();
   });
 
   test("method exact match", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -60,14 +61,14 @@ describe("Basic Matching", () => {
         },
         on_match: { type: "action", action: "post_handler" },
       }],
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     expect(matcher.evaluate({ method: "POST", path: "/" })).toBe("post_handler");
     expect(matcher.evaluate({ method: "GET", path: "/" })).toBeUndefined();
   });
 
   test("header match", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -76,7 +77,7 @@ describe("Basic Matching", () => {
         },
         on_match: { type: "action", action: "json" },
       }],
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     expect(matcher.evaluate({
       method: "POST",
@@ -91,7 +92,7 @@ describe("Basic Matching", () => {
   });
 
   test("query param match", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -100,7 +101,7 @@ describe("Basic Matching", () => {
         },
         on_match: { type: "action", action: "first_page" },
       }],
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     expect(matcher.evaluate({
       method: "GET",
@@ -121,7 +122,7 @@ describe("Basic Matching", () => {
 
 describe("Compound Predicates", () => {
   test("AND: path + method", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "and",
@@ -140,7 +141,7 @@ describe("Compound Predicates", () => {
         },
         on_match: { type: "action", action: "api_write" },
       }],
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     expect(matcher.evaluate({ method: "POST", path: "/api/users" })).toBe("api_write");
     expect(matcher.evaluate({ method: "GET", path: "/api/users" })).toBeUndefined();
@@ -148,7 +149,7 @@ describe("Compound Predicates", () => {
   });
 
   test("OR: multiple methods", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "or",
@@ -167,7 +168,7 @@ describe("Compound Predicates", () => {
         },
         on_match: { type: "action", action: "update" },
       }],
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     expect(matcher.evaluate({ method: "PUT", path: "/" })).toBe("update");
     expect(matcher.evaluate({ method: "PATCH", path: "/" })).toBe("update");
@@ -175,7 +176,7 @@ describe("Compound Predicates", () => {
   });
 
   test("NOT: exclude path", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "not",
@@ -187,7 +188,7 @@ describe("Compound Predicates", () => {
         },
         on_match: { type: "action", action: "not_health" },
       }],
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     expect(matcher.evaluate({ method: "GET", path: "/api/users" })).toBe("not_health");
     expect(matcher.evaluate({ method: "GET", path: "/health" })).toBeUndefined();
@@ -200,7 +201,7 @@ describe("Compound Predicates", () => {
 
 describe("Nesting & Fallback", () => {
   test("nested matcher: method then path", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -221,7 +222,7 @@ describe("Nesting & Fallback", () => {
           },
         },
       }],
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     expect(matcher.evaluate({ method: "GET", path: "/api/users" })).toBe("get_api");
     expect(matcher.evaluate({ method: "GET", path: "/health" })).toBeUndefined();
@@ -229,7 +230,7 @@ describe("Nesting & Fallback", () => {
   });
 
   test("on_no_match fallback", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -239,7 +240,7 @@ describe("Nesting & Fallback", () => {
         on_match: { type: "action", action: "api" },
       }],
       on_no_match: { type: "action", action: "default" },
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     expect(matcher.evaluate({ method: "GET", path: "/api" })).toBe("api");
     expect(matcher.evaluate({ method: "GET", path: "/other" })).toBe("default");
@@ -261,7 +262,7 @@ describe("String Match Types", () => {
 
   for (const { name, value_match, hit, miss } of matchTypes) {
     test(`${name} match`, () => {
-      const config = JSON.stringify({
+      const config = JSON.stringify(pj({
         matchers: [{
           predicate: {
             type: "single",
@@ -270,7 +271,7 @@ describe("String Match Types", () => {
           },
           on_match: { type: "action", action: "hit" },
         }],
-      });
+      }));
       const matcher = HttpMatcher.fromConfig(config);
       expect(matcher.evaluate({ method: "GET", path: hit })).toBe("hit");
       expect(matcher.evaluate({ method: "GET", path: miss })).toBeUndefined();
@@ -288,7 +289,7 @@ describe("Errors", () => {
   });
 
   test("unknown input type", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -297,12 +298,12 @@ describe("Errors", () => {
         },
         on_match: { type: "action", action: "test" },
       }],
-    });
+    }));
     expect(() => HttpMatcher.fromConfig(config)).toThrow();
   });
 
   test("invalid regex", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -311,12 +312,12 @@ describe("Errors", () => {
         },
         on_match: { type: "action", action: "test" },
       }],
-    });
+    }));
     expect(() => HttpMatcher.fromConfig(config)).toThrow(/regex/);
   });
 
   test("missing method in evaluate", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -325,7 +326,7 @@ describe("Errors", () => {
         },
         on_match: { type: "action", action: "test" },
       }],
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     expect(() => matcher.evaluate({ path: "/" })).toThrow(/method is required/);
   });
@@ -337,7 +338,7 @@ describe("Errors", () => {
 
 describe("Trace", () => {
   test("trace result matches evaluate", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -347,14 +348,14 @@ describe("Trace", () => {
         on_match: { type: "action", action: "api" },
       }],
       on_no_match: { type: "action", action: "default" },
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     const ctx = { method: "GET", path: "/api/users" };
     expect(matcher.trace(ctx).result).toBe(matcher.evaluate(ctx));
   });
 
   test("trace has steps and structure", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -363,7 +364,7 @@ describe("Trace", () => {
         },
         on_match: { type: "action", action: "root" },
       }],
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     const trace = matcher.trace({ method: "GET", path: "/" });
     expect(trace.steps.length).toBeGreaterThan(0);
@@ -373,7 +374,7 @@ describe("Trace", () => {
   });
 
   test("trace shows fallback usage", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -383,7 +384,7 @@ describe("Trace", () => {
         on_match: { type: "action", action: "api" },
       }],
       on_no_match: { type: "action", action: "default" },
-    });
+    }));
     const matcher = HttpMatcher.fromConfig(config);
     const trace = matcher.trace({ method: "GET", path: "/other" });
     expect(trace.result).toBe("default");

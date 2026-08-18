@@ -26,33 +26,31 @@ pub struct HttpMatcher {
 
 #[pymethods]
 impl HttpMatcher {
-    /// Load a matcher from a JSON config string.
+    /// Load a matcher from a canonical protojson config string.
     ///
-    /// The config format is `MatcherConfig<String>` — the same JSON shape used
-    /// by all x.uma implementations (rumi, puma, bumi).
+    /// protojson is the format all x.uma implementations use — protobuf's own
+    /// JSON mapping of `xds.type.matcher.v3.Matcher`. See DECISIONS.md D-026.
     ///
     /// # Supported input type URLs
     ///
-    /// - `xuma.http.v1.PathInput` — request path (config: `{}`)
-    /// - `xuma.http.v1.MethodInput` — HTTP method (config: `{}`)
-    /// - `xuma.http.v1.HeaderInput` — header value (config: `{"name": "..."}`)
-    /// - `xuma.http.v1.QueryParamInput` — query parameter (config: `{"name": "..."}`)
+    /// - `xuma.http.v1.PathInput` / `MethodInput` / `AuthorityInput` / `SchemeInput` — no config
+    /// - `xuma.http.v1.HeaderInput` — header value (`{"name": "..."}`)
+    /// - `xuma.http.v1.QueryParamInput` — query parameter (`{"name": "..."}`)
     ///
     /// # Errors
     ///
     /// Raises `ValueError` if:
-    /// - JSON config is malformed
+    /// - JSON config is malformed, or not a valid `Matcher`
     /// - Unknown type URL (error lists available URLs)
     /// - Invalid regex pattern
     /// - Depth/width limits exceeded
     #[staticmethod]
     fn from_config(json_config: &str) -> PyResult<Self> {
-        let config: rumi::MatcherConfig<String> = serde_json::from_str(json_config)
-            .map_err(|e| PyValueError::new_err(format!("invalid config JSON: {e}")))?;
+        let config = crate::protojson::load(json_config).map_err(PyValueError::new_err)?;
 
         let registry = build_http_registry();
         let matcher = registry
-            .load_matcher(config)
+            .load_typed_matcher(config, &crate::protojson::actions())
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
         matcher

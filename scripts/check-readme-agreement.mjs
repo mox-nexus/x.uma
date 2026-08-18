@@ -55,9 +55,10 @@ writeFileSync(configPath, extractConfig());
 
 const PY = `
 import sys, yaml
-from xuma import RegistryBuilder, parse_matcher_config
+from xuma import RegistryBuilder
+from xuma._protojson import parse_protojson
 from xuma.http import HttpRequest, register
-cfg = parse_matcher_config(yaml.safe_load(open(sys.argv[1])))
+cfg = parse_protojson(yaml.safe_load(open(sys.argv[1])))
 matcher = register(RegistryBuilder()).build().load_matcher(cfg)
 for method, path in [(a, b) for a, b in (x.split(" ") for x in sys.argv[2:])]:
     r = matcher.evaluate(HttpRequest(method=method, raw_path=path))
@@ -67,9 +68,9 @@ for method, path in [(a, b) for a, b in (x.split(" ") for x in sys.argv[2:])]:
 const TS = `
 import { parse } from "yaml";
 import { readFileSync } from "node:fs";
-import { RegistryBuilder, parseMatcherConfig } from "__ROOT__/bumi/src/index.ts";
+import { RegistryBuilder, parseProtojson } from "__ROOT__/bumi/src/index.ts";
 import { HttpRequest, register } from "__ROOT__/bumi/src/http/index.ts";
-const cfg = parseMatcherConfig(parse(readFileSync(process.argv[2], "utf8")));
+const cfg = parseProtojson(parse(readFileSync(process.argv[2], "utf8")));
 const matcher = register(new RegistryBuilder()).build().loadMatcher(cfg);
 for (const spec of process.argv.slice(3)) {
   const [method, path] = spec.split(" ");

@@ -6,27 +6,50 @@
 	const ORDER: Quadrant[] = ['tutorial', 'how-to', 'reference', 'explanation'];
 
 	const DEMO_CONFIG = `{
-  "matchers": [
-    {
-      "predicate": {
-        "type": "single",
-        "input": { "type_url": "xuma.kv.v1.MapInput",
-                   "config": { "key": "method" } },
-        "value_match": { "Exact": "GET" }
+  "matcherList": {
+    "matchers": [
+      {
+        "predicate": {
+          "singlePredicate": {
+            "input": {
+              "name": "method",
+              "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "method" }
+            },
+            "valueMatch": { "exact": "GET" }
+          }
+        },
+        "onMatch": {
+          "action": {
+            "name": "read-handler",
+            "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "read-handler" }
+          }
+        }
       },
-      "on_match": { "type": "action", "action": "read-handler" }
-    },
-    {
-      "predicate": {
-        "type": "single",
-        "input": { "type_url": "xuma.kv.v1.MapInput",
-                   "config": { "key": "method" } },
-        "value_match": { "Exact": "POST" }
-      },
-      "on_match": { "type": "action", "action": "write-handler" }
+      {
+        "predicate": {
+          "singlePredicate": {
+            "input": {
+              "name": "method",
+              "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "method" }
+            },
+            "valueMatch": { "exact": "POST" }
+          }
+        },
+        "onMatch": {
+          "action": {
+            "name": "write-handler",
+            "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "write-handler" }
+          }
+        }
+      }
+    ]
+  },
+  "onNoMatch": {
+    "action": {
+      "name": "405-not-allowed",
+      "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "405-not-allowed" }
     }
-  ],
-  "on_no_match": { "type": "action", "action": "405-not-allowed" }
+  }
 }`;
 
 	const DEMO_CONTEXT = `{ "method": "GET" }`;

@@ -109,31 +109,40 @@ Load matcher configuration from YAML/JSON at runtime:
 
 ```python
 import yaml
-from xuma import RegistryBuilder, parse_matcher_config
+from xuma import RegistryBuilder
+from xuma._protojson import parse_protojson
 from xuma.testing import register
 
 config = yaml.safe_load("""
-matchers:
-  - predicate:
-      type: single
-      input:
-        type_url: "xuma.kv.v1.MapInput"
-        config:
-          key: "method"
-      value_match:
-        Exact: "GET"
-    on_match:
-      type: action
-      action: "route-get"
-on_no_match:
-  type: action
-  action: "fallback"
+matcherList:
+  matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: method
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: method
+          valueMatch:
+            exact: GET
+      onMatch:
+        action:
+          name: route-get
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: route-get
+onNoMatch:
+  action:
+    name: fallback
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: fallback
 """)
 
 builder = RegistryBuilder()
 builder = register(builder)
 registry = builder.build()
-matcher = registry.load_matcher(parse_matcher_config(config))
+matcher = registry.load_matcher(parse_protojson(config))
 
 matcher.evaluate({"method": "GET"})     # "route-get"
 matcher.evaluate({"method": "DELETE"})   # "fallback"

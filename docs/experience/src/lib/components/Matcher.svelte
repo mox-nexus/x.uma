@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { RegistryBuilder, parseMatcherConfig } from 'xuma';
+	import { RegistryBuilder, parseProtojson } from 'xuma';
 	import { register as registerTest } from 'xuma/testing';
 
 	/**
 	 * A live matcher, embedded in prose.
 	 *
-	 * Authors write this in plain Markdown:
+	 * Authors write this in plain Markdown, `config` as canonical protojson:
 	 *
-	 *   <matcher config='{"matchers":[...]}' context='{"method":"GET"}' />
+	 *   <matcher config='{"matcherList":{"matchers":[...]}}' context='{"method":"GET"}' />
 	 *
 	 * rehype-raw parses the tag, and the renderer map in
 	 * $lib/config/markdown-plugins.ts swaps it for this component. The Markdown
@@ -32,7 +32,7 @@
 
 	const outcome = $derived.by((): Outcome => {
 		try {
-			const parsed = parseMatcherConfig(JSON.parse(configText));
+			const parsed = parseProtojson(JSON.parse(configText));
 			const matcher = registry.loadMatcher(parsed);
 			const ctx = JSON.parse(contextText) as Record<string, string>;
 			const result = matcher.evaluate(ctx);

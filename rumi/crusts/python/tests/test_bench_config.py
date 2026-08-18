@@ -1,9 +1,13 @@
-"""Head-to-head config benchmarks: puma (pure Python) vs xuma-crust (PyO3).
+"""Head-to-head config benchmarks: puma vs xuma-crust (PyO3).
 
 Compares the config loading path across both implementations to isolate:
-1. Config parsing overhead — JSON → config types
-2. Registry loading — type URL lookup + factory invocation
-3. Evaluation parity — config-loaded matcher evaluation speed
+1. Config parsing overhead -- JSON -> config types
+2. Registry loading -- type URL lookup + factory invocation
+3. Evaluation parity -- config-loaded matcher evaluation speed
+
+The configs are canonical protojson (DECISIONS.md D-026), fed through
+`parse_protojson` on the puma side and `from_config` on the crust side --
+both are the real production entry points, not synthetic ones.
 
 Run:
   cd rumi/crusts/python
@@ -20,85 +24,87 @@ import pytest
 from xuma_crust import HttpMatcher, TestMatcher as CrustTestMatcher
 
 # Pure Python for comparison
-from xuma import (
-    Action,
-    ExactMatcher,
-    FieldMatcher,
-    Matcher,
-    RegistryBuilder,
-    SinglePredicate,
-    parse_matcher_config,
-)
-from xuma.testing import DictInput, register
+from xuma import RegistryBuilder
+from xuma._protojson import parse_protojson
+from xuma.testing import register
 
-# ── Shared JSON configs ──────────────────────────────────────────────────────
+# ── Shared protojson configs ─────────────────────────────────────────────────
+
+
+def _map_input(key: str) -> dict:
+    return {"@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": key}
+
+
+def _named_action(name: str) -> dict:
+    return {"@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": name}
+
+
+def _single(input_name: str, key: str, variant: str, value: str) -> dict:
+    return {
+        "singlePredicate": {
+            "input": {"name": input_name, "typedConfig": _map_input(key)},
+            "valueMatch": {variant: value},
+        }
+    }
+
+
+def _action_match(name: str) -> dict:
+    return {"action": {"name": name, "typedConfig": _named_action(name)}}
+
 
 SIMPLE_CONFIG = json.dumps(
     {
-        "matchers": [
-            {
-                "predicate": {
-                    "type": "single",
-                    "input": {
-                        "type_url": "xuma.kv.v1.MapInput",
-                        "config": {"key": "role"},
-                    },
-                    "value_match": {"Exact": "admin"},
-                },
-                "on_match": {"type": "action", "action": "matched"},
-            }
-        ],
-        "on_no_match": {"type": "action", "action": "default"},
+        "matcherList": {
+            "matchers": [
+                {
+                    "predicate": _single("role", "role", "exact", "admin"),
+                    "onMatch": _action_match("matched"),
+                }
+            ]
+        },
+        "onNoMatch": _action_match("default"),
     }
 )
 
 COMPOUND_CONFIG = json.dumps(
     {
-        "matchers": [
-            {
-                "predicate": {
-                    "type": "and",
-                    "predicates": [
-                        {
-                            "type": "single",
-                            "input": {
-                                "type_url": "xuma.kv.v1.MapInput",
-                                "config": {"key": "role"},
-                            },
-                            "value_match": {"Exact": "admin"},
-                        },
-                        {
-                            "type": "single",
-                            "input": {
-                                "type_url": "xuma.kv.v1.MapInput",
-                                "config": {"key": "org"},
-                            },
-                            "value_match": {"Prefix": "acme"},
-                        },
-                    ],
-                },
-                "on_match": {"type": "action", "action": "admin_acme"},
-            }
-        ]
+        "matcherList": {
+            "matchers": [
+                {
+                    "predicate": {
+                        "andMatcher": {
+                            "predicate": [
+                                _single("role", "role", "exact", "admin"),
+                                _single("org", "org", "prefix", "acme"),
+                            ]
+                        }
+                    },
+                    "onMatch": _action_match("admin_acme"),
+                }
+            ]
+        }
     }
 )
 
 HTTP_SIMPLE_CONFIG = json.dumps(
     {
-        "matchers": [
-            {
-                "predicate": {
-                    "type": "single",
-                    "input": {
-                        "type_url": "xuma.http.v1.PathInput",
-                        "config": {},
+        "matcherList": {
+            "matchers": [
+                {
+                    "predicate": {
+                        "singlePredicate": {
+                            "input": {
+                                "name": "path",
+                                "typedConfig": {"@type": "type.googleapis.com/xuma.http.v1.PathInput"},
+                            },
+                            "valueMatch": {"exact": "/api/v1/users"},
+                        }
                     },
-                    "value_match": {"Exact": "/api/v1/users"},
-                },
-                "on_match": {"type": "action", "action": "users_api"},
-            }
-        ],
-        "on_no_match": {"type": "action", "action": "not_found"},
+                    "onMatch": _action_match("users_api"),
+                }
+            ]
+        },
+        "onNoMatch": _action_match("not_found"),
     }
 )
 
@@ -119,11 +125,11 @@ def test_bench_crusty_config_load_simple(benchmark):
 
 
 def test_bench_puma_config_load_simple(benchmark):
-    """Puma: parse_matcher_config → registry.load_matcher."""
+    """Puma: parse_protojson -> registry.load_matcher."""
     registry = _puma_registry()
 
     def go():
-        config = parse_matcher_config(json.loads(SIMPLE_CONFIG))
+        config = parse_protojson(json.loads(SIMPLE_CONFIG))
         return registry.load_matcher(config)
 
     benchmark(go)
@@ -139,7 +145,7 @@ def test_bench_puma_config_load_compound(benchmark):
     registry = _puma_registry()
 
     def go():
-        config = parse_matcher_config(json.loads(COMPOUND_CONFIG))
+        config = parse_protojson(json.loads(COMPOUND_CONFIG))
         return registry.load_matcher(config)
 
     benchmark(go)
@@ -156,7 +162,7 @@ def crusty_config_matcher():
 @pytest.fixture
 def puma_config_matcher():
     registry = _puma_registry()
-    config = parse_matcher_config(json.loads(SIMPLE_CONFIG))
+    config = parse_protojson(json.loads(SIMPLE_CONFIG))
     return registry.load_matcher(config)
 
 

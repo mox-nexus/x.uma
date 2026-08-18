@@ -1,8 +1,12 @@
 /**
- * Config-path benchmarks for bumi (Pure TypeScript).
+ * Config-path benchmarks for bumi.
  *
- * Measures the cost of JSON config → Registry → Matcher construction,
- * and compares config-loaded evaluation against compiler-built evaluation.
+ * Measures the cost of JSON config -> Registry -> Matcher construction, and
+ * compares config-loaded evaluation against compiler-built evaluation.
+ *
+ * The configs are canonical protojson (DECISIONS.md D-026) fed through
+ * `parseProtojson`, the same reader `Registry.loadMatcher` consumes from in
+ * production -- this measures the real config path, not a synthetic one.
  *
  * Run: cd bumi && bun run bench/config.bench.ts
  */
@@ -14,94 +18,84 @@ import {
 	ExactMatcher,
 	FieldMatcher,
 	Matcher,
+	parseProtojson,
 	RegistryBuilder,
 	SinglePredicate,
-	parseMatcherConfig,
 } from "../src/index.ts";
-import type { MatchingData } from "../src/index.ts";
 import { DictInput, register } from "../src/testing.ts";
 
-// ── Shared JSON configs (identical across all implementations) ────────────────
+// ── Shared protojson configs (identical shape across all implementations) ────
+
+function mapInput(key: string) {
+	return { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key };
+}
+
+function namedAction(name: string) {
+	return { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", name };
+}
+
+function single(inputName: string, key: string, variant: string, value: string) {
+	return {
+		singlePredicate: {
+			input: { name: inputName, typedConfig: mapInput(key) },
+			valueMatch: { [variant]: value },
+		},
+	};
+}
+
+function actionMatch(name: string) {
+	return { action: { name, typedConfig: namedAction(name) } };
+}
 
 const SIMPLE_CONFIG = JSON.stringify({
-	matchers: [
-		{
-			predicate: {
-				type: "single",
-				input: {
-					type_url: "xuma.kv.v1.MapInput",
-					config: { key: "role" },
-				},
-				value_match: { Exact: "admin" },
-			},
-			on_match: { type: "action", action: "matched" },
-		},
-	],
-	on_no_match: { type: "action", action: "default" },
+	matcherList: {
+		matchers: [
+			{ predicate: single("role", "role", "exact", "admin"), onMatch: actionMatch("matched") },
+		],
+	},
+	onNoMatch: actionMatch("default"),
 });
 
 const COMPOUND_CONFIG = JSON.stringify({
-	matchers: [
-		{
-			predicate: {
-				type: "and",
-				predicates: [
-					{
-						type: "single",
-						input: {
-							type_url: "xuma.kv.v1.MapInput",
-							config: { key: "role" },
-						},
-						value_match: { Exact: "admin" },
+	matcherList: {
+		matchers: [
+			{
+				predicate: {
+					andMatcher: {
+						predicate: [
+							single("role", "role", "exact", "admin"),
+							single("org", "org", "prefix", "acme"),
+						],
 					},
-					{
-						type: "single",
-						input: {
-							type_url: "xuma.kv.v1.MapInput",
-							config: { key: "org" },
-						},
-						value_match: { Prefix: "acme" },
-					},
-				],
+				},
+				onMatch: actionMatch("admin_acme"),
 			},
-			on_match: { type: "action", action: "admin_acme" },
-		},
-	],
+		],
+	},
 });
 
 const NESTED_CONFIG = JSON.stringify({
-	matchers: [
-		{
-			predicate: {
-				type: "single",
-				input: {
-					type_url: "xuma.kv.v1.MapInput",
-					config: { key: "tier" },
-				},
-				value_match: { Exact: "premium" },
-			},
-			on_match: {
-				type: "matcher",
-				matcher: {
-					matchers: [
-						{
-							predicate: {
-								type: "single",
-								input: {
-									type_url: "xuma.kv.v1.MapInput",
-									config: { key: "region" },
+	matcherList: {
+		matchers: [
+			{
+				predicate: single("tier", "tier", "exact", "premium"),
+				onMatch: {
+					matcher: {
+						matcherList: {
+							matchers: [
+								{
+									predicate: single("region", "region", "exact", "us"),
+									onMatch: actionMatch("premium_us"),
 								},
-								value_match: { Exact: "us" },
-							},
-							on_match: { type: "action", action: "premium_us" },
+							],
 						},
-					],
-					on_no_match: { type: "action", action: "premium_other" },
+						onNoMatch: actionMatch("premium_other"),
+					},
 				},
 			},
-		},
-	],
-	on_no_match: { type: "action", action: "default" },
+		],
+	},
+	onNoMatch: actionMatch("default"),
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -122,17 +116,17 @@ summary(() => {
 	const registry = buildRegistry();
 
 	bench("config_load_simple", () => {
-		const config = parseMatcherConfig(JSON.parse(SIMPLE_CONFIG));
+		const config = parseProtojson(JSON.parse(SIMPLE_CONFIG));
 		registry.loadMatcher(config);
 	});
 
 	bench("config_load_compound", () => {
-		const config = parseMatcherConfig(JSON.parse(COMPOUND_CONFIG));
+		const config = parseProtojson(JSON.parse(COMPOUND_CONFIG));
 		registry.loadMatcher(config);
 	});
 
 	bench("config_load_nested", () => {
-		const config = parseMatcherConfig(JSON.parse(NESTED_CONFIG));
+		const config = parseProtojson(JSON.parse(NESTED_CONFIG));
 		registry.loadMatcher(config);
 	});
 });
@@ -142,7 +136,7 @@ summary(() => {
 summary(() => {
 	const registry = buildRegistry();
 	const configMatcher = registry.loadMatcher(
-		parseMatcherConfig(JSON.parse(SIMPLE_CONFIG)),
+		parseProtojson(JSON.parse(SIMPLE_CONFIG)),
 	);
 
 	const compilerMatcher = new Matcher<Record<string, string>, string>(
@@ -170,7 +164,7 @@ summary(() => {
 	const registry = buildRegistry();
 
 	bench("config_construct_simple", () => {
-		const config = parseMatcherConfig(JSON.parse(SIMPLE_CONFIG));
+		const config = parseProtojson(JSON.parse(SIMPLE_CONFIG));
 		registry.loadMatcher(config);
 	});
 

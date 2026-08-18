@@ -13,8 +13,8 @@ This installs the `rumi` binary.
 ## Usage
 
 ```sh
-# Evaluate a config against key=value context
-rumi eval config.yaml --context method=GET path=/api
+# Run a config against key=value context
+rumi run config.yaml --context method=GET path=/api
 
 # Validate a config file
 rumi check config.yaml
@@ -25,23 +25,32 @@ rumi info
 
 ## Config format
 
-Configs are YAML or JSON files describing a matcher tree. See the
+Configs are YAML or JSON files, written as canonical protojson — protobuf's own
+JSON mapping of `xds.type.matcher.v3.Matcher`. See the
 [x.uma documentation](https://github.com/mox-nexus/x.uma) for the full schema.
 
 ```yaml
-matchers:
-  - predicate:
-      type: single
-      input:
-        type_url: "xuma.kv.v1.MapInput"
-        config:
-          key: "method"
-      value_match:
-        Exact: "GET"
-    on_match:
-      type: action
-      action: "route-get"
-on_no_match:
-  type: action
-  action: "fallback"
+matcherList:
+  matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: method
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: method
+          valueMatch:
+            exact: GET
+      onMatch:
+        action:
+          name: route-get
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: route-get
+onNoMatch:
+  action:
+    name: fallback
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: fallback
 ```

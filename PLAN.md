@@ -927,10 +927,28 @@ same fixtures through the same reader, in a `fixtures.rs` that is byte-identical
 between them, so the wheel and the npm package cannot diverge from each other or
 from rumi. That was found by CI rather than by design: `just ci` does not build
 the crusts (they need maturin and wasm-pack), so deleting the old dialect broke
-them silently on this machine. They run
-in CI (`spec/tests/07_protojson/`), every fixture listing
-`[rust, python, typescript]` — the ledger's end state, so the
-`implementations:` field can be deleted whenever nothing needs it.
+them silently on this machine. They run in CI (`spec/tests/07_protojson/`),
+every fixture listing `[rust, python, typescript]` — the ledger's end state, so
+the `implementations:` field can be deleted whenever nothing needs it.
+
+**And so does everything that reads config, not just the engines.** The CLI, all
+three README examples, every getting-started page, the docs site's live
+`<matcher>` demo, the playground and its presets, and every language's own
+README. The terse dialect's *readers* are deleted, not just deprecated —
+puma's `parse_matcher_config` and bumi's `parseMatcherConfig` no longer exist.
+Rust's four hand-written config types in `core/src/config.rs` remain only as the
+internal IR `rumi-proto`'s `convert.rs` produces; nothing reachable from user
+input still deserializes the terse shape.
+
+Two real bugs were caught doing this, in hand-written examples nobody had run.
+The README's own `routes.yaml` had a mis-indented `onMatch` —
+`check-readme-agreement.mjs` caught it by actually evaluating all three runtimes
+against it, which is the whole reason that check exists. And the Python
+getting-started page's "Load in Your App" snippet passed a raw dict to
+`load_matcher()`, which had never worked under any dialect — caught because
+`rust,no_run` blocks in docs are compiled by `cargo test --doc`, not merely
+displayed, and the equivalent Python and TypeScript snippets were run by hand
+before being trusted.
 
 None of the three carries a protobuf runtime. Rust generates types because
 prost-serde rejects unknown fields; puma and bumi hand-walk protojson because

@@ -1,5 +1,20 @@
 import type { Preset } from "../types.js";
 
+const named = (name: string) => ({
+  name,
+  typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", name },
+});
+
+const single = (key: string, valueMatch: Record<string, string>) => ({
+  singlePredicate: {
+    input: {
+      name: key,
+      typedConfig: { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key },
+    },
+    valueMatch,
+  },
+});
+
 export const branchProtection: Preset = {
   id: "claude-branch-protect",
   name: "Protect Main",
@@ -8,41 +23,23 @@ export const branchProtection: Preset = {
     "Claude Code hook: block file writes when on the main branch",
   config: JSON.stringify(
     {
-      matchers: [
-        {
-          predicate: {
-            type: "and",
-            predicates: [
-              {
-                type: "single",
-                input: {
-                  type_url: "xuma.kv.v1.MapInput",
-                  config: { key: "event" },
-                },
-                value_match: { Exact: "PreToolUse" },
+      matcherList: {
+        matchers: [
+          {
+            predicate: {
+              andMatcher: {
+                predicate: [
+                  single("event", { exact: "PreToolUse" }),
+                  single("tool_name", { exact: "Write" }),
+                  single("git_branch", { exact: "main" }),
+                ],
               },
-              {
-                type: "single",
-                input: {
-                  type_url: "xuma.kv.v1.MapInput",
-                  config: { key: "tool_name" },
-                },
-                value_match: { Exact: "Write" },
-              },
-              {
-                type: "single",
-                input: {
-                  type_url: "xuma.kv.v1.MapInput",
-                  config: { key: "git_branch" },
-                },
-                value_match: { Exact: "main" },
-              },
-            ],
+            },
+            onMatch: { action: named("BLOCK") },
           },
-          on_match: { type: "action", action: "BLOCK" },
-        },
-      ],
-      on_no_match: { type: "action", action: "ALLOW" },
+        ],
+      },
+      onNoMatch: { action: named("ALLOW") },
     },
     null,
     2,

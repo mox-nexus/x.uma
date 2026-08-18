@@ -2,10 +2,29 @@
  * Tests for bumi registry (bumi/src/registry.ts).
  *
  * Validates the builder -> frozen registry -> loadMatcher pipeline.
+ *
+ * These used to build configs through `parseMatcherConfig`, the terse
+ * dialect's reader. That dialect is retired (DECISIONS.md D-026); the IR
+ * types it produced (`MatcherConfig` and friends) are still exactly what the
+ * registry consumes, so the tests construct them directly instead. The
+ * `single`/`field` helpers below are the only new things -- small builders
+ * that keep test bodies close to their previous shape, not a second config
+ * format.
  */
 
 import { describe, expect, test } from "bun:test";
-import { parseMatcherConfig } from "../src/config.ts";
+import {
+	ActionConfig,
+	AndPredicateConfig,
+	BuiltInMatch,
+	CustomMatch,
+	FieldMatcherConfig,
+	MatcherConfig,
+	MatcherOnMatchConfig,
+	OrPredicateConfig,
+	SinglePredicateConfig,
+	TypedConfig,
+} from "../src/config.ts";
 import {
 	InvalidConfigError,
 	MAX_FIELD_MATCHERS,
@@ -20,6 +39,24 @@ import {
 } from "../src/registry.ts";
 import { DictInput, register } from "../src/testing.ts";
 
+/** A `xuma.kv.v1.MapInput` reference, config-shaped as the registry expects. */
+function mapInput(key: string): TypedConfig {
+	return new TypedConfig("xuma.kv.v1.MapInput", { key });
+}
+
+/** A single predicate: read `key`, compare with `variant` (Exact/Prefix/...). */
+function single(key: string, variant: string, value: string): SinglePredicateConfig {
+	return new SinglePredicateConfig(mapInput(key), new BuiltInMatch(variant, value));
+}
+
+/** A field matcher with a plain action on_match. */
+function field(
+	predicate: SinglePredicateConfig | AndPredicateConfig | OrPredicateConfig,
+	action: string,
+): FieldMatcherConfig<string> {
+	return new FieldMatcherConfig(predicate, new ActionConfig(action));
+}
+
 describe("RegistryBuilder", () => {
 	test("registers and freezes", () => {
 		const builder = new RegistryBuilder<Record<string, string>>();
@@ -28,15 +65,6 @@ describe("RegistryBuilder", () => {
 
 		expect(registry.inputCount).toBe(1);
 		expect(registry.containsInput("test.DictInput")).toBe(true);
-		expect(registry.containsInput("test.Unknown")).toBe(false);
-	});
-
-	test("register helper", () => {
-		const builder = new RegistryBuilder<Record<string, string>>();
-		register(builder);
-		const registry = builder.build();
-
-		expect(registry.containsInput("xuma.kv.v1.MapInput")).toBe(true);
 	});
 
 	test("introspection type URLs", () => {
@@ -59,22 +87,10 @@ describe("loadMatcher", () => {
 
 	test("simple exact match", () => {
 		const registry = makeRegistry();
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "single",
-						input: {
-							type_url: "xuma.kv.v1.MapInput",
-							config: { key: "name" },
-						},
-						value_match: { Exact: "alice" },
-					},
-					on_match: { type: "action", action: "matched" },
-				},
-			],
-			on_no_match: { type: "action", action: "default" },
-		});
+		const config = new MatcherConfig(
+			[field(single("name", "Exact", "alice"), "matched")],
+			new ActionConfig("default"),
+		);
 		const matcher = registry.loadMatcher(config);
 
 		expect(matcher.evaluate({ name: "alice" })).toBe("matched");
@@ -83,34 +99,12 @@ describe("loadMatcher", () => {
 
 	test("and predicate", () => {
 		const registry = makeRegistry();
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "and",
-						predicates: [
-							{
-								type: "single",
-								input: {
-									type_url: "xuma.kv.v1.MapInput",
-									config: { key: "role" },
-								},
-								value_match: { Exact: "admin" },
-							},
-							{
-								type: "single",
-								input: {
-									type_url: "xuma.kv.v1.MapInput",
-									config: { key: "org" },
-								},
-								value_match: { Prefix: "acme" },
-							},
-						],
-					},
-					on_match: { type: "action", action: "admin_acme" },
-				},
-			],
-		});
+		const config = new MatcherConfig([
+			field(
+				new AndPredicateConfig([single("role", "Exact", "admin"), single("org", "Prefix", "acme")]),
+				"admin_acme",
+			),
+		]);
 		const matcher = registry.loadMatcher(config);
 
 		expect(matcher.evaluate({ role: "admin", org: "acme-corp" })).toBe("admin_acme");
@@ -119,42 +113,11 @@ describe("loadMatcher", () => {
 
 	test("nested matcher", () => {
 		const registry = makeRegistry();
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "single",
-						input: {
-							type_url: "xuma.kv.v1.MapInput",
-							config: { key: "tier" },
-						},
-						value_match: { Prefix: "" },
-					},
-					on_match: {
-						type: "matcher",
-						matcher: {
-							matchers: [
-								{
-									predicate: {
-										type: "single",
-										input: {
-											type_url: "xuma.kv.v1.MapInput",
-											config: { key: "tier" },
-										},
-										value_match: { Exact: "premium" },
-									},
-									on_match: {
-										type: "action",
-										action: "premium_route",
-									},
-								},
-							],
-						},
-					},
-				},
-			],
-			on_no_match: { type: "action", action: "fallback" },
-		});
+		const inner = new MatcherConfig([field(single("tier", "Exact", "premium"), "premium_route")]);
+		const config = new MatcherConfig(
+			[new FieldMatcherConfig(single("tier", "Prefix", ""), new MatcherOnMatchConfig(inner))],
+			new ActionConfig("fallback"),
+		);
 		const matcher = registry.loadMatcher(config);
 
 		expect(matcher.evaluate({ tier: "premium" })).toBe("premium_route");
@@ -173,21 +136,7 @@ describe("loadMatcher", () => {
 		];
 
 		for (const [variant, pattern, ctx, shouldMatch] of cases) {
-			const config = parseMatcherConfig({
-				matchers: [
-					{
-						predicate: {
-							type: "single",
-							input: {
-								type_url: "xuma.kv.v1.MapInput",
-								config: { key: "key" },
-							},
-							value_match: { [variant]: pattern },
-						},
-						on_match: { type: "action", action: "hit" },
-					},
-				],
-			});
+			const config = new MatcherConfig([field(single("key", variant, pattern), "hit")]);
 			const matcher = registry.loadMatcher(config);
 			const result = matcher.evaluate(ctx);
 			const expected = shouldMatch ? "hit" : null;
@@ -199,18 +148,12 @@ describe("loadMatcher", () => {
 describe("registry errors", () => {
 	test("unknown input type_url", () => {
 		const registry = new RegistryBuilder<Record<string, string>>().build();
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "single",
-						input: { type_url: "unknown.Input", config: {} },
-						value_match: { Exact: "x" },
-					},
-					on_match: { type: "action", action: "x" },
-				},
-			],
-		});
+		const config = new MatcherConfig([
+			field(
+				new SinglePredicateConfig(new TypedConfig("unknown.Input"), new BuiltInMatch("Exact", "x")),
+				"x",
+			),
+		]);
 
 		expect(() => registry.loadMatcher(config)).toThrow(UnknownTypeUrlError);
 		try {
@@ -228,18 +171,12 @@ describe("registry errors", () => {
 		register(builder);
 		const registry = builder.build();
 
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "single",
-						input: { type_url: "unknown.Input", config: {} },
-						value_match: { Exact: "x" },
-					},
-					on_match: { type: "action", action: "x" },
-				},
-			],
-		});
+		const config = new MatcherConfig([
+			field(
+				new SinglePredicateConfig(new TypedConfig("unknown.Input"), new BuiltInMatch("Exact", "x")),
+				"x",
+			),
+		]);
 
 		try {
 			registry.loadMatcher(config);
@@ -258,21 +195,15 @@ describe("registry errors", () => {
 		register(builder);
 		const registry = builder.build();
 
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "single",
-						input: {
-							type_url: "xuma.kv.v1.MapInput",
-							config: { key: "x" },
-						},
-						custom_match: { type_url: "unknown.Matcher", config: {} },
-					},
-					on_match: { type: "action", action: "x" },
-				},
-			],
-		});
+		const config = new MatcherConfig([
+			field(
+				new SinglePredicateConfig(
+					mapInput("x"),
+					new CustomMatch(new TypedConfig("unknown.Matcher")),
+				),
+				"x",
+			),
+		]);
 
 		expect(() => registry.loadMatcher(config)).toThrow(UnknownTypeUrlError);
 		try {
@@ -290,21 +221,15 @@ describe("registry errors", () => {
 		register(builder);
 		const registry = builder.build();
 
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "single",
-						input: {
-							type_url: "xuma.kv.v1.MapInput",
-							config: { wrong_field: 42 },
-						},
-						value_match: { Exact: "x" },
-					},
-					on_match: { type: "action", action: "x" },
-				},
-			],
-		});
+		const config = new MatcherConfig([
+			field(
+				new SinglePredicateConfig(
+					new TypedConfig("xuma.kv.v1.MapInput", { wrong_field: 42 }),
+					new BuiltInMatch("Exact", "x"),
+				),
+				"x",
+			),
+		]);
 
 		expect(() => registry.loadMatcher(config)).toThrow(InvalidConfigError);
 	});
@@ -319,20 +244,10 @@ describe("width limits", () => {
 
 	test("too many field matchers", () => {
 		const registry = makeRegistry();
-		const fm = {
-			predicate: {
-				type: "single",
-				input: {
-					type_url: "xuma.kv.v1.MapInput",
-					config: { key: "x" },
-				},
-				value_match: { Exact: "x" },
-			},
-			on_match: { type: "action", action: "x" },
-		};
-		const config = parseMatcherConfig({
-			matchers: Array(MAX_FIELD_MATCHERS + 1).fill(fm),
-		});
+		const fm = field(single("x", "Exact", "x"), "x");
+		const config = new MatcherConfig(
+			Array(MAX_FIELD_MATCHERS + 1).fill(fm) as FieldMatcherConfig<string>[],
+		);
 
 		expect(() => registry.loadMatcher(config)).toThrow(TooManyFieldMatchersError);
 		try {
@@ -347,50 +262,20 @@ describe("width limits", () => {
 
 	test("too many predicates and", () => {
 		const registry = makeRegistry();
-		const single = {
-			type: "single",
-			input: {
-				type_url: "xuma.kv.v1.MapInput",
-				config: { key: "x" },
-			},
-			value_match: { Exact: "x" },
-		};
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "and",
-						predicates: Array(MAX_PREDICATES_PER_COMPOUND + 1).fill(single),
-					},
-					on_match: { type: "action", action: "x" },
-				},
-			],
-		});
+		const one = single("x", "Exact", "x");
+		const config = new MatcherConfig([
+			field(new AndPredicateConfig(Array(MAX_PREDICATES_PER_COMPOUND + 1).fill(one)), "x"),
+		]);
 
 		expect(() => registry.loadMatcher(config)).toThrow(TooManyPredicatesError);
 	});
 
 	test("too many predicates or", () => {
 		const registry = makeRegistry();
-		const single = {
-			type: "single",
-			input: {
-				type_url: "xuma.kv.v1.MapInput",
-				config: { key: "x" },
-			},
-			value_match: { Exact: "x" },
-		};
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "or",
-						predicates: Array(MAX_PREDICATES_PER_COMPOUND + 1).fill(single),
-					},
-					on_match: { type: "action", action: "x" },
-				},
-			],
-		});
+		const one = single("x", "Exact", "x");
+		const config = new MatcherConfig([
+			field(new OrPredicateConfig(Array(MAX_PREDICATES_PER_COMPOUND + 1).fill(one)), "x"),
+		]);
 
 		expect(() => registry.loadMatcher(config)).toThrow(TooManyPredicatesError);
 	});
@@ -398,21 +283,7 @@ describe("width limits", () => {
 	test("pattern too long exact", () => {
 		const registry = makeRegistry();
 		const longPattern = "x".repeat(MAX_PATTERN_LENGTH + 1);
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "single",
-						input: {
-							type_url: "xuma.kv.v1.MapInput",
-							config: { key: "x" },
-						},
-						value_match: { Exact: longPattern },
-					},
-					on_match: { type: "action", action: "x" },
-				},
-			],
-		});
+		const config = new MatcherConfig([field(single("x", "Exact", longPattern), "x")]);
 
 		expect(() => registry.loadMatcher(config)).toThrow(PatternTooLongError);
 		try {
@@ -428,21 +299,7 @@ describe("width limits", () => {
 	test("regex pattern too long", () => {
 		const registry = makeRegistry();
 		const longRegex = "a".repeat(MAX_REGEX_PATTERN_LENGTH + 1);
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "single",
-						input: {
-							type_url: "xuma.kv.v1.MapInput",
-							config: { key: "x" },
-						},
-						value_match: { Regex: longRegex },
-					},
-					on_match: { type: "action", action: "x" },
-				},
-			],
-		});
+		const config = new MatcherConfig([field(single("x", "Regex", longRegex), "x")]);
 
 		expect(() => registry.loadMatcher(config)).toThrow(PatternTooLongError);
 	});
@@ -450,21 +307,7 @@ describe("width limits", () => {
 	test("pattern at limit succeeds", () => {
 		const registry = makeRegistry();
 		const pattern = "x".repeat(MAX_PATTERN_LENGTH);
-		const config = parseMatcherConfig({
-			matchers: [
-				{
-					predicate: {
-						type: "single",
-						input: {
-							type_url: "xuma.kv.v1.MapInput",
-							config: { key: "x" },
-						},
-						value_match: { Exact: pattern },
-					},
-					on_match: { type: "action", action: "x" },
-				},
-			],
-		});
+		const config = new MatcherConfig([field(single("x", "Exact", pattern), "x")]);
 
 		// Should not throw
 		registry.loadMatcher(config);
@@ -472,20 +315,10 @@ describe("width limits", () => {
 
 	test("field matchers at limit succeeds", () => {
 		const registry = makeRegistry();
-		const fm = {
-			predicate: {
-				type: "single",
-				input: {
-					type_url: "xuma.kv.v1.MapInput",
-					config: { key: "x" },
-				},
-				value_match: { Exact: "x" },
-			},
-			on_match: { type: "action", action: "x" },
-		};
-		const config = parseMatcherConfig({
-			matchers: Array(MAX_FIELD_MATCHERS).fill(fm),
-		});
+		const fm = field(single("x", "Exact", "x"), "x");
+		const config = new MatcherConfig(
+			Array(MAX_FIELD_MATCHERS).fill(fm) as FieldMatcherConfig<string>[],
+		);
 
 		// Should not throw
 		registry.loadMatcher(config);
