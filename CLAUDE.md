@@ -7,7 +7,7 @@ A matcher engine implementing the xDS Unified Matcher API across multiple langua
 | Package | Language | Notes |
 |---------|----------|-------|
 | **rumi** | Rust | Core engine (reference implementation) |
-| **puma** | Python | Pure Python implementation (dir: `puma/`, **package `xuma`**) |
+| **puma** | Python | Python implementation, no protobuf runtime (dir: `puma/`, **package `xuma`**) |
 | **bumi** | Bun/TypeScript | Pure TypeScript implementation (dir: `bumi/`, **package `xuma`**) |
 | **xuma-crust** | Python | Rust bindings via PyO3 (from `rumi/crusts/python/`) |
 | **xuma-crust** | TypeScript | Rust bindings via wasm-bindgen (from `rumi/crusts/wasm/`) |
@@ -92,7 +92,7 @@ x.uma/
 │   └── tests/                  # conformance test fixtures (YAML)
 ├── rumi/                       # Rust workspace (core + extensions + crusts + proto)
 │   └── proto/src/gen/          # buf-generated Rust types (prost + prost-serde)
-├── puma/                       # Pure Python implementation (package: xuma)
+├── puma/                       # Python implementation (package: xuma)
 │   └── proto/src/gen/          # buf-generated Python types (betterproto)
 ├── bumi/                       # Pure TypeScript implementation (package: xuma)
 │   └── proto/src/gen/          # buf-generated TypeScript types (ts-proto)
@@ -113,7 +113,7 @@ x.uma/
 | 2.5 | Extensible MatchingData (`Custom` variant) | ✅ Done |
 | 3 | StringMatcher, MatcherTree, RadixTree | ✅ Done |
 | 4 | HTTP Domain (ext_proc model) | ✅ Done |
-| 5 | puma (Pure Python + HTTP) | ✅ Done |
+| 5 | puma (Python + HTTP) | ✅ Done |
 | 5.1 | puma arch-guild hardening | ✅ Done |
 | 6 | bumi (Bun/TypeScript + HTTP) | ✅ Done |
 | 6.1 | bumi arch-guild hardening | ✅ Done |

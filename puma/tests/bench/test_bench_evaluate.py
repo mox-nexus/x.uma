@@ -1,4 +1,4 @@
-"""Evaluate benchmarks for puma (Pure Python).
+"""Evaluate benchmarks for puma (pure-Python engine, no crust).
 
 Measures the hot path: predicate evaluation, first-match-wins scanning,
 miss-heavy workloads, and trace overhead.
@@ -213,6 +213,6 @@ def test_bench_trace_overhead_evaluate(benchmark):
     benchmark(matcher.evaluate, ctx)
 
 
-# NOTE: puma (pure Python) does not implement evaluate_with_trace.
+# NOTE: puma does not implement evaluate_with_trace.
 # Trace overhead comparison is measured in xuma-crust (Rust bindings)
 # where both evaluate() and evaluate_with_trace() are available.

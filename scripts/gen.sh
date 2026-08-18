@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 #
-# Regenerate proto code for all three languages.
+# Regenerate proto code.
+#
+# Rust only: puma and bumi read protojson directly rather than through generated
+# types, because no available generator for either language rejects unknown
+# fields — see DECISIONS.md D-038.
 #
 # Lives in a script rather than inline in the justfile so CI can run the exact
 # same steps without installing `just` — the setup action could not resolve a
@@ -24,7 +28,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-TREES=(rumi/proto/src/gen puma/proto/src/gen bumi/proto/src/gen)
+TREES=(rumi/proto/src/gen)
 
 STAGE=$(mktemp -d)
 echo "gen: staging in $STAGE"

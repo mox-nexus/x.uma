@@ -30,9 +30,9 @@ cargo add rumi-core rumi-http
 cargo install rumi-cli   # binary: rumi
 ```
 
-**Python** — pure Python or Rust-backed:
+**Python** — no-build or Rust-backed:
 ```bash
-uv add xuma          # pure Python (google-re2 for regex)
+uv add xuma          # no build step (google-re2 ships wheels)
 uv add xuma-crust    # Rust-backed via PyO3, 10–100x faster evaluation
 ```
 

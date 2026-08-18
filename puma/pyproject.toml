@@ -1,7 +1,7 @@
 [project]
 name = "xuma"
 version = "0.0.2"
-description = "Pure Python implementation of xDS Unified Matcher API"
+description = "Python implementation of the xDS Unified Matcher API"
 requires-python = ">=3.12"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
