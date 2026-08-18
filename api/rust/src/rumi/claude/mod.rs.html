@@ -49,14 +49,14 @@
 <a href=#49 id=49 data-nosnippet>49</a>
 <a href=#50 id=50 data-nosnippet>50</a><span class="comment">// Registry config types (hand-written)
 <a href=#51 id=51 data-nosnippet>51</a></span><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
-<a href=#52 id=52 data-nosnippet>52</a></span><span class="kw">pub use </span>inputs::ArgumentInputConfig;
+<a href=#52 id=52 data-nosnippet>52</a></span><span class="kw">pub use </span>inputs::ToolArgInputConfig;
 <a href=#53 id=53 data-nosnippet>53</a>
 <a href=#54 id=54 data-nosnippet>54</a><span class="doccomment">/// Register all Claude Code types for [`HookContext`] with the given builder.
 <a href=#55 id=55 data-nosnippet>55</a>///
 <a href=#56 id=56 data-nosnippet>56</a>/// Registers core matchers (`BoolMatcher`, `StringMatcher`) and Claude-domain inputs:
-<a href=#57 id=57 data-nosnippet>57</a>/// - `xuma.claude.v1.EventInput` → [`EventInput`]
+<a href=#57 id=57 data-nosnippet>57</a>/// - `xuma.claude.v1.EventTypeInput` → [`EventTypeInput`]
 <a href=#58 id=58 data-nosnippet>58</a>/// - `xuma.claude.v1.ToolNameInput` → [`ToolNameInput`]
-<a href=#59 id=59 data-nosnippet>59</a>/// - `xuma.claude.v1.ArgumentInput` → [`ArgumentInput`]
+<a href=#59 id=59 data-nosnippet>59</a>/// - `xuma.claude.v1.ToolArgInput` → [`ToolArgInput`]
 <a href=#60 id=60 data-nosnippet>60</a>/// - `xuma.claude.v1.SessionIdInput` → [`SessionIdInput`]
 <a href=#61 id=61 data-nosnippet>61</a>/// - `xuma.claude.v1.CwdInput` → [`CwdInput`]
 <a href=#62 id=62 data-nosnippet>62</a>/// - `xuma.claude.v1.GitBranchInput` → [`GitBranchInput`]
@@ -66,9 +66,9 @@
 <a href=#66 id=66 data-nosnippet>66</a>    builder: <span class="kw">crate</span>::RegistryBuilder&lt;HookContext&gt;,
 <a href=#67 id=67 data-nosnippet>67</a>) -&gt; <span class="kw">crate</span>::RegistryBuilder&lt;HookContext&gt; {
 <a href=#68 id=68 data-nosnippet>68</a>    <span class="kw">crate</span>::register_core_matchers(builder)
-<a href=#69 id=69 data-nosnippet>69</a>        .input::&lt;EventInput&gt;(<span class="string">"xuma.claude.v1.EventInput"</span>)
+<a href=#69 id=69 data-nosnippet>69</a>        .input::&lt;EventTypeInput&gt;(<span class="string">"xuma.claude.v1.EventTypeInput"</span>)
 <a href=#70 id=70 data-nosnippet>70</a>        .input::&lt;ToolNameInput&gt;(<span class="string">"xuma.claude.v1.ToolNameInput"</span>)
-<a href=#71 id=71 data-nosnippet>71</a>        .input::&lt;ArgumentInput&gt;(<span class="string">"xuma.claude.v1.ArgumentInput"</span>)
+<a href=#71 id=71 data-nosnippet>71</a>        .input::&lt;ToolArgInput&gt;(<span class="string">"xuma.claude.v1.ToolArgInput"</span>)
 <a href=#72 id=72 data-nosnippet>72</a>        .input::&lt;SessionIdInput&gt;(<span class="string">"xuma.claude.v1.SessionIdInput"</span>)
 <a href=#73 id=73 data-nosnippet>73</a>        .input::&lt;CwdInput&gt;(<span class="string">"xuma.claude.v1.CwdInput"</span>)
 <a href=#74 id=74 data-nosnippet>74</a>        .input::&lt;GitBranchInput&gt;(<span class="string">"xuma.claude.v1.GitBranchInput"</span>)
@@ -77,9 +77,9 @@
 <a href=#77 id=77 data-nosnippet>77</a><span class="doccomment">/// Prelude for convenient imports.
 <a href=#78 id=78 data-nosnippet>78</a></span><span class="kw">pub mod </span>prelude {
 <a href=#79 id=79 data-nosnippet>79</a>    <span class="kw">pub use </span>super::{
-<a href=#80 id=80 data-nosnippet>80</a>        compile_hook_matches, ArgumentInput, ArgumentMatch, CwdInput, EventInput, GitBranchInput,
-<a href=#81 id=81 data-nosnippet>81</a>        HookContext, HookEvent, HookMatch, HookMatchExt, HookMatchTrace, SessionIdInput,
-<a href=#82 id=82 data-nosnippet>82</a>        StringMatch, ToolNameInput, TraceStep,
+<a href=#80 id=80 data-nosnippet>80</a>        compile_hook_matches, ArgumentMatch, CwdInput, EventTypeInput, GitBranchInput, HookContext,
+<a href=#81 id=81 data-nosnippet>81</a>        HookEvent, HookMatch, HookMatchExt, HookMatchTrace, SessionIdInput, StringMatch,
+<a href=#82 id=82 data-nosnippet>82</a>        ToolArgInput, ToolNameInput, TraceStep,
 <a href=#83 id=83 data-nosnippet>83</a>    };
 <a href=#84 id=84 data-nosnippet>84</a>    <span class="kw">pub use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;
 <a href=#85 id=85 data-nosnippet>85</a>}
@@ -111,7 +111,7 @@
 <a href=#111 id=111 data-nosnippet>111</a>    </span><span class="kw">fn </span>test_event_input() {
 <a href=#112 id=112 data-nosnippet>112</a>        <span class="kw">let </span>ctx = HookContext::post_tool_use(<span class="string">"Read"</span>);
 <a href=#113 id=113 data-nosnippet>113</a>        <span class="macro">assert_eq!</span>(
-<a href=#114 id=114 data-nosnippet>114</a>            EventInput.get(<span class="kw-2">&amp;</span>ctx),
+<a href=#114 id=114 data-nosnippet>114</a>            EventTypeInput.get(<span class="kw-2">&amp;</span>ctx),
 <a href=#115 id=115 data-nosnippet>115</a>            MatchingData::String(<span class="string">"PostToolUse"</span>.into())
 <a href=#116 id=116 data-nosnippet>116</a>        );
 <a href=#117 id=117 data-nosnippet>117</a>    }
@@ -120,7 +120,7 @@
 <a href=#120 id=120 data-nosnippet>120</a>    </span><span class="kw">fn </span>test_argument_input() {
 <a href=#121 id=121 data-nosnippet>121</a>        <span class="kw">let </span>ctx = HookContext::pre_tool_use(<span class="string">"Bash"</span>).with_arg(<span class="string">"command"</span>, <span class="string">"echo hello"</span>);
 <a href=#122 id=122 data-nosnippet>122</a>
-<a href=#123 id=123 data-nosnippet>123</a>        <span class="kw">let </span>input = ArgumentInput::new(<span class="string">"command"</span>).unwrap();
+<a href=#123 id=123 data-nosnippet>123</a>        <span class="kw">let </span>input = ToolArgInput::new(<span class="string">"command"</span>).unwrap();
 <a href=#124 id=124 data-nosnippet>124</a>        <span class="macro">assert_eq!</span>(input.get(<span class="kw-2">&amp;</span>ctx), MatchingData::String(<span class="string">"echo hello"</span>.into()));
 <a href=#125 id=125 data-nosnippet>125</a>    }
 <a href=#126 id=126 data-nosnippet>126</a>
@@ -137,7 +137,7 @@
 <a href=#137 id=137 data-nosnippet>137</a>                        Box::new(ExactMatcher::new(<span class="string">"Bash"</span>)),
 <a href=#138 id=138 data-nosnippet>138</a>                    )),
 <a href=#139 id=139 data-nosnippet>139</a>                    Predicate::Single(SinglePredicate::new(
-<a href=#140 id=140 data-nosnippet>140</a>                        Box::new(ArgumentInput::new(<span class="string">"command"</span>).unwrap()),
+<a href=#140 id=140 data-nosnippet>140</a>                        Box::new(ToolArgInput::new(<span class="string">"command"</span>).unwrap()),
 <a href=#141 id=141 data-nosnippet>141</a>                        Box::new(ContainsMatcher::new(<span class="string">"rm -rf"</span>)),
 <a href=#142 id=142 data-nosnippet>142</a>                    )),
 <a href=#143 id=143 data-nosnippet>143</a>                ]),

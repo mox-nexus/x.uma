@@ -4,27 +4,27 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="icon" href="./favicon.svg" />
-		<link href="./_app/immutable/entry/start.DLUEiOZ-.js" rel="modulepreload">
-		<link href="./_app/immutable/chunks/Bipk0BDn.js" rel="modulepreload">
+		<link href="./_app/immutable/entry/start.DFL7gYlw.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/DEY1_-8W.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/DYiHVAw2.js" rel="modulepreload">
-		<link href="./_app/immutable/chunks/DkyL41Ua.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/CQAywe9v.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/-UyI9lYi.js" rel="modulepreload">
-		<link href="./_app/immutable/entry/app.CCS_7x1s.js" rel="modulepreload">
+		<link href="./_app/immutable/entry/app.ClruLrs5.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/DNngEcdt.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/DOHXvLXS.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/C7IGVkAW.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/C83bZML1.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/DQj2CSf0.js" rel="modulepreload">
-		<link href="./_app/immutable/nodes/0.DJl0GbaQ.js" rel="modulepreload">
+		<link href="./_app/immutable/nodes/0.BuCqFF78.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/ghtWklD6.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/DcI0cIgz.js" rel="modulepreload">
-		<link href="./_app/immutable/chunks/CPSCqjLh.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/Cp4muRpC.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/CDwJ5Klk.js" rel="modulepreload">
-		<link href="./_app/immutable/nodes/2.B6RUsefe.js" rel="modulepreload">
+		<link href="./_app/immutable/nodes/2.CHGhvEDe.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/CP6AjnRL.js" rel="modulepreload">
 		<link href="./_app/immutable/chunks/IoRnOvJ0.js" rel="modulepreload">
-		<link href="./_app/immutable/chunks/lahDOZch.js" rel="modulepreload">
-		<link href="./_app/immutable/chunks/Dsz6VqFH.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/Dg06BqUk.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/CYb0pQL1.js" rel="modulepreload">
 		<!--1uha8ag--><meta name="description" content="Match structured data against rule trees. Write the rules once, evaluate them in Rust, Python, or TypeScript, and get the same answer."/><!----><title>x.uma — cross-platform matcher engine</title>
 		<link href="./_app/immutable/assets/0.Bd28AARH.css" rel="stylesheet">
 		<link href="./_app/immutable/assets/Matcher._t7mB6Pz.css" rel="stylesheet">
@@ -35,27 +35,50 @@
 		implementations across three languages, one conformance suite proving they agree.</p></section> <section class="demo svelte-1uha8ag"><h2 class="svelte-1uha8ag">It runs here</h2> <p class="lede svelte-1uha8ag">This is the real engine. The pure TypeScript implementation, running in your browser, loading
 		the config beside it. Change the method to <code>POST</code>, or to something else entirely,
 		and watch the decision change.</p> <div class="matcher svelte-nkynu6"><div class="panes svelte-nkynu6"><label class="svelte-nkynu6"><span class="svelte-nkynu6">config</span> <textarea spellcheck="false" rows="10" class="svelte-nkynu6">{
-  "matchers": [
-    {
-      "predicate": {
-        "type": "single",
-        "input": { "type_url": "xuma.kv.v1.MapInput",
-                   "config": { "key": "method" } },
-        "value_match": { "Exact": "GET" }
+  "matcherList": {
+    "matchers": [
+      {
+        "predicate": {
+          "singlePredicate": {
+            "input": {
+              "name": "method",
+              "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "method" }
+            },
+            "valueMatch": { "exact": "GET" }
+          }
+        },
+        "onMatch": {
+          "action": {
+            "name": "read-handler",
+            "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "read-handler" }
+          }
+        }
       },
-      "on_match": { "type": "action", "action": "read-handler" }
-    },
-    {
-      "predicate": {
-        "type": "single",
-        "input": { "type_url": "xuma.kv.v1.MapInput",
-                   "config": { "key": "method" } },
-        "value_match": { "Exact": "POST" }
-      },
-      "on_match": { "type": "action", "action": "write-handler" }
+      {
+        "predicate": {
+          "singlePredicate": {
+            "input": {
+              "name": "method",
+              "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "method" }
+            },
+            "valueMatch": { "exact": "POST" }
+          }
+        },
+        "onMatch": {
+          "action": {
+            "name": "write-handler",
+            "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "write-handler" }
+          }
+        }
+      }
+    ]
+  },
+  "onNoMatch": {
+    "action": {
+      "name": "405-not-allowed",
+      "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "405-not-allowed" }
     }
-  ],
-  "on_no_match": { "type": "action", "action": "405-not-allowed" }
+  }
 }</textarea></label> <label class="svelte-nkynu6"><span class="svelte-nkynu6">context</span> <textarea spellcheck="false" rows="10" class="svelte-nkynu6">{ "method": "GET" }</textarea></label></div> <div class="result svelte-nkynu6" data-kind="match"><!--[0--><span class="tag svelte-nkynu6">match</span><code class="svelte-nkynu6">read-handler</code><!--]--></div> <p class="hint svelte-nkynu6">Editable. Change either side and the result updates as you type.</p></div><!----> <p class="aside svelte-1uha8ag">Rules are tried in order and the first match wins. When nothing matches, <code>on_no_match</code> decides. That is the whole evaluation model.</p></section> <section class="runtimes svelte-1uha8ag"><h2 class="svelte-1uha8ag">The same config, three runtimes</h2> <p class="lede svelte-1uha8ag">The config above is data, not code. Every implementation loads it through a registry and
 		evaluates it identically.</p> <div class="grid svelte-1uha8ag"><!--[--><article class="svelte-1uha8ag"><h3 class="svelte-1uha8ag">Rust</h3> <pre class="svelte-1uha8ag"><code>let matcher = registry.load_matcher(config)?;
 matcher.evaluate(&amp;ctx)   // Some("read-handler")</code></pre></article><article class="svelte-1uha8ag"><h3 class="svelte-1uha8ag">Python</h3> <pre class="svelte-1uha8ag"><code>matcher = registry.load_matcher(config)
@@ -70,7 +93,7 @@ matcher.evaluate(ctx);   // "read-handler"</code></pre></article><!--]--></div><
 			
 			<script>
 				{
-					__sveltekit_1rnfo0 = {
+					__sveltekit_1b4cevs = {
 						base: new URL(".", location).pathname.slice(0, -1),
 						assets: "/x.uma"
 					};
@@ -78,8 +101,8 @@ matcher.evaluate(ctx);   // "read-handler"</code></pre></article><!--]--></div><
 					const element = document.currentScript.parentElement;
 
 					Promise.all([
-						import("./_app/immutable/entry/start.DLUEiOZ-.js"),
-						import("./_app/immutable/entry/app.CCS_7x1s.js")
+						import("./_app/immutable/entry/start.DFL7gYlw.js"),
+						import("./_app/immutable/entry/app.ClruLrs5.js")
 					]).then(([kit, app]) => {
 						kit.start(app, element, {
 							node_ids: [0, 2],
