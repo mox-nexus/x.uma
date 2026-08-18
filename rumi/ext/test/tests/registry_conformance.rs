@@ -3,7 +3,8 @@
 //! Proves that the generic config-driven path (Path B: `Registry::load_matcher()`)
 //! produces identical results to the hand-coded path (Path A: `fixture::MatcherConfig::build()`).
 //!
-//! Run with: cargo test -p rumi-test --test registry_conformance --features rumi-test/registry,rumi-test/fixtures
+//! Run with:
+//! `cargo test -p rumi-test --test registry_conformance --features rumi-test/registry,rumi-test/fixtures`
 
 #![cfg(all(feature = "fixtures", feature = "registry"))]
 

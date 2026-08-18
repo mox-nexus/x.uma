@@ -139,44 +139,58 @@ pub struct TestCase {
 use crate::{KvContext, StringInput};
 
 impl MatcherConfig {
-    /// Build a rumi Matcher from this config
-    pub fn build(&self) -> Matcher<KvContext, String> {
+    /// Build a rumi Matcher from this config.
+    ///
+    /// # Errors
+    ///
+    /// Propagates whatever the underlying constructors reject — an empty map
+    /// key, an over-long pattern. A fixture that trips one of those is a broken
+    /// fixture, and it should say so rather than panic somewhere downstream.
+    pub fn build(&self) -> Result<Matcher<KvContext, String>, MatcherError> {
         let field_matchers = self
             .matchers
             .iter()
             .map(FieldMatcherConfig::build)
-            .collect();
-        let on_no_match = self.on_no_match.as_ref().map(|om| om.build());
-        Matcher::new(field_matchers, on_no_match)
+            .collect::<Result<Vec<_>, _>>()?;
+        let on_no_match = self.on_no_match.as_ref().map(|om| om.build()).transpose()?;
+        Ok(Matcher::new(field_matchers, on_no_match))
     }
 }
 
 impl FieldMatcherConfig {
-    fn build(&self) -> FieldMatcher<KvContext, String> {
-        FieldMatcher::new(self.predicate.build(), self.on_match.build())
+    fn build(&self) -> Result<FieldMatcher<KvContext, String>, MatcherError> {
+        Ok(FieldMatcher::new(
+            self.predicate.build()?,
+            self.on_match.build()?,
+        ))
     }
 }
 
 impl PredicateConfig {
-    fn build(&self) -> Predicate<KvContext> {
-        match self {
-            PredicateConfig::Single(s) => Predicate::Single(s.single.build()),
-            PredicateConfig::And(a) => {
-                Predicate::And(a.and.iter().map(PredicateConfig::build).collect())
-            }
-            PredicateConfig::Or(o) => {
-                Predicate::Or(o.or.iter().map(PredicateConfig::build).collect())
-            }
-            PredicateConfig::Not(n) => Predicate::Not(Box::new(n.not.build())),
-        }
+    fn build(&self) -> Result<Predicate<KvContext>, MatcherError> {
+        Ok(match self {
+            PredicateConfig::Single(s) => Predicate::Single(s.single.build()?),
+            PredicateConfig::And(a) => Predicate::And(
+                a.and
+                    .iter()
+                    .map(PredicateConfig::build)
+                    .collect::<Result<_, _>>()?,
+            ),
+            PredicateConfig::Or(o) => Predicate::Or(
+                o.or.iter()
+                    .map(PredicateConfig::build)
+                    .collect::<Result<_, _>>()?,
+            ),
+            PredicateConfig::Not(n) => Predicate::Not(Box::new(n.not.build()?)),
+        })
     }
 }
 
 impl SinglePredicateConfig {
-    fn build(&self) -> SinglePredicate<KvContext> {
-        let input: Box<dyn DataInput<KvContext>> = Box::new(StringInput::new(&self.input.key));
+    fn build(&self) -> Result<SinglePredicate<KvContext>, MatcherError> {
+        let input: Box<dyn DataInput<KvContext>> = Box::new(StringInput::new(&self.input.key)?);
         let matcher: Box<dyn InputMatcher> = self.value_match.build();
-        SinglePredicate::new(input, matcher)
+        Ok(SinglePredicate::new(input, matcher))
     }
 }
 
@@ -192,11 +206,11 @@ impl ValueMatchConfig {
 }
 
 impl OnMatchConfig {
-    fn build(&self) -> OnMatch<KvContext, String> {
-        match self {
+    fn build(&self) -> Result<OnMatch<KvContext, String>, MatcherError> {
+        Ok(match self {
             OnMatchConfig::Action(a) => OnMatch::Action(a.action.clone()),
-            OnMatchConfig::Matcher(m) => OnMatch::Matcher(Box::new(m.matcher.build())),
-        }
+            OnMatchConfig::Matcher(m) => OnMatch::Matcher(Box::new(m.matcher.build()?)),
+        })
     }
 }
 
@@ -240,11 +254,15 @@ impl Fixture {
         Ok(fixtures)
     }
 
-    /// Run all test cases and return results
-    #[must_use]
-    pub fn run(&self) -> Vec<CaseResult> {
-        let matcher = self.matcher.build();
-        self.cases
+    /// Run all test cases and return results.
+    ///
+    /// # Errors
+    ///
+    /// If the fixture's matcher cannot be built at all.
+    pub fn run(&self) -> Result<Vec<CaseResult>, MatcherError> {
+        let matcher = self.matcher.build()?;
+        Ok(self
+            .cases
             .iter()
             .map(|case| {
                 let ctx = case.build_context();
@@ -256,12 +274,14 @@ impl Fixture {
                     actual,
                 }
             })
-            .collect()
+            .collect())
     }
 
     /// Run all test cases and panic on first failure
     pub fn run_and_assert(&self) {
-        let results = self.run();
+        let results = self
+            .run()
+            .unwrap_or_else(|e| panic!("Fixture '{}' does not build: {e}", self.name));
         for result in results {
             assert!(
                 result.passed,

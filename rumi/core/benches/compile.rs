@@ -1,7 +1,7 @@
 //! Compile benchmarks — config → matcher construction.
 //!
 //! Measures the one-time cost of building matchers from configuration.
-//! Includes StringMatcher compilation (especially regex) and scaling scenarios.
+//! Includes `StringMatcher` compilation (especially regex) and scaling scenarios.
 
 use rumi::prelude::*;
 

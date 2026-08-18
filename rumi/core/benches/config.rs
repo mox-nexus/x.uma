@@ -135,7 +135,7 @@ fn compiler_evaluate_simple(bencher: divan::Bencher) {
     let matcher = Matcher::new(
         vec![FieldMatcher::new(
             Predicate::Single(SinglePredicate::new(
-                Box::new(rumi_kv::StringInput::new("role")),
+                Box::new(rumi_kv::StringInput::new("role").unwrap()),
                 Box::new(ExactMatcher::new("admin")),
             )),
             OnMatch::Action("matched".to_string()),
@@ -169,7 +169,7 @@ fn compiler_construct_simple(bencher: divan::Bencher) {
         Matcher::<KvContext, String>::new(
             vec![FieldMatcher::new(
                 Predicate::Single(SinglePredicate::new(
-                    Box::new(rumi_kv::StringInput::new("role")),
+                    Box::new(rumi_kv::StringInput::new("role").unwrap()),
                     Box::new(ExactMatcher::new("admin")),
                 )),
                 OnMatch::Action("matched".to_string()),

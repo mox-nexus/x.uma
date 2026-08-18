@@ -274,6 +274,17 @@ pub enum MatcherError {
         /// Maximum allowed.
         max: usize,
     },
+    /// An identifier that names what to look up was empty.
+    ///
+    /// Header names, query parameter names, tool argument names and map keys
+    /// all identify *where* to read a value. An empty one reads nothing, which
+    /// makes the predicate false and a deny rule silently stop firing. That is
+    /// a fail-open, so it is rejected where the value is constructed rather
+    /// than tolerated and discovered in production.
+    EmptyIdentifier {
+        /// What was being named, e.g. `"header name"`.
+        what: &'static str,
+    },
     /// A string match pattern exceeds the maximum allowed length.
     PatternTooLong {
         /// Actual length of the pattern.
@@ -331,6 +342,9 @@ impl std::fmt::Display for MatcherError {
                     f,
                     "compound predicate has {count} children, but maximum allowed is {max}"
                 )
+            }
+            Self::EmptyIdentifier { what } => {
+                write!(f, "{what} must not be empty")
             }
             Self::PatternTooLong { len, max } => {
                 write!(f, "pattern length is {len}, but maximum allowed is {max}")

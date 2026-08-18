@@ -1,6 +1,6 @@
 //! Evaluate benchmarks — the hot path.
 //!
-//! Measures: SinglePredicate, Predicate (And/Or/Not), Matcher first-match-wins,
+//! Measures: `SinglePredicate`, Predicate (And/Or/Not), Matcher first-match-wins,
 //! miss-heavy workloads, and trace overhead.
 
 use rumi::prelude::*;

@@ -21,7 +21,7 @@ use std::fmt::Debug;
 ///
 /// ```ignore
 /// let predicate = SinglePredicate::new(
-///     Box::new(HeaderInput::new("content-type")),
+///     Box::new(HeaderInput::new("content-type").unwrap()),
 ///     Box::new(ContainsMatcher::new("json")),
 /// );
 /// let result = predicate.evaluate(&request);
@@ -258,6 +258,37 @@ impl<Ctx> Predicate<Ctx> {
                 1 + ps.iter().map(Predicate::depth).max().unwrap_or(0)
             }
             Predicate::Not(p) => 1 + p.depth(),
+        }
+    }
+
+    /// Check that no compound in this tree holds more than
+    /// [`MAX_PREDICATES_PER_COMPOUND`](crate::MAX_PREDICATES_PER_COMPOUND)
+    /// children.
+    ///
+    /// Width is a denial-of-service axis that depth does not cover: a single
+    /// `and` with a hundred thousand children is one level deep. The check lives
+    /// here, on the type that holds the children, so every route to a predicate
+    /// inherits it — the registry, both domain compilers, the FFI bindings, and
+    /// hand construction. A limit enforced only where configs are parsed is
+    /// advisory to every other caller.
+    ///
+    /// # Errors
+    ///
+    /// [`MatcherError::TooManyPredicates`](crate::MatcherError::TooManyPredicates)
+    /// naming the offending count.
+    pub fn validate(&self) -> Result<(), crate::MatcherError> {
+        match self {
+            Predicate::Single(_) => Ok(()),
+            Predicate::And(ps) | Predicate::Or(ps) => {
+                if ps.len() > crate::MAX_PREDICATES_PER_COMPOUND {
+                    return Err(crate::MatcherError::TooManyPredicates {
+                        count: ps.len(),
+                        max: crate::MAX_PREDICATES_PER_COMPOUND,
+                    });
+                }
+                ps.iter().try_for_each(Predicate::validate)
+            }
+            Predicate::Not(p) => p.validate(),
         }
     }
 }

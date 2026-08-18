@@ -63,6 +63,9 @@ jobs:
       - name: Publishable
         run: node scripts/check-publishable.mjs
 
+      - name: Proto field types round-trip
+        run: node scripts/check-proto-field-types.mjs
+
       - name: Conformance fixtures
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test conformance --features rumi-test/fixtures
 
