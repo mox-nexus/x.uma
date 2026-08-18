@@ -327,8 +327,8 @@ class Registry[Ctx]:
 
     def _load_value_match(self, config: ValueMatchConfig) -> InputMatcher:
         match config:
-            case BuiltInMatch(variant=variant, value=value):
-                return _compile_built_in(variant, value)
+            case BuiltInMatch(variant=variant, value=value, ignore_case=ignore_case):
+                return _compile_built_in(variant, value, ignore_case)
             case CustomMatch(typed_config=tc):
                 factory = self._matcher_factories.get(tc.type_url)
                 if factory is None:
@@ -373,22 +373,68 @@ def _check_pattern_length(variant: str, value: str) -> None:
         raise PatternTooLongError(len(value), MAX_PATTERN_LENGTH)
 
 
-def _compile_built_in(variant: str, value: str) -> InputMatcher:
+def _disables_case_insensitivity(pattern: str) -> bool:
+    r"""Does this pattern clear the ``i`` flag with an inline group?
+
+    ignore_case asks the engine for a case-insensitive match, and an inline
+    ``(?-i)`` overrides that — measured in Rust both ways on 2026-08-18, and it
+    is correct regex semantics rather than an engine quirk, so no choice of
+    construction fixes it. The combination is refused instead.
+
+    Scans flag groups: ``(?`` followed by flag letters, ended by ``)`` or ``:``.
+    A group clears ``i`` only if an ``i`` follows a ``-`` inside it, so
+    ``(?i-s)`` is fine and ``(?-si)`` is not. An escaped ``\(`` is not a group.
+    """
+    i = 0
+    while i + 1 < len(pattern):
+        if pattern[i] == "\\":
+            i += 2
+            continue
+        if pattern[i] != "(" or pattern[i + 1] != "?":
+            i += 1
+            continue
+        j = i + 2
+        clearing = False
+        while j < len(pattern):
+            c = pattern[j]
+            if c == "-":
+                clearing = True
+            elif c == "i" and clearing:
+                return True
+            elif c not in "imsuxU":
+                break
+            j += 1
+        i = max(j, i + 2)
+    return False
+
+
+def _compile_built_in(
+    variant: str, value: str, ignore_case: bool = False
+) -> InputMatcher:
     """Compile a built-in string match variant into an InputMatcher."""
     _check_pattern_length(variant, value)
 
     match variant:
         case "Exact":
-            return ExactMatcher(value=value)
+            return ExactMatcher(value=value, ignore_case=ignore_case)
         case "Prefix":
-            return PrefixMatcher(prefix=value)
+            return PrefixMatcher(prefix=value, ignore_case=ignore_case)
         case "Suffix":
-            return SuffixMatcher(suffix=value)
+            return SuffixMatcher(suffix=value, ignore_case=ignore_case)
         case "Contains":
-            return ContainsMatcher(substring=value)
+            return ContainsMatcher(substring=value, ignore_case=ignore_case)
         case "Regex":
+            if ignore_case and _disables_case_insensitivity(value):
+                msg = (
+                    f"ignore_case is set, but the pattern {value!r} turns "
+                    f"case-insensitivity off inline with a (?-i) flag. An inline flag "
+                    f"wins, so this rule would read case-insensitive and not be. "
+                    f"Remove one of the two."
+                )
+                raise InvalidConfigError(msg)
             try:
-                return RegexMatcher(pattern=value)
+                pattern = f"(?i){value}" if ignore_case else value
+                return RegexMatcher(pattern=pattern)
             except Exception as e:
                 msg = f"invalid regex pattern: {e}"
                 raise InvalidConfigError(msg) from e

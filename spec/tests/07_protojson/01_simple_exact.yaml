@@ -6,7 +6,7 @@ description: >
   mapping of xds.type.matcher.v3.Matcher — rather than a dialect that exists
   nowhere but this repo. See DECISIONS.md D-026.
 
-implementations: [rust]
+implementations: [rust, python]
 
 proto_matcher:
   matcherList:
@@ -45,7 +45,7 @@ description: >
   until 2026-08-18, so a rule that read case-insensitive matched
   case-sensitively — PLAN.md F6 / SF1.
 
-implementations: [rust]
+implementations: [rust, python]
 
 proto_matcher:
   matcherList:
@@ -90,7 +90,7 @@ description: >
   unknown fields, which extends SECURITY.md control #6 to the whole config
   surface.
 
-implementations: [rust]
+implementations: [rust, python]
 expect_error: true
 
 proto_matcher:
@@ -119,7 +119,7 @@ description: >
   returns the first match. Accepting the field and ignoring it answers a
   different question than the config asked — PLAN.md F2 / SF2.
 
-implementations: [rust]
+implementations: [rust, python]
 expect_error: true
 
 proto_matcher:
@@ -155,7 +155,7 @@ description: >
   uses that key is not mistaken for a nested Any. A walk that descended would
   corrupt this rule rather than fail on it.
 
-implementations: [rust]
+implementations: [rust, python]
 
 proto_matcher:
   matcherList:

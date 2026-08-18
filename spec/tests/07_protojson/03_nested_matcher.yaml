@@ -3,6 +3,7 @@ name: nested_matcher
 description: 'OnMatch::Matcher nesting: outer match delegates to inner matcher'
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:

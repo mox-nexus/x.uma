@@ -194,7 +194,10 @@ fn convert_single_predicate(
         .matcher
         .as_ref()
         .ok_or_else(|| MatcherError::InvalidConfig {
-            source: "SinglePredicate has no matcher".into(),
+            // Names the fields, so the error says what to write rather than
+            // what is absent — and so it agrees with puma's wording, which is
+            // a conformance property the fixtures pin.
+            source: "singlePredicate: one of 'valueMatch' or 'customMatch' is required".into(),
         })?;
 
     let matcher = match matcher_oneof {

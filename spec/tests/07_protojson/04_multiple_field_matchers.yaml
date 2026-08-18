@@ -3,6 +3,7 @@ name: first_match_wins
 description: 'Multiple field matchers: first match wins, later matchers are not evaluated'
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:

@@ -3,6 +3,7 @@ name: simple_exact
 description: Single field matcher with exact string match via config loading
 implementations:
 - rust
+- python
 proto_matcher:
   matcherList:
     matchers:
