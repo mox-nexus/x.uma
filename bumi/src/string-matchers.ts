@@ -162,4 +162,8 @@ export class BoolMatcher {
 	matches(value: MatchingData): boolean {
 		return typeof value === "boolean" && value === this.expected;
 	}
+
+	supportedTypes(): readonly string[] {
+		return ["bool"];
+	}
 }

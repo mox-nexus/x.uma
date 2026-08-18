@@ -41,3 +41,31 @@ class InputMatcher(Protocol):
     """
 
     def matches(self, value: MatchingData, /) -> bool: ...
+
+
+@runtime_checkable
+class TypedDataInput(Protocol):
+    """A `DataInput` that declares what kind of value it produces.
+
+    Optional. The registry treats an input without `data_type` as producing
+    `"string"`, which is rumi's default, so only inputs returning something
+    else need to say so.
+
+    Kept separate from `DataInput` rather than added to it: a Protocol member
+    is *required* for structural typing even when it has a default body, so
+    folding it in would have made every existing input stop satisfying the
+    protocol.
+    """
+
+    def data_type(self) -> str: ...
+
+
+@runtime_checkable
+class TypedInputMatcher(Protocol):
+    """An `InputMatcher` that declares which value kinds it can compare.
+
+    Optional, and separate from `InputMatcher` for the same reason
+    `TypedDataInput` is separate from `DataInput`. Absent means `("string",)`.
+    """
+
+    def supported_types(self) -> tuple[str, ...]: ...

@@ -12,6 +12,17 @@ export type MatchingData = string | number | boolean | Uint8Array | null;
  */
 export interface DataInput<Ctx> {
 	get(ctx: Ctx): MatchingData;
+
+	/**
+	 * The kind of value `get` returns: "string", "int", "bool", "bytes".
+	 *
+	 * Checked against the matcher's `supportedTypes` at load time, so a config
+	 * pairing a string input with a boolean matcher is a load error rather than
+	 * a rule that silently never fires.
+	 *
+	 * Optional; absent means "string", matching rumi's default.
+	 */
+	dataType?(): string;
 }
 
 /**
@@ -23,4 +34,12 @@ export interface DataInput<Ctx> {
  */
 export interface InputMatcher {
 	matches(value: MatchingData): boolean;
+
+	/**
+	 * The value kinds this matcher can compare.
+	 *
+	 * Optional; absent means ["string"], matching rumi's default. See
+	 * `DataInput.dataType`.
+	 */
+	supportedTypes?(): readonly string[];
 }

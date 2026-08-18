@@ -118,6 +118,24 @@ export class TooManyFieldMatchersError extends MatcherError {
 }
 
 /** Compound predicate has too many children (width-based limit). */
+/**
+ * An input's data type is not one the matcher can compare.
+ *
+ * Caught at load time rather than at evaluation, where the mismatch would look
+ * like a rule that simply never fires.
+ */
+export class IncompatibleTypesError extends MatcherError {
+	constructor(
+		readonly inputType: string,
+		readonly matcherTypes: readonly string[],
+	) {
+		super(
+			`input produces "${inputType}" data but matcher supports [${matcherTypes.map((t) => `'${t}'`).join(", ")}]`,
+		);
+		this.name = "IncompatibleTypesError";
+	}
+}
+
 export class TooManyPredicatesError extends MatcherError {
 	readonly count: number;
 	readonly max: number;
@@ -290,6 +308,18 @@ export class Registry<Ctx> {
 		}
 
 		const matcher = this.loadValueMatch(config.matcher);
+
+		// Type compatibility, checked at load rather than discovered at
+		// evaluation. rumi has done this since the beginning; puma and bumi did
+		// not, so a config pairing a string input with a boolean matcher was a
+		// load error in one implementation and a rule that silently never fired
+		// in the other two — DECISIONS.md D-040.
+		const dataType = dataInput.dataType?.() ?? "string";
+		const supported = matcher.supportedTypes?.() ?? ["string"];
+		if (!supported.includes(dataType)) {
+			throw new IncompatibleTypesError(dataType, supported);
+		}
+
 		return new SinglePredicate(dataInput, matcher);
 	}
 

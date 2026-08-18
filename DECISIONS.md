@@ -42,23 +42,29 @@ have changed nothing. All three now register `BoolMatcher`, from every domain.
 **Revisit if** an input that produces `MatchingData::Bool` ships. That would
 make a positive conformance fixture expressible, which today it is not.
 
-### D-040 · Type-compatibility validation exists in Rust only — recorded, not fixed
+### D-040 · Type compatibility is validated at load in all three implementations
 
-Found while fixturing the above. `rumi` rejects an incompatible input/matcher
-pair at load: a `MapInput` (string) against a `BoolMatcher` (bool) gives
-*"input produces \"string\" data but matcher supports [\"bool\"]"*. puma loads
-the same config and returns `None` at evaluation. bumi has no check either.
+`rumi` rejected an incompatible input/matcher pair at load — a `MapInput`
+(string) against a `BoolMatcher` (bool) — while puma loaded the same config and
+returned `None` at evaluation, and bumi had no check at all. One config, a load
+error in one implementation and a rule that silently never fires in the other
+two. That is the divergence the conformance suite exists to catch, in
+`CLAUDE.md`'s own "validate extension points at construction" constraint.
 
-This is `CLAUDE.md`'s "validate extension points at construction" constraint,
-implemented once. It is a genuine cross-language divergence and it is written
-into the fixture-coverage gap list rather than papered over, because the only
-fixture that would exercise `BoolMatcher` in the kv domain is precisely the one
-the divergence affects.
+All three now check it and produce the same message:
+*input produces "string" data but matcher supports ['bool']*.
 
-**Not fixed here** because adding `supported_types` to puma and bumi is a new
-cross-language feature, not a translation, and this session's remit was the
-format migration. It is the next thing that makes the suite able to close its
-own gap.
+**The optional half is a separate protocol in puma and an optional method in
+bumi, deliberately.** A Python `Protocol` member is *required* for structural
+typing even when it has a default body, so folding `data_type` into `DataInput`
+made every existing input stop satisfying it — 28 type errors. `TypedDataInput`
+and `TypedInputMatcher` are separate protocols; absent means `"string"`, which
+is rumi's default. bumi uses `dataType?()` for the same reason.
+
+This is what made the `BoolMatcher` fixture expressible. It was in the
+fixture-coverage gap list for exactly one commit, with the divergence named as
+the reason it could not be written — the list working as intended rather than
+as a place things go to be forgotten.
 
 ## 2026-08-18 · How Python and TypeScript read protojson
 
