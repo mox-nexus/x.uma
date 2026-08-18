@@ -12,6 +12,8 @@ Covers:
 
 import json
 
+from _terse_to_protojson import pj
+
 import pytest
 
 from xuma_crust import HttpMatcher
@@ -26,7 +28,7 @@ class TestBasicMatching:
     """Single-field config-driven HTTP matching."""
 
     def test_path_exact_match(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -35,13 +37,13 @@ class TestBasicMatching:
                 },
                 "on_match": {"type": "action", "action": "users"},
             }],
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         assert matcher.evaluate("GET", "/api/users") == "users"
         assert matcher.evaluate("GET", "/api/orders") is None
 
     def test_path_prefix_match(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -51,14 +53,14 @@ class TestBasicMatching:
                 "on_match": {"type": "action", "action": "api_backend"},
             }],
             "on_no_match": {"type": "action", "action": "default"},
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         assert matcher.evaluate("GET", "/api/users") == "api_backend"
         assert matcher.evaluate("GET", "/api/orders") == "api_backend"
         assert matcher.evaluate("GET", "/health") == "default"
 
     def test_method_exact_match(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -67,13 +69,13 @@ class TestBasicMatching:
                 },
                 "on_match": {"type": "action", "action": "write"},
             }],
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         assert matcher.evaluate("POST", "/anything") == "write"
         assert matcher.evaluate("GET", "/anything") is None
 
     def test_header_match(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -85,7 +87,7 @@ class TestBasicMatching:
                 },
                 "on_match": {"type": "action", "action": "json_handler"},
             }],
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         assert matcher.evaluate(
             "POST", "/api", headers={"content-type": "application/json"},
@@ -97,7 +99,7 @@ class TestBasicMatching:
         assert matcher.evaluate("POST", "/api") is None
 
     def test_query_param_match(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -109,7 +111,7 @@ class TestBasicMatching:
                 },
                 "on_match": {"type": "action", "action": "json_response"},
             }],
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         assert matcher.evaluate(
             "GET", "/api", query_params={"format": "json"},
@@ -128,7 +130,7 @@ class TestCompoundPredicates:
     """AND, OR, NOT predicate compositions."""
 
     def test_and_path_and_method(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "and",
@@ -147,14 +149,14 @@ class TestCompoundPredicates:
                 },
                 "on_match": {"type": "action", "action": "api_write"},
             }],
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         assert matcher.evaluate("POST", "/api/users") == "api_write"
         assert matcher.evaluate("GET", "/api/users") is None
         assert matcher.evaluate("POST", "/health") is None
 
     def test_or_predicate(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "or",
@@ -173,14 +175,14 @@ class TestCompoundPredicates:
                 },
                 "on_match": {"type": "action", "action": "probe"},
             }],
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         assert matcher.evaluate("GET", "/health") == "probe"
         assert matcher.evaluate("GET", "/ready") == "probe"
         assert matcher.evaluate("GET", "/api") is None
 
     def test_not_predicate(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "not",
@@ -192,7 +194,7 @@ class TestCompoundPredicates:
                 },
                 "on_match": {"type": "action", "action": "public"},
             }],
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         assert matcher.evaluate("GET", "/api/users") == "public"
         assert matcher.evaluate("GET", "/internal/debug") is None
@@ -207,7 +209,7 @@ class TestNesting:
     """Nested matchers and on_no_match fallback."""
 
     def test_nested_matcher(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -230,14 +232,14 @@ class TestNesting:
                 },
             }],
             "on_no_match": {"type": "action", "action": "default"},
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         assert matcher.evaluate("POST", "/api/users") == "api_write"
         assert matcher.evaluate("GET", "/api/users") == "api_read"
         assert matcher.evaluate("GET", "/health") == "default"
 
     def test_multiple_field_matchers_first_wins(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [
                 {
                     "predicate": {
@@ -256,7 +258,7 @@ class TestNesting:
                     "on_match": {"type": "action", "action": "catch_all"},
                 },
             ],
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         # First match wins
         assert matcher.evaluate("GET", "/health") == "health"
@@ -272,7 +274,7 @@ class TestStringMatchTypes:
     """All built-in string match types."""
 
     def _make_path_matcher(self, value_match):
-        return HttpMatcher.from_config(json.dumps({
+        return HttpMatcher.from_config(json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -281,7 +283,7 @@ class TestStringMatchTypes:
                 },
                 "on_match": {"type": "action", "action": "matched"},
             }],
-        }))
+        })))
 
     def test_exact(self):
         m = self._make_path_matcher({"Exact": "/api"})
@@ -324,7 +326,7 @@ class TestErrors:
             HttpMatcher.from_config("not json")
 
     def test_unknown_type_url(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -333,12 +335,12 @@ class TestErrors:
                 },
                 "on_match": {"type": "action", "action": "x"},
             }],
-        })
+        }))
         with pytest.raises(ValueError, match="xuma.fake.v1.FakeInput"):
             HttpMatcher.from_config(config)
 
     def test_invalid_regex(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -347,21 +349,30 @@ class TestErrors:
                 },
                 "on_match": {"type": "action", "action": "x"},
             }],
-        })
+        }))
         with pytest.raises(ValueError):
             HttpMatcher.from_config(config)
 
     def test_missing_on_match(self):
+        # Hand-written protojson, not run through pj(): the thing under test is
+        # the real from_config's real rejection of a field matcher with no
+        # onMatch, and pj() would raise its own (different) error first.
         config = json.dumps({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": {"type_url": "xuma.http.v1.PathInput", "config": {}},
-                    "value_match": {"Exact": "/"},
-                },
-            }],
+            "matcherList": {
+                "matchers": [{
+                    "predicate": {
+                        "singlePredicate": {
+                            "input": {
+                                "name": "path",
+                                "typedConfig": {"@type": "type.googleapis.com/xuma.http.v1.PathInput"},
+                            },
+                            "valueMatch": {"exact": "/"},
+                        }
+                    },
+                }]
+            }
         })
-        with pytest.raises(ValueError, match="invalid config JSON"):
+        with pytest.raises(ValueError):
             HttpMatcher.from_config(config)
 
 
@@ -374,7 +385,7 @@ class TestTrace:
     """Trace evaluation for debugging."""
 
     def test_trace_result_matches_evaluate(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -384,7 +395,7 @@ class TestTrace:
                 "on_match": {"type": "action", "action": "api"},
             }],
             "on_no_match": {"type": "action", "action": "default"},
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
 
         eval_result = matcher.evaluate("GET", "/api/users")
@@ -392,7 +403,7 @@ class TestTrace:
         assert trace.result == eval_result
 
     def test_trace_has_steps(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -401,14 +412,14 @@ class TestTrace:
                 },
                 "on_match": {"type": "action", "action": "api"},
             }],
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         trace = matcher.trace("GET", "/api/users")
         assert len(trace.steps) > 0
         assert trace.steps[0].matched is True
 
     def test_trace_fallback(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -418,7 +429,7 @@ class TestTrace:
                 "on_match": {"type": "action", "action": "api"},
             }],
             "on_no_match": {"type": "action", "action": "fallback"},
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         trace = matcher.trace("GET", "/other")
         assert trace.result == "fallback"
@@ -434,7 +445,7 @@ class TestDeveloperExperience:
     """Repr and usability checks."""
 
     def test_repr(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -443,6 +454,6 @@ class TestDeveloperExperience:
                 },
                 "on_match": {"type": "action", "action": "root"},
             }],
-        })
+        }))
         matcher = HttpMatcher.from_config(config)
         assert "HttpMatcher" in repr(matcher)

@@ -10,6 +10,8 @@ Covers:
 """
 
 import json
+
+from _terse_to_protojson import pj
 from pathlib import Path
 
 import pytest
@@ -29,7 +31,7 @@ class TestBasicMatching:
     """Single-field config-driven test matching."""
 
     def test_exact_match_hit(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -42,14 +44,14 @@ class TestBasicMatching:
                 "on_match": {"type": "action", "action": "allow"},
             }],
             "on_no_match": {"type": "action", "action": "deny"},
-        })
+        }))
         matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"role": "admin"}) == "allow"
         assert matcher.evaluate({"role": "viewer"}) == "deny"
         assert matcher.evaluate({"other": "admin"}) == "deny"
 
     def test_prefix_match(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -61,13 +63,13 @@ class TestBasicMatching:
                 },
                 "on_match": {"type": "action", "action": "internal"},
             }],
-        })
+        }))
         matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"email": "alice@acme.com"}) == "internal"
         assert matcher.evaluate({"email": "bob@other.com"}) is None
 
     def test_regex_match(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -79,7 +81,7 @@ class TestBasicMatching:
                 },
                 "on_match": {"type": "action", "action": "valid"},
             }],
-        })
+        }))
         matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"version": "v1.0"}) == "valid"
         assert matcher.evaluate({"version": "latest"}) is None
@@ -94,7 +96,7 @@ class TestCompoundPredicates:
     """AND, OR, NOT compositions."""
 
     def test_and_predicate(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "and",
@@ -119,14 +121,14 @@ class TestCompoundPredicates:
                 },
                 "on_match": {"type": "action", "action": "admin_acme"},
             }],
-        })
+        }))
         matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"role": "admin", "org": "acme-corp"}) == "admin_acme"
         assert matcher.evaluate({"role": "admin", "org": "other"}) is None
         assert matcher.evaluate({"role": "viewer", "org": "acme-corp"}) is None
 
     def test_or_predicate(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "or",
@@ -151,14 +153,14 @@ class TestCompoundPredicates:
                 },
                 "on_match": {"type": "action", "action": "privileged"},
             }],
-        })
+        }))
         matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"role": "admin"}) == "privileged"
         assert matcher.evaluate({"role": "superadmin"}) == "privileged"
         assert matcher.evaluate({"role": "viewer"}) is None
 
     def test_not_predicate(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "not",
@@ -173,7 +175,7 @@ class TestCompoundPredicates:
                 },
                 "on_match": {"type": "action", "action": "non_prod"},
             }],
-        })
+        }))
         matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"env": "staging"}) == "non_prod"
         assert matcher.evaluate({"env": "prod"}) is None
@@ -189,7 +191,7 @@ class TestNesting:
 
     def test_nested_matcher(self):
         """Mirrors spec/tests/07_protojson/03_nested_matcher.yaml."""
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -231,7 +233,7 @@ class TestNesting:
                 },
             }],
             "on_no_match": {"type": "action", "action": "free_tier"},
-        })
+        }))
         matcher = CrustTestMatcher.from_config(config)
         assert matcher.evaluate({"tier": "premium", "region": "us-east"}) == "premium_us_east"
         assert matcher.evaluate({"tier": "premium", "region": "eu-west"}) == "premium_eu_west"
@@ -277,7 +279,7 @@ class TestErrors:
             CrustTestMatcher.from_config("{bad json}")
 
     def test_unknown_type_url(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -286,12 +288,12 @@ class TestErrors:
                 },
                 "on_match": {"type": "action", "action": "x"},
             }],
-        })
+        }))
         with pytest.raises(ValueError, match="xuma.fake.v1.Unknown"):
             CrustTestMatcher.from_config(config)
 
     def test_invalid_regex(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -303,7 +305,7 @@ class TestErrors:
                 },
                 "on_match": {"type": "action", "action": "x"},
             }],
-        })
+        }))
         with pytest.raises(ValueError):
             CrustTestMatcher.from_config(config)
 
@@ -317,7 +319,7 @@ class TestTrace:
     """Trace evaluation for debugging."""
 
     def test_trace_result_matches_evaluate(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -330,14 +332,14 @@ class TestTrace:
                 "on_match": {"type": "action", "action": "allow"},
             }],
             "on_no_match": {"type": "action", "action": "deny"},
-        })
+        }))
         matcher = CrustTestMatcher.from_config(config)
         eval_result = matcher.evaluate({"role": "admin"})
         trace = matcher.trace({"role": "admin"})
         assert trace.result == eval_result
 
     def test_trace_miss_uses_fallback(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -350,7 +352,7 @@ class TestTrace:
                 "on_match": {"type": "action", "action": "allow"},
             }],
             "on_no_match": {"type": "action", "action": "deny"},
-        })
+        }))
         matcher = CrustTestMatcher.from_config(config)
         trace = matcher.trace({"role": "viewer"})
         assert trace.result == "deny"
@@ -366,7 +368,7 @@ class TestDeveloperExperience:
     """Repr and usability checks."""
 
     def test_repr(self):
-        config = json.dumps({
+        config = json.dumps(pj({
             "matchers": [{
                 "predicate": {
                     "type": "single",
@@ -378,6 +380,6 @@ class TestDeveloperExperience:
                 },
                 "on_match": {"type": "action", "action": "z"},
             }],
-        })
+        }))
         matcher = CrustTestMatcher.from_config(config)
         assert "TestMatcher" in repr(matcher)

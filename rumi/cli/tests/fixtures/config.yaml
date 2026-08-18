@@ -1,21 +1,48 @@
-# Fixture for the CLI's YAML config-loading tests.
+# Fixture for the CLI's config-loading tests.
 #
 # Checked in deliberately: these tests previously read a hardcoded
 # /tmp/xuma-yaml-test/config.yaml that no clone ever had, so they failed for
 # everyone but the machine that happened to create it by hand.
 #
-# Uses the test registry (xuma.kv.v1.MapInput), matching on "method".
-matchers:
-  - predicate:
-      type: single
-      input: { type_url: "xuma.kv.v1.MapInput", config: { key: "method" } }
-      value_match: { Exact: "GET" }
-    on_match: { type: action, action: "route-get" }
+# Canonical protojson — the format `rumi run` accepts. Matches on "method"
+# through the key-value domain.
+matcherList:
+  matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: method
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: method
+          valueMatch:
+            exact: GET
+      onMatch:
+        action:
+          name: route-get
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: route-get
 
-  - predicate:
-      type: single
-      input: { type_url: "xuma.kv.v1.MapInput", config: { key: "method" } }
-      value_match: { Exact: "POST" }
-    on_match: { type: action, action: "route-post" }
+    - predicate:
+        singlePredicate:
+          input:
+            name: method
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: method
+          valueMatch:
+            exact: POST
+      onMatch:
+        action:
+          name: route-post
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: route-post
 
-on_no_match: { type: action, action: "fallback" }
+onNoMatch:
+  action:
+    name: fallback
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: fallback

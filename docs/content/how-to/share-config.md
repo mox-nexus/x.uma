@@ -9,13 +9,29 @@ A matcher config is data. Nothing in it is language-specific. The same file load
 in every implementation:
 
 ```yaml
-matchers:
-  - predicate:
-      type: single
-      input: { type_url: xuma.kv.v1.MapInput, config: { key: method } }
-      value_match: { Exact: "GET" }
-    on_match: { type: action, action: read-handler }
-on_no_match: { type: action, action: reject }
+matcherList:
+  matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: method
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: method
+          valueMatch:
+            exact: GET
+      onMatch:
+        action:
+          name: read-handler
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: read-handler
+onNoMatch:
+  action:
+    name: reject
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: reject
 ```
 
 ```rust

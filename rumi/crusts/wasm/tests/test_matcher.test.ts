@@ -9,6 +9,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "bun:test";
+import { pj } from "./_terse_to_protojson.ts";
 // @ts-expect-error — generated WASM package has no TS project reference
 import init, { TestMatcher } from "../pkg/xuma_crust.js";
 
@@ -22,7 +23,7 @@ beforeAll(async () => {
 
 describe("Basic Matching", () => {
   test("exact match", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -31,14 +32,14 @@ describe("Basic Matching", () => {
         },
         on_match: { type: "action", action: "admin_route" },
       }],
-    });
+    }));
     const matcher = TestMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin" })).toBe("admin_route");
     expect(matcher.evaluate({ role: "user" })).toBeUndefined();
   });
 
   test("prefix match", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -47,14 +48,14 @@ describe("Basic Matching", () => {
         },
         on_match: { type: "action", action: "api_route" },
       }],
-    });
+    }));
     const matcher = TestMatcher.fromConfig(config);
     expect(matcher.evaluate({ path: "/api/users" })).toBe("api_route");
     expect(matcher.evaluate({ path: "/health" })).toBeUndefined();
   });
 
   test("missing key returns no match", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -63,7 +64,7 @@ describe("Basic Matching", () => {
         },
         on_match: { type: "action", action: "admin_route" },
       }],
-    });
+    }));
     const matcher = TestMatcher.fromConfig(config);
     expect(matcher.evaluate({ org: "acme" })).toBeUndefined();
   });
@@ -75,7 +76,7 @@ describe("Basic Matching", () => {
 
 describe("Compound Predicates", () => {
   test("AND: role + org", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "and",
@@ -94,7 +95,7 @@ describe("Compound Predicates", () => {
         },
         on_match: { type: "action", action: "acme_admin" },
       }],
-    });
+    }));
     const matcher = TestMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin", org: "acme" })).toBe("acme_admin");
     expect(matcher.evaluate({ role: "admin", org: "other" })).toBeUndefined();
@@ -102,7 +103,7 @@ describe("Compound Predicates", () => {
   });
 
   test("OR: multiple roles", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "or",
@@ -121,7 +122,7 @@ describe("Compound Predicates", () => {
         },
         on_match: { type: "action", action: "elevated" },
       }],
-    });
+    }));
     const matcher = TestMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin" })).toBe("elevated");
     expect(matcher.evaluate({ role: "superadmin" })).toBe("elevated");
@@ -129,7 +130,7 @@ describe("Compound Predicates", () => {
   });
 
   test("NOT: exclude role", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "not",
@@ -141,7 +142,7 @@ describe("Compound Predicates", () => {
         },
         on_match: { type: "action", action: "authenticated" },
       }],
-    });
+    }));
     const matcher = TestMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin" })).toBe("authenticated");
     expect(matcher.evaluate({ role: "guest" })).toBeUndefined();
@@ -154,7 +155,7 @@ describe("Compound Predicates", () => {
 
 describe("Nesting & Fallback", () => {
   test("nested matcher: role then org", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -175,7 +176,7 @@ describe("Nesting & Fallback", () => {
           },
         },
       }],
-    });
+    }));
     const matcher = TestMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin", org: "acme" })).toBe("acme_admin");
     expect(matcher.evaluate({ role: "admin", org: "other" })).toBeUndefined();
@@ -183,7 +184,7 @@ describe("Nesting & Fallback", () => {
   });
 
   test("on_no_match fallback", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -193,7 +194,7 @@ describe("Nesting & Fallback", () => {
         on_match: { type: "action", action: "admin" },
       }],
       on_no_match: { type: "action", action: "default" },
-    });
+    }));
     const matcher = TestMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin" })).toBe("admin");
     expect(matcher.evaluate({ role: "user" })).toBe("default");
@@ -238,7 +239,7 @@ describe("Errors", () => {
   });
 
   test("unknown input type", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -247,12 +248,12 @@ describe("Errors", () => {
         },
         on_match: { type: "action", action: "test" },
       }],
-    });
+    }));
     expect(() => TestMatcher.fromConfig(config)).toThrow();
   });
 
   test("invalid regex", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -261,7 +262,7 @@ describe("Errors", () => {
         },
         on_match: { type: "action", action: "test" },
       }],
-    });
+    }));
     expect(() => TestMatcher.fromConfig(config)).toThrow(/regex/);
   });
 });
@@ -272,7 +273,7 @@ describe("Errors", () => {
 
 describe("Trace", () => {
   test("trace result matches evaluate", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -282,14 +283,14 @@ describe("Trace", () => {
         on_match: { type: "action", action: "admin" },
       }],
       on_no_match: { type: "action", action: "default" },
-    });
+    }));
     const matcher = TestMatcher.fromConfig(config);
     const ctx = { role: "admin" };
     expect(matcher.trace(ctx).result).toBe(matcher.evaluate(ctx));
   });
 
   test("trace has steps", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -298,7 +299,7 @@ describe("Trace", () => {
         },
         on_match: { type: "action", action: "admin" },
       }],
-    });
+    }));
     const matcher = TestMatcher.fromConfig(config);
     const trace = matcher.trace({ role: "admin" });
     expect(trace.steps.length).toBeGreaterThan(0);
@@ -308,7 +309,7 @@ describe("Trace", () => {
   });
 
   test("trace shows fallback usage", () => {
-    const config = JSON.stringify({
+    const config = JSON.stringify(pj({
       matchers: [{
         predicate: {
           type: "single",
@@ -318,7 +319,7 @@ describe("Trace", () => {
         on_match: { type: "action", action: "admin" },
       }],
       on_no_match: { type: "action", action: "default" },
-    });
+    }));
     const matcher = TestMatcher.fromConfig(config);
     const trace = matcher.trace({ role: "user" });
     expect(trace.result).toBe("default");

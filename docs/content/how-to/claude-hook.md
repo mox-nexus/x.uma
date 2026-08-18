@@ -8,20 +8,39 @@ a hook Claude Code actually runs.
 `hooks.yaml`:
 
 ```yaml
-matchers:
-  - predicate:
-      type: and
-      predicates:
-        - type: single
-          input: { type_url: "xuma.claude.v1.EventInput" }
-          value_match: { Exact: "PreToolUse" }
-        - type: single
-          input: { type_url: "xuma.claude.v1.ToolNameInput" }
-          value_match: { Exact: "Bash" }
-        - type: single
-          input: { type_url: "xuma.claude.v1.ArgumentInput", config: { name: "command" } }
-          value_match: { Contains: "rm -rf" }
-    on_match: { type: action, action: "deny" }
+matcherList:
+  matchers:
+    - predicate:
+        andMatcher:
+          predicate:
+            - singlePredicate:
+                input:
+                  name: event
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.claude.v1.EventTypeInput
+                valueMatch:
+                  exact: PreToolUse
+            - singlePredicate:
+                input:
+                  name: tool
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.claude.v1.ToolNameInput
+                valueMatch:
+                  exact: Bash
+            - singlePredicate:
+                input:
+                  name: command
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.claude.v1.ToolArgInput
+                    name: command
+                valueMatch:
+                  contains: "rm -rf"
+      onMatch:
+        action:
+          name: deny
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: deny
 ```
 
 Check it before wiring it up. `check` reports what it read, so you can see the
@@ -104,25 +123,40 @@ Match what is *allowed* and set the fallback to deny. Do not try to express it
 by inverting the default:
 
 ```yaml
-matchers:
-  - predicate:
-      type: single
-      input: { type_url: "xuma.claude.v1.ToolNameInput" }
-      value_match: { Exact: "Read" }
-    on_match: { type: action, action: "allow" }
-on_no_match: { type: action, action: "deny" }
+matcherList:
+  matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: tool
+            typedConfig:
+              "@type": type.googleapis.com/xuma.claude.v1.ToolNameInput
+          valueMatch:
+            exact: Read
+      onMatch:
+        action:
+          name: allow
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: allow
+onNoMatch:
+  action:
+    name: deny
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: deny
 ```
 
-An empty `matchers:` list matches everything, so the polarity comes entirely
-from how you assign actions. `rumi check` tells you which case you are in — it
-prints the fallback, and says so explicitly when there are zero rules.
+An empty `matcherList.matchers` list matches everything, so the polarity comes
+entirely from how you assign actions. `rumi check` tells you which case you are
+in — it prints the fallback, and says so explicitly when there are zero rules.
 
 ## The rule that catches people
 
 **If an input finds no value, its predicate is false. That is not an error.**
 
-A rule matching on `config: { name: "command" }` simply does not fire for a tool
-call that has no `command` argument. It does not error, and it does not match.
+A rule matching on `typedConfig: { name: "command" }` simply does not fire for a
+tool call that has no `command` argument. It does not error, and it does not match.
 For a deny rule that is usually what you want; for an allow rule in an
 allowlist, it means the call falls through to `on_no_match`.
 

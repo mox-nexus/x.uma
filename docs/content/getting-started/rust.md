@@ -27,33 +27,68 @@ cargo install --path rumi/cli
 Create `routes.yaml`:
 
 ```yaml
-matchers:
-  - predicate:
-      type: and
-      predicates:
-        - type: single
-          input: { type_url: "xuma.http.v1.PathInput" }
-          value_match: { Prefix: "/api" }
-        - type: single
-          input: { type_url: "xuma.http.v1.MethodInput" }
-          value_match: { Exact: "GET" }
-    on_match: { type: action, action: "api_read" }
+matcherList:
+  matchers:
+    - predicate:
+        andMatcher:
+          predicate:
+            - singlePredicate:
+                input:
+                  name: path
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.http.v1.PathInput
+                valueMatch:
+                  prefix: /api
+            - singlePredicate:
+                input:
+                  name: method
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.http.v1.MethodInput
+                valueMatch:
+                  exact: GET
+      onMatch:
+        action:
+          name: api_read
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: api_read
 
-  - predicate:
-      type: and
-      predicates:
-        - type: single
-          input: { type_url: "xuma.http.v1.PathInput" }
-          value_match: { Prefix: "/api" }
-        - type: single
-          input: { type_url: "xuma.http.v1.MethodInput" }
-          value_match: { Exact: "POST" }
-    on_match: { type: action, action: "api_write" }
+    - predicate:
+        andMatcher:
+          predicate:
+            - singlePredicate:
+                input:
+                  name: path
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.http.v1.PathInput
+                valueMatch:
+                  prefix: /api
+            - singlePredicate:
+                input:
+                  name: method
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.http.v1.MethodInput
+                valueMatch:
+                  exact: POST
+      onMatch:
+        action:
+          name: api_write
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: api_write
 
-on_no_match: { type: action, action: "not_found" }
+onNoMatch:
+  action:
+    name: not_found
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: not_found
 ```
 
-The `type_url` selects which data input to extract. `value_match` tests the extracted value. See [Config Format](../reference/config.md) for the full schema.
+This is canonical protojson — protobuf's own JSON mapping of
+`xds.type.matcher.v3.Matcher`. `@type` selects which data input to extract.
+`valueMatch` tests the extracted value. See [Config Format](../reference/config.md)
+for the full schema.
 
 ## Validate with the CLI
 
@@ -83,17 +118,47 @@ The same config file works programmatically via the Registry API:
 
 ```rust,no_run
 use rumi::prelude::*;
-use rumi::{MatcherConfig, RegistryBuilder};
+use rumi::RegistryBuilder;
 use rumi_http::{register_simple, HttpRequest};
+use rumi_proto::any_resolver::{AnyResolver, AnyResolverBuilder};
+use rumi_proto::convert::convert_matcher;
+use rumi_proto::protojson::parse_matcher;
+use rumi_proto::xuma;
+
+/// Every type URL a config may name, and the one action type this engine ships.
+fn resolver() -> AnyResolver {
+    AnyResolverBuilder::new()
+        .register::<xuma::http::v1::PathInput>("xuma.http.v1.PathInput")
+        .register::<xuma::http::v1::MethodInput>("xuma.http.v1.MethodInput")
+        .register::<xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
+        .build()
+}
+
+struct NamedActionFactory;
+
+impl rumi::IntoAction<String> for NamedActionFactory {
+    type Config = xuma::core::v1::NamedAction;
+
+    fn from_config(config: Self::Config) -> Result<String, rumi::MatcherError> {
+        Ok(config.name)
+    }
+}
 
 fn main() {
-    // Build registry with HTTP inputs
+    // Build registry with HTTP inputs, and the action registry NamedAction
+    // resolves through.
     let registry = register_simple(RegistryBuilder::new()).build();
+    let actions = rumi::ActionRegistryBuilder::new()
+        .action::<NamedActionFactory>("xuma.core.v1.NamedAction")
+        .build();
 
-    // Load the config
+    // Load the config: canonical protojson in, runtime Matcher out.
     let yaml = std::fs::read_to_string("routes.yaml").unwrap();
-    let config: MatcherConfig<String> = serde_yaml::from_str(&yaml).unwrap();
-    let matcher = registry.load_matcher(config).unwrap();
+    let resolver = resolver();
+    let doc: serde_json::Value = serde_yaml::from_str(&yaml).unwrap();
+    let proto = parse_matcher(&resolver, doc).unwrap();
+    let config = convert_matcher(&proto, &resolver).unwrap();
+    let matcher = registry.load_typed_matcher(config, &actions).unwrap();
 
     // Evaluate
     let request = HttpRequest::builder()
@@ -104,7 +169,10 @@ fn main() {
 }
 ```
 
-The registry resolves `type_url` strings to concrete `DataInput` implementations at load time. Unknown type URLs produce an error listing available types.
+The registry resolves `@type` URLs to concrete `DataInput` implementations at
+load time, through the same `AnyResolver` that decodes them off the wire when a
+host's xDS client is the source instead of a file. Unknown type URLs produce an
+error listing available types.
 
 ## Compiler Shorthand
 
@@ -154,22 +222,46 @@ only if you are writing an Envoy ext_proc filter.
 rumi also matches Claude Code hook events. Create `hooks.yaml`:
 
 ```yaml
-matchers:
-  - predicate:
-      type: and
-      predicates:
-        - type: single
-          input: { type_url: "xuma.claude.v1.EventInput" }
-          value_match: { Exact: "PreToolUse" }
-        - type: single
-          input: { type_url: "xuma.claude.v1.ToolNameInput" }
-          value_match: { Exact: "Bash" }
-        - type: single
-          input: { type_url: "xuma.claude.v1.ArgumentInput", config: { name: "command" } }
-          value_match: { Contains: "rm -rf" }
-    on_match: { type: action, action: "block" }
+matcherList:
+  matchers:
+    - predicate:
+        andMatcher:
+          predicate:
+            - singlePredicate:
+                input:
+                  name: event
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.claude.v1.EventTypeInput
+                valueMatch:
+                  exact: PreToolUse
+            - singlePredicate:
+                input:
+                  name: tool
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.claude.v1.ToolNameInput
+                valueMatch:
+                  exact: Bash
+            - singlePredicate:
+                input:
+                  name: command
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.claude.v1.ToolArgInput
+                    name: command
+                valueMatch:
+                  contains: "rm -rf"
+      onMatch:
+        action:
+          name: block
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: block
 
-on_no_match: { type: action, action: "allow" }
+onNoMatch:
+  action:
+    name: allow
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: allow
 ```
 
 ```bash

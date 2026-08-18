@@ -16,9 +16,8 @@ crate-type = ["cdylib", "lib"]
 # Off by default, so the published artifact carries no YAML fixture loader.
 # The conformance suite builds with it; consumers never do. PLAN.md E3.
 default = []
-# Running the protojson conformance suite. Pulls rumi-proto because the
-# crusts read the same fixtures through the same reader as rumi.
-fixtures = ["dep:rumi-test", "dep:rumi-proto"]
+# Running the protojson conformance suite.
+fixtures = ["dep:rumi-test"]
 
 [dependencies]
 pyo3 = { version = "0.29", features = ["extension-module"] }
@@ -28,7 +27,9 @@ rumi-http = { path = "../../ext/http", default-features = false, features = ["re
 # shipped wheel/npm package (PLAN.md E3).
 rumi-kv = { path = "../../ext/kv", features = ["registry"] }
 rumi-test = { path = "../../ext/test", features = ["registry", "fixtures"], optional = true }
-rumi-proto = { path = "../../proto", optional = true }
+# Config loading. The config format is protojson (DECISIONS.md D-026), and
+# from_config() uses it whether or not the fixtures feature is on.
+rumi-proto = { path = "../../proto", version = "0.0.2" }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 

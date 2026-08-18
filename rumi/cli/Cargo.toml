@@ -21,5 +21,8 @@ rumi-http = { workspace = true, default-features = false, features = ["registry"
 # rumi-test is publish = false. That edge is why rumi-cli could not be
 # published (PLAN.md F9).
 rumi-kv = { workspace = true, features = ["registry"] }
+# The config format is protojson, so the CLI reads it through the same
+# resolver and conversion the control-plane path uses.
+rumi-proto = { path = "../proto", version = "0.0.2" }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }

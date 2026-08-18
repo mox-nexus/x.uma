@@ -136,16 +136,22 @@ matcher = compile_route_matches(routes, "api", "not_found")
 
 ```json
 {
-  "matcher_list": [{
-    "predicate": {
-      "single": {
-        "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "method" } },
-        "matcher": { "type_url": "xuma.core.v1.StringMatcher", "config": { "exact": "GET" } }
+  "matcherList": {
+    "matchers": [{
+      "predicate": {
+        "singlePredicate": {
+          "input": { "name": "method", "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "method" } },
+          "valueMatch": { "exact": "GET" }
+        }
+      },
+      "onMatch": {
+        "action": { "name": "route-get", "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "route-get" } }
       }
-    },
-    "on_match": { "action": "route-get" }
-  }],
-  "on_no_match": { "action": "fallback" }
+    }]
+  },
+  "onNoMatch": {
+    "action": { "name": "fallback", "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "fallback" } }
+  }
 }
 ```
 

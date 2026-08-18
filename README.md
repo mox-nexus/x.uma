@@ -44,30 +44,58 @@ bun add xuma-crust   # Rust-backed via WASM, 3–10x faster evaluation
 
 ## HTTP route matching — same rules, three languages
 
-**routes.yaml** (one config, all runtimes):
+**routes.yaml** (one config, all runtimes — canonical protojson):
 ```yaml
-matchers:
-  - predicate:
-      type: and
-      predicates:
-        - type: single
-          input: { type_url: "xuma.http.v1.PathInput" }
-          value_match: { Prefix: "/api" }
-        - type: single
-          input: { type_url: "xuma.http.v1.MethodInput" }
-          value_match: { Exact: "GET" }
-    on_match: { type: action, action: "api_read" }
-on_no_match: { type: action, action: "not_found" }
+matcherList:
+  matchers:
+    - predicate:
+        andMatcher:
+          predicate:
+            - singlePredicate:
+                input:
+                  name: path
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.http.v1.PathInput
+                valueMatch:
+                  prefix: /api
+            - singlePredicate:
+                input:
+                  name: method
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.http.v1.MethodInput
+                valueMatch:
+                  exact: GET
+      onMatch:
+          action:
+            name: api_read
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: api_read
+onNoMatch:
+  action:
+    name: not_found
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: not_found
 ```
 
 **Rust:**
 ```rust,ignore
 use rumi::prelude::*;
 use rumi_http::{HttpRequest, register_simple};
+use rumi_proto::{any_resolver::AnyResolverBuilder, convert::convert_matcher, protojson::parse_matcher};
+
+let resolver = AnyResolverBuilder::new()
+    .register::<rumi_proto::xuma::http::v1::PathInput>("xuma.http.v1.PathInput")
+    .register::<rumi_proto::xuma::http::v1::MethodInput>("xuma.http.v1.MethodInput")
+    .register::<rumi_proto::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
+    .build();
 
 let registry = register_simple(RegistryBuilder::new()).build();
-let config: MatcherConfig<String> = serde_yaml::from_str(&yaml).unwrap();
-let matcher = registry.load_matcher(config).unwrap();
+let doc: serde_json::Value = serde_yaml::from_str(&yaml).unwrap();
+let proto = parse_matcher(&resolver, doc).unwrap();
+let config = convert_matcher(&proto, &resolver).unwrap();
+let matcher = registry.load_typed_matcher(config, &actions).unwrap();
 
 let req = HttpRequest::builder().method("GET").path("/api/users").build();
 assert_eq!(matcher.evaluate(&req), Some("api_read".to_string()));

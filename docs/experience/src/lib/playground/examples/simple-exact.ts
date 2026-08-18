@@ -1,5 +1,20 @@
 import type { Preset } from "../types.js";
 
+const named = (name: string) => ({
+  name,
+  typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", name },
+});
+
+const single = (key: string, valueMatch: Record<string, string>) => ({
+  singlePredicate: {
+    input: {
+      name: key,
+      typedConfig: { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key },
+    },
+    valueMatch,
+  },
+});
+
 export const blockDangerousCommands: Preset = {
   id: "claude-block-rm",
   name: "Block rm -rf",
@@ -8,41 +23,23 @@ export const blockDangerousCommands: Preset = {
     "Claude Code hook: block dangerous Bash commands containing rm -rf",
   config: JSON.stringify(
     {
-      matchers: [
-        {
-          predicate: {
-            type: "and",
-            predicates: [
-              {
-                type: "single",
-                input: {
-                  type_url: "xuma.kv.v1.MapInput",
-                  config: { key: "event" },
-                },
-                value_match: { Exact: "PreToolUse" },
+      matcherList: {
+        matchers: [
+          {
+            predicate: {
+              andMatcher: {
+                predicate: [
+                  single("event", { exact: "PreToolUse" }),
+                  single("tool_name", { exact: "Bash" }),
+                  single("argument.command", { contains: "rm -rf" }),
+                ],
               },
-              {
-                type: "single",
-                input: {
-                  type_url: "xuma.kv.v1.MapInput",
-                  config: { key: "tool_name" },
-                },
-                value_match: { Exact: "Bash" },
-              },
-              {
-                type: "single",
-                input: {
-                  type_url: "xuma.kv.v1.MapInput",
-                  config: { key: "argument.command" },
-                },
-                value_match: { Contains: "rm -rf" },
-              },
-            ],
+            },
+            onMatch: { action: named("BLOCK") },
           },
-          on_match: { type: "action", action: "BLOCK" },
-        },
-      ],
-      on_no_match: { type: "action", action: "ALLOW" },
+        ],
+      },
+      onNoMatch: { action: named("ALLOW") },
     },
     null,
     2,

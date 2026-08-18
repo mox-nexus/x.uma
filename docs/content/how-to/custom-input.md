@@ -64,8 +64,11 @@ The registry is immutable once built. Register everything before calling
 
 ```yaml
 input:
-  type_url: myapp.v1.RegionInput
-value_match: { Exact: "eu-west-1" }
+  name: region
+  typedConfig:
+    "@type": type.googleapis.com/myapp.v1.RegionInput
+valueMatch:
+  exact: eu-west-1
 ```
 
 ## Matching on something that is not a scalar

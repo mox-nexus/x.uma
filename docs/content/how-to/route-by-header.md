@@ -5,8 +5,8 @@ with a safe default when the header is absent or unrecognised.
 
 ## The shape
 
-Two things do the work. A `single` predicate reads one input and compares it. A
-`on_no_match` at the matcher level catches everything the list did not.
+Two things do the work. A `singlePredicate` reads one input and compares it. An
+`onNoMatch` at the matcher level catches everything the list did not.
 
 Rules are tried in order. The first one that matches wins, and evaluation stops.
 
@@ -17,25 +17,29 @@ one worth understanding: a missing input is not an error, it is a non-match.
 
 <matcher
   config='{
-  "matchers": [
-    {
-      "predicate": {
-        "type": "single",
-        "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "tier" } },
-        "value_match": { "Exact": "enterprise" }
+  "matcherList": {
+    "matchers": [
+      {
+        "predicate": {
+          "singlePredicate": {
+            "input": { "name": "tier", "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "tier" } },
+            "valueMatch": { "exact": "enterprise" }
+          }
+        },
+        "onMatch": { "action": { "name": "dedicated-pool", "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "dedicated-pool" } } }
       },
-      "on_match": { "type": "action", "action": "dedicated-pool" }
-    },
-    {
-      "predicate": {
-        "type": "single",
-        "input": { "type_url": "xuma.kv.v1.MapInput", "config": { "key": "tier" } },
-        "value_match": { "Exact": "pro" }
-      },
-      "on_match": { "type": "action", "action": "shared-pool" }
-    }
-  ],
-  "on_no_match": { "type": "action", "action": "free-pool" }
+      {
+        "predicate": {
+          "singlePredicate": {
+            "input": { "name": "tier", "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "tier" } },
+            "valueMatch": { "exact": "pro" }
+          }
+        },
+        "onMatch": { "action": { "name": "shared-pool", "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "shared-pool" } } }
+      }
+    ]
+  },
+  "onNoMatch": { "action": { "name": "free-pool", "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "free-pool" } } }
 }'
   context='{ "tier": "enterprise" }' />
 
@@ -43,18 +47,18 @@ one worth understanding: a missing input is not an error, it is a non-match.
 
 When a `DataInput` finds nothing, it returns no data, and the predicate evaluates
 to `false`. It does not throw and it does not halt evaluation. The matcher simply
-moves to the next rule, and eventually to `on_no_match`.
+moves to the next rule, and eventually to `onNoMatch`.
 
 This is deliberate. A matcher that threw on absent input would make every rule
 order-sensitive to data you do not control.
 
 ## Matching on part of a value
 
-`Exact` is one of several comparisons. `Prefix`, `Suffix`, `Contains`, and
-`Regex` all work in the same slot:
+`exact` is one of several comparisons. `prefix`, `suffix`, `contains`, and
+`safeRegex` all work in the same slot:
 
 ```json
-"value_match": { "Prefix": "internal-" }
+"valueMatch": { "prefix": "internal-" }
 ```
 
 Prefer the cheapest comparison that expresses the rule. `Regex` is
@@ -68,8 +72,10 @@ requests, the HTTP domain provides inputs that understand a request:
 
 ```yaml
 input:
-  type_url: xuma.http.v1.HeaderInput
-  config: { name: x-tier }
+  name: header
+  typedConfig:
+    "@type": type.googleapis.com/xuma.http.v1.HeaderInput
+    name: x-tier
 ```
 
 The evaluation model does not change. Only the input does.

@@ -23,25 +23,53 @@ Requires Bun runtime. `xuma` uses `re2js` for linear-time regex.
 Create `routes.yaml`:
 
 ```yaml
-matchers:
-  - predicate:
-      type: and
-      predicates:
-        - type: single
-          input: { type_url: "xuma.http.v1.PathInput" }
-          value_match: { Prefix: "/api" }
-        - type: single
-          input: { type_url: "xuma.http.v1.MethodInput" }
-          value_match: { Exact: "GET" }
-    on_match: { type: action, action: "api_read" }
+matcherList:
+  matchers:
+    - predicate:
+        andMatcher:
+          predicate:
+            - singlePredicate:
+                input:
+                  name: path
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.http.v1.PathInput
+                valueMatch:
+                  prefix: /api
+            - singlePredicate:
+                input:
+                  name: method
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.http.v1.MethodInput
+                valueMatch:
+                  exact: GET
+      onMatch:
+        action:
+          name: api_read
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: api_read
 
-  - predicate:
-      type: single
-      input: { type_url: "xuma.http.v1.PathInput" }
-      value_match: { Exact: "/health" }
-    on_match: { type: action, action: "health" }
+    - predicate:
+        singlePredicate:
+          input:
+            name: path
+            typedConfig:
+              "@type": type.googleapis.com/xuma.http.v1.PathInput
+          valueMatch:
+            exact: /health
+      onMatch:
+        action:
+          name: health
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: health
 
-on_no_match: { type: action, action: "not_found" }
+onNoMatch:
+  action:
+    name: not_found
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: not_found
 ```
 
 ## Validate with the CLI
@@ -69,18 +97,18 @@ not_found
 The pure TypeScript implementation loads the same config:
 
 ```typescript
-import { RegistryBuilder, registerHttp, type MatcherConfig } from "xuma";
-import { HttpRequest } from "xuma/http";
+import { parseProtojson, RegistryBuilder } from "xuma";
+import { HttpRequest, register } from "xuma/http";
 import { parse } from "yaml";
 
 // Build registry with HTTP inputs
 const builder = new RegistryBuilder();
-registerHttp(builder);
+register(builder);
 const registry = builder.build();
 
-// Load config
+// Load config: canonical protojson in, runtime Matcher out
 const yaml = await Bun.file("routes.yaml").text();
-const config: MatcherConfig = parse(yaml);
+const config = parseProtojson(parse(yaml));
 const matcher = registry.loadMatcher(config);
 
 // Evaluate

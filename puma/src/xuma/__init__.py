@@ -26,7 +26,6 @@ from xuma._config import (
     SinglePredicateConfig,
     TypedConfig,
     ValueMatchConfig,
-    parse_matcher_config,
 )
 from xuma._matcher import (
     MAX_DEPTH,
@@ -123,7 +122,6 @@ __all__ = [
     "FieldMatcherConfig",
     "MatcherConfig",
     "ConfigParseError",
-    "parse_matcher_config",
     "parse_protojson",
     # Registry
     "RegistryBuilder",

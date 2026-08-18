@@ -2,14 +2,14 @@
  * Transform matcher config JSON into the renderer-independent graph model.
  *
  * Two paths:
- * - Config mode: MatcherConfig AST → tree graph
- * - HTTP mode: Route array → flat route graph
+ * - Config mode: protojson -> MatcherConfig IR -> tree graph
+ * - HTTP mode: Route array -> flat route graph
  *
  * Produces structure only. Position, size and styling are decided downstream by
  * `layout.ts` and `draw.ts`.
  */
 import {
-  parseMatcherConfig,
+  parseProtojson,
   type MatcherConfig,
   type FieldMatcherConfig,
   type PredicateConfig,
@@ -39,7 +39,7 @@ export function configToGraph(configJson: string, mode: ModeKind): GraphData {
     if (mode === "http") {
       return httpToGraph(parsed);
     }
-    const config = parseMatcherConfig(parsed);
+    const config = parseProtojson(parsed);
     return matcherConfigToGraph(config);
   } catch {
     return { nodes: [], edges: [] };

@@ -23,25 +23,53 @@ Requires Python 3.12+. `xuma` uses `google-re2` for linear-time regex.
 Create `routes.yaml`:
 
 ```yaml
-matchers:
-  - predicate:
-      type: and
-      predicates:
-        - type: single
-          input: { type_url: "xuma.http.v1.PathInput" }
-          value_match: { Prefix: "/api" }
-        - type: single
-          input: { type_url: "xuma.http.v1.MethodInput" }
-          value_match: { Exact: "GET" }
-    on_match: { type: action, action: "api_read" }
+matcherList:
+  matchers:
+    - predicate:
+        andMatcher:
+          predicate:
+            - singlePredicate:
+                input:
+                  name: path
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.http.v1.PathInput
+                valueMatch:
+                  prefix: /api
+            - singlePredicate:
+                input:
+                  name: method
+                  typedConfig:
+                    "@type": type.googleapis.com/xuma.http.v1.MethodInput
+                valueMatch:
+                  exact: GET
+      onMatch:
+        action:
+          name: api_read
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: api_read
 
-  - predicate:
-      type: single
-      input: { type_url: "xuma.http.v1.PathInput" }
-      value_match: { Exact: "/health" }
-    on_match: { type: action, action: "health" }
+    - predicate:
+        singlePredicate:
+          input:
+            name: path
+            typedConfig:
+              "@type": type.googleapis.com/xuma.http.v1.PathInput
+          valueMatch:
+            exact: /health
+      onMatch:
+        action:
+          name: health
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: health
 
-on_no_match: { type: action, action: "not_found" }
+onNoMatch:
+  action:
+    name: not_found
+    typedConfig:
+      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+      name: not_found
 ```
 
 ## Validate with the CLI
@@ -70,7 +98,8 @@ The `xuma` implementation loads the same config:
 
 ```python
 import yaml
-from xuma import Registry, RegistryBuilder
+from xuma import RegistryBuilder
+from xuma._protojson import parse_protojson
 from xuma.http import HttpRequest, register
 
 # Build registry with HTTP inputs
@@ -78,9 +107,9 @@ builder = RegistryBuilder()
 register(builder)
 registry = builder.build()
 
-# Load config
+# Load config: canonical protojson in, runtime Matcher out
 with open("routes.yaml") as f:
-    config = yaml.safe_load(f)
+    config = parse_protojson(yaml.safe_load(f))
 matcher = registry.load_matcher(config)
 
 # Evaluate

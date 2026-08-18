@@ -49,14 +49,14 @@ pub use inputs::*;
 
 // Registry config types (hand-written)
 #[cfg(feature = "registry")]
-pub use inputs::ArgumentInputConfig;
+pub use inputs::ToolArgInputConfig;
 
 /// Register all Claude Code types for [`HookContext`] with the given builder.
 ///
 /// Registers core matchers (`BoolMatcher`, `StringMatcher`) and Claude-domain inputs:
-/// - `xuma.claude.v1.EventInput` → [`EventInput`]
+/// - `xuma.claude.v1.EventTypeInput` → [`EventTypeInput`]
 /// - `xuma.claude.v1.ToolNameInput` → [`ToolNameInput`]
-/// - `xuma.claude.v1.ArgumentInput` → [`ArgumentInput`]
+/// - `xuma.claude.v1.ToolArgInput` → [`ToolArgInput`]
 /// - `xuma.claude.v1.SessionIdInput` → [`SessionIdInput`]
 /// - `xuma.claude.v1.CwdInput` → [`CwdInput`]
 /// - `xuma.claude.v1.GitBranchInput` → [`GitBranchInput`]
@@ -66,9 +66,9 @@ pub fn register(
     builder: crate::RegistryBuilder<HookContext>,
 ) -> crate::RegistryBuilder<HookContext> {
     crate::register_core_matchers(builder)
-        .input::<EventInput>("xuma.claude.v1.EventInput")
+        .input::<EventTypeInput>("xuma.claude.v1.EventTypeInput")
         .input::<ToolNameInput>("xuma.claude.v1.ToolNameInput")
-        .input::<ArgumentInput>("xuma.claude.v1.ArgumentInput")
+        .input::<ToolArgInput>("xuma.claude.v1.ToolArgInput")
         .input::<SessionIdInput>("xuma.claude.v1.SessionIdInput")
         .input::<CwdInput>("xuma.claude.v1.CwdInput")
         .input::<GitBranchInput>("xuma.claude.v1.GitBranchInput")
@@ -77,9 +77,9 @@ pub fn register(
 /// Prelude for convenient imports.
 pub mod prelude {
     pub use super::{
-        compile_hook_matches, ArgumentInput, ArgumentMatch, CwdInput, EventInput, GitBranchInput,
-        HookContext, HookEvent, HookMatch, HookMatchExt, HookMatchTrace, SessionIdInput,
-        StringMatch, ToolNameInput, TraceStep,
+        compile_hook_matches, ArgumentMatch, CwdInput, EventTypeInput, GitBranchInput, HookContext,
+        HookEvent, HookMatch, HookMatchExt, HookMatchTrace, SessionIdInput, StringMatch,
+        ToolArgInput, ToolNameInput, TraceStep,
     };
     pub use crate::prelude::*;
 }
@@ -111,7 +111,7 @@ mod tests {
     fn test_event_input() {
         let ctx = HookContext::post_tool_use("Read");
         assert_eq!(
-            EventInput.get(&ctx),
+            EventTypeInput.get(&ctx),
             MatchingData::String("PostToolUse".into())
         );
     }
@@ -120,7 +120,7 @@ mod tests {
     fn test_argument_input() {
         let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "echo hello");
 
-        let input = ArgumentInput::new("command").unwrap();
+        let input = ToolArgInput::new("command").unwrap();
         assert_eq!(input.get(&ctx), MatchingData::String("echo hello".into()));
     }
 
@@ -137,7 +137,7 @@ mod tests {
                         Box::new(ExactMatcher::new("Bash")),
                     )),
                     Predicate::Single(SinglePredicate::new(
-                        Box::new(ArgumentInput::new("command").unwrap()),
+                        Box::new(ToolArgInput::new("command").unwrap()),
                         Box::new(ContainsMatcher::new("rm -rf")),
                     )),
                 ]),

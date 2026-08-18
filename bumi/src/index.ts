@@ -17,7 +17,6 @@ export {
 	OrPredicateConfig,
 	SinglePredicateConfig,
 	TypedConfig,
-	parseMatcherConfig,
 } from "./config.ts";
 export type { OnMatchConfig, PredicateConfig, ValueMatchConfig } from "./config.ts";
 

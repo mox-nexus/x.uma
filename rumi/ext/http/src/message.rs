@@ -211,7 +211,7 @@ impl From<&ProcessingRequest> for HttpMessage {
     }
 }
 
-/// Decode ext_proc headers, then delegate the indexing.
+/// Decode `ext_proc` headers, then delegate the indexing.
 ///
 /// This *calls* [`HttpMessage::from_header_pairs`] rather than reproducing it.
 /// It used to hand-copy the pseudo-header lift, and a comment claimed the two

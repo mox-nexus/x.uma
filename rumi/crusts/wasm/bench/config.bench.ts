@@ -1,10 +1,14 @@
 /**
- * Head-to-head config benchmarks: bumi (pure TS) vs xuma-crust (WASM).
+ * Head-to-head config benchmarks: bumi vs xuma-crust (WASM).
  *
  * Compares the config loading path across both implementations to isolate:
  * 1. Config parsing overhead — JSON → config types
  * 2. Registry loading — type URL lookup + factory invocation
  * 3. Evaluation parity — config-loaded matcher evaluation speed
+ *
+ * The configs are canonical protojson (DECISIONS.md D-026), fed through
+ * `parseProtojson` on the bumi side and `fromConfig` on the crust side —
+ * both are the real production entry points, not synthetic ones.
  *
  * Run:
  *   cd rumi/crusts/wasm
@@ -18,81 +22,75 @@ import { bench, run, summary } from "mitata";
 import init, { HttpMatcher, TestMatcher } from "../pkg/xuma_crust.js";
 await init();
 
-// bumi (pure TypeScript)
-import {
-	Action,
-	ExactMatcher,
-	FieldMatcher,
-	Matcher,
-	RegistryBuilder,
-	SinglePredicate,
-	parseMatcherConfig,
-} from "../../../../bumi/src/index.ts";
-import { DictInput, register } from "../../../../bumi/src/testing.ts";
+// bumi
+import { parseProtojson, RegistryBuilder } from "../../../../bumi/src/index.ts";
+import { register } from "../../../../bumi/src/testing.ts";
 
-// ── Shared JSON configs ──────────────────────────────────────────────────────
+// ── Shared protojson configs ─────────────────────────────────────────────────
+
+function mapInput(key: string) {
+	return { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key };
+}
+
+function namedAction(name: string) {
+	return { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", name };
+}
+
+function single(inputName: string, key: string, variant: string, value: string) {
+	return {
+		singlePredicate: {
+			input: { name: inputName, typedConfig: mapInput(key) },
+			valueMatch: { [variant]: value },
+		},
+	};
+}
+
+function actionMatch(name: string) {
+	return { action: { name, typedConfig: namedAction(name) } };
+}
 
 const SIMPLE_CONFIG = JSON.stringify({
-	matchers: [
-		{
-			predicate: {
-				type: "single",
-				input: {
-					type_url: "xuma.kv.v1.MapInput",
-					config: { key: "role" },
-				},
-				value_match: { Exact: "admin" },
-			},
-			on_match: { type: "action", action: "matched" },
-		},
-	],
-	on_no_match: { type: "action", action: "default" },
+	matcherList: {
+		matchers: [
+			{ predicate: single("role", "role", "exact", "admin"), onMatch: actionMatch("matched") },
+		],
+	},
+	onNoMatch: actionMatch("default"),
 });
 
 const COMPOUND_CONFIG = JSON.stringify({
-	matchers: [
-		{
-			predicate: {
-				type: "and",
-				predicates: [
-					{
-						type: "single",
-						input: {
-							type_url: "xuma.kv.v1.MapInput",
-							config: { key: "role" },
-						},
-						value_match: { Exact: "admin" },
+	matcherList: {
+		matchers: [
+			{
+				predicate: {
+					andMatcher: {
+						predicate: [
+							single("role", "role", "exact", "admin"),
+							single("org", "org", "prefix", "acme"),
+						],
 					},
-					{
-						type: "single",
-						input: {
-							type_url: "xuma.kv.v1.MapInput",
-							config: { key: "org" },
-						},
-						value_match: { Prefix: "acme" },
-					},
-				],
+				},
+				onMatch: actionMatch("admin_acme"),
 			},
-			on_match: { type: "action", action: "admin_acme" },
-		},
-	],
+		],
+	},
 });
 
 const HTTP_SIMPLE_CONFIG = JSON.stringify({
-	matchers: [
-		{
-			predicate: {
-				type: "single",
-				input: {
-					type_url: "xuma.http.v1.PathInput",
-					config: {},
+	matcherList: {
+		matchers: [
+			{
+				predicate: {
+					singlePredicate: {
+						input: { name: "path", typedConfig: { "@type": "type.googleapis.com/xuma.http.v1.PathInput" } },
+						valueMatch: { exact: "/api/v1/users" },
+					},
 				},
-				value_match: { Exact: "/api/v1/users" },
+				onMatch: actionMatch("users_api"),
 			},
-			on_match: { type: "action", action: "users_api" },
-		},
-	],
-	on_no_match: { type: "action", action: "not_found" },
+		],
+	},
+	onNoMatch: actionMatch("not_found"),
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -111,7 +109,7 @@ summary(() => {
 	);
 
 	bench("bumi_config_load_simple", () => {
-		const config = parseMatcherConfig(JSON.parse(SIMPLE_CONFIG));
+		const config = parseProtojson(JSON.parse(SIMPLE_CONFIG));
 		registry.loadMatcher(config);
 	});
 });
@@ -124,7 +122,7 @@ summary(() => {
 	);
 
 	bench("bumi_config_load_compound", () => {
-		const config = parseMatcherConfig(JSON.parse(COMPOUND_CONFIG));
+		const config = parseProtojson(JSON.parse(COMPOUND_CONFIG));
 		registry.loadMatcher(config);
 	});
 });
@@ -135,7 +133,7 @@ summary(() => {
 	const crusty = TestMatcher.fromConfig(SIMPLE_CONFIG);
 	const registry = bumiRegistry();
 	const bumi = registry.loadMatcher(
-		parseMatcherConfig(JSON.parse(SIMPLE_CONFIG)),
+		parseProtojson(JSON.parse(SIMPLE_CONFIG)),
 	);
 
 	const ctx = { role: "admin" };

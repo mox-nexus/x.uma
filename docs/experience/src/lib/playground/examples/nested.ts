@@ -1,5 +1,20 @@
 import type { Preset } from "../types.js";
 
+const named = (name: string) => ({
+  name,
+  typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", name },
+});
+
+const single = (key: string, valueMatch: Record<string, string>) => ({
+  singlePredicate: {
+    input: {
+      name: key,
+      typedConfig: { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key },
+    },
+    valueMatch,
+  },
+});
+
 export const tieredRouting: Preset = {
   id: "tiered-routing",
   name: "Tiered Routing",
@@ -8,58 +23,31 @@ export const tieredRouting: Preset = {
     "Nested matcher: premium users route by region, free users get default",
   config: JSON.stringify(
     {
-      matchers: [
-        {
-          predicate: {
-            type: "single",
-            input: {
-              type_url: "xuma.kv.v1.MapInput",
-              config: { key: "tier" },
-            },
-            value_match: { Exact: "premium" },
-          },
-          on_match: {
-            type: "matcher",
-            matcher: {
-              matchers: [
-                {
-                  predicate: {
-                    type: "single",
-                    input: {
-                      type_url: "xuma.kv.v1.MapInput",
-                      config: { key: "region" },
+      matcherList: {
+        matchers: [
+          {
+            predicate: single("tier", { exact: "premium" }),
+            onMatch: {
+              matcher: {
+                matcherList: {
+                  matchers: [
+                    {
+                      predicate: single("region", { exact: "us-east" }),
+                      onMatch: { action: named("premium_us_east") },
                     },
-                    value_match: { Exact: "us-east" },
-                  },
-                  on_match: {
-                    type: "action",
-                    action: "premium_us_east",
-                  },
-                },
-                {
-                  predicate: {
-                    type: "single",
-                    input: {
-                      type_url: "xuma.kv.v1.MapInput",
-                      config: { key: "region" },
+                    {
+                      predicate: single("region", { exact: "eu-west" }),
+                      onMatch: { action: named("premium_eu_west") },
                     },
-                    value_match: { Exact: "eu-west" },
-                  },
-                  on_match: {
-                    type: "action",
-                    action: "premium_eu_west",
-                  },
+                  ],
                 },
-              ],
-              on_no_match: {
-                type: "action",
-                action: "premium_default",
+                onNoMatch: { action: named("premium_default") },
               },
             },
           },
-        },
-      ],
-      on_no_match: { type: "action", action: "free_tier" },
+        ],
+      },
+      onNoMatch: { action: named("free_tier") },
     },
     null,
     2,

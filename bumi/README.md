@@ -68,19 +68,35 @@ matcher.evaluate(new HttpRequest({ method: "POST", rawPath: "/api/users" })); //
 ### Example 3: Config-Driven Matchers
 
 ```typescript
-import { parseMatcherConfig, RegistryBuilder } from "xuma";
+import { parseProtojson, RegistryBuilder } from "xuma";
 import { register } from "xuma/testing";
 
-const config = parseMatcherConfig({
-    matchers: [{
-        predicate: {
-            type: "single",
-            input: { type_url: "xuma.kv.v1.MapInput", config: { key: "method" } },
-            value_match: { Exact: "GET" },
+const config = parseProtojson({
+    matcherList: {
+        matchers: [{
+            predicate: {
+                singlePredicate: {
+                    input: {
+                        name: "method",
+                        typedConfig: { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key: "method" },
+                    },
+                    valueMatch: { exact: "GET" },
+                },
+            },
+            onMatch: {
+                action: {
+                    name: "route-get",
+                    typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", name: "route-get" },
+                },
+            },
+        }],
+    },
+    onNoMatch: {
+        action: {
+            name: "fallback",
+            typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", name: "fallback" },
         },
-        on_match: { type: "action", action: "route-get" },
-    }],
-    on_no_match: { type: "action", action: "fallback" },
+    },
 });
 
 const builder = new RegistryBuilder<Record<string, string>>();
