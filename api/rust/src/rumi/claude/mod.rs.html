@@ -120,7 +120,7 @@
 <a href=#120 id=120 data-nosnippet>120</a>    </span><span class="kw">fn </span>test_argument_input() {
 <a href=#121 id=121 data-nosnippet>121</a>        <span class="kw">let </span>ctx = HookContext::pre_tool_use(<span class="string">"Bash"</span>).with_arg(<span class="string">"command"</span>, <span class="string">"echo hello"</span>);
 <a href=#122 id=122 data-nosnippet>122</a>
-<a href=#123 id=123 data-nosnippet>123</a>        <span class="kw">let </span>input = ArgumentInput::new(<span class="string">"command"</span>);
+<a href=#123 id=123 data-nosnippet>123</a>        <span class="kw">let </span>input = ArgumentInput::new(<span class="string">"command"</span>).unwrap();
 <a href=#124 id=124 data-nosnippet>124</a>        <span class="macro">assert_eq!</span>(input.get(<span class="kw-2">&amp;</span>ctx), MatchingData::String(<span class="string">"echo hello"</span>.into()));
 <a href=#125 id=125 data-nosnippet>125</a>    }
 <a href=#126 id=126 data-nosnippet>126</a>
@@ -137,7 +137,7 @@
 <a href=#137 id=137 data-nosnippet>137</a>                        Box::new(ExactMatcher::new(<span class="string">"Bash"</span>)),
 <a href=#138 id=138 data-nosnippet>138</a>                    )),
 <a href=#139 id=139 data-nosnippet>139</a>                    Predicate::Single(SinglePredicate::new(
-<a href=#140 id=140 data-nosnippet>140</a>                        Box::new(ArgumentInput::new(<span class="string">"command"</span>)),
+<a href=#140 id=140 data-nosnippet>140</a>                        Box::new(ArgumentInput::new(<span class="string">"command"</span>).unwrap()),
 <a href=#141 id=141 data-nosnippet>141</a>                        Box::new(ContainsMatcher::new(<span class="string">"rm -rf"</span>)),
 <a href=#142 id=142 data-nosnippet>142</a>                    )),
 <a href=#143 id=143 data-nosnippet>143</a>                ]),

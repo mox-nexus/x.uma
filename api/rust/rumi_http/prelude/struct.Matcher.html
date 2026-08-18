@@ -82,14 +82,29 @@ would return for the same context.</p>
 </div></details><details class="toggle method-toggle" open><summary><section id="method.has_fallback" class="method"><h4 class="code-header">pub fn <a href="#method.has_fallback" class="fn">has_fallback</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.95.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Returns <code>true</code> if there is an <code>on_no_match</code> fallback.</p>
 </div></details><details class="toggle method-toggle" open><summary><section id="method.depth" class="method"><h4 class="code-header">pub fn <a href="#method.depth" class="fn">depth</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.95.0/std/primitive.usize.html">usize</a></h4></section></summary><div class="docblock"><p>Calculate the maximum depth of this matcher tree.</p>
 <p>Used for depth limit validation at config time.</p>
-</div></details><details class="toggle method-toggle" open><summary><section id="method.validate" class="method"><h4 class="code-header">pub fn <a href="#method.validate" class="fn">validate</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.95.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.95.0/std/primitive.unit.html">()</a>, <a class="enum" href="enum.MatcherError.html" title="enum rumi_http::prelude::MatcherError">MatcherError</a>&gt;</h4></section></summary><div class="docblock"><p>Validate this matcher against safety constraints.</p>
-<p>Checks:</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.validate" class="method"><h4 class="code-header">pub fn <a href="#method.validate" class="fn">validate</a>(&amp;self) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.95.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.95.0/std/primitive.unit.html">()</a>, <a class="enum" href="enum.MatcherError.html" title="enum rumi_http::prelude::MatcherError">MatcherError</a>&gt;</h4></section></summary><div class="docblock"><p>Validate this matcher against every structural safety limit.</p>
+<p>Checks, over the whole tree including nested matchers and <code>on_no_match</code>
+chains:</p>
 <ul>
-<li>Nesting depth does not exceed [<code>MAX_DEPTH</code>]</li>
+<li>nesting depth against [<code>MAX_DEPTH</code>]</li>
+<li>rules per matcher against <a href="crate::MAX_FIELD_MATCHERS"><code>MAX_FIELD_MATCHERS</code></a></li>
+<li>children per <code>and</code>/<code>or</code> against
+<a href="crate::MAX_PREDICATES_PER_COMPOUND"><code>MAX_PREDICATES_PER_COMPOUND</code></a></li>
 </ul>
-<p>Call this at config load time to catch errors early.</p>
+<p>The width limits used to live in the registry, which meant a matcher
+built by a domain compiler or across the FFI carried none of them. They
+belong here, on the type that holds the rules, so that whatever builds a
+matcher — in any language, through any adapter — inherits the same
+guarantees rather than reimplementing them.</p>
+<p>Pattern-length limits are not here: a compiled pattern is held by
+<a href="enum.StringMatchSpec.html" title="enum rumi_http::prelude::StringMatchSpec"><code>StringMatchSpec</code></a>, which enforces its own in
+its constructor, for the same reason.</p>
 <h5 id="errors"><a class="doc-anchor" href="#errors">§</a>Errors</h5>
-<p>Returns <a href="enum.MatcherError.html#variant.DepthExceeded" title="variant rumi_http::prelude::MatcherError::DepthExceeded"><code>MatcherError::DepthExceeded</code></a> if nesting is too deep.</p>
+<ul>
+<li><a href="enum.MatcherError.html#variant.DepthExceeded" title="variant rumi_http::prelude::MatcherError::DepthExceeded"><code>MatcherError::DepthExceeded</code></a> if nesting is too deep</li>
+<li><a href="enum.MatcherError.html#variant.TooManyFieldMatchers" title="variant rumi_http::prelude::MatcherError::TooManyFieldMatchers"><code>MatcherError::TooManyFieldMatchers</code></a> if one matcher holds too many rules</li>
+<li><a href="enum.MatcherError.html#variant.TooManyPredicates" title="variant rumi_http::prelude::MatcherError::TooManyPredicates"><code>MatcherError::TooManyPredicates</code></a> if one compound holds too many children</li>
+</ul>
 </div></details></div></details></div><h2 id="trait-implementations" class="section-header">Trait Implementations<a href="#trait-implementations" class="anchor">§</a></h2><div id="trait-implementations-list"><details class="toggle implementors-toggle" open><summary><section id="impl-Clone-for-Matcher%3CCtx,+A%3E" class="impl"><a href="#impl-Clone-for-Matcher%3CCtx,+A%3E" class="anchor">§</a><h3 class="code-header">impl&lt;Ctx, A&gt; <a class="trait" href="https://doc.rust-lang.org/1.95.0/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> for <a class="struct" href="struct.Matcher.html" title="struct rumi_http::prelude::Matcher">Matcher</a>&lt;Ctx, A&gt;<div class="where">where
     A: <a class="trait" href="https://doc.rust-lang.org/1.95.0/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> + <a class="trait" href="https://doc.rust-lang.org/1.95.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + <a class="trait" href="https://doc.rust-lang.org/1.95.0/core/marker/trait.Sync.html" title="trait core::marker::Sync">Sync</a> + 'static,
     <a class="struct" href="struct.FieldMatcher.html" title="struct rumi_http::prelude::FieldMatcher">FieldMatcher</a>&lt;Ctx, A&gt;: <a class="trait" href="https://doc.rust-lang.org/1.95.0/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a>,

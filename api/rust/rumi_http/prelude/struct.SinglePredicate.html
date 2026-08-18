@@ -7,7 +7,7 @@ passes it to the matcher for evaluation.</p>
 This is a critical invariant that simplifies reasoning about matcher behavior.</p>
 <h2 id="example"><a class="doc-anchor" href="#example">§</a>Example</h2>
 <div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">let </span>predicate = SinglePredicate::new(
-    Box::new(HeaderInput::new(<span class="string">"content-type"</span>)),
+    Box::new(HeaderInput::new(<span class="string">"content-type"</span>).unwrap()),
     Box::new(ContainsMatcher::new(<span class="string">"json"</span>)),
 );
 <span class="kw">let </span>result = predicate.evaluate(<span class="kw-2">&amp;</span>request);</code></pre></div></div></details><h2 id="implementations" class="section-header">Implementations<a href="#implementations" class="anchor">§</a></h2><div id="implementations-list"><details class="toggle implementors-toggle" open><summary><section id="impl-SinglePredicate%3CCtx%3E" class="impl"><a href="#impl-SinglePredicate%3CCtx%3E" class="anchor">§</a><h3 class="code-header">impl&lt;Ctx&gt; <a class="struct" href="struct.SinglePredicate.html" title="struct rumi_http::prelude::SinglePredicate">SinglePredicate</a>&lt;Ctx&gt;</h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.new" class="method"><h4 class="code-header">pub fn <a href="#method.new" class="fn">new</a>(
