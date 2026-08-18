@@ -1,5 +1,39 @@
 # Release plan — x.uma 0.1.0
 
+## Where this stands (2026-08-18)
+
+Read this block first; the rest of the file was written before any of it was done.
+
+| Milestone | State |
+|---|---|
+| **M1** repo stops asserting what it cannot show | **met** — PR #26 |
+| **M2** a stranger can start | **met** — PR #27 (DX), #29 (reproducibility) |
+| **M3** nothing loads clean and lies | **met** — PR #25, all three blocking security findings fixed |
+| **M4/M5** schema freeze → one schema | **not started.** SF0 is *decided* (D-026); the fixtures and the migration are not written |
+| **M6** everything is publishable | **most of the way** — Phase E done, gate needs restating, see below |
+| **M7** released | yours. Publishing is irreversible |
+
+**Merged:** #23 plan repair + D-026/D-027 · #24 codegen pinned, `rumi-proto` compiles ·
+#25 security SEC1–SEC3 · #26 truth repair · #27 DX defaults · #28 crust CI +
+README agreement · #29 reproducibility.
+
+**Open:** #30 Phase K (Claude hook contract) — 9/10 green; `build-and-deploy` is
+the PR-preview deploy and is flaky today, unrelated to the change.
+**Unpushed PR:** Phase E is committed on `phase-e/publishable` and pushed, no PR opened yet.
+
+**Phases done:** A, B, S, E, F, H1–H3, K. **Left: SF → C**, then G.
+
+**Ground rule change:** the maintainer authorised `gh pr merge --admin --squash`
+for these PRs. `just ci` must still be exit 0 before every commit.
+
+**What is left, honestly.** SF → C is the large one: write SF1–SF9 as red
+fixtures, then retire the hand-written config vocabulary across three languages.
+F13, F24, F25, F26 and F27 are all the *same* defect — two config vocabularies
+competing for one slot — and D-026 already chose the winner. Fixing them is the
+migration, not five separate tasks.
+
+---
+
 **Written for an agent arriving with no context.** Read this file top to bottom
 before touching anything. Every task tells you how to prove you are done.
 
@@ -40,6 +74,22 @@ already states plainly: that this project commits generated code, and that
 | `ci-scaffolds:whitehat` | Phase S, and any change to limits, regex, or the FFI boundary. |
 | `guild-arch:trust-boundaries` | Phase S design questions, before writing the fix. |
 | `frontend-design` | Phase H, docs-site work only. |
+
+**The checks that now exist. Run them; do not re-derive what they prove.**
+
+| Command | Proves |
+|---|---|
+| `just ci` | everything CI runs, same order |
+| `just doctor` | every required tool is installed |
+| `just verify-clean-clone` | the *tracked* tree builds — `just ci` cannot see an untracked file |
+| `just features` | all ten `rumi-http` feature combinations build **and test** |
+| `just publishable` | no publishable crate depends on a `publish = false` crate |
+| `just readme-agreement` | the README's literal config gives the same answer in all three runtimes |
+| `just docs-commands` / `just docs-links` | every `rumi ...` command and internal link in the docs is real |
+
+**`--all-features` is not a substitute for `just features`.** It samples one
+corner of the feature lattice; additivity is a property of the whole lattice.
+That is precisely how a broken `gateway`-only build stayed invisible.
 
 **Also read, they are not skills but they are context:**
 `CLAUDE.md` (project), `DECISIONS.md` (D-001 to D-027, newest first — **D-026
@@ -158,7 +208,7 @@ gate on partial evidence.
 | **M3** | Nothing loads clean and lies | S | SEC1, SEC2, SEC3 fixed, each with its falsifying test committed as a regression fixture. |
 | **M4** | **Schema freeze** | SF | Every defect in §4 that crosses a schema boundary exists as a **failing** conformance fixture, and the schema's shape is decided and recorded. |
 | **M5** | One schema | C | The M4 fixtures pass. `buf generate` is the only source of config types in all three languages, and all three `gen/` trees are **tracked** (F20). All 27 fixtures pass through the frozen schema everywhere, or C4 records why a fixture legitimately does not. `just test-full` compiles (F19). |
-| **M6** | Everything is publishable | E, F, K | `cargo publish --dry-run` passes for all five **crates** — `rumi-core`, `rumi-proto`, `rumi-kv`, `rumi-http`, `rumi-cli` — in dependency order with no path patching. No published crate depends on a `publish = false` crate. CI builds every artifact, including the two crusts and the puma/bumi packages (seven artifacts total; the crates are a subset). |
+| **M6** | Everything is publishable | E, F, K | **Corrected 2026-08-18.** `cargo publish --dry-run` runs a verification build that resolves from crates.io, so crate N+1 cannot be dry-run until crate N is live — only `rumi-core` can pass today, and that is inherent, not a defect. The verifiable gate: `scripts/check-publishable.mjs` green (no publishable crate depends on a `publish = false` crate, all metadata present), `scripts/check-features.sh` green, and `release.yml` publishing in dependency order with index waits. The chain itself is provable only at publish time. |
 | **M7** | Released | G | Published, install instructions true, every `future`-marked doc block resolved. Phase L follows in 0.1.x. |
 
 **Ordering.** M1 and M2 are independent of the rest and can run in parallel with
@@ -355,27 +405,31 @@ builds and deploys. PR #22 is **merged**; `main` is the baseline now.
 |---|---|---|
 | ~~F1~~ | ~~`rumi-proto` has never compiled~~ **RESOLVED** | Fixed 2026-08-17 by pinning the codegen plugins (D-028). Compiles; 14 tests pass, three end-to-end. Its original evidence was also false: `gen/` *was* tracked — `935ed9f` added 14 files, `e36dd29` removed them, both ancestors of HEAD. |
 | ~~F20~~ | ~~generated code gitignored in all three languages~~ **RESOLVED** | All three `gen/` trees are tracked as of 2026-08-17 (D-028). CI5's no-diff check is now meaningful. |
-| F23 | `rumi-http` violates feature additivity | `simple.rs` gated six items `#[cfg(all(feature = "registry", not(feature = "proto")))]` while `register_simple` (gated on `registry` alone) called them — so enabling `proto` **deleted** the `IntoDataInput` impls it needs, with nothing replacing them. `rust-mastery` states features must be strictly additive. Fixed 2026-08-17; only `--all-features` exposed it, which `just ci` never ran. |
+| F25 | **`rumi-http/src/inputs.rs` has 8 more additivity violations, and one is fail-open** | Same `#[cfg(all(feature = "registry", not(feature = "proto")))]` pattern as F23, unfixed: two public config types deleted and six `IntoDataInput` impls replaced when `proto` is on. Not benign — the hand-written `HeaderInputConfig` makes `name` **required**, so `config: {}` is a load error; the proto version does `unwrap_or_default()`, so `config: {}` silently becomes `HeaderInput::new("")` → `None` → predicate false. **A deny rule keyed on a header stops firing, and nothing reports it.** Fail-open produced by a feature flag. Same for `QueryParamInput`. Found by Dijkstra 2026-08-17. |
+| F26 | **F14 is misdiagnosed — Rust disagrees with itself, no `cfg` involved** | The plan says puma strips the query string and Rust does not. The sharper defect is that `xuma.http.v1.PathInput` is bound to **two different semantics in Rust**: via `register` it is `PathInput` → `ctx.path()` → query stripped; via `register_simple` it is `SimplePathInput` → verbatim. Both crusts call `register_simple`, so `/admin?x=1` against `{Exact: "/admin"}` matches natively and does **not** match through the wheel or the npm package. For a path-prefix gate that is fail-open on a query-string suffix. Found by Dijkstra 2026-08-17. |
+| F27 | `rumi-test`'s `proto` feature is dead | `rumi/ext/test/Cargo.toml` declares `proto = ["registry", "dep:rumi-proto"]`, but no source file under `ext/test` references `rumi_proto`, and it does not forward to `rumi-kv/proto`. It links a dependency and does nothing. |
+| F24 | **F13 is a feature-additivity violation, not just a name mismatch** | `rumi-kv/src/lib.rs` carries two mutually-exclusive `IntoDataInput` impls, selected by `#[cfg(all(feature = "registry", not(feature = "proto")))]`. Without `proto` the config field is `key`; with `proto` it is `value`. So the same crate reads a different config key depending on a feature — which is why F13 presents as "the proto says `value`, the code uses `key`". Both are true, in different builds. `rust-mastery`: features must be strictly additive. Found 2026-08-17 when a dev-dependency omitted `proto` and three end-to-end tests started failing with `missing field 'key'`. SF4's fixture should pin one answer. |
+| ~~F23~~ | ~~`rumi-http` violates feature additivity~~ **RESOLVED** (#24), and `check-features.sh` now builds all ten combinations | `simple.rs` gated six items `#[cfg(all(feature = "registry", not(feature = "proto")))]` while `register_simple` (gated on `registry` alone) called them — so enabling `proto` **deleted** the `IntoDataInput` impls it needs, with nothing replacing them. `rust-mastery` states features must be strictly additive. Fixed 2026-08-17; only `--all-features` exposed it, which `just ci` never ran. |
 | F2 | `keep_matching` documented as an enforced invariant, not implemented | `CLAUDE.md:213`. **Corrected evidence:** not "zero occurrences" — there are 8, all `keep_matching: false` literals in `rumi/proto/src/convert.rs`'s test module. Zero in `rumi/{core,ext,cli,crusts}`, `puma/src`, `bumi/src`. |
 | F3 | `MatcherTree`/`RadixTree` unreachable from config | No tree variant in `MatcherConfig`; `convert.rs:88` returns "MatcherTree is not yet supported" |
 | F4 | Claude domain is Rust-only | Absent from `puma/src` and `bumi/src`; README presents it as a peer of HTTP |
-| F5 | CI never builds either crust | Zero `crust` references in `.github/workflows/ci.yml`; crusts are outside `default-members` |
+| ~~F5~~ | ~~CI never builds either crust~~ **RESOLVED** (#28) — both built, 160 tests run per PR | Zero `crust` references in `.github/workflows/ci.yml`; crusts are outside `default-members` |
 | F6 | `ignore_case` silently dropped | `rumi/proto/src/convert.rs:226-236` reads it off the proto and discards it. Loads clean, matches case-sensitively. Silent wrong answer. |
-| F7 | README example does not compile from README instructions | `rumi-core` has `default = []`; `Registry`, `RegistryBuilder`, `MatcherConfig` are behind the `registry` feature, mentioned zero times in `docs/content/` |
-| F8 | Four how-to pages teach APIs that do not exist | `rumi eval`, `rumi validate`, `--config`, `register_input` — none exist. Real: `run`, `check`, `info`, `.input::<T>()` |
-| F9 | `rumi-cli` cannot be published | Hard dependency on `rumi-test`, which is `publish = false` |
-| F10 | `rumi-http` cannot be published | `proto` feature depends on `rumi-proto`, `publish = false` |
+| ~~F7~~ | ~~README example does not compile~~ **RESOLVED** (#27) — `default = ["registry"]`, verified from a scratch crate outside the workspace | `rumi-core` has `default = []`; `Registry`, `RegistryBuilder`, `MatcherConfig` are behind the `registry` feature, mentioned zero times in `docs/content/` |
+| ~~F8~~ | ~~how-to pages teach APIs that do not exist~~ **RESOLVED** (#26), and `check-doc-commands.mjs` now fails the build on recurrence | `rumi eval`, `rumi validate`, `--config`, `register_input` — none exist. Real: `run`, `check`, `info`, `.input::<T>()` |
+| ~~F9~~ | ~~`rumi-cli` cannot be published~~ **RESOLVED** (Phase E) — depends on `rumi-kv`, not `rumi-test` | Hard dependency on `rumi-test`, which is `publish = false` |
+| ~~F10~~ | ~~`rumi-http` cannot be published~~ **RESOLVED** (Phase E) — `rumi-proto` is publishable | `proto` feature depends on `rumi-proto`, `publish = false` |
 | F11 | `xuma.core.v1.StringMatcher` names a message that does not exist | `registry.rs:263`; `proto/xuma/core/v1/` contains only `action.proto` |
 | F12 | `register_core_matchers` is a no-op in Python, absent in TypeScript | `puma/src/xuma/_registry.py:181-190` returns the builder unchanged |
 | F13 | `xuma.test.v1.StringInput.value` is used as a lookup key | `proto/.../test/v1/inputs.proto:11-14` vs `rumi/ext/test/src/lib.rs:119-121`. Under protojson, every example in the repo breaks. |
 | F14 | Query-string handling diverges between Python and Rust | puma strips query from path; Rust stores path verbatim. Same config, same input, different answer. |
-| F15 | `CLAUDE.md` calls the packages `puma`/`bumi` | They are `xuma`. `CLAUDE.md:10-11, 95, 98` |
-| F16 | HTTP compiler swallows invalid regex | `rumi/ext/http/src/compiler.rs:77-81` falls back to exact-matching the pattern literal. Route silently disappears. Sibling Claude compiler returns `Result`. |
+| ~~F15~~ | ~~`CLAUDE.md` calls the packages `puma`/`bumi`~~ **RESOLVED** (#26) | They are `xuma`. `CLAUDE.md:10-11, 95, 98` |
+| ~~F16~~ | ~~HTTP compiler swallows invalid regex~~ **RESOLVED** (#25) — returns `Result`, with regression tests | `rumi/ext/http/src/compiler.rs:77-81` falls back to exact-matching the pattern literal. Route silently disappears. Sibling Claude compiler returns `Result`. |
 | F17 | `data_type()` defaults to `"string"` | `data_input.rs:60-62`. A custom input returning `Int` that forgets to override passes the compatibility check, loads clean, never matches. |
-| F18 | Docs snippets are invisible to CI | Every Rust block is ```` ```rust,ignore ````; shell blocks are unchecked. This is the root cause of F8. |
+| ~~F18~~ | ~~Docs snippets are invisible to CI~~ **RESOLVED** (#26) — `rumi-docs-tests` compiles them; it caught four broken snippets immediately | Every Rust block is ```` ```rust,ignore ````; shell blocks are unchecked. This is the root cause of F8. |
 | F19 | **`just test-full` is red** — *partially resolved* | `cargo test --all-features` → the same 4 errors as F1, because `--all-features` enables `rumi-test/proto` → `rumi-proto`. `just ci` passes anyway: `just test` uses `default-members` (`rumi/Cargo.toml:6`) and `justfile:68` hard-codes `--exclude rumi-proto`. A shipped `just` target is red and the gate cannot see it. **2026-08-17:** both *compile* failures are fixed (D-028, F23). What remains is two failing tests, and they are **F13** — `unknown field 'key', expected 'value'`. F13 is therefore no longer prose: it is a reproducible test failure, which is what SF4 was going to have to write anyway. |
 | F20 | Generated code is gitignored in **all three** languages | `.gitignore:58-60` covers `rumi/proto/src/gen/`, `puma/proto/src/gen/`, `bumi/proto/src/gen/`. All three exist on disk untracked (28 / 7 / 6 files); nothing imports the Python or TypeScript ones. M5's "all three languages" gate and CI5's no-diff check are both vacuous over untracked trees. |
-| F22 | The plan cited files a clone does not contain | `.gitignore:63` ignores `scratch/` wholesale, and §0 told the reader to open `scratch/phase-12/prior-art.md`. Fixed 2026-08-17 by moving both cited artifacts to a tracked `reference/`. Left as a row because the *class* recurs: `just verify-clean-clone` (H1) is the check that would catch the next one. |
+| ~~F22~~ | ~~plan cited files a clone does not contain~~ **RESOLVED** (#26) — moved to tracked `reference/` | `.gitignore:63` ignores `scratch/` wholesale, and §0 told the reader to open `scratch/phase-12/prior-art.md`. Fixed 2026-08-17 by moving both cited artifacts to a tracked `reference/`. Left as a row because the *class* recurs: `just verify-clean-clone` (H1) is the check that would catch the next one. |
 | F21 | Fixtures use **four** dialects, not three | `matcher:` (14), `config:` (7), `http_route_match:` (5), `http_route_matches:` **plural** (1, `spec/tests/05_http/multiple_routes.yaml:5`), each with its own branch in all three loaders. A5 says three. |
 
 **Security review: complete, and now in the repo.**
@@ -401,7 +455,7 @@ this section applies to itself.
 Dependency-ordered. Do not start a phase until the one before it is on a green
 PR, except where noted as independent.
 
-### Phase A — Truth repair
+### Phase A — Truth repair  ✅ DONE (#26)
 
 **Independent. Start here. Cheapest value in the plan.**
 
@@ -474,7 +528,7 @@ exist" — predates the taxonomy and is the unsatisfiable form §0.9 replaced.)
 
 ---
 
-### Phase B — DX defaults
+### Phase B — DX defaults  ✅ DONE (#27)
 
 **Independent of C. Do it before publish; it is free now and breaking later.**
 
@@ -656,6 +710,41 @@ Three things that example exposes, each of which is a task below:
 **This example is hand-derived and unexecuted** — `rumi-proto` does not compile
 (C1). Treat it as schema-correct and runtime-unverified until C2 runs.
 
+**Before you start SF: five findings are one defect.**
+
+F13, F24, F25, F26 and F27 all have the same cause — **two config vocabularies
+competing for one `IntoDataInput::Config` slot**, selected by
+`#[cfg(all(feature = "registry", not(feature = "proto")))]`. Enabling `proto`
+does not add; it *replaces*. Dijkstra's audit, 2026-08-17:
+
+| Where | What swaps |
+|---|---|
+| `ext/kv/src/lib.rs` | `StringInputConfig{key}` ⇄ proto `StringInput{value}` — this *is* F13 |
+| `ext/http/src/inputs.rs` | 8 more: two public config types deleted, six impls replaced |
+
+One of them is **fail-open**: hand-written `HeaderInputConfig` makes `name`
+required, so `config: {}` is a load error; the proto version does
+`unwrap_or_default()`, so the same config silently becomes `HeaderInput::new("")`
+→ `None` → predicate false. A deny rule keyed on a header stops firing and
+nothing reports it.
+
+D-026 already chose the winner: protojson. **So the fix is not five tasks, it is
+the migration** — delete the hand-written vocabulary rather than reconciling it.
+Until then `cargo test --all-features` on the workspace fails all 27 fixtures
+with `unknown field 'key'`, and that failure is the invariant reporting
+correctly. Do not fork the fixtures to make it pass.
+
+Dijkstra's structural note, worth reading before designing the migration: the
+additivity violation is recoverable *by construction* — keep one `Config` type
+unconditionally and make `proto` add a `From<proto::X> for XConfig` rather than
+replace the impl. Then no `not(feature)` is expressible. `rumi-core` is already
+immune this way: it has no `proto` feature at all.
+
+**Also unresolved and separate:** F26. `xuma.http.v1.PathInput` is bound to two
+different semantics with no `cfg` involved — `register` strips the query,
+`register_simple` does not, and both crusts use `register_simple`. Feature
+powerset checks cannot see this class. It needs a conformance fixture.
+
 **SF1–SF7. Write these fixtures. All must be red at the end of this phase.**
 
 | # | Fixture asserts | Today |
@@ -796,7 +885,7 @@ generated code.
 
 ---
 
-### Phase S — Security
+### Phase S — Security  ✅ DONE (#25) — SEC1/2/3 fixed; the 0.1.1 list below is still open
 
 **Release-blocking. A full review was run and the verdict was DO NOT SHIP in
 current form.** The review is at `reference/security-review-2026-08-16.md`.
@@ -991,7 +1080,7 @@ not just the blocking part.
 
 ---
 
-### Phase E — Publishability: all of it, by crate design
+### Phase E — Publishability  ✅ DONE (branch `phase-e/publishable`, no PR yet)
 
 **Everything ships.** `rumi-core`, `rumi-http`, `rumi-cli`, `xuma` on PyPI,
 `xuma` on npm, `xuma-crust` on both. The blockers are dependency edges, not
@@ -1074,7 +1163,7 @@ dependency order with no path patching, and no published crate depends on a
 
 ---
 
-### Phase F — CI as the arbiter
+### Phase F — CI as the arbiter  ✅ DONE (#28), plus the feature and publishable checks from E
 
 The general lesson from this whole exercise: **what CI does not check is not
 true.** Every false claim found was outside CI's reach.
@@ -1128,7 +1217,7 @@ question.
 
 ---
 
-### Phase K — The Claude hook contract  *(release-blocking, and not documentation)*
+### Phase K — The Claude hook contract  ✅ DONE (PR #30, open)  *(release-blocking, and not documentation)*
 
 An earlier draft filed this under "documentation polish". It is a **new CLI
 feature on an agent-safety path**, and as a docs subtask it would have received

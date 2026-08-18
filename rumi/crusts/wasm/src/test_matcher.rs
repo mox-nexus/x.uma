@@ -4,7 +4,7 @@
 //! against key-value contexts passed as plain JS objects.
 
 use rumi::prelude::*;
-use rumi_test::TestContext;
+use rumi_kv::KvContext;
 use wasm_bindgen::prelude::*;
 
 use crate::matcher::{TraceResultSerde, TraceStepSerde};
@@ -15,7 +15,7 @@ use crate::matcher::{TraceResultSerde, TraceStepSerde};
 /// Evaluates key-value contexts against compiled matcher trees.
 #[wasm_bindgen]
 pub struct TestMatcher {
-    inner: Matcher<TestContext, String>,
+    inner: Matcher<KvContext, String>,
 }
 
 #[wasm_bindgen]
@@ -82,6 +82,7 @@ impl TestMatcher {
         serde_wasm_bindgen::to_value(&result).map_err(|e| JsValue::from_str(&e.to_string()))
     }
 
+    #[cfg(feature = "fixtures")]
     /// Load and run conformance fixtures from a YAML string.
     ///
     /// Returns an array of `{ fixture, caseName, passed, detail }` objects.
@@ -177,15 +178,15 @@ impl TestMatcher {
     }
 }
 
-/// Build the test registry for `TestContext`.
-fn build_test_registry() -> rumi::Registry<TestContext> {
-    rumi_test::register(rumi::RegistryBuilder::new()).build()
+/// Build the test registry for `KvContext`.
+fn build_test_registry() -> rumi::Registry<KvContext> {
+    rumi_kv::register(rumi::RegistryBuilder::new()).build()
 }
 
-/// Build a `TestContext` from a JS plain object (Record<string, string>).
-fn build_context_from_js(val: &JsValue) -> Result<TestContext, JsValue> {
+/// Build a `KvContext` from a JS plain object (Record<string, string>).
+fn build_context_from_js(val: &JsValue) -> Result<KvContext, JsValue> {
     let entries = js_sys::Object::entries(&js_sys::Object::from(val.clone()));
-    let mut ctx = TestContext::new();
+    let mut ctx = KvContext::new();
     for entry in entries.iter() {
         let pair = js_sys::Array::from(&entry);
         let key = pair
@@ -204,6 +205,7 @@ fn build_context_from_js(val: &JsValue) -> Result<TestContext, JsValue> {
 /// Fixture result for serde-wasm-bindgen serialization.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg(feature = "fixtures")]
 struct FixtureResultSerde {
     fixture: String,
     case_name: String,

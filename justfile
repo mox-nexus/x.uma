@@ -15,13 +15,16 @@ default:
 # libpython under plain `cargo test`), so nothing in `just test` touches them.
 # 80 tests here had never run in CI — PLAN.md F5 / CI1.
 crust-py-check:
-    cd rumi/crusts/python && maturin develop --uv
+    # --features fixtures for the TEST build only. The published wheel is built
+    # without it, so no YAML fixture loader ships to PyPI (PLAN.md E3).
+    cd rumi/crusts/python && maturin develop --uv --features fixtures
     cd rumi/crusts/python && uv run pytest tests/ -q \
         --ignore=tests/test_bench_config.py --ignore=tests/test_bench_crusty.py
 
 # Build the wasm-bindgen crust and run its tests. 80 more, same story.
 crust-wasm-check:
-    cd rumi/crusts/wasm && wasm-pack build --target web
+    # --features fixtures for the TEST build only; the npm package ships without.
+    cd rumi/crusts/wasm && wasm-pack build --target web -- --features fixtures
     cd rumi/crusts/wasm && bun install --frozen-lockfile && bun test
 
 # Both crusts. Not in `just ci`: wasm-pack builds take ~1 minute and the two
@@ -37,6 +40,18 @@ doctor:
 # or ignored, which is a class that has bitten this repo three times.
 verify-clean-clone:
     ./scripts/verify-clean-clone.sh
+
+# Build and test each rumi-http feature in isolation.
+#
+# --all-features samples one corner of the feature lattice, and additivity is a
+# property of the whole lattice — which is why a broken `gateway`-only build was
+# invisible to it.
+features:
+    ./scripts/check-features.sh
+
+# No publishable crate may depend on a publish = false crate.
+publishable:
+    node scripts/check-publishable.mjs
 
 # Generate proto code (all three languages) and the xDS dependency types.
 #
@@ -96,7 +111,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-fixtures docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-fixtures features publishable docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:

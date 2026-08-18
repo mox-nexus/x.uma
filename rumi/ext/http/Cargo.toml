@@ -1,19 +1,47 @@
 [package]
 name = "rumi-http"
-description = "HTTP domain for rumi - Gateway API matching on ext_proc"
+description = "HTTP matching domain for rumi — method, path, headers, query parameters"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+readme = "README.md"
 keywords = ["xds", "matcher", "http", "envoy", "gateway"]
 categories = ["config", "web-programming"]
 
 [features]
-default = ["ext-proc"]
-ext-proc = ["dep:envoy-grpc-ext-proc", "dep:k8s-gateway-api", "dep:k8s-openapi"]
-registry = ["rumi-core/registry", "serde"]
-proto = ["registry", "ext-proc", "dep:rumi-proto"]
+# default = [] deliberately. `ext-proc` used to be on by default and pulled 101
+# crates against 7 — tokio, tonic, axum, hyper, h2, two major versions of http —
+# into a library that never opens a socket. Its heaviest root, envoy-grpc-ext-proc,
+# had 1,121 total downloads and a single third-party maintainer. Every consumer
+# in this repo already passed --no-default-features, which is the tell: the
+# project never used its own default. Feature defaults freeze at first publish.
+default = []
+
+# The domain: HttpMessage, its DataInputs, and the query/path helpers. No
+# dependencies at all — it is a HashMap and five Options. Everything else is an
+# adapter onto it, which is what makes the two below siblings rather than a
+# chain.
+message = []
+
+# Gateway API config types and compile_route_matches. Config, not transport.
+gateway = ["message", "dep:k8s-gateway-api", "dep:k8s-openapi"]
+
+# Envoy ext_proc data-plane types, and From<ProcessingRequest> for HttpMessage.
+# Deliberately does NOT imply `gateway`: an ext_proc filter has no use for
+# Kubernetes config types, and making one adapter depend on its sibling is the
+# same conflation this split exists to remove.
+ext-proc = ["message", "dep:envoy-grpc-ext-proc"]
+
+registry = ["message", "rumi-core/registry", "serde"]
+
+# xDS control-plane config loading. It names `message` explicitly: `proto_configs`
+# lives inside `mod inputs`, and until 2026-08-17 `proto` reached it only by
+# accident, transitively through `ext-proc`. That both dragged the data plane
+# into a control-plane feature and meant trimming ext-proc off proto would have
+# silently deleted the impls with no error.
+proto = ["registry", "message", "dep:rumi-proto"]
 
 [dependencies]
 rumi-core.workspace = true

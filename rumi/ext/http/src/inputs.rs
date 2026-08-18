@@ -259,81 +259,46 @@ mod proto_configs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use envoy_grpc_ext_proc::envoy::{
-        config::core::v3::{HeaderMap, HeaderValue},
-        service::ext_proc::v3::{processing_request::Request, HttpHeaders, ProcessingRequest},
-    };
+    use crate::message::HttpMessageBuilder;
 
-    /// Builder for constructing test `ProcessingRequest` instances.
+    // These test DataInput behaviour on HttpMessage, which is domain, not
+    // transport — so they build via the public builder rather than assembling
+    // an ext_proc ProcessingRequest. The ext_proc conversion has its own tests
+    // in message.rs, including one asserting both paths agree.
     struct ProcessingRequestBuilder {
-        headers: Vec<HeaderValue>,
+        inner: HttpMessageBuilder,
     }
 
     impl ProcessingRequestBuilder {
         fn new() -> Self {
-            Self { headers: vec![] }
+            Self {
+                inner: HttpMessageBuilder::new(),
+            }
         }
-
-        fn path(mut self, path: &str) -> Self {
-            self.headers.push(HeaderValue {
-                key: ":path".into(),
-                value: path.into(),
-                raw_value: vec![],
-            });
+        fn path(mut self, v: &str) -> Self {
+            self.inner = self.inner.path(v);
             self
         }
-
-        fn method(mut self, method: &str) -> Self {
-            self.headers.push(HeaderValue {
-                key: ":method".into(),
-                value: method.into(),
-                raw_value: vec![],
-            });
+        fn method(mut self, v: &str) -> Self {
+            self.inner = self.inner.method(v);
             self
         }
-
-        fn scheme(mut self, scheme: &str) -> Self {
-            self.headers.push(HeaderValue {
-                key: ":scheme".into(),
-                value: scheme.into(),
-                raw_value: vec![],
-            });
+        fn scheme(mut self, v: &str) -> Self {
+            self.inner = self.inner.scheme(v);
             self
         }
-
-        fn authority(mut self, authority: &str) -> Self {
-            self.headers.push(HeaderValue {
-                key: ":authority".into(),
-                value: authority.into(),
-                raw_value: vec![],
-            });
+        fn authority(mut self, v: &str) -> Self {
+            self.inner = self.inner.authority(v);
             self
         }
-
-        fn header(mut self, name: &str, value: &str) -> Self {
-            self.headers.push(HeaderValue {
-                key: name.to_lowercase(),
-                value: value.into(),
-                raw_value: vec![],
-            });
+        fn header(mut self, k: &str, v: &str) -> Self {
+            self.inner = self.inner.header(k, v);
             self
         }
-
         fn build(self) -> HttpMessage {
-            let req = ProcessingRequest {
-                request: Some(Request::RequestHeaders(HttpHeaders {
-                    headers: Some(HeaderMap {
-                        headers: self.headers,
-                    }),
-                    ..Default::default()
-                })),
-                ..Default::default()
-            };
-            HttpMessage::from(&req)
+            self.inner.build()
         }
     }
-
-    // ========== PathInput Tests ==========
 
     #[test]
     fn path_input_extracts_simple_path() {
@@ -587,8 +552,9 @@ mod tests {
     }
 
     #[test]
-    fn empty_processing_request_returns_none() {
-        let msg = HttpMessage::from(&ProcessingRequest::default());
+    fn an_empty_message_yields_none_from_every_input() {
+        // An empty message: no transport needed to assert INV-1.
+        let msg = HttpMessageBuilder::new().build();
 
         assert_eq!(PathInput.get(&msg), MatchingData::None);
         assert_eq!(MethodInput.get(&msg), MatchingData::None);

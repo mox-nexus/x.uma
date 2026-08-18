@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use rumi::prelude::*;
-use rumi_test::TestContext;
+use rumi_kv::KvContext;
 
 /// An opaque compiled test matcher.
 ///
@@ -20,7 +20,7 @@ use rumi_test::TestContext;
 /// `TestMatcher` is immutable and safe to share across threads.
 #[pyclass(frozen)]
 pub struct TestMatcher {
-    inner: Matcher<TestContext, String>,
+    inner: Matcher<KvContext, String>,
 }
 
 #[pymethods]
@@ -96,6 +96,7 @@ impl TestMatcher {
         }
     }
 
+    #[cfg(feature = "fixtures")]
     /// Load and run conformance fixtures from a YAML file.
     ///
     /// Returns a list of `(fixture_name, case_name, passed, detail)` tuples.
@@ -194,14 +195,14 @@ impl TestMatcher {
     }
 }
 
-/// Build the test registry for `TestContext`.
-fn build_test_registry() -> rumi::Registry<TestContext> {
-    rumi_test::register(rumi::RegistryBuilder::new()).build()
+/// Build the test registry for `KvContext`.
+fn build_test_registry() -> rumi::Registry<KvContext> {
+    rumi_kv::register(rumi::RegistryBuilder::new()).build()
 }
 
-/// Build a `TestContext` from a Python dict.
-fn build_context(values: HashMap<String, String>) -> TestContext {
-    let mut ctx = TestContext::new();
+/// Build a `KvContext` from a Python dict.
+fn build_context(values: HashMap<String, String>) -> KvContext {
+    let mut ctx = KvContext::new();
     for (k, v) in values {
         ctx = ctx.with(k, v);
     }

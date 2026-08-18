@@ -1,9 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["core", "proto", "ext/test", "ext/http", "cli", "docs-tests", "crusts/python", "crusts/wasm"]
+members = ["core", "proto", "ext/kv", "ext/test", "ext/http", "cli", "docs-tests", "crusts/python", "crusts/wasm"]
 
 # Proto, crusts use specialized build tools — test individually, not via cargo test
-default-members = ["core", "ext/test", "ext/http", "cli", "docs-tests"]
+default-members = ["core", "ext/kv", "ext/test", "ext/http", "cli", "docs-tests"]
 
 [workspace.package]
 version = "0.0.2"
@@ -16,6 +16,7 @@ authors = ["Yashodeep Vyas"]
 # Internal
 rumi-core = { path = "core", version = "0.0.2" }
 rumi-http = { path = "ext/http", version = "0.0.2", default-features = false }
+rumi-kv = { path = "ext/kv", version = "0.0.2" }
 rumi-test = { path = "ext/test", version = "0.0.2" }
 
 # Serialization

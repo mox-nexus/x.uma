@@ -6,6 +6,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+readme = "README.md"
 keywords = ["xds", "matcher", "envoy", "cli"]
 categories = ["command-line-utilities"]
 
@@ -16,6 +17,9 @@ path = "src/main.rs"
 [dependencies]
 rumi-core = { workspace = true, features = ["registry", "claude"] }
 rumi-http = { workspace = true, default-features = false, features = ["registry"] }
-rumi-test = { workspace = true, features = ["registry"] }
+# rumi-kv, not rumi-test: the CLI wants the key-value *domain*, and
+# rumi-test is publish = false. That edge is why rumi-cli could not be
+# published (PLAN.md F9).
+rumi-kv = { workspace = true, features = ["registry"] }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }

@@ -1,7 +1,9 @@
 [package]
 name = "rumi-proto"
-description = "Proto-generated types for x.uma — xDS + xuma extensions"
-publish = false
+description = "xDS and xuma proto types for rumi, with Any resolution and Matcher conversion"
+keywords = ["xds", "protobuf", "envoy", "matcher", "prost"]
+categories = ["config", "encoding"]
+readme = "README.md"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -22,4 +24,6 @@ package = "pbjson-types"
 version = "0.7"
 
 [dev-dependencies]
-rumi-test = { path = "../ext/test", features = ["proto"] }
+# Dev-only: convert.rs's end-to-end tests evaluate against the kv domain.
+rumi-kv = { path = "../ext/kv", features = ["registry", "proto"] }
+rumi-test = { path = "../ext/test", features = ["proto", "fixtures"] }

@@ -1212,7 +1212,7 @@ version = "0.0.2"
 dependencies = [
  "rumi-core",
  "rumi-http",
- "rumi-test",
+ "rumi-kv",
  "serde_json",
  "serde_yaml",
 ]
@@ -1223,6 +1223,7 @@ version = "0.0.2"
 dependencies = [
  "divan",
  "regex",
+ "rumi-kv",
  "rumi-test",
  "serde",
  "serde_json",
@@ -1254,6 +1255,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rumi-kv"
+version = "0.0.2"
+dependencies = [
+ "rumi-core",
+ "rumi-proto",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "rumi-proto"
 version = "0.0.2"
 dependencies = [
@@ -1261,6 +1272,7 @@ dependencies = [
  "pbjson-types",
  "prost 0.13.5",
  "rumi-core",
+ "rumi-kv",
  "rumi-test",
  "serde",
  "serde_json",
@@ -1271,6 +1283,7 @@ name = "rumi-test"
 version = "0.0.2"
 dependencies = [
  "rumi-core",
+ "rumi-kv",
  "rumi-proto",
  "serde",
  "serde_json",
@@ -1942,6 +1955,7 @@ dependencies = [
  "js-sys",
  "rumi-core",
  "rumi-http",
+ "rumi-kv",
  "rumi-test",
  "serde",
  "serde-wasm-bindgen",
@@ -1958,6 +1972,7 @@ dependencies = [
  "pyo3",
  "rumi-core",
  "rumi-http",
+ "rumi-kv",
  "rumi-test",
  "serde_json",
  "serde_yaml",

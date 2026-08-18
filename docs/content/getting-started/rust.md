@@ -11,7 +11,7 @@ Build an HTTP route matcher with `rumi` and `rumi-http`.
 ```toml
 [dependencies]
 rumi-core = "0.0.2"
-rumi-http = "0.0.2"
+rumi-http = { version = "0.0.2", features = ["registry"] }   # add "gateway" for the compiler
 ```
 
 `rumi-http` brings in `rumi-core` as a transitive dependency. The lib name is `rumi`, so you write `use rumi::prelude::*`.
@@ -139,7 +139,15 @@ ext_proc filter, but not from a scratch program. If you want to experiment
 locally, use the config path above with `HttpRequest`, which does have a
 builder.
 
-This requires `rumi-http` with the `ext-proc` feature (enabled by default).
+This requires `rumi-http` with the `gateway` feature. Nothing is enabled by
+default — `default = []` — so ask for what you need:
+
+```toml
+rumi-http = { version = "0.0.2", features = ["registry", "gateway"] }
+```
+
+The `ext-proc` feature is separate and pulls tonic, tokio and hyper. You want it
+only if you are writing an Envoy ext_proc filter.
 
 ## Claude Code Hooks
 

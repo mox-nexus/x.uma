@@ -594,10 +594,10 @@ mod tests {
         // Full pipeline: proto → convert → load → evaluate
         let matcher = load_proto_matcher(&registry, &actions, &resolver, &proto).unwrap();
 
-        let ctx = rumi_test::TestContext::new().with("role", "admin");
+        let ctx = rumi_kv::KvContext::new().with("role", "admin");
         assert_eq!(matcher.evaluate(&ctx), Some("allow".to_string()));
 
-        let ctx = rumi_test::TestContext::new().with("role", "viewer");
+        let ctx = rumi_kv::KvContext::new().with("role", "viewer");
         assert_eq!(matcher.evaluate(&ctx), None);
     }
 
@@ -662,11 +662,11 @@ mod tests {
         let matcher = load_proto_matcher(&registry, &actions, &resolver, &proto).unwrap();
 
         // Match: role=admin → "allow"
-        let ctx = rumi_test::TestContext::new().with("role", "admin");
+        let ctx = rumi_kv::KvContext::new().with("role", "admin");
         assert_eq!(matcher.evaluate(&ctx), Some("allow".to_string()));
 
         // No match: role=viewer → fallback "deny"
-        let ctx = rumi_test::TestContext::new().with("role", "viewer");
+        let ctx = rumi_kv::KvContext::new().with("role", "viewer");
         assert_eq!(matcher.evaluate(&ctx), Some("deny".to_string()));
     }
 
@@ -740,19 +740,19 @@ mod tests {
         let matcher = load_proto_matcher(&registry, &actions, &resolver, &proto).unwrap();
 
         // Both match → action
-        let ctx = rumi_test::TestContext::new()
+        let ctx = rumi_kv::KvContext::new()
             .with("role", "admin")
             .with("org", "acme");
         assert_eq!(matcher.evaluate(&ctx), Some("admin_acme".to_string()));
 
         // Only one matches → None
-        let ctx = rumi_test::TestContext::new()
+        let ctx = rumi_kv::KvContext::new()
             .with("role", "admin")
             .with("org", "other");
         assert_eq!(matcher.evaluate(&ctx), None);
 
         // Neither matches → None
-        let ctx = rumi_test::TestContext::new()
+        let ctx = rumi_kv::KvContext::new()
             .with("role", "viewer")
             .with("org", "other");
         assert_eq!(matcher.evaluate(&ctx), None);

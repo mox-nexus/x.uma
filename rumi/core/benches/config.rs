@@ -4,7 +4,7 @@
 //! Compares against the manual construction path (Phase 9) to isolate overhead.
 
 use rumi::prelude::*;
-use rumi_test::TestContext;
+use rumi_kv::KvContext;
 
 fn main() {
     divan::main();
@@ -85,7 +85,7 @@ fn config_registry_build(bencher: divan::Bencher) {
 // Config loading: JSON string → Registry → Matcher
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn build_registry() -> rumi::Registry<TestContext> {
+fn build_registry() -> rumi::Registry<KvContext> {
     rumi_test::register(rumi::RegistryBuilder::new()).build()
 }
 
@@ -125,7 +125,7 @@ fn config_evaluate_simple(bencher: divan::Bencher) {
     let registry = build_registry();
     let config: rumi::MatcherConfig<String> = serde_json::from_str(SIMPLE_CONFIG).unwrap();
     let matcher = registry.load_matcher(config).unwrap();
-    let ctx = TestContext::new().with("role", "admin");
+    let ctx = KvContext::new().with("role", "admin");
 
     bencher.bench_local(|| matcher.evaluate(&ctx));
 }
@@ -135,14 +135,14 @@ fn compiler_evaluate_simple(bencher: divan::Bencher) {
     let matcher = Matcher::new(
         vec![FieldMatcher::new(
             Predicate::Single(SinglePredicate::new(
-                Box::new(rumi_test::StringInput::new("role")),
+                Box::new(rumi_kv::StringInput::new("role")),
                 Box::new(ExactMatcher::new("admin")),
             )),
             OnMatch::Action("matched".to_string()),
         )],
         Some(OnMatch::Action("default".to_string())),
     );
-    let ctx = TestContext::new().with("role", "admin");
+    let ctx = KvContext::new().with("role", "admin");
 
     bencher.bench_local(|| matcher.evaluate(&ctx));
 }
@@ -166,10 +166,10 @@ fn config_construct_simple(bencher: divan::Bencher) {
 #[divan::bench]
 fn compiler_construct_simple(bencher: divan::Bencher) {
     bencher.bench_local(|| {
-        Matcher::<TestContext, String>::new(
+        Matcher::<KvContext, String>::new(
             vec![FieldMatcher::new(
                 Predicate::Single(SinglePredicate::new(
-                    Box::new(rumi_test::StringInput::new("role")),
+                    Box::new(rumi_kv::StringInput::new("role")),
                     Box::new(ExactMatcher::new("admin")),
                 )),
                 OnMatch::Action("matched".to_string()),
