@@ -124,7 +124,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-full test-fixtures test-protojson test-fixture-coverage features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-full test-protojson test-fixture-coverage features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -263,10 +263,6 @@ bumi-check: bumi-lint bumi-fmt-check bumi-typecheck bumi-test
 # ═══════════════════════════════════════════════════════════════════════════════
 # Conformance Testing
 # ═══════════════════════════════════════════════════════════════════════════════
-
-# Run conformance fixtures
-test-fixtures:
-    cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test conformance --features rumi-test/fixtures
 
 # Conformance over the protojson fixtures — the format that replaces the four
 # transitional dialects. Each fixture names the implementations expected to run

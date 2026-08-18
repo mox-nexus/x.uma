@@ -6,12 +6,13 @@
 //! could not be published either. The domain is now `rumi-kv`; what remains
 //! here is only the machinery that reads `spec/tests/*.yaml`.
 //!
+//! It also used to carry three more fixture dialects — a terse `config:` shape
+//! and a native `matcher:` shape, each with its own loader and its own
+//! `MatcherConfig` type. All three are gone; `spec/tests/07_protojson/` is the
+//! format, and `proto_fixture` is the only reader.
+//!
 //! Stays `publish = false`, deliberately. Nothing user-facing depends on it.
 
-#[cfg(feature = "fixtures")]
-pub mod config_fixture;
-#[cfg(feature = "fixtures")]
-pub mod fixture;
 #[cfg(all(feature = "fixtures", feature = "registry"))]
 pub mod proto_fixture;
 

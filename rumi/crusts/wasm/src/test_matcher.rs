@@ -86,94 +86,24 @@ impl TestMatcher {
     /// Load and run conformance fixtures from a YAML string.
     ///
     /// Returns an array of `{ fixture, caseName, passed, detail }` objects.
+    ///
+    /// Runs `spec/tests/07_protojson/` — canonical protojson, the same fixtures
+    /// and the same reader rumi, puma and bumi use. The crusts are
+    /// implementations four and five; reading a different config format from
+    /// the other three would turn "all five agree" into a claim about five
+    /// different questions.
     #[wasm_bindgen(js_name = "runFixtures")]
     pub fn run_fixtures(yaml_content: &str) -> Result<JsValue, JsValue> {
-        let fixtures = rumi_test::config_fixture::ConfigFixture::from_yaml_multi(yaml_content)
-            .map_err(|e| JsValue::from_str(&format!("invalid YAML: {e}")))?;
-
-        let registry = build_test_registry();
-        let mut results: Vec<FixtureResultSerde> = Vec::new();
-
-        for fixture in &fixtures {
-            if fixture.expect_error {
-                let config_result: Result<rumi::MatcherConfig<String>, _> =
-                    serde_json::from_value(fixture.config.clone());
-                match config_result {
-                    Err(_) => {
-                        results.push(FixtureResultSerde {
-                            fixture: fixture.name.clone(),
-                            case_name: "parse_error".into(),
-                            passed: true,
-                            detail: "correctly rejected at parse".into(),
-                        });
-                    }
-                    Ok(config) => match registry.load_matcher(config) {
-                        Err(_) => {
-                            results.push(FixtureResultSerde {
-                                fixture: fixture.name.clone(),
-                                case_name: "load_error".into(),
-                                passed: true,
-                                detail: "correctly rejected at load".into(),
-                            });
-                        }
-                        Ok(_) => {
-                            results.push(FixtureResultSerde {
-                                fixture: fixture.name.clone(),
-                                case_name: "should_fail".into(),
-                                passed: false,
-                                detail: "expected error but config loaded successfully".into(),
-                            });
-                        }
-                    },
-                }
-                continue;
-            }
-
-            let config: rumi::MatcherConfig<String> =
-                match serde_json::from_value(fixture.config.clone()) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        results.push(FixtureResultSerde {
-                            fixture: fixture.name.clone(),
-                            case_name: "parse".into(),
-                            passed: false,
-                            detail: format!("config parse failed: {e}"),
-                        });
-                        continue;
-                    }
-                };
-
-            let matcher = match registry.load_matcher(config) {
-                Ok(m) => m,
-                Err(e) => {
-                    results.push(FixtureResultSerde {
-                        fixture: fixture.name.clone(),
-                        case_name: "load".into(),
-                        passed: false,
-                        detail: format!("config load failed: {e}"),
-                    });
-                    continue;
-                }
-            };
-
-            for case in &fixture.cases {
-                let ctx = case.build_context();
-                let result = matcher.evaluate(&ctx);
-                let passed = result == case.expect;
-                let detail = if passed {
-                    format!("got {result:?}")
-                } else {
-                    format!("expected {:?}, got {result:?}", case.expect)
-                };
-                results.push(FixtureResultSerde {
-                    fixture: fixture.name.clone(),
-                    case_name: case.name.clone(),
-                    passed,
-                    detail,
-                });
-            }
-        }
-
+        let results: Vec<FixtureResultSerde> = crate::fixtures::run_protojson(yaml_content)
+            .map_err(|e| JsValue::from_str(&e))?
+            .into_iter()
+            .map(|(fixture, case_name, passed, detail)| FixtureResultSerde {
+                fixture,
+                case_name,
+                passed,
+                detail,
+            })
+            .collect();
         serde_wasm_bindgen::to_value(&results).map_err(|e| JsValue::from_str(&e.to_string()))
     }
 }

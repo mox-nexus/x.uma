@@ -17,7 +17,7 @@ import pytest
 from xuma_crust import TestMatcher as CrustTestMatcher
 
 
-FIXTURES_DIR = Path(__file__).resolve().parents[4] / "spec" / "tests" / "06_config"
+FIXTURES_DIR = Path(__file__).resolve().parents[4] / "spec" / "tests" / "07_protojson"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -188,7 +188,7 @@ class TestNesting:
     """Nested matchers and on_no_match fallback."""
 
     def test_nested_matcher(self):
-        """Mirrors spec/tests/06_config/03_nested_matcher.yaml."""
+        """Mirrors spec/tests/07_protojson/03_nested_matcher.yaml."""
         config = json.dumps({
             "matchers": [{
                 "predicate": {
@@ -246,7 +246,11 @@ class TestNesting:
 
 
 class TestConformance:
-    """Run the conformance fixtures from spec/tests/06_config/."""
+    """Run the conformance fixtures from spec/tests/07_protojson/.
+
+    Same fixtures, same reader as rumi, puma and bumi — see
+    `crusts/*/src/fixtures.rs`.
+    """
 
     @pytest.fixture(params=sorted(FIXTURES_DIR.glob("*.yaml")), ids=lambda p: p.stem)
     def fixture_file(self, request):

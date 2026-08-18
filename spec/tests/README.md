@@ -1,19 +1,19 @@
 # Conformance Test Fixtures
 
 YAML fixtures every x.uma implementation must pass. The suite is the source of
-truth for correctness: Rust, Python and TypeScript all run the same files and
-must produce the same answers.
+truth for correctness: Rust, Python and TypeScript run the same files and must
+produce the same answers.
 
-## Read this first: there are five dialects, and four of them are going away
+## `proto_matcher:` — the format
 
-`proto_matcher:` is the one to write. It is canonical protojson — protobuf's own
-JSON mapping of `xds.type.matcher.v3.Matcher` — which is the format x.uma
-implements and the one `DECISIONS.md` D-026 settled on. The other four are
-transitional and are being retired.
+Canonical protojson: protobuf's own JSON mapping of
+`xds.type.matcher.v3.Matcher`. It is what x.uma implements and what a user
+writes, and `DECISIONS.md` D-026 explains why the alternative — a terse dialect
+that existed nowhere but this repo — was retired.
 
 ```yaml
 name: "protojson_simple_exact"
-implementations: [rust]          # who is expected to run this, see below
+description: "One predicate, one action."
 
 proto_matcher:
   matcherList:
@@ -38,137 +38,77 @@ cases:
   - name: "matches"
     context: { role: admin }
     expect: "allow"
-```
-
-### `implementations:` is a ledger, not a convenience
-
-Omit it and every implementation must run the fixture — that is the end state.
-A shorter list is an **expiring exception** saying the others have not been
-migrated yet, and CI holds it in *both* directions: a listed implementation that
-fails is a failure, and an implementation that is *not* listed but succeeds is
-**also** a failure.
-
-The second half is the one that matters. A skip that quietly starts working
-means the ledger is reporting on work somebody already finished, and a suite
-that lies about its own coverage is worse than one that is red.
-
-The property this protects is not "the suite is green". It is that **for every
-fixture, every pair of implementations reaches the same verdict** — so a
-disagreement still means something while the migration is in flight. The
-migration is done when every fixture lists all three and the field can be
-deleted.
-
----
-
-## The four transitional dialects
-
-The top-level key of a fixture selects which loader reads it, and the four are
-**not interchangeable**. An earlier version of this file documented only the
-first one, which is the one no user can write.
-
-| Top-level key | Fixtures | What it exercises | Can a user write this? |
-|---|---|---|---|
-| `proto_matcher:` | 4 | **Canonical protojson — the shipping format.** Loads through `parse_matcher` and the same conversion the control-plane path uses | **Yes, and this is the one to write** |
-| `config:` | 7 | The **shipping config format** — what a user actually authors and what `rumi run` loads | **Yes** |
-| `matcher:` | 14 | Native construction. Builds `Matcher` values directly, bypassing the config layer entirely | No |
-| `http_route_match:` | 5 | One Gateway API route through the HTTP compiler | Via the compiler API, not config |
-| `http_route_matches:` | 1 | Several Gateway API routes, ORed | Via the compiler API, not config |
-
-Each has its own branch in each of three loaders:
-
-- Rust — `rumi/ext/test/src/fixture.rs`
-- Python — `puma/tests/conftest.py`
-- TypeScript — `bumi/tests/helpers/fixture-loader.ts`
-
-Adding a dialect means touching all three. Prefer `config:` unless you are
-specifically testing a path that config cannot reach.
-
-## The shipping format: `config:`
-
-This is the one to copy. It is the format `rumi run` and `rumi check` accept,
-and the only one that round-trips through the registry.
-
-```yaml
-name: "and_predicate"
-description: "Compound AND predicate: all conditions must match"
-
-config:
-  matchers:
-    - predicate:
-        type: and
-        predicates:
-          - type: single
-            input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } }
-            value_match: { Exact: "admin" }
-          - type: single
-            input: { type_url: "xuma.kv.v1.MapInput", config: { key: "org" } }
-            value_match: { Prefix: "acme" }
-      on_match: { type: action, action: "admin_acme" }
-
-cases:
-  - name: "both_match"
-    context: { role: "admin", org: "acme-corp" }
-    expect: "admin_acme"
-  - name: "first_fails"
-    context: { role: "viewer", org: "acme-corp" }
+  - name: "does_not_match"
+    context: { role: viewer }
     expect: null
 ```
 
-Notes that cost time if you learn them the hard way:
+Things worth knowing before you write one:
 
-- **Casing is inconsistent and it is not a typo.** `type:` and `on_match:` are
-  lowercase; `value_match` variants are PascalCase (`Exact`, `Prefix`,
-  `Suffix`, `Contains`, `Regex`). That is a Rust serde enum default that leaked
-  into a cross-language format.
-- **`config: {}` is optional.** Inputs that take no configuration can omit it.
-- **`expect: null` means no match**, including after `on_no_match` is consulted.
+- **Field names are `lowerCamelCase`**, and both that and the proto's own
+  `snake_case` are accepted — protojson allows either. A third spelling is a
+  load error.
+- **`@type` must carry the full `type.googleapis.com/` prefix.** protojson
+  requires it, and a bare name is refused rather than quietly accepted.
+- **Unknown fields are load errors**, at every level and inside `@type`
+  payloads. That is the point: a typo in a deny rule must not produce a rule
+  that silently never fires.
+- **`expect: null` means no match**, including after `onNoMatch` is consulted.
 
-## The native dialect: `matcher:`
-
-Fourteen fixtures build matchers directly, without going through config. They
-exist to test engine semantics — predicate composition, first-match-wins,
-`on_no_match` chains — independently of whether the config layer can express
-them.
-
-Its shape is *not* the config shape. `single:` rather than `type: single`,
-`{ key: ... }` rather than a `type_url`, lowercase `exact:` rather than `Exact:`.
-Copying it into a real config will not load.
+### Negative fixtures pin their reason
 
 ```yaml
-matcher:
-  matchers:
-    - predicate:
-        single:
-          input: { key: "field_name" }
-          value_match: { exact: "expected_value" }
-      on_match:
-        action: "action_name"
-  on_no_match:
-    action: "default_action"
+expect_error: true
+error_contains: "unknown field"
 ```
 
-## The compiler dialects: `http_route_match:` / `http_route_matches:`
+Without `error_contains` a fixture passes on *any* failure — so one that starts
+failing earlier still looks green while no longer testing what it was written
+for. That happened: a fixture meant to prove a both-set `oneof` is rejected was
+failing on an unregistered type instead, and passing.
 
-Gateway API `HttpRouteMatch` values fed through `compile_route_matches`. Plural
-takes a list and ORs them. Neither is a config format — they are inputs to a
-compiler API.
+Because the string has to match in every implementation, it also holds the
+error *wording* to cross-language agreement. When Rust and puma disagreed, the
+messages were harmonized rather than the assertion weakened.
 
-## Status
+### `implementations:` — the migration ledger
 
-**These four are transitional.** The config format is moving to protojson, which
-will replace the `config:` dialect and may or may not absorb `matcher:` — that
-call belongs to the migration, not to this file. Key renames were deliberately
-*not* done here, because renaming keys in three loaders before knowing which
-dialects survive is work that gets thrown away.
+Omit it and every implementation must run the fixture. That is the state today,
+and the field can be deleted once nothing needs it.
 
-Until then: `config:` is the format users write. The other three are test
-apparatus, and this table is the only place that says so.
+A shorter list is an **expiring exception**, and CI holds it in *both*
+directions: a listed implementation that fails is a failure, and one that is
+**not** listed but succeeds is **also** a failure. The second half is the one
+that matters — a skip that quietly starts working means the ledger is reporting
+on work somebody already finished.
+
+The property this protects is not "the suite is green". It is that **for every
+fixture, every pair of implementations reaches the same verdict**, so a
+disagreement still means something while a migration is in flight.
+
+## `http_route_match:` / `http_route_matches:` — the compiler dialect
+
+Gateway API `HttpRouteMatch` values fed through `compile_route_matches`; the
+plural takes a list and ORs them. **Not a config format** — they are inputs to a
+compiler API, which is why D-026 does not touch them and why they are still
+here. Loaded by `puma/tests/conftest.py` and `bumi/tests/helpers/fixture-loader.ts`.
+
+## Coverage is checked
+
+`rumi/ext/test/tests/fixture_coverage.rs` fails when a message in
+`proto/xuma/**` has no fixture, or a field of one is never set. Messages with no
+fixture are listed there with a reason, and that list is checked for staleness
+in both directions.
+
+This exists because puma and bumi read protojson by hand rather than through
+generated types (D-038), so their dependency on the schema is not an arrow a
+build can see. The fixture corpus carries it instead — without the check, "all
+three implementations agree" would mean only "all three agree about whatever
+somebody remembered to fixture".
 
 ## Adding a fixture
 
 1. Write the fixture first — this project is conformance-driven.
-2. Use `config:` unless you are testing something config cannot express.
-3. Run it in all three implementations before committing:
-   `just test-fixtures`, `just puma-test`, `just bumi-test`.
-4. A fixture that passes in one implementation and not another is a finding,
+2. Run it everywhere: `just test-protojson`, `just puma-test`, `just bumi-test`.
+3. A fixture that passes in one implementation and not another is a **finding**,
    not a fixture bug. Cross-language disagreement is what this suite is for.

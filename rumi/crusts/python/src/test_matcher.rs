@@ -100,93 +100,15 @@ impl TestMatcher {
     /// Load and run conformance fixtures from a YAML file.
     ///
     /// Returns a list of `(fixture_name, case_name, passed, detail)` tuples.
-    /// Used for running the `spec/tests/06_config/` conformance suite.
+    /// Runs `spec/tests/07_protojson/` — canonical protojson, the same fixtures
+    /// and the same reader rumi, puma and bumi use.
+    ///
+    /// The crusts are implementations four and five. Reading a different config
+    /// format from the other three would turn "all five agree" into a claim
+    /// about five different questions.
     #[staticmethod]
     fn run_fixtures(yaml_content: &str) -> PyResult<Vec<(String, String, bool, String)>> {
-        let fixtures = rumi_test::config_fixture::ConfigFixture::from_yaml_multi(yaml_content)
-            .map_err(|e| PyValueError::new_err(format!("invalid YAML: {e}")))?;
-
-        let registry = build_test_registry();
-        let mut results = Vec::new();
-
-        for fixture in &fixtures {
-            if fixture.expect_error {
-                // Error fixtures: config should fail to load
-                let config_result: Result<rumi::MatcherConfig<String>, _> =
-                    serde_json::from_value(fixture.config.clone());
-                match config_result {
-                    Err(_) => {
-                        results.push((
-                            fixture.name.clone(),
-                            "parse_error".into(),
-                            true,
-                            "correctly rejected at parse".into(),
-                        ));
-                    }
-                    Ok(config) => match registry.load_matcher(config) {
-                        Err(_) => {
-                            results.push((
-                                fixture.name.clone(),
-                                "load_error".into(),
-                                true,
-                                "correctly rejected at load".into(),
-                            ));
-                        }
-                        Ok(_) => {
-                            results.push((
-                                fixture.name.clone(),
-                                "should_fail".into(),
-                                false,
-                                "expected error but config loaded successfully".into(),
-                            ));
-                        }
-                    },
-                }
-                continue;
-            }
-
-            // Normal fixtures: load config and run cases
-            let config: rumi::MatcherConfig<String> =
-                match serde_json::from_value(fixture.config.clone()) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        results.push((
-                            fixture.name.clone(),
-                            "parse".into(),
-                            false,
-                            format!("config parse failed: {e}"),
-                        ));
-                        continue;
-                    }
-                };
-
-            let matcher = match registry.load_matcher(config) {
-                Ok(m) => m,
-                Err(e) => {
-                    results.push((
-                        fixture.name.clone(),
-                        "load".into(),
-                        false,
-                        format!("config load failed: {e}"),
-                    ));
-                    continue;
-                }
-            };
-
-            for case in &fixture.cases {
-                let ctx = case.build_context();
-                let result = matcher.evaluate(&ctx);
-                let passed = result == case.expect;
-                let detail = if passed {
-                    format!("got {result:?}")
-                } else {
-                    format!("expected {:?}, got {:?}", case.expect, result)
-                };
-                results.push((fixture.name.clone(), case.name.clone(), passed, detail));
-            }
-        }
-
-        Ok(results)
+        crate::fixtures::run_protojson(yaml_content).map_err(PyValueError::new_err)
     }
 
     #[allow(clippy::unused_self)]

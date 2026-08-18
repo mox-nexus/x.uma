@@ -103,27 +103,6 @@ function parseMatcher(spec: any): Matcher<Record<string, string>, string> {
 
 // ─── Fixture loading ──────────────────────────────────────────────
 
-export function loadCoreFixtures(): FixtureCase[] {
-	const cases: FixtureCase[] = [];
-	const subdirs = readdirSync(SPEC_DIR, { withFileTypes: true })
-		.filter((d) => d.isDirectory() && /^0[1-4]_/.test(d.name))
-		.sort((a, b) => a.name.localeCompare(b.name));
-
-	for (const subdir of subdirs) {
-		const dirPath = join(SPEC_DIR, subdir.name);
-		const files = readdirSync(dirPath)
-			.filter((f) => f.endsWith(".yaml"))
-			.sort();
-
-		for (const file of files) {
-			cases.push(...loadCoreFile(join(dirPath, file)));
-		}
-	}
-	return cases;
-}
-
-// ─── HTTP fixture loading ─────────────────────────────────────────
-
 export function loadHttpFixtures(): HttpFixtureCase[] {
 	const cases: HttpFixtureCase[] = [];
 	const httpDir = join(SPEC_DIR, "05_http");
@@ -236,36 +215,4 @@ function parseHttpRequest(spec: any): HttpRequest {
 		}
 	}
 	return new HttpRequest(String(spec.method ?? "GET"), String(spec.path ?? "/"), headers);
-}
-
-function loadCoreFile(path: string): FixtureCase[] {
-	const cases: FixtureCase[] = [];
-	const content = readFileSync(path, "utf-8");
-	const docs = loadAll(content) as unknown[];
-
-	for (const doc of docs) {
-		if (doc == null || typeof doc !== "object") continue;
-		// biome-ignore lint/suspicious/noExplicitAny: YAML document
-		const d = doc as any;
-		const fixtureName: string = d.name;
-		const matcher = parseMatcher(d.matcher);
-
-		// biome-ignore lint/suspicious/noExplicitAny: YAML case parsing
-		for (const c of d.cases as any[]) {
-			const context: Record<string, string> = {};
-			if (c.context) {
-				for (const [k, v] of Object.entries(c.context)) {
-					context[String(k)] = String(v);
-				}
-			}
-			cases.push({
-				fixtureName,
-				caseName: c.name,
-				matcher,
-				context,
-				expect: c.expect ?? null,
-			});
-		}
-	}
-	return cases;
 }
