@@ -79,6 +79,11 @@ jobs:
       - name: Conformance fixtures (protojson)
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test proto_conformance --features rumi-test/registry,rumi-test/fixtures
 
+      # Every config message is fixtured, or listed as a gap with a reason.
+      # See DECISIONS.md D-038 for why this check is not optional.
+      - name: Fixture coverage spans the schema
+        run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test fixture_coverage --features rumi-test/registry,rumi-test/fixtures
+
       # The Rust snippets in docs/content are compiled by rumi-docs-tests, which
       # include!s the Markdown so rustdoc sees them. They were all `rust,ignore`
       # until 2026-08-17, which is how four how-to pages taught APIs that had

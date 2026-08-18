@@ -124,7 +124,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-full test-fixtures test-protojson features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-full test-fixtures test-protojson test-fixture-coverage features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -274,6 +274,15 @@ test-fixtures:
 # quietly starts working is caught as well as one that quietly starts failing.
 test-protojson:
     cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test proto_conformance --features rumi-test/registry,rumi-test/fixtures
+
+# Does the fixture corpus span the schema?
+#
+# The price of not generating types for puma and bumi: their dependency on
+# proto/xuma is a human's memory rather than an arrow the build can see, so the
+# fixture corpus has to carry it. Messages with no fixture are listed with a
+# reason, and that list is checked for staleness in both directions.
+test-fixture-coverage:
+    cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test fixture_coverage --features rumi-test/registry,rumi-test/fixtures
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Development
