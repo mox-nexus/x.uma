@@ -6,23 +6,24 @@
 <a href=#6 id=6 data-nosnippet>6</a>//! could not be published either. The domain is now `rumi-kv`; what remains
 <a href=#7 id=7 data-nosnippet>7</a>//! here is only the machinery that reads `spec/tests/*.yaml`.
 <a href=#8 id=8 data-nosnippet>8</a>//!
-<a href=#9 id=9 data-nosnippet>9</a>//! Stays `publish = false`, deliberately. Nothing user-facing depends on it.
-<a href=#10 id=10 data-nosnippet>10</a>
-<a href=#11 id=11 data-nosnippet>11</a></span><span class="attr">#[cfg(feature = <span class="string">"fixtures"</span>)]
-<a href=#12 id=12 data-nosnippet>12</a></span><span class="kw">pub mod </span>config_fixture;
-<a href=#13 id=13 data-nosnippet>13</a><span class="attr">#[cfg(feature = <span class="string">"fixtures"</span>)]
-<a href=#14 id=14 data-nosnippet>14</a></span><span class="kw">pub mod </span>fixture;
-<a href=#15 id=15 data-nosnippet>15</a><span class="attr">#[cfg(all(feature = <span class="string">"fixtures"</span>, feature = <span class="string">"registry"</span>))]
-<a href=#16 id=16 data-nosnippet>16</a></span><span class="kw">pub mod </span>proto_fixture;
-<a href=#17 id=17 data-nosnippet>17</a>
-<a href=#18 id=18 data-nosnippet>18</a><span class="comment">// The conformance suite refers to the domain by these names, so they are
-<a href=#19 id=19 data-nosnippet>19</a>// re-exported rather than duplicated. `rumi-kv` is the single definition.
-<a href=#20 id=20 data-nosnippet>20</a></span><span class="kw">pub use </span>rumi_kv::{KvContext, StringInput};
-<a href=#21 id=21 data-nosnippet>21</a>
-<a href=#22 id=22 data-nosnippet>22</a><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
-<a href=#23 id=23 data-nosnippet>23</a></span><span class="kw">pub use </span>rumi_kv::register;
-<a href=#24 id=24 data-nosnippet>24</a>
-<a href=#25 id=25 data-nosnippet>25</a><span class="kw">pub mod </span>prelude {
-<a href=#26 id=26 data-nosnippet>26</a>    <span class="kw">pub use </span>rumi_kv::prelude::<span class="kw-2">*</span>;
-<a href=#27 id=27 data-nosnippet>27</a>}
+<a href=#9 id=9 data-nosnippet>9</a>//! It also used to carry three more fixture dialects — a terse `config:` shape
+<a href=#10 id=10 data-nosnippet>10</a>//! and a native `matcher:` shape, each with its own loader and its own
+<a href=#11 id=11 data-nosnippet>11</a>//! `MatcherConfig` type. All three are gone; `spec/tests/07_protojson/` is the
+<a href=#12 id=12 data-nosnippet>12</a>//! format, and `proto_fixture` is the only reader.
+<a href=#13 id=13 data-nosnippet>13</a>//!
+<a href=#14 id=14 data-nosnippet>14</a>//! Stays `publish = false`, deliberately. Nothing user-facing depends on it.
+<a href=#15 id=15 data-nosnippet>15</a>
+<a href=#16 id=16 data-nosnippet>16</a></span><span class="attr">#[cfg(all(feature = <span class="string">"fixtures"</span>, feature = <span class="string">"registry"</span>))]
+<a href=#17 id=17 data-nosnippet>17</a></span><span class="kw">pub mod </span>proto_fixture;
+<a href=#18 id=18 data-nosnippet>18</a>
+<a href=#19 id=19 data-nosnippet>19</a><span class="comment">// The conformance suite refers to the domain by these names, so they are
+<a href=#20 id=20 data-nosnippet>20</a>// re-exported rather than duplicated. `rumi-kv` is the single definition.
+<a href=#21 id=21 data-nosnippet>21</a></span><span class="kw">pub use </span>rumi_kv::{KvContext, StringInput};
+<a href=#22 id=22 data-nosnippet>22</a>
+<a href=#23 id=23 data-nosnippet>23</a><span class="attr">#[cfg(feature = <span class="string">"registry"</span>)]
+<a href=#24 id=24 data-nosnippet>24</a></span><span class="kw">pub use </span>rumi_kv::register;
+<a href=#25 id=25 data-nosnippet>25</a>
+<a href=#26 id=26 data-nosnippet>26</a><span class="kw">pub mod </span>prelude {
+<a href=#27 id=27 data-nosnippet>27</a>    <span class="kw">pub use </span>rumi_kv::prelude::<span class="kw-2">*</span>;
+<a href=#28 id=28 data-nosnippet>28</a>}
 </code></pre></div></section></main></body></html>
