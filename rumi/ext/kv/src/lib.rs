@@ -203,7 +203,6 @@ mod config_tests {
 
         // Core matchers + 1 test input
         assert!(registry.contains_input("xuma.kv.v1.MapInput"));
-        assert!(registry.contains_matcher("xuma.core.v1.StringMatcher"));
         assert!(registry.contains_matcher("xuma.core.v1.BoolMatcher"));
     }
 

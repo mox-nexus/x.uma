@@ -42,6 +42,13 @@ const KNOWN_GAPS: &[(&str, &str)] = &[
         "context data, not configuration — it is what a matcher reads, never an @type payload",
     ),
     (
+        "xuma.core.v1.BoolMatcher",
+        "no shipped input produces a boolean, so a positive fixture is not expressible in the \
+         kv domain this runner uses. The negative one — an incompatible input/matcher pair — \
+         is rejected at load by rumi and accepted by puma, because `supported_types` \
+         validation exists in Rust only. Fixture it when that divergence is closed.",
+    ),
+    (
         "xuma.claude.v1.AllowAction",
         "Claude domain has no protojson fixtures yet",
     ),

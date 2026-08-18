@@ -1,4 +1,4 @@
-import type { RegistryBuilder } from "./registry.ts";
+import { type RegistryBuilder, registerCoreMatchers } from "./registry.ts";
 import type { MatchingData } from "./types.ts";
 
 /**
@@ -18,6 +18,7 @@ export class DictInput {
 export function register(
 	builder: RegistryBuilder<Record<string, string>>,
 ): RegistryBuilder<Record<string, string>> {
+	registerCoreMatchers(builder);
 	builder.input("xuma.kv.v1.MapInput", (config) => {
 		const key = config.key;
 		if (typeof key !== "string") {

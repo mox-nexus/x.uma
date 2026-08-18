@@ -567,6 +567,7 @@ fn build_resolver() -> AnyResolver {
         .register::<xuma::claude::v1::SessionIdInput>("xuma.claude.v1.SessionIdInput")
         .register::<xuma::claude::v1::CwdInput>("xuma.claude.v1.CwdInput")
         .register::<xuma::claude::v1::GitBranchInput>("xuma.claude.v1.GitBranchInput")
+        .register::<xuma::core::v1::BoolMatcher>("xuma.core.v1.BoolMatcher")
         .register::<xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
         .build()
 }
@@ -874,7 +875,6 @@ mod tests {
     fn build_test_registry_has_expected_types() {
         let registry = build_test_registry();
         assert!(registry.contains_input("xuma.kv.v1.MapInput"));
-        assert!(registry.contains_matcher("xuma.core.v1.StringMatcher"));
         assert!(registry.contains_matcher("xuma.core.v1.BoolMatcher"));
     }
 
@@ -885,7 +885,6 @@ mod tests {
         assert!(registry.contains_input("xuma.http.v1.MethodInput"));
         assert!(registry.contains_input("xuma.http.v1.HeaderInput"));
         assert!(registry.contains_input("xuma.http.v1.QueryParamInput"));
-        assert!(registry.contains_matcher("xuma.core.v1.StringMatcher"));
     }
 
     #[test]
@@ -897,7 +896,6 @@ mod tests {
         assert!(registry.contains_input("xuma.claude.v1.SessionIdInput"));
         assert!(registry.contains_input("xuma.claude.v1.CwdInput"));
         assert!(registry.contains_input("xuma.claude.v1.GitBranchInput"));
-        assert!(registry.contains_matcher("xuma.core.v1.StringMatcher"));
     }
 
     // ─── HTTP argument parsing ───────────────────────────────────────────

@@ -45,6 +45,7 @@ from xuma._matcher import (
 )
 from xuma._predicate import And, Not, Or, SinglePredicate
 from xuma._string_matchers import (
+    BoolMatcher,
     ContainsMatcher,
     ExactMatcher,
     PrefixMatcher,
@@ -182,15 +183,23 @@ class RegistryBuilder[Ctx]:
 
 
 def register_core_matchers[Ctx](builder: RegistryBuilder[Ctx]) -> RegistryBuilder[Ctx]:
-    """Register core built-in matchers (BoolMatcher, StringMatcher).
+    """Register core built-in matchers.
 
-    Call this in domain register() functions to avoid duplicating
-    core matcher registrations.
+    Call this in domain register() functions to avoid duplicating core matcher
+    registrations.
+
+    This registered *nothing* until 2026-08-18 while claiming otherwise, so
+    `xuma.core.v1.BoolMatcher` resolved in rumi and not here — a cross-language
+    divergence in what a config may name.
+
+    `xuma.core.v1.StringMatcher` is deliberately absent: it was a second way to
+    say what `valueMatch` already says, and `customMatch` exists for
+    comparisons that oneof cannot express, not for duplicating it.
     """
-    # StringMatcher handles all built-in string match types.
-    # BoolMatcher is not used in config loading (built-in value_match covers strings),
-    # but register it for custom_match usage.
-    return builder
+    return builder.matcher(
+        "xuma.core.v1.BoolMatcher",
+        lambda cfg: BoolMatcher(expected=bool(cfg["expected"])),
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

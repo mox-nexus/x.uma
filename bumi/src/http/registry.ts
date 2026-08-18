@@ -5,12 +5,13 @@
  * with their xuma type URLs.
  */
 
-import type { RegistryBuilder } from "../registry.ts";
+import { type RegistryBuilder, registerCoreMatchers } from "../registry.ts";
 import { HeaderInput, MethodInput, PathInput, QueryParamInput } from "./inputs.ts";
 import type { HttpRequest } from "./request.ts";
 
 /** Register all HTTP domain DataInputs with the registry builder. */
 export function register(builder: RegistryBuilder<HttpRequest>): RegistryBuilder<HttpRequest> {
+	registerCoreMatchers(builder);
 	builder
 		.input("xuma.http.v1.PathInput", () => new PathInput())
 		.input("xuma.http.v1.MethodInput", () => new MethodInput())

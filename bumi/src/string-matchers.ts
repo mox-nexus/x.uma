@@ -142,3 +142,24 @@ export class RegexMatcher {
 		return this.compiled.matcher(value).find();
 	}
 }
+
+/**
+ * Matches a boolean value.
+ *
+ * Reachable through a `customMatch`, which is the seam for comparisons xDS's
+ * own `StringMatcher` cannot express — a boolean is one, since `valueMatch`
+ * only compares strings.
+ *
+ * No input x.uma ships produces a boolean; this exists for a custom domain
+ * whose `DataInput` returns one. It is registered by `registerCoreMatchers` so
+ * that `xuma.core.v1.BoolMatcher` resolves here as it does in rumi and puma —
+ * bumi had no such registration at all, so a config naming it failed here and
+ * loaded there.
+ */
+export class BoolMatcher {
+	constructor(readonly expected: boolean) {}
+
+	matches(value: MatchingData): boolean {
+		return typeof value === "boolean" && value === this.expected;
+	}
+}

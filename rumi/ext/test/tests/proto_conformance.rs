@@ -27,6 +27,7 @@ fn fixtures_dir() -> PathBuf {
 fn resolver() -> AnyResolver {
     AnyResolverBuilder::new()
         .register::<rumi_proto::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+        .register::<rumi_proto::xuma::core::v1::BoolMatcher>("xuma.core.v1.BoolMatcher")
         .register::<rumi_proto::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
         .build()
 }

@@ -12,6 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from xuma._registry import register_core_matchers
+
 if TYPE_CHECKING:
     from xuma._registry import RegistryBuilder
     from xuma._types import MatchingData
@@ -45,7 +47,9 @@ def register(
     Type URL: xuma.kv.v1.MapInput (matches rumi-test convention).
     Config field: { "key": "field_name" }
     """
-    return builder.input("xuma.kv.v1.MapInput", _dict_input_factory)
+    return register_core_matchers(builder).input(
+        "xuma.kv.v1.MapInput", _dict_input_factory
+    )
 
 
 def _dict_input_factory(config: dict[str, Any]) -> DictInput:
