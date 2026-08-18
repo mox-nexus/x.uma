@@ -9,28 +9,185 @@ Read this block first; the rest of the file was written before any of it was don
 | **M1** repo stops asserting what it cannot show | **met** — PR #26 |
 | **M2** a stranger can start | **met** — PR #27 (DX), #29 (reproducibility) |
 | **M3** nothing loads clean and lies | **met** — PR #25, all three blocking security findings fixed |
-| **M4/M5** schema freeze → one schema | **in progress.** SF0 decided (D-026); the schema itself is frozen and the two config vocabularies are down to one (#32, #33). The fixture dialects and the puma/bumi loaders are what remain; the fixtures and the migration are not written |
+| **M4/M5** schema freeze → one schema | **schema frozen, migration part-done.** SF0 decided (D-026). The type URLs and field names are now correct in all five implementations, there is one config vocabulary, and the protojson load path exists and is tested (#32, #35, #36). What remains is the *loaders*: the fixture dialects, and puma/bumi — neither of which has xDS types generated yet |
 | **M6** everything is publishable | **most of the way** — Phase E done, gate needs restating, see below |
 | **M7** released | yours. Publishing is irreversible |
 
-**Merged:** #23 plan repair + D-026/D-027 · #24 codegen pinned, `rumi-proto` compiles ·
-#25 security SEC1–SEC3 · #26 truth repair · #27 DX defaults · #28 crust CI +
-README agreement · #29 reproducibility.
+**Merged:** #23 plan repair + D-026/D-027 · #24 codegen pinned, `rumi-proto`
+compiles · #25 security SEC1–SEC3 · #26 truth repair · #27 DX defaults · #28
+crust CI + README agreement · #29 reproducibility · #30 Claude hook contract ·
+#31 `rumi-kv` split + feature untangle · #32 limits and identity on the types ·
+#35 one config vocabulary + type URLs · #36 one meaning per type URL.
 
-**Open:** #30 Phase K (Claude hook contract) — 9/10 green; `build-and-deploy` is
-the PR-preview deploy and is flaky today, unrelated to the change.
-**Unpushed PR:** Phase E is committed on `phase-e/publishable` and pushed, no PR opened yet.
+**Nothing is open.** `main` is green, including `cargo test --all-features` and
+`just test-full`, both of which now run in CI and both of which were red for
+months while `just ci` ran default features instead.
 
 **Phases done:** A, B, S, E, F, H1–H3, K. **Left: SF → C**, then G.
 
 **Ground rule change:** the maintainer authorised `gh pr merge --admin --squash`
 for these PRs. `just ci` must still be exit 0 before every commit.
 
-**What is left, honestly.** SF → C is the large one: write SF1–SF9 as red
-fixtures, then retire the hand-written config vocabulary across three languages.
-F13, F24, F25, F26 and F27 are all the *same* defect — two config vocabularies
-competing for one slot — and D-026 already chose the winner. Fixing them is the
-migration, not five separate tasks.
+**Stacked PRs: do not delete the base branch on merge.** Doing so *closes* the
+child PR rather than retargeting it, and a closed PR cannot be reopened or
+retargeted — it has to be recreated. That happened twice on 2026-08-18 (#33 and
+#34 became #35 and #36). Merge the base with `--squash` and leave the branch, or
+retarget children to `main` first.
+
+**What is left, honestly.** The migration's *schema* half is done; its *loader*
+half is not. Concretely:
+
+- the four fixture dialects, and the 27 fixtures written in them
+- puma and bumi, neither of which has xDS types generated at all
+- `MatcherConfig` still derives `Deserialize` — the dialect is still authorable
+- SF1, SF2, SF3, SF5, SF6, SF9 remain; SF4, SF7 and SF8's renames are done
+
+The next section is what the work so far established, and it changes several
+things this plan says further down. Read it before starting.
+
+### What the 2026-08-18 work settled, and what it changed about this plan
+
+Four PRs (#32, #35, #36, and the flake fix folded into #32) closed F13, F19,
+F24, F25, F26 and F27, and the design work behind them answered several
+questions this plan had left open. Burner and Dijkstra both reviewed the load
+path; their transcripts are not in the repo, so what survived of them is here.
+
+**The load path's shape is settled, and it is not what the plan assumed.**
+`pbjson-types`'s `Any` does not implement protojson's `@type` expansion, and
+cannot — expanding an `Any` needs the payload's schema at deserialization time,
+and static codegen has no descriptor pool. So a canonical document does not
+simply deserialize. `AnyResolver::pack` supplies the missing half (D-034). The
+worked example in SF0 above is therefore *schema-correct and now executable*,
+which it was not when written.
+
+**C4 is answered.** Migrate 11 of the 14 `matcher:` fixtures to protojson. Move
+the other 3 — first-match-wins, nested-matcher-failure propagation, `on_no_match`
+precedence — into `rumi/core/src/matcher.rs`'s test module, because their subject
+is `Matcher::new` and `evaluate`, which after C5 is the path both domain
+compilers use and which no protojson fixture would then cover. They are not
+cross-language claims; puma and bumi have their own `Matcher` types.
+
+Then delete the dialect. Independently of that: `fixture.rs`'s `ValueMatchConfig`
+and `OnMatchConfig` are `#[serde(untagged)]` with no `deny_unknown_fields`, so
+`value_match: {exact: "a", contains: "b"}` silently drops `contains` and
+`on_match: {matcher: …, action: …}` silently drops the action. That is
+`SECURITY.md` control #6's class, and it is an argument for migration rather
+than a reason to keep the dialect.
+
+**The §6 grep gate is measuring the wrong thing.** `grep -rn "MatcherConfig"`
+is satisfiable by renaming — the same objection D-026 raised against the
+wire-only option. It is also unsatisfiable without renaming, because the loader
+needs *some* intermediate type. Replace it with:
+
+> **No `Deserialize` impl for matcher-tree structure exists outside generated
+> code**, across `rumi/core/src`, `rumi/ext/*/src`, `puma/src`, `bumi/src`.
+
+That cannot be satisfied by renaming, it decides C4, and it catches the third
+dialect in `fixture.rs` that the current gate is blind to.
+
+`MatcherConfig` itself survives as an internal IR with its serde impls deleted
+and exactly one producer (`rumi-proto`'s `convert`). Making `Registry` consume
+proto types directly is not merely undesirable — it is **unreachable**:
+`rumi-proto` depends on `rumi-core`, so the reverse edge is a cargo cycle. The
+two ways out of that cycle both put prost, pbjson and the generated tree inside
+the crate the README tells strangers to `cargo add`. Rename it (`MatcherIr`) and
+move `config.rs` to `ir.rs`: a type called `…Config` in a config-loading crate
+will regrow a `Deserialize` within a year, and the reviewer who adds it will be
+right by the name.
+
+**The IR is a Rust artifact and must not be ported.** It exists because
+`Registry` is generic over `Ctx` and `A` and needs a typed walk. puma and bumi
+have no such constraint and should walk the proto and call their registries
+directly. Do not add a row for it to `CLAUDE.md`'s cross-language table.
+
+**INV-SUITE, and the ordering it forces.** The invariant to hold during the
+migration is not "the suite is green" but:
+
+> at every commit, for every fixture and every pair of implementations, the two
+> produce the **same verdict**.
+
+A migration that preserves that never emits a false divergence signal even while
+failing; one that breaks it emits nothing else. The mechanism: add a **fifth**
+top-level fixture key (`proto_matcher:`) rather than mutating the four, with a
+stub branch in all three loaders in the same commit. Mutating a fixture in place
+changes it for all three implementations atomically, which forces a simultaneous
+three-language migration — exactly what Phase C's "Rust first" mandate forbids.
+The fifth key is what makes the mandated ordering expressible at all.
+
+Rust then runs ahead, and that one transient is unavoidable. Represent it
+explicitly — a per-fixture `implementations:` list — and have CI fail both when
+a fixture is skipped by an implementation not on the list *and* when a listed
+implementation starts passing. **Phase C is done when the list is empty and CI
+enforces emptiness.** That is a machine-checkable M5, which the current gate is
+not. Delete the four old keys only after that, in the same PR series.
+
+**Migrate the 7 `config:` fixtures first** — they are the only ones exercising
+the path being replaced, so their status carries information. The 5+1
+`http_route_match(es):` fixtures exercise the compilers, which D-026 does not
+change; migrate them last or not at all.
+
+**Do not port `spec/tests/05_http/multiple_routes.yaml:118-143` verbatim.** It
+asserts the empty-rule-list catch-all — a fixture that *ratifies* a fail-open.
+The protojson config path is fail-closed for both sub-cases (absent
+`matcherType` errors; an empty `matchers` array falls through to `on_no_match`
+or `None`); the catch-all comes from the HTTP and Claude *compilers*. It is a
+compiler test wearing fixture clothes. Delete it or invert it, but migrating it
+spends the migration's one free moment preserving a fail-open.
+
+### Findings this work sharpened rather than closed
+
+| # | Sharpened to |
+|---|---|
+| F6 / SF1 | `convert.rs:226-236` reads `ignore_case` and discards it, under a comment asserting the registry handles it. The registry path *does* honour it (`StringMatcher::from_config`); only the proto path drops it, and the proto path is becoming the only path. When fixing it, also assert the `(?-i)` case. `input_matcher.rs:372` implements ignore-case by prefixing `(?i)`, so a pattern starting `(?-i)` turns it back off. **Measured 2026-08-18**, not merely cited: `(?i)(?-i)admin` does not match `ADMIN` and does match `admin` — so `ignoreCase: true` reads case-insensitive and is not, silently. One fixture, both cases. |
+| F11 / SF5 | `xuma.core.v1.StringMatcher` and `xuma.core.v1.BoolMatcher` are registered type URLs naming messages that do not exist — `proto/xuma/core/v1/` holds only `action.proto`. **Blocked by a cycle:** their `Config` types live in `rumi-core`, which cannot depend on `rumi-proto`. The scoped answer is a `rumi-proto-types` crate holding only the `xuma.*` messages, depending on nothing but prost/pbjson/serde, which `rumi-core` may then use. Decide it deliberately — crate names freeze at M6. Consider also whether `xuma.core.v1.StringMatcher` should exist at all: xDS already expresses string matching through `valueMatch`, and `customMatch` is for genuine extensions. `BoolMatcher` has no `valueMatch` equivalent, so it is the one that needs a message. |
+| — (new) | **An empty `NamedAction.name` is a fail-open waiting to be written, not one that ships.** Every other empty identifier makes a predicate false — no decision. This one would make the rule *fire* and return `""` as the action, so a host discriminating on `action == "deny"` gets `""` and the polarity becomes the caller's. Checked: the only `IntoAction` impl for `NamedAction` is `NamedActionFactory` inside `convert.rs`'s `#[cfg(test)]` module, and it does `Ok(config.name)` unchecked. Nothing ships it. So this is a constraint on the factory Phase C has to write — **reject an empty name there**, per D-035 — and SF0's note that `NamedAction`'s shape "is still free" still holds. |
+| — (new) | `TypedConfig.config` carries `#[serde(default)]`, so an omitted payload becomes `{}`. Combined with the above, `typedConfig: {"@type": ".../HeaderInput"}` with no `name` is a valid document producing a never-matching predicate. Covered by the constructor checks in D-035 and by nothing else. **Verbosity makes people prune, so this is the most likely authoring mistake of all of them.** |
+| — (new) | **puma and bumi have no xDS types generated, and adding them is a dependency decision, not a config line.** `puma/proto/src/gen/` and `bumi/proto/src/gen/` hold only `xuma`; `buf.gen.rust.yaml`'s second pass outputs Rust alone. Adding the betterproto and ts-proto outputs to that pass *works* — measured 2026-08-18, it produces `xds/type/matcher/v3` for both languages — but the generated Python imports `betterproto`, which puma does not depend on, and puma is a **published package**. So the step is: pick the runtime, then generate. Worth evaluating before defaulting to betterproto (v2 is beta): Google's own `protobuf` package implements protojson `@type` expansion natively via its descriptor pool, and `@bufbuild/protobuf` does the same for TypeScript with a registry — either would remove the need for a puma/bumi equivalent of `AnyResolver::pack` entirely. `protocol-mastery` already flags ts-proto → protobuf-es as the intended path. **Do not commit generated code that nothing imports** — that is the "unverified by construction" trap this plan opens with; generate and wire the loader in one PR. |
+| — (new) | **Type-URL leniency.** `strip_type_prefix` accepts both prefixed and bare forms and normalises to bare, which is consistent internally but silent. Settled form: **bare is the internal registry key; the file surface must carry the full `type.googleapis.com/` prefix**, because protojson requires it — so `pack` should reject a bare `@type`. SF8's "fixture that fails on a bare name" tests the file surface; it does not test the registries, and both need saying. |
+
+### What is verified about the round trip, so nobody re-derives it
+
+The JSON→bytes→JSON hop touches **only `Any` payloads** — the
+`xds.type.matcher.v3.Matcher` tree goes JSON→struct directly. So `ignoreCase`
+and `keepMatching` are not on the round-trip path at all.
+
+On the payload surface the hop is the identity, and the proof is short because
+the surface is small: every field in `proto/xuma/**` is a `string`, a
+`map<string, string>`, or an empty message. No `optional`, no wrappers, no
+enums, no 64-bit ints, no floats, no nested `Any`, no oneofs. The only lossy
+transform is explicit `""` → absent, which is proto3 implicit presence and which
+every conforming protojson implementation does identically.
+
+`scripts/check-proto-field-types.mjs` (D-033) is what keeps that proof from
+decaying silently.
+
+**Verified fail-closed, do not weaken:** all four registry-divergence directions;
+all five absent-oneof sites in `convert.rs`; both-set oneofs (pbjson's
+duplicate-field check, which is what `08_invalid_configs.yaml` depends on);
+unknown fields at every level of the generated tree; absent `matcherType`; an
+empty `matchers` array.
+
+That last group is the migration's strongest correctness argument and belongs in
+its PR body: `rumi/core/src/config.rs` carries **no** `#[serde(deny_unknown_fields)]`
+on any config type, so today `{"name": "x-real", "nmae": "x-typo"}` loads clean
+and the deny rule keys on the wrong header. After migration it is a load error.
+**The migration extends `SECURITY.md` control #6 from `HookMatch` to the entire
+config surface.**
+
+One invariant holds that up and must not be quietly broken:
+
+> **INV-EXPAND.** For every registered type URL `U` with message type `T`,
+> `pack(U, rest) == <T as pbjson Deserialize>::deserialize(rest).map(encode_to_vec)`.
+
+Implement the encoder any other way — a manual field walk, `prost-reflect`,
+anything tolerant — and unknown-field rejection is lost *silently and only
+inside `Any` payloads*, which is exactly where the deny-rule keys live.
+Falsifier: `{"@type": ".../HeaderInput", "nmae": "x-admin"}` must fail to load.
+`protojson.rs`'s `unknown_field_inside_a_payload_is_an_error` is that test.
+
+**Add a sixth absent-oneof check** when SF3 goes green: `matcher_tree::TreeType`
+is an `Option` oneof that `convert.rs:86-90` currently never reaches, because it
+rejects `MatcherTree` wholesale.
 
 ---
 
@@ -1342,10 +1499,14 @@ authoring dialect lowering into proto could be described either way. It cannot
 now.
 
 - [ ] **One config schema — protojson, generated from proto, in all three
-      languages.** No hand-written config types, no terse dialect, no aliases.
-      `grep -rn "MatcherConfig" rumi puma bumi` returns only generated code —
-      currently **221 hits**, and see C4 for the one legitimate remaining
-      question (the `matcher:` fixture loader)
+      languages.** The gate is **not** `grep -rn "MatcherConfig"`: that measures
+      spelling, is satisfiable by renaming — the same objection D-026 raised
+      against the wire-only option — and is *unsatisfiable* without renaming,
+      because the loader needs some intermediate type. The gate is:
+      **no `Deserialize` impl for matcher-tree structure exists outside
+      generated code**, across `rumi/core/src`, `rumi/ext/*/src`, `puma/src` and
+      `bumi/src`. That cannot be satisfied by renaming, it decides C4, and it
+      catches the third dialect in `fixture.rs` that the grep is blind to
 - [ ] All three `gen/` trees are **tracked**, and `just gen` produces no diff in
       CI (F20 — the check is vacuous while they are gitignored)
 - [ ] `rumi-proto` compiles, is in the CI test job, and `just test-full` is green
