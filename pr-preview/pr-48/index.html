@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" href="./favicon.svg" />
+		<link href="./_app/immutable/entry/start.BLnnp3g8.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/D9WDosN1.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/DYiHVAw2.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/B8m74XfO.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/-UyI9lYi.js" rel="modulepreload">
+		<link href="./_app/immutable/entry/app.DA2JrCoG.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/DNngEcdt.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/DOHXvLXS.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/C7IGVkAW.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/C83bZML1.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/DQj2CSf0.js" rel="modulepreload">
+		<link href="./_app/immutable/nodes/0.mrUZNgRo.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/ghtWklD6.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/DcI0cIgz.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/Dlz7HheT.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/CDwJ5Klk.js" rel="modulepreload">
+		<link href="./_app/immutable/nodes/2.Bus6WxKh.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/CP6AjnRL.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/IoRnOvJ0.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/Y8z-qYU3.js" rel="modulepreload">
+		<link href="./_app/immutable/chunks/NkOF9ywp.js" rel="modulepreload">
+		<!--1uha8ag--><meta name="description" content="Match structured data against rule trees. Write the rules once, evaluate them in Rust, Python, or TypeScript, and get the same answer."/><!----><title>x.uma — cross-platform matcher engine</title>
+		<link href="./_app/immutable/assets/0.Bd28AARH.css" rel="stylesheet">
+		<link href="./_app/immutable/assets/Matcher._t7mB6Pz.css" rel="stylesheet">
+		<link href="./_app/immutable/assets/2._MJzlbT-.css" rel="stylesheet">
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents"><!--[--><!--[0--><!--[--><div class="shell svelte-12qhfyh"><header class="svelte-12qhfyh"><a class="wordmark svelte-12qhfyh" href="./">x<span class="svelte-12qhfyh">.</span>uma</a> <nav class="svelte-12qhfyh"><a href="./docs">Docs</a> <a href="./playground">Playground</a> <a href="https://github.com/mox-nexus/x.uma">GitHub</a></nav></header> <div class="body svelte-12qhfyh"><!--[-1--><!--]--> <main class="svelte-12qhfyh"><!--[--><section class="hero svelte-1uha8ag"><h1 class="svelte-1uha8ag">Write the rules once.<br/><em class="svelte-1uha8ag">Get the same answer everywhere.</em></h1> <p class="svelte-1uha8ag">x.uma is a matcher engine implementing the xDS Unified Matcher API. One config, five
+		implementations across three languages, one conformance suite proving they agree.</p></section> <section class="demo svelte-1uha8ag"><h2 class="svelte-1uha8ag">It runs here</h2> <p class="lede svelte-1uha8ag">This is the real engine. The pure TypeScript implementation, running in your browser, loading
+		the config beside it. Change the method to <code>POST</code>, or to something else entirely,
+		and watch the decision change.</p> <div class="matcher svelte-nkynu6"><div class="panes svelte-nkynu6"><label class="svelte-nkynu6"><span class="svelte-nkynu6">config</span> <textarea spellcheck="false" rows="10" class="svelte-nkynu6">{
+  "matcherList": {
+    "matchers": [
+      {
+        "predicate": {
+          "singlePredicate": {
+            "input": {
+              "name": "method",
+              "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "method" }
+            },
+            "valueMatch": { "exact": "GET" }
+          }
+        },
+        "onMatch": {
+          "action": {
+            "name": "read-handler",
+            "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "read-handler" }
+          }
+        }
+      },
+      {
+        "predicate": {
+          "singlePredicate": {
+            "input": {
+              "name": "method",
+              "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "method" }
+            },
+            "valueMatch": { "exact": "POST" }
+          }
+        },
+        "onMatch": {
+          "action": {
+            "name": "write-handler",
+            "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "write-handler" }
+          }
+        }
+      }
+    ]
+  },
+  "onNoMatch": {
+    "action": {
+      "name": "405-not-allowed",
+      "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": "405-not-allowed" }
+    }
+  }
+}</textarea></label> <label class="svelte-nkynu6"><span class="svelte-nkynu6">context</span> <textarea spellcheck="false" rows="10" class="svelte-nkynu6">{ "method": "GET" }</textarea></label></div> <div class="result svelte-nkynu6" data-kind="match"><!--[0--><span class="tag svelte-nkynu6">match</span><code class="svelte-nkynu6">read-handler</code><!--]--></div> <p class="hint svelte-nkynu6">Editable. Change either side and the result updates as you type.</p></div><!----> <p class="aside svelte-1uha8ag">Rules are tried in order and the first match wins. When nothing matches, <code>on_no_match</code> decides. That is the whole evaluation model.</p></section> <section class="runtimes svelte-1uha8ag"><h2 class="svelte-1uha8ag">The same config, three runtimes</h2> <p class="lede svelte-1uha8ag">The config above is data, not code. Every implementation loads it through a registry and
+		evaluates it identically.</p> <div class="grid svelte-1uha8ag"><!--[--><article class="svelte-1uha8ag"><h3 class="svelte-1uha8ag">Rust</h3> <pre class="svelte-1uha8ag"><code>let matcher = registry.load_matcher(config)?;
+matcher.evaluate(&amp;ctx)   // Some("read-handler")</code></pre></article><article class="svelte-1uha8ag"><h3 class="svelte-1uha8ag">Python</h3> <pre class="svelte-1uha8ag"><code>matcher = registry.load_matcher(config)
+matcher.evaluate(ctx)    # "read-handler"</code></pre></article><article class="svelte-1uha8ag"><h3 class="svelte-1uha8ag">TypeScript</h3> <pre class="svelte-1uha8ag"><code>const matcher = registry.loadMatcher(config);
+matcher.evaluate(ctx);   // "read-handler"</code></pre></article><!--]--></div></section> <section class="impls svelte-1uha8ag"><h2 class="svelte-1uha8ag">Five implementations</h2> <p class="lede svelte-1uha8ag">Pick by runtime and by how much speed you need. The pure implementations have no native
+		dependency beyond RE2. The crusts are the Rust engine, bound.</p> <table><thead><tr><th>Package</th><th>Language</th><th>What it is</th></tr></thead><tbody><tr><td><code>rumi-core</code></td><td>Rust</td><td>The engine. Reference implementation.</td></tr><tr><td><code>xuma</code></td><td>Python 3.12+</td><td>Pure Python, RE2 for regex.</td></tr><tr><td><code>xuma</code></td><td>TypeScript</td><td>Pure TypeScript, RE2 for regex.</td></tr><tr><td><code>xuma-crust</code></td><td>Python</td><td>Rust via PyO3.</td></tr><tr><td><code>xuma-crust</code></td><td>TypeScript</td><td>Rust via WebAssembly.</td></tr></tbody></table> <p class="aside svelte-1uha8ag">All five run the same conformance fixtures from <code>spec/tests/</code>. An implementation
+		that disagrees fails its own build.</p></section> <section class="pipeline svelte-1uha8ag"><h2 class="svelte-1uha8ag">How a decision is made</h2> <pre><code>Context  →  DataInput  →  MatchingData  →  InputMatcher  →  bool
+            domain-        erased           domain-
+            specific                        agnostic</code></pre> <p class="lede svelte-1uha8ag">An <code>ExactMatcher</code> does not know whether it is matching an HTTP path, a Claude Code
+		hook event, or your own domain. It matches <em>data</em>. Extracting that data from a context
+		is a separate port, which is why one matcher works everywhere.</p></section> <section class="quadrants svelte-1uha8ag"><h2 class="svelte-1uha8ag">Where to go next</h2> <div class="grid svelte-1uha8ag"><!--[--><article style="--quadrant: var(--quadrant-tutorials)" class="svelte-1uha8ag"><h3 class="svelte-1uha8ag">Tutorials</h3> <p class="svelte-1uha8ag">Start here. Working code in a few minutes.</p> <ul class="svelte-1uha8ag"><!--[--><li><a href="./docs/rust">Rust</a></li><li><a href="./docs/python">Python</a></li><li><a href="./docs/typescript">TypeScript</a></li><!--]--></ul></article><article style="--quadrant: var(--quadrant-how-to)" class="svelte-1uha8ag"><h3 class="svelte-1uha8ag">How-to</h3> <p class="svelte-1uha8ag">Solve one specific problem.</p> <ul class="svelte-1uha8ag"><!--[--><li><a href="./docs/route-by-header">Route on a header</a></li><li><a href="./docs/custom-input">Add a custom input</a></li><li><a href="./docs/claude-hook">Gate a Claude Code tool call</a></li><li><a href="./docs/debug-a-match">Debug why something matched</a></li><!--]--></ul></article><article style="--quadrant: var(--quadrant-reference)" class="svelte-1uha8ag"><h3 class="svelte-1uha8ag">Reference</h3> <p class="svelte-1uha8ag">Look something up.</p> <ul class="svelte-1uha8ag"><!--[--><li><a href="./docs/config">Config format</a></li><li><a href="./docs/cli">CLI</a></li><li><a href="./docs/api">API</a></li><!--]--></ul></article><article style="--quadrant: var(--quadrant-explanation)" class="svelte-1uha8ag"><h3 class="svelte-1uha8ag">Explanation</h3> <p class="svelte-1uha8ag">Understand why it works this way.</p> <ul class="svelte-1uha8ag"><!--[--><li><a href="./docs/pipeline">The matching pipeline</a></li><li><a href="./docs/type-erasure">Type erasure and ports</a></li><li><a href="./docs/architecture">Architecture</a></li><li><a href="./docs/security">Security model</a></li><!--]--></ul></article><!--]--></div></section><!--]--><!----></main></div> <footer class="svelte-12qhfyh"><span>MIT OR Apache-2.0</span> <span>Alpha 0.0.2 — not yet published to registries</span></footer></div><!--]--><!--]--> <!--[-1--><!--]--><!--]-->
+			
+			<script>
+				{
+					__sveltekit_1nuo5ao = {
+						base: new URL(".", location).pathname.slice(0, -1),
+						assets: "/x.uma/pr-preview/pr-48"
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("./_app/immutable/entry/start.BLnnp3g8.js"),
+						import("./_app/immutable/entry/app.DA2JrCoG.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element, {
+							node_ids: [0, 2],
+							data: [null,null],
+							form: null,
+							error: null
+						});
+					});
+				}
+			</script>
+		</div>
+	</body>
+</html>
