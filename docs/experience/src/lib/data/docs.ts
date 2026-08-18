@@ -91,6 +91,14 @@ export const DOCS: DocsEntry[] = [
 		readMinutes: 5
 	},
 	{
+		slug: 'claude-hook',
+		file: 'how-to/claude-hook',
+		title: 'Gate a Claude Code tool call',
+		description: 'From a rule to a hook Claude Code actually runs, including the exit-code contract.',
+		kind: 'how-to',
+		readMinutes: 5
+	},
+	{
 		slug: 'debug-a-match',
 		file: 'how-to/debug-a-match',
 		title: 'Debug why something matched',
