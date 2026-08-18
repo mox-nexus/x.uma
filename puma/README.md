@@ -1,8 +1,8 @@
-# xuma — Pure Python xDS Matcher
+# xuma — the xDS Unified Matcher API in Python
 
 **v0.0.2** — Part of the [x.uma](https://github.com/mox-nexus/x.uma) matcher engine.
 
-xuma is a pure Python implementation of the xDS Unified Matcher API. Match structured data (HTTP requests, events, messages) against rule trees with first-match-wins semantics. Python 3.12+.
+xuma is a Python implementation of the xDS Unified Matcher API, with no protobuf runtime and no build step — `google-re2` ships platform wheels. Match structured data (HTTP requests, events, messages) against rule trees with first-match-wins semantics. Python 3.12+.
 
 ## Installation
 

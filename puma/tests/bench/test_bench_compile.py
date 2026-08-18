@@ -1,4 +1,4 @@
-"""Compile benchmarks for puma (Pure Python).
+"""Compile benchmarks for puma (pure-Python engine, no crust).
 
 Measures matcher construction cost: string matcher creation,
 predicate tree building, and HTTP route compilation.

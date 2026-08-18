@@ -1,6 +1,6 @@
 # Python Quick Start
 
-Build an HTTP route matcher with `xuma` (pure Python) or `xuma-crust` (Rust-backed).
+Build an HTTP route matcher with `xuma` (no build step) or `xuma-crust` (Rust-backed).
 
 ## Install
 
@@ -9,7 +9,7 @@ Build an HTTP route matcher with `xuma` (pure Python) or `xuma-crust` (Rust-back
 > See the [README](https://github.com/mox-nexus/x.uma#install).
 
 ```bash
-# Pure Python
+# No build step — google-re2 ships wheels
 uv add xuma
 
 # Rust-backed (faster, same API surface)
@@ -66,7 +66,7 @@ not_found
 
 ## Load in Your App (xuma)
 
-The pure Python implementation loads the same config:
+The `xuma` implementation loads the same config:
 
 ```python
 import yaml
@@ -103,7 +103,7 @@ assert matcher.evaluate("GET", "/api/users") == "api_read"
 assert matcher.evaluate("DELETE", "/other") == "not_found"
 ```
 
-`xuma-crust` is 10-100x faster than pure Python for evaluation.
+`xuma-crust` is 10-100x faster than `xuma` for evaluation.
 
 ## Compiler Shorthand
 

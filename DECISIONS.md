@@ -8,6 +8,89 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-18 · How Python and TypeScript read protojson
+
+### D-039 · `CLAUDE.md`'s "Pure Python" is false for puma and true for bumi
+
+`puma/uv.lock` lists **zero** `py3-none-any` wheels for `google-re2` — macOS,
+manylinux and Windows wheels per Python version, nothing else. puma has not been
+pure Python since RE2 replaced the `re` module, and a table saying otherwise is
+the kind of claim this repo has spent four PRs removing.
+
+bumi is different and the asymmetry matters: `re2js` is a pure-JavaScript port,
+so bumi genuinely is pure TypeScript. "puma is already impure, so a dependency
+is free" does not transfer.
+
+What the word was standing in for is worth keeping under a name that can be
+held: **puma and bumi carry no protobuf runtime and read protojson directly.**
+That is the only boundary distinguishing them from `xuma-crust`, which is the
+same engine, faster, already on PyPI and npm. Erase it and the two artifacts
+have the same boundary — which makes them one artifact with two names.
+
+**Revisit** by deleting puma and bumi, not by making them heavier. If the
+dependency-light property is not worth holding, the packages are not either.
+
+### D-038 · puma and bumi read protojson directly; no generated types in either
+
+Measured 2026-08-18, both languages:
+
+| | given `{"kye": "role"}` for `MapInput` |
+|---|---|
+| ts-proto `fromJSON` | returns `{key: ""}` — no error |
+| betterproto `from_dict` | returns `MapInput(key='')` — no error |
+
+Neither rejects an unknown field, so **neither can satisfy
+`protojson_rejects_an_unknown_field`** — the fixture carrying the migration's
+headline claim, that a typo'd field in a deny rule is a load error rather than a
+rule that silently never fires.
+
+Generated code that is lenient is *worse* than a hand-written reader, not
+equivalent: a reviewer audits a hand-written parser and does not audit a file
+headed `DO NOT EDIT`. Note also that both return an **empty key** — precisely
+the fail-open D-035 rejects in Rust's constructor.
+
+So the Python and TypeScript plugins are removed from `buf.gen.yaml`, and the
+fifteen generated files that were tracked but imported by nothing — `betterproto`
+absent from `pyproject.toml`, `@bufbuild/protobuf` absent from `package.json`,
+and `bumi/tsconfig.json` never including the directory — are deleted. They were
+the "unverified by construction" trap the plan opens with, sitting in the repo.
+
+**The document has two regions, and the boundary is region-shaped, not
+language-shaped.** D-034 already split them by making `pack` stop at `@type`:
+
+- **the xDS tree** — schema owned upstream and frozen, ~12 structural types,
+  destructured and discarded in one pass. Hand-walked in puma and bumi,
+  mirroring `rumi-proto`'s `convert.rs`.
+- **`Any` payloads** — schema owned by x.uma, growing with every domain, and
+  where the security property lives. The contract is *an unknown field is a load
+  error*, in all three implementations, satisfied by whatever means each
+  language actually can.
+
+Hand-writing the payload reader is safe for a reason that was already paid for:
+`scripts/check-proto-field-types.mjs` (D-033) bounds payloads to `string`,
+`bool`, `bytes` and `map<string, string>`. The proof that made D-034's round trip
+an identity is the same proof that makes a hand-written payload reader adequate.
+
+**The price of this decision, which is not optional.** Under generated types the
+dependency on `proto/xuma/**` is an arrow the build can see. Here it is a
+human's memory. That is a missing arrow, not a wrong one, and it has to be made
+explicit or this is a rationalisation: a descriptor-driven check must assert
+that for every message and field in `proto/xuma/**`, a fixture sets it *and* a
+sibling misspells it and expects a load error. Without that, three
+implementations agree only on what somebody remembered to fixture.
+
+Worth recording what this decision does **not** claim. Codegen propagates
+shapes, not semantics — and of the schema-crossing defects this repo actually
+shipped, only F13 was a shape. F6, F2 and F14 were all semantic and generated
+types would have caught none of them. Neither mechanism dominates; they cover
+different halves.
+
+**Revisit if** a generator appears that rejects unknown fields by default —
+`@bufbuild/protobuf`'s strict `fromJson` is the near-term candidate and was not
+measured here. The dependency-inversion objection to Google's `protobuf` for
+Python stands separately: it would pull an ecosystem in for the whole document
+to fix a property only the payload region needs.
+
 ## 2026-08-18 · One config vocabulary
 
 ### D-037 · There is no `proto` feature, because there is nothing left for it to select

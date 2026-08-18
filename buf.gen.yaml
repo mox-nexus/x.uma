@@ -28,14 +28,10 @@ plugins:
   - remote: buf.build/community/neoeinstein-prost-serde:v0.3.0
     out: rumi/proto/src/gen
 
-  # Python (betterproto)
-  - remote: buf.build/community/danielgtaylor-betterproto
-    out: puma/proto/src/gen
-
-  # TypeScript (ts-proto)
-  - remote: buf.build/community/stephenh-ts-proto
-    out: bumi/proto/src/gen
-    opt:
-      - esModuleInterop=true
-      - outputServices=generic-definitions
-      - useExactTypes=false
+  # Python and TypeScript have no generated types. Measured 2026-08-18: neither
+  # betterproto's `from_dict` nor ts-proto's `fromJSON` rejects an unknown
+  # field — both return the message with defaults — so neither can satisfy the
+  # conformance fixture that says a typo'd field is a load error. Generated
+  # code that is lenient is worse than a hand-written reader, because nobody
+  # audits a file headed "DO NOT EDIT". puma and bumi read protojson directly.
+  # See DECISIONS.md D-038.

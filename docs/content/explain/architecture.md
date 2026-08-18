@@ -156,8 +156,8 @@ Both paths produce the same `Matcher`. The compiler path is for programmatic con
 | Implementation | Language | Type |
 |----------------|----------|------|
 | **rumi** | Rust | Reference implementation |
-| **xuma** (Python) | Python | Pure Python |
-| **xuma** (TypeScript) | TypeScript | Pure TypeScript |
+| **xuma** (Python) | Python | No protobuf runtime; `google-re2` ships platform wheels |
+| **xuma** (TypeScript) | TypeScript | Pure TypeScript — `re2js` is a JS port of RE2 |
 | **xuma-crust** | Python | Rust core via PyO3 |
 | **xuma-crust** | TypeScript | Rust core via WASM |
 
