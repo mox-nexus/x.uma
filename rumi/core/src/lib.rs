@@ -354,3 +354,13 @@ impl std::fmt::Display for MatcherError {
 }
 
 impl std::error::Error for MatcherError {}
+
+/// The crate README's Rust blocks, compiled and run as doctests.
+///
+/// A crate README is a published artifact — it is the crates.io front page —
+/// and until 2026-08-18 nothing checked one. `rumi-core`'s showed a config
+/// dialect that had been retired, so the first thing a new reader would have
+/// copied could not load. Nothing failed, because nothing looked.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;

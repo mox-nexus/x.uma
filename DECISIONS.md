@@ -8,6 +8,88 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-18 · Retiring the terse dialect, and checking the READMEs
+
+### D-043 · A crate README's Rust blocks are doctests
+
+Three crates ship a README with a Rust example. All three examples were wrong,
+and had been for as long as they existed:
+
+| Crate | Defect |
+|---|---|
+| `rumi-core` | showed the terse dialect, deserialized into `MatcherConfig` |
+| `rumi-http` | referenced an undefined `config`, and used `?` in a non-`Result` scope |
+| `rumi-kv` | same two errors as `rumi-http` |
+
+None had ever compiled. `scripts/check-readme-agreement.mjs` covers only the
+**root** README's `routes.yaml` block, so every crate README — the crates.io
+front page, and the first thing a new reader copies — was outside CI's reach and
+therefore unverified by construction.
+
+Each crate now carries:
+
+```rust
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;
+```
+
+`cargo test --doc` compiles and runs the blocks. Two of the three defects above
+were found by adding this, not before it — the mechanism paid for itself inside
+one commit.
+
+Examples needing an optional feature are wrapped in `# #[cfg(feature = "…")] {`
+so they compile under default features and actually run under `--all-features`,
+which CI does via `just test-full`.
+
+**Revisit if** a README grows an example that genuinely cannot be executed —
+then mark that block `ignore` and say why in the block, rather than dropping the
+wiring.
+
+### D-042 · The tree-shape config types do not derive `Deserialize`
+
+D-026 retired the terse JSON dialect in favour of canonical protojson. It stayed
+*authorable* in Rust for months afterwards, because `MatcherConfig`,
+`FieldMatcherConfig`, `PredicateConfig`, `SinglePredicateConfig`, `TypedConfig`
+and `OnMatchConfig` still derived `Deserialize`. No fixture used it, no other
+implementation could read it, and nothing documented it — but `serde_json::from_str::<MatcherConfig<String>>`
+compiled, so it was still a format the crate offered.
+
+puma and bumi had already closed this by construction: frozen dataclasses and
+classes with constructors, reachable only through `parseProtojson()`. Rust was
+the sole outlier.
+
+Removing the impls makes writing the dialect a **compile error** rather than a
+convention. The types remain — they are the intermediate representation
+`Registry::load_matcher` consumes and `rumi-proto`'s converter produces, and
+deleting them would require `rumi-core` to depend on `rumi-proto`, which is the
+wrong direction. So Phase C's stated gate ("`grep -rn MatcherConfig` returns
+only generated code") was never achievable and is restated: **no hand-written
+config type is deserializable.**
+
+Payload types keep their `Deserialize`. A `TypedConfig.config` body is
+deserialized as the registered factory's `Config` associated type — that is the
+extension seam working as designed, not a dialect.
+
+What it cost: 66 call sites. 60 tests were rebuilt against struct literals, and
+8 were deleted because their subject was the deserializer itself — 6 in
+`config.rs` and the two `SinglePredicate` oneof tests in `registry.rs`. Neither
+oneof requirement was dropped: `ValueMatchConfig` is an enum, so both-set is now
+unrepresentable rather than rejected, and neither-set is caught by the converter
+and fixtured in `08_invalid_configs.yaml` — five implementations assert it where
+one used to. Test count went 329 → 321, exactly the 8 removed.
+
+`rumi/core/benches/config.rs` was measuring the terse dialect's parse cost,
+which was always cheaper than what any caller ran and, after this, measured
+nothing that existed. It now walks the shipping path — `parse_matcher_str` then
+`load_proto_matcher`. The honest numbers: ~6.7 µs to load a simple config,
+against 73 ns to evaluate it, matching the 82 ns of a hand-built matcher.
+
+**Revisit if** a second config dialect is ever genuinely wanted. It would need
+its own reader producing these types, not a derive on them.
+
+---
+
 ## 2026-08-18 · The core matcher registrations
 
 ### D-041 · `xuma.core.v1.StringMatcher` is not registered; `BoolMatcher` is, and now exists

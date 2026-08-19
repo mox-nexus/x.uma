@@ -35,6 +35,7 @@ serde_json = { workspace = true, optional = true }
 rumi-kv = { path = "../ext/kv", features = ["registry"] }
 divan = "0.1"
 rumi-test = { path = "../ext/test", features = ["registry"] }
+rumi-proto = { path = "../proto" }
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

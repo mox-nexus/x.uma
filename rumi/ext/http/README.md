@@ -6,15 +6,44 @@ Match on method, path, headers and query parameters — either from a config fil
 through the registry, or by compiling Gateway API `HttpRouteMatch` values
 directly.
 
+Configs are canonical protojson, read through `rumi-proto`. This example builds
+the same matcher directly, so it stays self-contained:
+
 ```rust
+# #[cfg(feature = "registry")] {
 use rumi::prelude::*;
+use rumi::{
+    FieldMatcherConfig, MatcherConfig, OnMatchConfig, PredicateConfig, RegistryBuilder,
+    SinglePredicateConfig, StringMatchSpec, TypedConfig, ValueMatchConfig,
+};
 use rumi_http::{register_simple, HttpRequest};
 
 let registry = register_simple(RegistryBuilder::new()).build();
-let matcher = registry.load_matcher(config)?;
+
+let config = MatcherConfig {
+    matchers: vec![FieldMatcherConfig {
+        predicate: PredicateConfig::Single(SinglePredicateConfig {
+            input: TypedConfig {
+                type_url: "xuma.http.v1.PathInput".into(),
+                config: serde_json::json!({}),
+            },
+            matcher: ValueMatchConfig::BuiltIn {
+                spec: StringMatchSpec::Prefix("/api".into()),
+                ignore_case: false,
+            },
+        }),
+        on_match: OnMatchConfig::Action {
+            action: "api_read".to_string(),
+        },
+    }],
+    on_no_match: None,
+};
+
+let matcher = registry.load_matcher(config).unwrap();
 
 let req = HttpRequest::builder().method("GET").path("/api/users").build();
 assert_eq!(matcher.evaluate(&req), Some("api_read".to_string()));
+# }
 ```
 
 ## Features

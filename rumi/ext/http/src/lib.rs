@@ -137,7 +137,10 @@ pub fn register(builder: rumi::RegistryBuilder<HttpMessage>) -> rumi::RegistryBu
 #[cfg(all(test, feature = "registry"))]
 mod proto_tests {
     use super::*;
-    use rumi::MatcherConfig;
+    use rumi::{
+        FieldMatcherConfig, MatcherConfig, OnMatchConfig, PredicateConfig, SinglePredicateConfig,
+        StringMatchSpec, TypedConfig, ValueMatchConfig,
+    };
 
     // Built via HttpMessageBuilder rather than an ext_proc ProcessingRequest.
     // `proto` is a control-plane feature and has no business requiring the data
@@ -148,6 +151,42 @@ mod proto_tests {
             .into_iter()
             .fold(HttpMessageBuilder::new(), |b, (k, v)| b.header(k, v))
             .build()
+    }
+
+    // `MatcherConfig` and friends are built, never parsed — see rumi's
+    // `config` module.
+
+    fn input(type_url: &str, config: serde_json::Value) -> TypedConfig {
+        TypedConfig {
+            type_url: type_url.into(),
+            config,
+        }
+    }
+
+    fn built_in(input: TypedConfig, spec: StringMatchSpec) -> PredicateConfig {
+        PredicateConfig::Single(SinglePredicateConfig {
+            input,
+            matcher: ValueMatchConfig::BuiltIn {
+                spec,
+                ignore_case: false,
+            },
+        })
+    }
+
+    fn act(action: &str) -> OnMatchConfig<String> {
+        OnMatchConfig::Action {
+            action: action.into(),
+        }
+    }
+
+    fn one(predicate: PredicateConfig, on_match: OnMatchConfig<String>) -> MatcherConfig<String> {
+        MatcherConfig {
+            matchers: vec![FieldMatcherConfig {
+                predicate,
+                on_match,
+            }],
+            on_no_match: None,
+        }
     }
 
     #[test]
@@ -167,22 +206,16 @@ mod proto_tests {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
         // PathInput is an empty proto message — no config fields
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": {
-                        "type_url": "xuma.http.v1.PathInput",
-                        "config": {}
-                    },
-                    "value_match": { "Prefix": "/api" }
-                },
-                "on_match": { "type": "action", "action": "api_backend" }
+        let config = MatcherConfig {
+            matchers: vec![FieldMatcherConfig {
+                predicate: built_in(
+                    input("xuma.http.v1.PathInput", serde_json::json!({})),
+                    StringMatchSpec::Prefix("/api".into()),
+                ),
+                on_match: act("api_backend"),
             }],
-            "on_no_match": { "type": "action", "action": "default" }
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+            on_no_match: Some(act("default")),
+        };
         let matcher = registry.load_matcher(config).unwrap();
 
         let msg = build_request(vec![(":path", "/api/users"), (":method", "GET")]);
@@ -197,21 +230,16 @@ mod proto_tests {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
         // HeaderInput config has "name" field (the header name to extract)
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": {
-                        "type_url": "xuma.http.v1.HeaderInput",
-                        "config": { "name": "content-type" }
-                    },
-                    "value_match": { "Exact": "application/json" }
-                },
-                "on_match": { "type": "action", "action": "json_handler" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            built_in(
+                input(
+                    "xuma.http.v1.HeaderInput",
+                    serde_json::json!({ "name": "content-type" }),
+                ),
+                StringMatchSpec::Exact("application/json".into()),
+            ),
+            act("json_handler"),
+        );
         let matcher = registry.load_matcher(config).unwrap();
 
         let msg = build_request(vec![("content-type", "application/json")]);
@@ -225,34 +253,21 @@ mod proto_tests {
     fn load_matcher_with_and_path_and_method() {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "and",
-                    "predicates": [
-                        {
-                            "type": "single",
-                            "input": {
-                                "type_url": "xuma.http.v1.PathInput",
-                                "config": {}
-                            },
-                            "value_match": { "Prefix": "/api" }
-                        },
-                        {
-                            "type": "single",
-                            "input": {
-                                "type_url": "xuma.http.v1.MethodInput",
-                                "config": {}
-                            },
-                            "value_match": { "Exact": "POST" }
-                        }
-                    ]
-                },
-                "on_match": { "type": "action", "action": "api_write" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            PredicateConfig::And {
+                predicates: vec![
+                    built_in(
+                        input("xuma.http.v1.PathInput", serde_json::json!({})),
+                        StringMatchSpec::Prefix("/api".into()),
+                    ),
+                    built_in(
+                        input("xuma.http.v1.MethodInput", serde_json::json!({})),
+                        StringMatchSpec::Exact("POST".into()),
+                    ),
+                ],
+            },
+            act("api_write"),
+        );
         let matcher = registry.load_matcher(config).unwrap();
 
         let msg = build_request(vec![(":path", "/api/users"), (":method", "POST")]);
@@ -267,3 +282,13 @@ mod proto_tests {
         assert_eq!(matcher.evaluate(&msg), None);
     }
 }
+
+/// The crate README's Rust blocks, compiled and run as doctests.
+///
+/// A crate README is a published artifact — it is the crates.io front page —
+/// and until 2026-08-18 nothing checked one. `rumi-core`'s showed a config
+/// dialect that had been retired, so the first thing a new reader would have
+/// copied could not load. Nothing failed, because nothing looked.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;

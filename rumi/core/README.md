@@ -20,23 +20,48 @@ use rumi::prelude::*;
 
 ```rust
 use rumi::prelude::*;
-use rumi::{MatcherConfig, RegistryBuilder};
 
-// Build from config (JSON/YAML → registry → matcher)
-let json = serde_json::json!({
-    "matchers": [{
-        "predicate": {
-            "type": "single",
-            "input": { "type_url": "my.StringInput", "config": { "key": "method" } },
-            "value_match": { "Exact": "GET" }
-        },
-        "on_match": { "type": "action", "action": "matched" }
-    }],
-    "on_no_match": { "type": "action", "action": "fallback" }
-});
+#[derive(Debug)]
+struct MethodInput;
 
-let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
-// ... register inputs, build registry, load matcher, evaluate
+impl DataInput<&'static str> for MethodInput {
+    fn get(&self, ctx: &&'static str) -> MatchingData {
+        MatchingData::String((*ctx).to_string())
+    }
+}
+
+let matcher = Matcher::new(
+    vec![FieldMatcher::new(
+        Predicate::Single(SinglePredicate::new(
+            Box::new(MethodInput),
+            Box::new(ExactMatcher::new("GET")),
+        )),
+        OnMatch::Action("matched"),
+    )],
+    Some(OnMatch::Action("fallback")),
+);
+matcher.validate().unwrap();
+
+assert_eq!(matcher.evaluate(&"GET"), Some("matched"));
+assert_eq!(matcher.evaluate(&"POST"), Some("fallback"));
+```
+
+## Loading from a config file
+
+Configs are written in canonical protojson — protobuf's own JSON mapping of
+`xds.type.matcher.v3.Matcher`. Reading one needs the generated xDS types, so it
+lives in `rumi-proto` rather than here:
+
+```toml
+rumi-proto = "0.0.2"
+```
+
+```rust,ignore
+use rumi_proto::convert::load_proto_matcher;
+use rumi_proto::protojson::parse_matcher_str;
+
+let proto = parse_matcher_str(&resolver, config_json)?;
+let matcher = load_proto_matcher(&registry, &actions, &resolver, &proto)?;
 ```
 
 ## Features

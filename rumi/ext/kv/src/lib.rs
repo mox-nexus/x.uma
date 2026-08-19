@@ -133,7 +133,6 @@ pub fn register(builder: rumi::RegistryBuilder<KvContext>) -> rumi::RegistryBuil
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn an_empty_key_is_rejected() {
         let err = StringInput::new("").unwrap_err();
@@ -195,6 +194,44 @@ mod tests {
 #[cfg(all(test, feature = "registry"))]
 mod config_tests {
     use super::*;
+
+    use rumi::{
+        FieldMatcherConfig, OnMatchConfig, PredicateConfig, SinglePredicateConfig, StringMatchSpec,
+        TypedConfig, ValueMatchConfig,
+    };
+
+    // `MatcherConfig` and friends are built, never parsed — see rumi's
+    // `config` module. These keep the tests below readable without deciding
+    // anything on their behalf.
+
+    fn built_in(key: &str, spec: StringMatchSpec) -> PredicateConfig {
+        PredicateConfig::Single(SinglePredicateConfig {
+            input: TypedConfig {
+                type_url: "xuma.kv.v1.MapInput".into(),
+                config: serde_json::json!({ "key": key }),
+            },
+            matcher: ValueMatchConfig::BuiltIn {
+                spec,
+                ignore_case: false,
+            },
+        })
+    }
+
+    fn act(action: &str) -> OnMatchConfig<String> {
+        OnMatchConfig::Action {
+            action: action.into(),
+        }
+    }
+
+    fn field(
+        predicate: PredicateConfig,
+        on_match: OnMatchConfig<String>,
+    ) -> FieldMatcherConfig<String> {
+        FieldMatcherConfig {
+            predicate,
+            on_match,
+        }
+    }
     use rumi::MatcherConfig;
 
     #[test]
@@ -210,22 +247,13 @@ mod config_tests {
     fn load_matcher_with_map_input() {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": {
-                        "type_url": "xuma.kv.v1.MapInput",
-                        "config": { "key": "role" }
-                    },
-                    "value_match": { "Exact": "admin" }
-                },
-                "on_match": { "type": "action", "action": "allow" }
-            }],
-            "on_no_match": { "type": "action", "action": "deny" }
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = MatcherConfig {
+            matchers: vec![field(
+                built_in("role", StringMatchSpec::Exact("admin".into())),
+                act("allow"),
+            )],
+            on_no_match: Some(act("deny")),
+        };
         let matcher = registry.load_matcher(config).unwrap();
 
         let ctx = KvContext::new().with("role", "admin");
@@ -239,34 +267,18 @@ mod config_tests {
     fn load_matcher_with_and_predicate() {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "and",
-                    "predicates": [
-                        {
-                            "type": "single",
-                            "input": {
-                                "type_url": "xuma.kv.v1.MapInput",
-                                "config": { "key": "role" }
-                            },
-                            "value_match": { "Exact": "admin" }
-                        },
-                        {
-                            "type": "single",
-                            "input": {
-                                "type_url": "xuma.kv.v1.MapInput",
-                                "config": { "key": "org" }
-                            },
-                            "value_match": { "Prefix": "acme" }
-                        }
-                    ]
+        let config = MatcherConfig {
+            matchers: vec![field(
+                PredicateConfig::And {
+                    predicates: vec![
+                        built_in("role", StringMatchSpec::Exact("admin".into())),
+                        built_in("org", StringMatchSpec::Prefix("acme".into())),
+                    ],
                 },
-                "on_match": { "type": "action", "action": "admin_acme" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+                act("admin_acme"),
+            )],
+            on_no_match: None,
+        };
         let matcher = registry.load_matcher(config).unwrap();
 
         let ctx = KvContext::new()
@@ -278,3 +290,13 @@ mod config_tests {
         assert_eq!(matcher.evaluate(&ctx), None);
     }
 }
+
+/// The crate README's Rust blocks, compiled and run as doctests.
+///
+/// A crate README is a published artifact — it is the crates.io front page —
+/// and until 2026-08-18 nothing checked one. `rumi-core`'s showed a config
+/// dialect that had been retired, so the first thing a new reader would have
+/// copied could not load. Nothing failed, because nothing looked.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;
