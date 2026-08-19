@@ -1,4 +1,6 @@
-# Collapse buf-generated code in GitHub PR diffs
+# Collapse buf-generated code in GitHub PR diffs.
+#
+# Rust only: puma and bumi have no generated types — they read protojson by
+# hand, because neither betterproto nor ts-proto rejects an unknown field.
+# See DECISIONS.md D-038.
 rumi/proto/src/gen/** linguist-generated=true
-puma/proto/src/gen/** linguist-generated=true
-bumi/proto/src/gen/** linguist-generated=true
