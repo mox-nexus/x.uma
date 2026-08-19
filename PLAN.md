@@ -84,7 +84,7 @@ which it was not when written.
 **C4 is answered.** Migrate 11 of the 14 `matcher:` fixtures to protojson. Move
 the other 3 — first-match-wins, nested-matcher-failure propagation, `on_no_match`
 precedence — into `rumi/core/src/matcher.rs`'s test module, because their subject
-is `Matcher::new` and `evaluate`, which after C5 is the path both domain
+is `Matcher::list` and `evaluate`, which after C5 is the path both domain
 compilers use and which no protojson fixture would then cover. They are not
 cross-language claims; puma and bumi have their own `Matcher` types.
 

@@ -171,7 +171,7 @@ mod tests {
     fn test_full_matcher() {
         let ctx = KvContext::new().with("role", "admin");
 
-        let matcher: Matcher<KvContext, &str> = Matcher::new(
+        let matcher: Matcher<KvContext, &str> = Matcher::list(
             vec![FieldMatcher::new(
                 Predicate::Single(SinglePredicate::new(
                     Box::new(StringInput::new("role").unwrap()),

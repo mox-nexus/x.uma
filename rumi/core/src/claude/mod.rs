@@ -129,7 +129,7 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "rm -rf /important");
 
         // Match dangerous Bash commands
-        let matcher: Matcher<HookContext, &str> = Matcher::new(
+        let matcher: Matcher<HookContext, &str> = Matcher::list(
             vec![FieldMatcher::new(
                 Predicate::And(vec![
                     Predicate::Single(SinglePredicate::new(

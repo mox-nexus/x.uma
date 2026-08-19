@@ -269,7 +269,7 @@ fn config_evaluate_simple(bencher: divan::Bencher) {
 
 #[divan::bench]
 fn compiler_evaluate_simple(bencher: divan::Bencher) {
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![FieldMatcher::new(
             Predicate::Single(SinglePredicate::new(
                 Box::new(rumi_kv::StringInput::new("role").unwrap()),
@@ -302,7 +302,7 @@ fn config_construct_simple(bencher: divan::Bencher) {
 #[divan::bench]
 fn compiler_construct_simple(bencher: divan::Bencher) {
     bencher.bench_local(|| {
-        Matcher::<KvContext, String>::new(
+        Matcher::<KvContext, String>::list(
             vec![FieldMatcher::new(
                 Predicate::Single(SinglePredicate::new(
                     Box::new(rumi_kv::StringInput::new("role").unwrap()),

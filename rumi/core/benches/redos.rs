@@ -56,7 +56,7 @@ impl DataInput<Ctx> for ValueInput {
 
 #[divan::bench(args = [10, 20, 50, 100])]
 fn redos_full_pipeline(bencher: divan::Bencher, n: usize) {
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![FieldMatcher::new(
             Predicate::Single(SinglePredicate::new(
                 Box::new(ValueInput),

@@ -53,9 +53,9 @@ Apply this in `Registry::load_matcher()` if the method body grows large. Monomor
 
 **Source:** rustls (typestate builder → frozen config), confirmed across 8/13 codebases
 
-x.uma does this on the loaded-config path: `Matcher::new` → `validate()` → use. The hot path (`evaluate()` at 33ns) is infallible.
+x.uma does this on the loaded-config path: `Matcher::list` → `validate()` → use. The hot path (`evaluate()` at 33ns) is infallible.
 
-**Know which path you are on.** `Matcher::new` (`matcher.rs:64`) is a bare struct constructor that validates nothing; `validate()` is a separate call. It happens for you on the registry path (`registry.rs:414`) and at every FFI entry point. It does **not** happen in either domain compiler (`ext/http/src/compiler.rs:127`, `core/src/claude/compiler.rs:109`) — the very path CLAUDE.md promotes as the door handle. A hand-built `Matcher` that never calls `validate()` carries no guarantees at all.
+**Know which path you are on.** `Matcher::list` (`matcher.rs:64`) is a bare struct constructor that validates nothing; `validate()` is a separate call. It happens for you on the registry path (`registry.rs:414`) and at every FFI entry point. It does **not** happen in either domain compiler (`ext/http/src/compiler.rs:127`, `core/src/claude/compiler.rs:109`) — the very path CLAUDE.md promotes as the door handle. A hand-built `Matcher` that never calls `validate()` carries no guarantees at all.
 
 **Why this matters for x.uma:** Config loading can fail loudly. Evaluation must never panic. This is how Envoy works too — bad config is rejected at load, never at request time.
 
@@ -118,7 +118,7 @@ This is making illegal states unrepresentable. The proto uses `oneof`, Rust uses
    }
    ```
 
-   Note what this would buy x.uma: today `Matcher::new` returns a `Matcher` whether or not `validate()` was ever called, so the domain compilers hand back matchers carrying no guarantees. A typestate `Matcher<Unvalidated>` / `Matcher<Validated>` would make that path a compile error rather than a convention. Not proposed as work here, but it is the shape of the answer if the split ever bites.
+   Note what this would buy x.uma: today `Matcher::list` returns a `Matcher` whether or not `validate()` was ever called, so the domain compilers hand back matchers carrying no guarantees. A typestate `Matcher<Unvalidated>` / `Matcher<Validated>` would make that path a compile error rather than a convention. Not proposed as work here, but it is the shape of the answer if the split ever bites.
 
 3. **Runtime check at a chokepoint** — `validate()` and the `Registry::load_*` limits. Weakest of the three, because it only holds on paths that call it. Use when the constraint is data-dependent and genuinely cannot be typed.
 

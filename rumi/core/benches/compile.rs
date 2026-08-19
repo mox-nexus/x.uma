@@ -72,7 +72,7 @@ fn compile_n_exact_rules(bencher: divan::Bencher, n: usize) {
                 )
             })
             .collect();
-        Matcher::new(rules, None)
+        Matcher::list(rules, None)
     });
 }
 
@@ -90,7 +90,7 @@ fn compile_n_regex_rules(bencher: divan::Bencher, n: usize) {
                 )
             })
             .collect();
-        Matcher::new(rules, None)
+        Matcher::list(rules, None)
     });
 }
 
@@ -118,7 +118,7 @@ fn compile_radix_tree(bencher: divan::Bencher, n: usize) {
 #[divan::bench(args = [2, 8, 16, 30])]
 fn validate_nested_depth(bencher: divan::Bencher, depth: usize) {
     // Build a matcher nested to the given depth
-    let mut current = Matcher::<Ctx, String>::new(
+    let mut current = Matcher::<Ctx, String>::list(
         vec![FieldMatcher::new(
             Predicate::Single(SinglePredicate::new(
                 Box::new(ValueInput),
@@ -130,7 +130,7 @@ fn validate_nested_depth(bencher: divan::Bencher, depth: usize) {
     );
 
     for _ in 0..depth.saturating_sub(2) {
-        current = Matcher::new(
+        current = Matcher::list(
             vec![FieldMatcher::new(
                 Predicate::Single(SinglePredicate::new(
                     Box::new(ValueInput),

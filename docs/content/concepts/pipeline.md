@@ -66,7 +66,7 @@ let predicate = Predicate::Single(SinglePredicate::new(
     Box::new(PrefixMatcher::new("/api")), // domain-agnostic
 ));
 
-let matcher: Matcher<HttpRequest, &str> = Matcher::new(
+let matcher: Matcher<HttpRequest, &str> = Matcher::list(
     vec![FieldMatcher::new(predicate, OnMatch::Action("api_backend"))],
     None,
 );

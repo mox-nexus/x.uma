@@ -8,6 +8,38 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-18 · Constructor naming
+
+### D-047 · `Matcher::list`, not `Matcher::new`
+
+D-044 made `Matcher` an xDS `oneof matcher_type` — a list of field matchers XOR
+a lookup tree. `new` was left as the list constructor, which reads as *the* way
+to build a `Matcher` and is true of neither half.
+
+Renamed to `Matcher::list`, paired symmetrically with `Matcher::tree`.
+
+Fifty-one call sites, of which twenty-two are benchmarks and twenty-three are
+`matcher.rs`'s own tests; about five are production. All mechanical, all
+compiler-verified. The change is only free before publish, and nothing is
+published.
+
+Two things the rename found that a sed alone would have missed, and which are
+the reason the sweep goes wider than the source tree:
+
+- `Self::new` inside `from_predicate`, invisible to a `Matcher::new` pattern.
+- Four documents describing the API as it works *now* — `docs/content/concepts/pipeline.md`,
+  the `rust-mastery` and `maintainer` skills, and `PLAN.md`. A skill still
+  saying `Matcher::new` is worse than a stale comment: it is loaded as guidance
+  and acted on.
+
+Two occurrences are deliberately **not** updated. `DECISIONS.md:979` and
+`bench/RESULTS.md:222` describe what was true when they were written — a past
+correction and a past benchmark run. A decision log is appended to, not
+rewritten; editing the name inside them would falsify the record to tidy a
+grep.
+
+---
+
 ## 2026-08-18 · MatcherTree from config (SF3)
 
 ### D-044 · `Matcher` is a list XOR a tree, and the tree owns no fallback
