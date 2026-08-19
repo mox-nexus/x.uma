@@ -9,7 +9,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from xuma._registry import register_core_matchers
-from xuma.http._inputs import HeaderInput, MethodInput, PathInput, QueryParamInput
+from xuma.http._inputs import (
+    AuthorityInput,
+    HeaderInput,
+    MethodInput,
+    PathInput,
+    QueryParamInput,
+    SchemeInput,
+)
 
 if TYPE_CHECKING:
     from xuma._registry import RegistryBuilder
@@ -33,7 +40,17 @@ def register(
         .input("xuma.http.v1.MethodInput", _method_factory)
         .input("xuma.http.v1.HeaderInput", _header_factory)
         .input("xuma.http.v1.QueryParamInput", _query_param_factory)
+        .input("xuma.http.v1.AuthorityInput", _authority_factory)
+        .input("xuma.http.v1.SchemeInput", _scheme_factory)
     )
+
+
+def _authority_factory(_config: dict[str, Any]) -> AuthorityInput:
+    return AuthorityInput()
+
+
+def _scheme_factory(_config: dict[str, Any]) -> SchemeInput:
+    return SchemeInput()
 
 
 def _path_factory(_config: dict[str, Any]) -> PathInput:

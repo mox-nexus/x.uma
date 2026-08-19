@@ -137,6 +137,35 @@ impl DataInput<HttpRequest> for SimplePathInput {
     }
 }
 
+/// Extracts the `:authority` pseudo-header from simple `HttpRequest`.
+///
+/// `HttpMessage` reads authority and scheme from the `:authority` and
+/// `:scheme` pseudo-headers, and `HttpRequest` carries headers, so it reads
+/// them from the same place. Without these two, `register_simple` bound four of
+/// the six `xuma.http.v1.*` type URLs and `register` bound all six — the same
+/// one-type-URL-two-behaviours class as F26, in the shape of a type URL that
+/// resolves in one context and not the other.
+#[derive(Debug, Clone, Default)]
+pub struct SimpleAuthorityInput;
+
+impl DataInput<HttpRequest> for SimpleAuthorityInput {
+    fn get(&self, ctx: &HttpRequest) -> MatchingData {
+        ctx.header(":authority")
+            .map_or(MatchingData::None, |a| MatchingData::String(a.to_string()))
+    }
+}
+
+/// Extracts the `:scheme` pseudo-header from simple `HttpRequest`.
+#[derive(Debug, Clone, Default)]
+pub struct SimpleSchemeInput;
+
+impl DataInput<HttpRequest> for SimpleSchemeInput {
+    fn get(&self, ctx: &HttpRequest) -> MatchingData {
+        ctx.header(":scheme")
+            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
+    }
+}
+
 /// Extracts a header from simple `HttpRequest`.
 #[derive(Debug, Clone)]
 pub struct SimpleHeaderInput {
@@ -223,6 +252,28 @@ impl rumi::IntoDataInput<HttpRequest> for SimpleMethodInput {
 }
 
 #[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HttpRequest> for SimpleAuthorityInput {
+    type Config = rumi_proto::xuma::http::v1::AuthorityInput;
+
+    fn from_config(
+        _: Self::Config,
+    ) -> Result<Box<dyn rumi::DataInput<HttpRequest>>, rumi::MatcherError> {
+        Ok(Box::new(SimpleAuthorityInput))
+    }
+}
+
+#[cfg(feature = "registry")]
+impl rumi::IntoDataInput<HttpRequest> for SimpleSchemeInput {
+    type Config = rumi_proto::xuma::http::v1::SchemeInput;
+
+    fn from_config(
+        _: Self::Config,
+    ) -> Result<Box<dyn rumi::DataInput<HttpRequest>>, rumi::MatcherError> {
+        Ok(Box::new(SimpleSchemeInput))
+    }
+}
+
+#[cfg(feature = "registry")]
 impl rumi::IntoDataInput<HttpRequest> for SimpleHeaderInput {
     type Config = SimpleHeaderInputConfig;
 
@@ -264,6 +315,8 @@ pub fn register_simple(
         .input::<SimpleMethodInput>("xuma.http.v1.MethodInput")
         .input::<SimpleHeaderInput>("xuma.http.v1.HeaderInput")
         .input::<SimpleQueryParamInput>("xuma.http.v1.QueryParamInput")
+        .input::<SimpleAuthorityInput>("xuma.http.v1.AuthorityInput")
+        .input::<SimpleSchemeInput>("xuma.http.v1.SchemeInput")
 }
 
 #[cfg(test)]

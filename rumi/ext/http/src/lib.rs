@@ -46,8 +46,8 @@ mod message;
 
 // Simple types (always available)
 pub use simple::{
-    HttpRequest, HttpRequestBuilder, SimpleHeaderInput, SimpleMethodInput, SimplePathInput,
-    SimpleQueryParamInput,
+    HttpRequest, HttpRequestBuilder, SimpleAuthorityInput, SimpleHeaderInput, SimpleMethodInput,
+    SimplePathInput, SimpleQueryParamInput, SimpleSchemeInput,
 };
 
 // Registry for simple HttpRequest context (always available with registry)
@@ -80,10 +80,12 @@ pub mod prelude {
         // Simple context + inputs (always available)
         HttpRequest,
         HttpRequestBuilder,
+        SimpleAuthorityInput,
         SimpleHeaderInput,
         SimpleMethodInput,
         SimplePathInput,
         SimpleQueryParamInput,
+        SimpleSchemeInput,
     };
 
     // The domain: indexed context and its DataInputs.

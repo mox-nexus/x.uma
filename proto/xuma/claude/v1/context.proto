@@ -27,23 +27,3 @@ message HookContext {
   string git_branch = 6;
 }
 
-// Action to allow the tool use to proceed.
-message AllowAction {
-  // Optional message to display.
-  string message = 1;
-}
-
-// Action to block the tool use.
-message BlockAction {
-  // Reason for blocking (displayed to user).
-  string reason = 1;
-}
-
-// Action to modify the tool use.
-message ModifyAction {
-  // Modified tool arguments.
-  map<string, string> modified_args = 1;
-
-  // Optional message explaining the modification.
-  string message = 2;
-}

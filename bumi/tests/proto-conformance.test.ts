@@ -17,19 +17,32 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { loadAll } from "js-yaml";
 
+import { HttpRequest, register as registerHttp } from "../src/http/index.ts";
 import { RegistryBuilder, parseProtojson } from "../src/index.ts";
 import { register } from "../src/testing.ts";
 
 const ME = "typescript";
 const PROTO_DIR = join(import.meta.dir, "..", "..", "spec", "tests", "07_protojson");
 
+interface HttpRequestSpec {
+	method?: string;
+	path?: string;
+	headers?: Record<string, string>;
+}
+
 interface Fixture {
 	name: string;
 	proto_matcher: unknown;
 	implementations?: string[];
+	domain?: "kv" | "http";
 	expect_error?: boolean;
 	error_contains?: string;
-	cases?: { name: string; context?: Record<string, string>; expect: string | null }[];
+	cases?: {
+		name: string;
+		context?: Record<string, string>;
+		http_request?: HttpRequestSpec;
+		expect: string | null;
+	}[];
 }
 
 function load(): Fixture[] {
@@ -46,9 +59,30 @@ function load(): Fixture[] {
 
 const FIXTURES = load();
 
-function build(fixture: Fixture) {
-	const registry = register(new RegistryBuilder()).build();
-	return registry.loadMatcher(parseProtojson(fixture.proto_matcher));
+/**
+ * Load the fixture's matcher. The config is domain-agnostic; only the registry
+ * differs.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: two domains, two Matcher<Ctx> types
+function build(fixture: Fixture): any {
+	const builder =
+		fixture.domain === "http"
+			? registerHttp(new RegistryBuilder())
+			: register(new RegistryBuilder());
+	return builder.build().loadMatcher(parseProtojson(fixture.proto_matcher));
+}
+
+/** Build the context a case evaluates against, for its fixture's domain. */
+// biome-ignore lint/suspicious/noExplicitAny: see build()
+function context(fixture: Fixture, c: NonNullable<Fixture["cases"]>[number]): any {
+	if (fixture.domain === "http") {
+		const spec = c.http_request;
+		if (spec === undefined) {
+			throw new Error(`case "${c.name}" is in the http domain but has no http_request`);
+		}
+		return new HttpRequest(spec.method ?? "", spec.path ?? "", spec.headers ?? {});
+	}
+	return c.context ?? {};
 }
 
 describe("protojson conformance", () => {
@@ -83,7 +117,7 @@ describe("protojson conformance", () => {
 
 			const matcher = build(fixture);
 			for (const c of fixture.cases ?? []) {
-				expect(matcher.evaluate(c.context ?? {})).toBe(c.expect);
+				expect(matcher.evaluate(context(fixture, c))).toBe(c.expect);
 			}
 		});
 	}

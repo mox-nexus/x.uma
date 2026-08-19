@@ -42,64 +42,40 @@ const KNOWN_GAPS: &[(&str, &str)] = &[
         "context data, not configuration — it is what a matcher reads, never an @type payload",
     ),
     (
-        "xuma.claude.v1.AllowAction",
-        "Claude domain has no protojson fixtures yet",
-    ),
-    (
-        "xuma.claude.v1.BlockAction",
-        "Claude domain has no protojson fixtures yet",
-    ),
-    (
-        "xuma.claude.v1.ModifyAction",
-        "Claude domain has no protojson fixtures yet",
-    ),
-    (
         "xuma.claude.v1.EventTypeInput",
-        "Claude domain has no protojson fixtures yet",
+        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
+         would not be a cross-language claim. Fixture it when puma and bumi grow the \
+         domain — see CLAUDE.md, which states the asymmetry",
     ),
     (
         "xuma.claude.v1.ToolNameInput",
-        "Claude domain has no protojson fixtures yet",
+        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
+         would not be a cross-language claim. Fixture it when puma and bumi grow the \
+         domain — see CLAUDE.md, which states the asymmetry",
     ),
     (
         "xuma.claude.v1.ToolArgInput",
-        "Claude domain has no protojson fixtures yet",
+        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
+         would not be a cross-language claim. Fixture it when puma and bumi grow the \
+         domain — see CLAUDE.md, which states the asymmetry",
     ),
     (
         "xuma.claude.v1.SessionIdInput",
-        "Claude domain has no protojson fixtures yet",
+        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
+         would not be a cross-language claim. Fixture it when puma and bumi grow the \
+         domain — see CLAUDE.md, which states the asymmetry",
     ),
     (
         "xuma.claude.v1.CwdInput",
-        "Claude domain has no protojson fixtures yet",
+        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
+         would not be a cross-language claim. Fixture it when puma and bumi grow the \
+         domain — see CLAUDE.md, which states the asymmetry",
     ),
     (
         "xuma.claude.v1.GitBranchInput",
-        "Claude domain has no protojson fixtures yet",
-    ),
-    (
-        "xuma.http.v1.HeaderInput",
-        "HTTP domain has no protojson fixtures yet",
-    ),
-    (
-        "xuma.http.v1.PathInput",
-        "HTTP domain has no protojson fixtures yet",
-    ),
-    (
-        "xuma.http.v1.MethodInput",
-        "HTTP domain has no protojson fixtures yet",
-    ),
-    (
-        "xuma.http.v1.QueryParamInput",
-        "HTTP domain has no protojson fixtures yet",
-    ),
-    (
-        "xuma.http.v1.AuthorityInput",
-        "HTTP domain has no protojson fixtures yet",
-    ),
-    (
-        "xuma.http.v1.SchemeInput",
-        "HTTP domain has no protojson fixtures yet",
+        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
+         would not be a cross-language claim. Fixture it when puma and bumi grow the \
+         domain — see CLAUDE.md, which states the asymmetry",
     ),
 ];
 
