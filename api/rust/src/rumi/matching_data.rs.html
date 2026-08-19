@@ -606,7 +606,7 @@
 <a href=#606 id=606 data-nosnippet>606</a>            };
 <a href=#607 id=607 data-nosnippet>607</a>
 <a href=#608 id=608 data-nosnippet>608</a>            <span class="comment">// Build matcher: route to different backends based on location
-<a href=#609 id=609 data-nosnippet>609</a>            </span><span class="kw">let </span>matcher: Matcher&lt;GeoRequest, String&gt; = Matcher::new(
+<a href=#609 id=609 data-nosnippet>609</a>            </span><span class="kw">let </span>matcher: Matcher&lt;GeoRequest, String&gt; = Matcher::list(
 <a href=#610 id=610 data-nosnippet>610</a>                <span class="macro">vec!</span>[
 <a href=#611 id=611 data-nosnippet>611</a>                    <span class="comment">// Rule 1: SF area → sf_backend
 <a href=#612 id=612 data-nosnippet>612</a>                    </span>FieldMatcher::new(

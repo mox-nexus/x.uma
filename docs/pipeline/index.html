@@ -4,23 +4,23 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="icon" href="../../favicon.svg" />
-		<link href="../../_app/immutable/entry/start.Dld0MWd6.js" rel="modulepreload">
-		<link href="../../_app/immutable/chunks/CoZu83F_.js" rel="modulepreload">
+		<link href="../../_app/immutable/entry/start.DWFSwwX9.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/CG3xW0gJ.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/DYiHVAw2.js" rel="modulepreload">
-		<link href="../../_app/immutable/chunks/0sOeOjdC.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/CYtnHna0.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/-UyI9lYi.js" rel="modulepreload">
-		<link href="../../_app/immutable/entry/app.BquSp1UW.js" rel="modulepreload">
+		<link href="../../_app/immutable/entry/app.XORKQ7mR.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/DNngEcdt.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/DOHXvLXS.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/C7IGVkAW.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/C83bZML1.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/DQj2CSf0.js" rel="modulepreload">
-		<link href="../../_app/immutable/nodes/0.DI3XTMkI.js" rel="modulepreload">
+		<link href="../../_app/immutable/nodes/0.B57VqSyb.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/ghtWklD6.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/DcI0cIgz.js" rel="modulepreload">
-		<link href="../../_app/immutable/chunks/BJO1mW1c.js" rel="modulepreload">
+		<link href="../../_app/immutable/chunks/DQB9fQ9K.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/CDwJ5Klk.js" rel="modulepreload">
-		<link href="../../_app/immutable/nodes/4.CkPJah7b.js" rel="modulepreload">
+		<link href="../../_app/immutable/nodes/4.BngbhPjy.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/IoRnOvJ0.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/Dn50trCA.js" rel="modulepreload">
 		<link href="../../_app/immutable/chunks/30izSzcL.js" rel="modulepreload">
@@ -89,7 +89,7 @@ let predicate = Predicate::Single(SinglePredicate::new(
     Box::new(PrefixMatcher::new("/api")), // domain-agnostic
 ));
 
-let matcher: Matcher&lt;HttpRequest, &amp;str> = Matcher::new(
+let matcher: Matcher&lt;HttpRequest, &amp;str> = Matcher::list(
     vec![FieldMatcher::new(predicate, OnMatch::Action("api_backend"))],
     None,
 );
@@ -208,7 +208,7 @@ assert_eq!(matcher.evaluate(&amp;request), Some("api_backend"));
 			
 			<script>
 				{
-					__sveltekit_ukwkom = {
+					__sveltekit_tb4swo = {
 						base: new URL("../..", location).pathname.slice(0, -1),
 						assets: "/x.uma"
 					};
@@ -216,8 +216,8 @@ assert_eq!(matcher.evaluate(&amp;request), Some("api_backend"));
 					const element = document.currentScript.parentElement;
 
 					Promise.all([
-						import("../../_app/immutable/entry/start.Dld0MWd6.js"),
-						import("../../_app/immutable/entry/app.BquSp1UW.js")
+						import("../../_app/immutable/entry/start.DWFSwwX9.js"),
+						import("../../_app/immutable/entry/app.XORKQ7mR.js")
 					]).then(([kit, app]) => {
 						kit.start(app, element, {
 							node_ids: [0, 4],

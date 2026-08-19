@@ -129,7 +129,7 @@
 <a href=#129 id=129 data-nosnippet>129</a>        <span class="kw">let </span>ctx = HookContext::pre_tool_use(<span class="string">"Bash"</span>).with_arg(<span class="string">"command"</span>, <span class="string">"rm -rf /important"</span>);
 <a href=#130 id=130 data-nosnippet>130</a>
 <a href=#131 id=131 data-nosnippet>131</a>        <span class="comment">// Match dangerous Bash commands
-<a href=#132 id=132 data-nosnippet>132</a>        </span><span class="kw">let </span>matcher: Matcher&lt;HookContext, <span class="kw-2">&amp;</span>str&gt; = Matcher::new(
+<a href=#132 id=132 data-nosnippet>132</a>        </span><span class="kw">let </span>matcher: Matcher&lt;HookContext, <span class="kw-2">&amp;</span>str&gt; = Matcher::list(
 <a href=#133 id=133 data-nosnippet>133</a>            <span class="macro">vec!</span>[FieldMatcher::new(
 <a href=#134 id=134 data-nosnippet>134</a>                Predicate::And(<span class="macro">vec!</span>[
 <a href=#135 id=135 data-nosnippet>135</a>                    Predicate::Single(SinglePredicate::new(
