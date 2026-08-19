@@ -129,15 +129,34 @@ class FieldMatcherConfig[A]:
 
 
 @dataclass(frozen=True, slots=True)
+class MatcherTreeConfig[A]:
+    """Configuration for a MatcherTree — xDS ``Matcher.MatcherTree``.
+
+    Carries no fallback. The proto MatcherTree has no ``on_no_match`` field;
+    the enclosing Matcher owns it, so there is exactly one place a miss can be
+    handled. See DECISIONS.md D-044.
+    """
+
+    input: TypedConfig
+    # "exact" or "prefix" — which lookup rule applies.
+    rule: str
+    entries: tuple[tuple[str, OnMatchConfig[A]], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class MatcherConfig[A]:
     """Configuration for a Matcher.
 
-    Deserializes from JSON/YAML dicts and can be loaded into a runtime
-    Matcher via Registry.load_matcher().
+    Built by the protojson reader and loaded into a runtime Matcher via
+    Registry.load_matcher().
+
+    ``matchers`` and ``tree`` mirror xDS's ``oneof matcher_type``: exactly one
+    is set. A list is by far the common case, so it stays the positional field.
     """
 
-    matchers: tuple[FieldMatcherConfig[A], ...]
+    matchers: tuple[FieldMatcherConfig[A], ...] = ()
     on_no_match: OnMatchConfig[A] | None = None
+    tree: MatcherTreeConfig[A] | None = None
 
 
 class ConfigParseError(Exception):

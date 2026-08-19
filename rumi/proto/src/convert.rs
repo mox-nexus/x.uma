@@ -18,9 +18,9 @@
 //! | `OnMatch::Matcher` | `OnMatchConfig::Matcher { matcher: Box<...> }` |
 
 use rumi::{
-    ActionRegistry, FieldMatcherConfig, Matcher, MatcherConfig, MatcherError, OnMatchConfig,
-    PredicateConfig, Registry, SinglePredicateConfig, StringMatchSpec, TypedConfig,
-    ValueMatchConfig,
+    ActionRegistry, FieldMatcherConfig, Matcher, MatcherConfig, MatcherError, MatcherKindConfig,
+    MatcherTreeConfig, OnMatchConfig, PredicateConfig, Registry, SinglePredicateConfig,
+    StringMatchSpec, TreeTypeConfig, TypedConfig, ValueMatchConfig,
 };
 
 use crate::any_resolver::AnyResolver;
@@ -66,8 +66,9 @@ where
 ///
 /// # Supported matcher types
 ///
-/// Currently supports `MatcherList` (linear first-match-wins). `MatcherTree`
-/// support will be added when needed.
+/// `MatcherList` (linear first-match-wins) and `MatcherTree` (exact or
+/// longest-prefix map lookup). `MatcherTree.custom_match` is refused by name —
+/// rumi has no caller-supplied tree extension point.
 ///
 /// # Errors
 ///
@@ -77,16 +78,15 @@ pub fn convert_matcher(
     matcher: &proto_matcher::Matcher,
     resolver: &AnyResolver,
 ) -> Result<MatcherConfig<TypedConfig>, MatcherError> {
-    let matchers = match &matcher.matcher_type {
-        Some(proto_matcher::matcher::MatcherType::MatcherList(list)) => list
-            .matchers
-            .iter()
-            .map(|fm| convert_field_matcher(fm, resolver))
-            .collect::<Result<Vec<_>, _>>()?,
-        Some(proto_matcher::matcher::MatcherType::MatcherTree(_)) => {
-            return Err(MatcherError::InvalidConfig {
-                source: "MatcherTree is not yet supported; use MatcherList".into(),
-            });
+    let kind = match &matcher.matcher_type {
+        Some(proto_matcher::matcher::MatcherType::MatcherList(list)) => MatcherKindConfig::List(
+            list.matchers
+                .iter()
+                .map(|fm| convert_field_matcher(fm, resolver))
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
+        Some(proto_matcher::matcher::MatcherType::MatcherTree(tree)) => {
+            MatcherKindConfig::Tree(convert_matcher_tree(tree, resolver)?)
         }
         None => {
             return Err(MatcherError::InvalidConfig {
@@ -101,9 +101,68 @@ pub fn convert_matcher(
         .map(|om| convert_on_match(om, resolver))
         .transpose()?;
 
-    Ok(MatcherConfig {
-        matchers,
-        on_no_match,
+    Ok(MatcherConfig { kind, on_no_match })
+}
+
+/// Convert a proto `MatcherTree`.
+///
+/// Entries route through [`convert_on_match`] rather than reimplementing it, so
+/// a tree inherits the same `keep_matching` refusal and nested-matcher handling
+/// a list entry gets.
+fn convert_matcher_tree(
+    tree: &proto_matcher::matcher::MatcherTree,
+    resolver: &AnyResolver,
+) -> Result<MatcherTreeConfig<TypedConfig>, MatcherError> {
+    use proto_matcher::matcher::matcher_tree::TreeType;
+
+    let input = tree
+        .input
+        .as_ref()
+        .ok_or_else(|| MatcherError::InvalidConfig {
+            source: "matcherTree: 'input' is required".into(),
+        })?;
+    let input = resolver.resolve(input)?;
+
+    let convert_map = |map: &proto_matcher::matcher::matcher_tree::MatchMap| {
+        // A `HashMap` iterates in an unspecified order. Sorting makes the
+        // loaded config a deterministic function of the document, which
+        // matters because a duplicate-key error should name the same key on
+        // every run.
+        let mut entries: Vec<_> = map.map.iter().collect();
+        entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+        entries
+            .into_iter()
+            .map(|(key, om)| convert_on_match(om, resolver).map(|om| (key.clone(), om)))
+            .collect::<Result<Vec<_>, _>>()
+    };
+
+    let tree_type = match &tree.tree_type {
+        Some(TreeType::ExactMatchMap(map)) => TreeTypeConfig::ExactMatchMap(convert_map(map)?),
+        Some(TreeType::PrefixMatchMap(map)) => TreeTypeConfig::PrefixMatchMap(convert_map(map)?),
+        Some(TreeType::CustomMatch(_)) => {
+            // Refused by name rather than falling into the absent-oneof branch
+            // below: reporting "no map set" for a config that plainly sets one
+            // sends the author looking in the wrong place.
+            return Err(MatcherError::InvalidConfig {
+                source: "matcherTree: 'customMatch' is not supported; \
+                         use 'exactMatchMap' or 'prefixMatchMap'"
+                    .into(),
+            });
+        }
+        None => {
+            // Fail closed. An empty tree matches nothing, so it would fall
+            // straight through to onNoMatch and silently turn a deny rule into
+            // whatever the fallback says.
+            return Err(MatcherError::InvalidConfig {
+                source: "matcherTree: one of 'exactMatchMap' or 'prefixMatchMap' is required"
+                    .into(),
+            });
+        }
+    };
+
+    Ok(MatcherTreeConfig {
+        input,
+        tree: tree_type,
     })
 }
 
@@ -291,6 +350,15 @@ fn convert_on_match(
 
 #[cfg(test)]
 mod tests {
+    /// The field matchers of a converted config. Panics on a tree — the
+    /// callers here all build lists.
+    fn list_of<A>(config: &MatcherConfig<A>) -> &[FieldMatcherConfig<A>] {
+        match &config.kind {
+            MatcherKindConfig::List(l) => l,
+            MatcherKindConfig::Tree(_) => panic!("expected a list matcher"),
+        }
+    }
+
     use super::*;
     use crate::any_resolver::AnyResolverBuilder;
     use crate::xds::core::v3::TypedExtensionConfig;
@@ -366,11 +434,11 @@ mod tests {
         };
 
         let config = convert_matcher(&proto, &resolver).unwrap();
-        assert_eq!(config.matchers.len(), 1);
+        assert_eq!(list_of(&config).len(), 1);
         assert!(config.on_no_match.is_none());
 
         // Check the predicate has our input
-        match &config.matchers[0].predicate {
+        match &list_of(&config)[0].predicate {
             PredicateConfig::Single(sp) => {
                 assert_eq!(sp.input.type_url, "xuma.kv.v1.MapInput");
                 assert_eq!(sp.input.config["key"], "role");
@@ -379,7 +447,7 @@ mod tests {
         }
 
         // Check the action
-        match &config.matchers[0].on_match {
+        match &list_of(&config)[0].on_match {
             OnMatchConfig::Action { action } => {
                 assert_eq!(action.type_url, "xuma.core.v1.NamedAction");
                 assert_eq!(action.config["name"], "allow");
@@ -514,7 +582,7 @@ mod tests {
         };
 
         let config = convert_matcher(&proto, &resolver).unwrap();
-        match &config.matchers[0].predicate {
+        match &list_of(&config)[0].predicate {
             PredicateConfig::And { predicates } => assert_eq!(predicates.len(), 2),
             other => panic!("expected And, got {other:?}"),
         }

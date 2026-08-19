@@ -14,6 +14,17 @@ import { MatcherError } from "./matcher.ts";
 /** Maximum field matchers in one matcher list. */
 export const MAX_FIELD_MATCHERS = 256;
 
+/**
+ * Maximum entries in a single MatcherTree.
+ *
+ * Deliberately not MAX_FIELD_MATCHERS, and for a different reason. That limit
+ * is about evaluation: a list is O(n) per request, so its width is a
+ * per-request cost. A tree is a keyed lookup, so entry count costs nothing at
+ * evaluation time — and large routing tables are the entire reason to reach
+ * for one. What a tree's width costs is memory at config load.
+ */
+export const MAX_TREE_ENTRIES = 65_536;
+
 /** Maximum predicates inside one compound predicate. */
 export const MAX_PREDICATES_PER_COMPOUND = 256;
 

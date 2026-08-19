@@ -104,15 +104,7 @@ impl HookMatcher {
         let ctx = build_context_from_js(&context)?;
         let trace = self.inner.evaluate_with_trace(&ctx);
 
-        let steps: Vec<TraceStepSerde> = trace
-            .steps
-            .iter()
-            .map(|step| TraceStepSerde {
-                index: step.index,
-                matched: step.matched,
-                predicate: format!("{:?}", step.predicate_trace),
-            })
-            .collect();
+        let steps = trace_steps(&trace.steps);
 
         let result = TraceResultSerde {
             result: trace.result,
@@ -205,4 +197,29 @@ pub(crate) struct TraceStepSerde {
     pub(crate) index: usize,
     pub(crate) matched: bool,
     pub(crate) predicate: String,
+}
+
+/// Flatten a trace's steps into the FFI shape.
+///
+/// A tree performs one lookup rather than a list of predicate evaluations, so
+/// it maps to a single step whose `predicate` field describes the lookup. It
+/// does **not** synthesize a predicate trace: the trace would then assert a
+/// `SinglePredicate` that is not in the config, making it a second and wrong
+/// source of truth. `index` is 0 because there is exactly one.
+pub(crate) fn trace_steps<A: std::fmt::Debug>(steps: &rumi::EvalSteps<A>) -> Vec<TraceStepSerde> {
+    match steps {
+        rumi::EvalSteps::List(list) => list
+            .iter()
+            .map(|step| TraceStepSerde {
+                index: step.index,
+                matched: step.matched,
+                predicate: format!("{:?}", step.predicate_trace),
+            })
+            .collect(),
+        rumi::EvalSteps::Tree(lookup) => vec![TraceStepSerde {
+            index: 0,
+            matched: lookup.matched_key.is_some(),
+            predicate: format!("{lookup:?}"),
+        }],
+    }
 }

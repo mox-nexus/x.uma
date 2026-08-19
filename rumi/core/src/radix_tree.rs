@@ -55,6 +55,36 @@ impl<V> RadixTree<V> {
         self.root.insert(key, value)
     }
 
+    /// Number of stored values.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.root.count()
+    }
+
+    /// Returns `true` if the tree stores no values.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Every stored value, in unspecified order.
+    pub fn values(&self) -> impl Iterator<Item = &V> {
+        let mut out = Vec::new();
+        self.root.collect_values(&mut out);
+        out.into_iter()
+    }
+
+    /// Longest matching prefix, with the key that matched.
+    ///
+    /// The winning key is by definition a prefix of `key`, so it is returned as
+    /// a slice of the input rather than stored on every node. Traces need it:
+    /// "`/api/v2` won for `/api/v2/users`" is the whole non-obvious step of a
+    /// prefix lookup, and a trace without it explains nothing.
+    #[must_use]
+    pub fn find_longest_prefix_entry<'a>(&'a self, key: &'a str) -> Option<(&'a str, &'a V)> {
+        self.root.find_longest_prefix_entry(key)
+    }
+
     /// Find the value for an exact key match.
     #[must_use]
     pub fn get(&self, key: &str) -> Option<&V> {
@@ -204,6 +234,53 @@ impl<V> Node<V> {
         }
 
         last_match
+    }
+
+    fn count(&self) -> usize {
+        usize::from(self.value.is_some()) + self.children.values().map(Node::count).sum::<usize>()
+    }
+
+    fn collect_values<'a>(&'a self, out: &mut Vec<&'a V>) {
+        if let Some(ref v) = self.value {
+            out.push(v);
+        }
+        for child in self.children.values() {
+            child.collect_values(out);
+        }
+    }
+
+    fn find_longest_prefix_entry<'a>(&'a self, key: &'a str) -> Option<(&'a str, &'a V)> {
+        let mut current = self;
+        let mut consumed = 0usize;
+        let mut last: Option<(usize, &V)> = None;
+
+        if let Some(ref v) = current.value {
+            last = Some((0, v));
+        }
+
+        loop {
+            let remaining = &key[consumed..];
+            if remaining.is_empty() {
+                break;
+            }
+
+            let first_byte = remaining.as_bytes()[0];
+            let Some(child) = current.children.get(&first_byte) else {
+                break;
+            };
+
+            if remaining.len() >= child.prefix.len() && remaining.starts_with(&child.prefix) {
+                consumed += child.prefix.len();
+                current = child;
+                if let Some(ref v) = current.value {
+                    last = Some((consumed, v));
+                }
+            } else {
+                break;
+            }
+        }
+
+        last.map(|(n, v)| (&key[..n], v))
     }
 
     fn find_all_prefixes<'a>(&'a self, key: &str, results: &mut Vec<&'a V>) {

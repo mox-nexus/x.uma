@@ -137,15 +137,7 @@ impl HookMatcher {
         let ctx = build_context(event, tool_name, arguments, cwd, session_id, git_branch)?;
         let trace = self.inner.evaluate_with_trace(&ctx);
 
-        let steps: Vec<PyTraceStep> = trace
-            .steps
-            .iter()
-            .map(|step| PyTraceStep {
-                index: step.index,
-                matched: step.matched,
-                predicate: format!("{:?}", step.predicate_trace),
-            })
-            .collect();
+        let steps = trace_steps(&trace.steps);
 
         Ok(PyTraceResult {
             result: trace.result,
@@ -250,7 +242,7 @@ impl PyTraceResult {
 #[pyclass(frozen, from_py_object)]
 #[derive(Debug, Clone)]
 pub struct PyTraceStep {
-    /// Index of the field matcher (0-based).
+    /// Index of the field matcher (0-based). Always 0 for a tree lookup.
     #[pyo3(get)]
     pub index: usize,
     /// Whether this predicate matched.
@@ -259,6 +251,31 @@ pub struct PyTraceStep {
     /// Debug representation of the predicate trace.
     #[pyo3(get)]
     pub predicate: String,
+}
+
+/// Flatten a trace's steps into the FFI shape.
+///
+/// A tree performs one lookup rather than a list of predicate evaluations, so
+/// it maps to a single step whose `predicate` field describes the lookup. It
+/// does **not** synthesize a predicate trace: the trace would then assert a
+/// `SinglePredicate` that is not in the config, making it a second and wrong
+/// source of truth. `index` is 0 because there is exactly one.
+pub fn trace_steps<A: std::fmt::Debug>(steps: &rumi::EvalSteps<A>) -> Vec<PyTraceStep> {
+    match steps {
+        rumi::EvalSteps::List(list) => list
+            .iter()
+            .map(|step| PyTraceStep {
+                index: step.index,
+                matched: step.matched,
+                predicate: format!("{:?}", step.predicate_trace),
+            })
+            .collect(),
+        rumi::EvalSteps::Tree(lookup) => vec![PyTraceStep {
+            index: 0,
+            matched: lookup.matched_key.is_some(),
+            predicate: format!("{lookup:?}"),
+        }],
+    }
 }
 
 #[pymethods]

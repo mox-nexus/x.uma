@@ -247,13 +247,11 @@ mod config_tests {
     fn load_matcher_with_map_input() {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
-        let config = MatcherConfig {
-            matchers: vec![field(
-                built_in("role", StringMatchSpec::Exact("admin".into())),
-                act("allow"),
-            )],
-            on_no_match: Some(act("deny")),
-        };
+        let config = MatcherConfig::list(vec![field(
+            built_in("role", StringMatchSpec::Exact("admin".into())),
+            act("allow"),
+        )])
+        .with_fallback(Some(act("deny")));
         let matcher = registry.load_matcher(config).unwrap();
 
         let ctx = KvContext::new().with("role", "admin");
@@ -267,18 +265,15 @@ mod config_tests {
     fn load_matcher_with_and_predicate() {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
-        let config = MatcherConfig {
-            matchers: vec![field(
-                PredicateConfig::And {
-                    predicates: vec![
-                        built_in("role", StringMatchSpec::Exact("admin".into())),
-                        built_in("org", StringMatchSpec::Prefix("acme".into())),
-                    ],
-                },
-                act("admin_acme"),
-            )],
-            on_no_match: None,
-        };
+        let config = MatcherConfig::list(vec![field(
+            PredicateConfig::And {
+                predicates: vec![
+                    built_in("role", StringMatchSpec::Exact("admin".into())),
+                    built_in("org", StringMatchSpec::Prefix("acme".into())),
+                ],
+            },
+            act("admin_acme"),
+        )]);
         let matcher = registry.load_matcher(config).unwrap();
 
         let ctx = KvContext::new()

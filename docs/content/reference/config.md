@@ -14,7 +14,16 @@ in a deny rule must not become a rule that never fires.
 ## Matcher
 
 Top-level config for a matcher — a `oneof`, so exactly one of `matcherList` /
-`matcherTree` is set. `matcherTree` is not implemented; use `matcherList`.
+`matcherTree` is set.
+
+Use `matcherList` to evaluate rules in order, first match wins. Use
+`matcherTree` to dispatch on a single key: it is a map lookup rather than a
+linear scan, and longest-prefix routing is the one thing a list cannot express
+— a list matches in written order, so it returns `/api` for `/api/v2` whenever
+`/api` is listed first.
+
+`onNoMatch` belongs to the `Matcher`, never to the tree. A tree that finds no
+entry falls through to it, so there is exactly one place a miss is handled.
 
 ```json
 {
@@ -26,8 +35,51 @@ Top-level config for a matcher — a `oneof`, so exactly one of `matcherList` /
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `matcherList` | `MatcherList` | One of | Field matchers evaluated in order, first match wins |
-| `matcherTree` | `MatcherTree` | One of | Not implemented — rejected at load |
+| `matcherTree` | `MatcherTree` | One of | Map lookup on one extracted key |
 | `onNoMatch` | `OnMatch` | No | Fallback when no field matcher matches |
+
+## MatcherTree
+
+Dispatches on a key extracted from the context.
+
+```json
+{
+  "input": {
+    "name": "role",
+    "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "role" }
+  },
+  "exactMatchMap": {
+    "map": {
+      "admin": { "action": { ... } },
+      "viewer": { "action": { ... } }
+    }
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `input` | `TypedExtensionConfig` | Yes | Produces the lookup key. Must be a string input |
+| `exactMatchMap` | `MatchMap` | One of | O(1) exact key lookup |
+| `prefixMatchMap` | `MatchMap` | One of | Longest matching prefix wins |
+| `customMatch` | `TypedExtensionConfig` | One of | **Not supported** — rejected by name at load |
+
+A `MatchMap` is `{"map": {"<key>": OnMatch}}`. Entry values are `OnMatch`, so
+an entry may carry a nested `Matcher` rather than an action.
+
+Rejected at load, rather than silently doing nothing:
+
+- **no map set at all.** An empty tree matches nothing, so it would fall
+  straight through to `onNoMatch` and turn a rule written to deny into
+  whatever the fallback says.
+- **`customMatch`.** Refused by name so the error does not read "no map set"
+  for a config that plainly sets one.
+- **duplicate keys.** A map keeps the last writer, which would make one of two
+  configured rules vanish without a word.
+- **a non-string `input`.** It could never match anything.
+
+Tree entries count toward the 32-level depth limit, exactly as nested
+`matcherList` matchers do.
 
 ## FieldMatcher
 

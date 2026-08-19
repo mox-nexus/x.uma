@@ -98,15 +98,7 @@ impl HttpMatcher {
         let req = build_request(method, path, headers, query_params);
         let trace = self.inner.evaluate_with_trace(&req);
 
-        let steps: Vec<super::matcher::PyTraceStep> = trace
-            .steps
-            .iter()
-            .map(|step| super::matcher::PyTraceStep {
-                index: step.index,
-                matched: step.matched,
-                predicate: format!("{:?}", step.predicate_trace),
-            })
-            .collect();
+        let steps = super::matcher::trace_steps(&trace.steps);
 
         super::matcher::PyTraceResult {
             result: trace.result,

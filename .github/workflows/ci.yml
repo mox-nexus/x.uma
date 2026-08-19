@@ -62,6 +62,17 @@ jobs:
       - name: Test (all features)
         run: cargo test --manifest-path rumi/Cargo.toml --all-features
 
+      # The crusts are outside default-members and need maturin / wasm-pack to
+      # build for real, so they run as their own jobs — which means nothing in
+      # this job or in `just ci` noticed when a core change stopped them
+      # compiling. That happened three times on 2026-08-18 alone, each found
+      # only after pushing. `cargo check` neither links nor builds a cdylib, so
+      # it needs none of that toolchain and takes ~3s.
+      - name: Crusts still compile
+        run: |
+          cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures
+          cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures
+
       - name: Feature combinations
         run: ./scripts/check-features.sh
 

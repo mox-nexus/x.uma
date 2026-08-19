@@ -36,11 +36,59 @@ use serde::Deserialize;
 /// [`Registry::load_matcher()`](crate::Registry::load_matcher).
 #[derive(Debug, Clone)]
 pub struct MatcherConfig<A> {
-    /// Field matchers to evaluate in order (first-match-wins).
-    pub matchers: Vec<FieldMatcherConfig<A>>,
+    /// A list of field matchers, or a lookup tree. Never both.
+    pub kind: MatcherKindConfig<A>,
 
-    /// Fallback when no field matcher matches.
+    /// Fallback when nothing matched.
     pub on_no_match: Option<OnMatchConfig<A>>,
+}
+
+impl<A> MatcherConfig<A> {
+    /// A list matcher, which is what most configs are.
+    #[must_use]
+    pub fn list(matchers: Vec<FieldMatcherConfig<A>>) -> Self {
+        Self {
+            kind: MatcherKindConfig::List(matchers),
+            on_no_match: None,
+        }
+    }
+
+    /// Set the fallback.
+    #[must_use]
+    pub fn with_fallback(mut self, on_no_match: Option<OnMatchConfig<A>>) -> Self {
+        self.on_no_match = on_no_match;
+        self
+    }
+}
+
+/// Config mirror of [`MatcherKind`](crate::MatcherKind) — xDS `oneof matcher_type`.
+#[derive(Debug, Clone)]
+pub enum MatcherKindConfig<A> {
+    /// Field matchers evaluated in order.
+    List(Vec<FieldMatcherConfig<A>>),
+    /// A single map lookup.
+    Tree(MatcherTreeConfig<A>),
+}
+
+/// Config for a [`MatcherTree`](crate::MatcherTree).
+///
+/// Carries no fallback: the proto `MatcherTree` has no such field and the
+/// enclosing `Matcher` owns it. See `DECISIONS.md` D-044.
+#[derive(Debug, Clone)]
+pub struct MatcherTreeConfig<A> {
+    /// The input producing the lookup key, resolved via the registry.
+    pub input: TypedConfig,
+    /// Which lookup rule applies, and the entries it applies to.
+    pub tree: TreeTypeConfig<A>,
+}
+
+/// Config mirror of xDS `MatcherTree.tree_type`.
+#[derive(Debug, Clone)]
+pub enum TreeTypeConfig<A> {
+    /// O(1) exact key lookup.
+    ExactMatchMap(Vec<(String, OnMatchConfig<A>)>),
+    /// O(k) longest-prefix lookup.
+    PrefixMatchMap(Vec<(String, OnMatchConfig<A>)>),
 }
 
 /// Configuration for a [`FieldMatcher`](crate::FieldMatcher).

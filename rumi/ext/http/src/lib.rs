@@ -180,13 +180,10 @@ mod proto_tests {
     }
 
     fn one(predicate: PredicateConfig, on_match: OnMatchConfig<String>) -> MatcherConfig<String> {
-        MatcherConfig {
-            matchers: vec![FieldMatcherConfig {
-                predicate,
-                on_match,
-            }],
-            on_no_match: None,
-        }
+        MatcherConfig::list(vec![FieldMatcherConfig {
+            predicate,
+            on_match,
+        }])
     }
 
     #[test]
@@ -206,16 +203,14 @@ mod proto_tests {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
         // PathInput is an empty proto message — no config fields
-        let config = MatcherConfig {
-            matchers: vec![FieldMatcherConfig {
-                predicate: built_in(
-                    input("xuma.http.v1.PathInput", serde_json::json!({})),
-                    StringMatchSpec::Prefix("/api".into()),
-                ),
-                on_match: act("api_backend"),
-            }],
-            on_no_match: Some(act("default")),
-        };
+        let config = MatcherConfig::list(vec![FieldMatcherConfig {
+            predicate: built_in(
+                input("xuma.http.v1.PathInput", serde_json::json!({})),
+                StringMatchSpec::Prefix("/api".into()),
+            ),
+            on_match: act("api_backend"),
+        }])
+        .with_fallback(Some(act("default")));
         let matcher = registry.load_matcher(config).unwrap();
 
         let msg = build_request(vec![(":path", "/api/users"), (":method", "GET")]);

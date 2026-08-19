@@ -403,22 +403,31 @@ impl<Ctx: 'static> Registry<Ctx> {
     where
         A: Clone + Send + Sync + 'static,
     {
-        if config.matchers.len() > MAX_FIELD_MATCHERS {
-            return Err(MatcherError::TooManyFieldMatchers {
-                count: config.matchers.len(),
-                max: MAX_FIELD_MATCHERS,
-            });
-        }
-        let matchers = config
-            .matchers
-            .into_iter()
-            .map(|fm| self.load_field_matcher(fm))
-            .collect::<Result<Vec<_>, _>>()?;
         let on_no_match = config
             .on_no_match
             .map(|om| self.load_on_match(om))
             .transpose()?;
-        let matcher = Matcher::new(matchers, on_no_match);
+
+        let matcher = match config.kind {
+            crate::config::MatcherKindConfig::List(matchers) => {
+                if matchers.len() > MAX_FIELD_MATCHERS {
+                    return Err(MatcherError::TooManyFieldMatchers {
+                        count: matchers.len(),
+                        max: MAX_FIELD_MATCHERS,
+                    });
+                }
+                let matchers = matchers
+                    .into_iter()
+                    .map(|fm| self.load_field_matcher(fm))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Matcher::new(matchers, on_no_match)
+            }
+            crate::config::MatcherKindConfig::Tree(tree) => {
+                let tree = self.load_tree(tree, |om| self.load_on_match(om))?;
+                Matcher::tree(tree, on_no_match)
+            }
+        };
+
         matcher.validate()?;
         Ok(matcher)
     }
@@ -448,22 +457,31 @@ impl<Ctx: 'static> Registry<Ctx> {
     where
         A: Clone + Send + Sync + 'static,
     {
-        if config.matchers.len() > MAX_FIELD_MATCHERS {
-            return Err(MatcherError::TooManyFieldMatchers {
-                count: config.matchers.len(),
-                max: MAX_FIELD_MATCHERS,
-            });
-        }
-        let matchers = config
-            .matchers
-            .into_iter()
-            .map(|fm| self.load_typed_field_matcher(fm, actions))
-            .collect::<Result<Vec<_>, _>>()?;
         let on_no_match = config
             .on_no_match
             .map(|om| self.load_typed_on_match(om, actions))
             .transpose()?;
-        let matcher = Matcher::new(matchers, on_no_match);
+
+        let matcher = match config.kind {
+            crate::config::MatcherKindConfig::List(matchers) => {
+                if matchers.len() > MAX_FIELD_MATCHERS {
+                    return Err(MatcherError::TooManyFieldMatchers {
+                        count: matchers.len(),
+                        max: MAX_FIELD_MATCHERS,
+                    });
+                }
+                let matchers = matchers
+                    .into_iter()
+                    .map(|fm| self.load_typed_field_matcher(fm, actions))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Matcher::new(matchers, on_no_match)
+            }
+            crate::config::MatcherKindConfig::Tree(tree) => {
+                let tree = self.load_tree(tree, |om| self.load_typed_on_match(om, actions))?;
+                Matcher::tree(tree, on_no_match)
+            }
+        };
+
         matcher.validate()?;
         Ok(matcher)
     }
@@ -472,6 +490,58 @@ impl<Ctx: 'static> Registry<Ctx> {
     #[must_use]
     pub fn input_count(&self) -> usize {
         self.input_factories.len()
+    }
+
+    /// Build a [`MatcherTree`] from config, resolving its input and entries.
+    ///
+    /// Generic over how an `OnMatch` is loaded so the direct and typed-action
+    /// loaders share one implementation — the entry semantics are identical and
+    /// only action resolution differs.
+    fn load_tree<A, C, F>(
+        &self,
+        config: crate::config::MatcherTreeConfig<C>,
+        load_on_match: F,
+    ) -> Result<crate::MatcherTree<Ctx, A>, MatcherError>
+    where
+        A: Clone + Send + Sync + 'static,
+        F: Fn(crate::config::OnMatchConfig<C>) -> Result<crate::OnMatch<Ctx, A>, MatcherError>,
+    {
+        use crate::config::TreeTypeConfig;
+
+        let input_factory = self
+            .input_factories
+            .get(&config.input.type_url)
+            .ok_or_else(|| MatcherError::UnknownTypeUrl {
+                type_url: config.input.type_url.clone(),
+                registry: "input",
+                available: self.input_factories.keys().cloned().collect(),
+            })?;
+        let input = input_factory(&config.input.config)?;
+
+        let (entries, is_prefix) = match config.tree {
+            TreeTypeConfig::ExactMatchMap(e) => (e, false),
+            TreeTypeConfig::PrefixMatchMap(e) => (e, true),
+        };
+
+        // Width is checked before building, so a config that would blow memory
+        // is rejected rather than materialised and then measured.
+        if entries.len() > crate::MAX_TREE_ENTRIES {
+            return Err(MatcherError::TooManyTreeEntries {
+                count: entries.len(),
+                max: crate::MAX_TREE_ENTRIES,
+            });
+        }
+
+        let loaded = entries
+            .into_iter()
+            .map(|(key, om)| load_on_match(om).map(|om| (key, om)))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        if is_prefix {
+            crate::MatcherTree::prefix(input, loaded)
+        } else {
+            crate::MatcherTree::exact(input, loaded)
+        }
     }
 
     /// Returns the number of registered matcher types.
@@ -794,10 +864,7 @@ mod tests {
 
     /// A matcher of one field matcher and no fallback — the common shape.
     fn one<A>(predicate: PredicateConfig, on_match: OnMatchConfig<A>) -> MatcherConfig<A> {
-        MatcherConfig {
-            matchers: vec![field(predicate, on_match)],
-            on_no_match: None,
-        }
+        MatcherConfig::list(vec![field(predicate, on_match)])
     }
 
     #[test]
@@ -806,13 +873,11 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let config = MatcherConfig {
-            matchers: vec![field(
-                built_in(value_input(), StringMatchSpec::Exact("hello".into())),
-                act("matched!"),
-            )],
-            on_no_match: Some(act("default")),
-        };
+        let config = MatcherConfig::list(vec![field(
+            built_in(value_input(), StringMatchSpec::Exact("hello".into())),
+            act("matched!"),
+        )])
+        .with_fallback(Some(act("default")));
         let matcher = registry.load_matcher(config).unwrap();
 
         let ctx = TestCtx {
@@ -1084,18 +1149,16 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let config = MatcherConfig {
-            matchers: vec![field(
-                built_in(value_input(), StringMatchSpec::Prefix(String::new())),
-                OnMatchConfig::Matcher {
-                    matcher: Box::new(one(
-                        built_in(value_input(), StringMatchSpec::Exact("deep".into())),
-                        act("nested_hit"),
-                    )),
-                },
-            )],
-            on_no_match: Some(act("fallback")),
-        };
+        let config = MatcherConfig::list(vec![field(
+            built_in(value_input(), StringMatchSpec::Prefix(String::new())),
+            OnMatchConfig::Matcher {
+                matcher: Box::new(one(
+                    built_in(value_input(), StringMatchSpec::Exact("deep".into())),
+                    act("nested_hit"),
+                )),
+            },
+        )])
+        .with_fallback(Some(act("fallback")));
         let matcher = registry.load_matcher(config).unwrap();
 
         assert_eq!(
@@ -1151,19 +1214,17 @@ mod tests {
             .action::<StringActionFactory>("test.StringAction")
             .build();
 
-        let config = MatcherConfig {
-            matchers: vec![field(
-                built_in(value_input(), StringMatchSpec::Exact("hello".into())),
-                act_typed(
-                    "test.StringAction",
-                    serde_json::json!({ "value": "typed_hit" }),
-                ),
-            )],
-            on_no_match: Some(act_typed(
+        let config = MatcherConfig::list(vec![field(
+            built_in(value_input(), StringMatchSpec::Exact("hello".into())),
+            act_typed(
                 "test.StringAction",
-                serde_json::json!({ "value": "typed_miss" }),
-            )),
-        };
+                serde_json::json!({ "value": "typed_hit" }),
+            ),
+        )])
+        .with_fallback(Some(act_typed(
+            "test.StringAction",
+            serde_json::json!({ "value": "typed_miss" }),
+        )));
         let matcher = registry.load_typed_matcher(config, &actions).unwrap();
 
         assert_eq!(
@@ -1276,10 +1337,7 @@ mod tests {
             )
         };
         let matchers: Vec<_> = (0..=crate::MAX_FIELD_MATCHERS).map(|_| fm()).collect();
-        let config = MatcherConfig {
-            matchers,
-            on_no_match: None,
-        };
+        let config = MatcherConfig::list(matchers);
         let err = registry.load_matcher(config).unwrap_err();
         match err {
             MatcherError::TooManyFieldMatchers { count, max } => {
@@ -1397,10 +1455,7 @@ mod tests {
         };
         // Exactly at the limit
         let matchers: Vec<_> = (0..crate::MAX_FIELD_MATCHERS).map(|_| fm()).collect();
-        let config = MatcherConfig {
-            matchers,
-            on_no_match: None,
-        };
+        let config = MatcherConfig::list(matchers);
         assert!(registry.load_matcher(config).is_ok());
     }
 }

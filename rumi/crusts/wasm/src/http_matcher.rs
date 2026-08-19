@@ -7,7 +7,7 @@ use rumi::prelude::*;
 use rumi_http::HttpRequest;
 use wasm_bindgen::prelude::*;
 
-use crate::matcher::{TraceResultSerde, TraceStepSerde};
+use crate::matcher::TraceResultSerde;
 
 /// An opaque compiled HTTP matcher.
 ///
@@ -69,15 +69,7 @@ impl HttpMatcher {
         let req = build_request_from_js(&context)?;
         let trace = self.inner.evaluate_with_trace(&req);
 
-        let steps: Vec<TraceStepSerde> = trace
-            .steps
-            .iter()
-            .map(|step| TraceStepSerde {
-                index: step.index,
-                matched: step.matched,
-                predicate: format!("{:?}", step.predicate_trace),
-            })
-            .collect();
+        let steps = super::matcher::trace_steps(&trace.steps);
 
         let result = TraceResultSerde {
             result: trace.result,

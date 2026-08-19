@@ -23,8 +23,7 @@ use rumi_kv::{register, KvContext};
 
 let registry = register(RegistryBuilder::new()).build();
 
-let config = MatcherConfig {
-    matchers: vec![FieldMatcherConfig {
+let config = MatcherConfig::list(vec![FieldMatcherConfig {
         predicate: PredicateConfig::Single(SinglePredicateConfig {
             input: TypedConfig {
                 type_url: "xuma.kv.v1.MapInput".into(),
@@ -38,9 +37,7 @@ let config = MatcherConfig {
         on_match: OnMatchConfig::Action {
             action: "allow".to_string(),
         },
-    }],
-    on_no_match: None,
-};
+}]);
 
 let matcher = registry.load_matcher(config).unwrap();
 

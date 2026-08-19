@@ -46,6 +46,7 @@ from xuma._config import (
     FieldMatcherConfig,
     MatcherConfig,
     MatcherOnMatchConfig,
+    MatcherTreeConfig,
     NotPredicateConfig,
     OrPredicateConfig,
     SinglePredicateConfig,
@@ -212,12 +213,16 @@ def _matcher(
         msg = f"{where}: one of 'matcherList' or 'matcherTree' is required"
         raise ConfigParseError(msg)
 
-    key, value = chosen
-    if key in ("matcher_tree", "matcherTree"):
-        # Rejected rather than ignored: a tree that silently became an empty
-        # list would answer every request with on_no_match.
-        msg = f"{where}: matcherTree is not implemented; use matcherList"
-        raise ConfigParseError(msg)
+    chosen_key, value = chosen
+
+    on_no_match = None
+    for key in ("on_no_match", "onNoMatch"):
+        if key in data:
+            on_no_match = _on_match(data[key], f"{where}.onNoMatch", depth + 1, action)
+
+    if chosen_key in ("matcher_tree", "matcherTree"):
+        tree = _matcher_tree(value, f"{where}.matcherTree", depth + 1, action)
+        return MatcherConfig(on_no_match=on_no_match, tree=tree)
 
     listing = _obj(value, f"{where}.matcherList")
     _reject_unknown(listing, frozenset({"matchers"}), f"{where}.matcherList")
@@ -231,12 +236,80 @@ def _matcher(
         for i, fm in enumerate(raw)
     )
 
-    on_no_match = None
-    for key in ("on_no_match", "onNoMatch"):
-        if key in data:
-            on_no_match = _on_match(data[key], f"{where}.onNoMatch", depth + 1, action)
-
     return MatcherConfig(matchers=matchers, on_no_match=on_no_match)
+
+
+_TREE_FIELDS = frozenset(
+    {
+        "input",
+        "exact_match_map",
+        "exactMatchMap",
+        "prefix_match_map",
+        "prefixMatchMap",
+        "custom_match",
+        "customMatch",
+    }
+)
+
+
+def _matcher_tree(
+    data: Any, where: str, depth: int, action: Callable[[TypedConfig], str]
+) -> MatcherTreeConfig[str]:
+    """Read an xDS ``MatcherTree``."""
+    _check_depth(depth, where)
+    data = _obj(data, where)
+    _reject_unknown(data, _TREE_FIELDS, where)
+
+    if "input" not in data:
+        msg = f"{where}: 'input' is required"
+        raise ConfigParseError(msg)
+    tree_input = _typed_extension(data["input"], f"{where}.input")
+
+    chosen = _one_of(
+        data,
+        (
+            "exact_match_map",
+            "exactMatchMap",
+            "prefix_match_map",
+            "prefixMatchMap",
+            "custom_match",
+            "customMatch",
+        ),
+        where,
+    )
+    if chosen is None:
+        # Fail closed. An empty tree matches nothing, so it would fall straight
+        # through to onNoMatch and silently turn a deny rule into whatever the
+        # fallback says.
+        msg = f"{where}: one of 'exactMatchMap' or 'prefixMatchMap' is required"
+        raise ConfigParseError(msg)
+
+    key, value = chosen
+    if key in ("custom_match", "customMatch"):
+        # Refused by name rather than falling into the branch above: reporting
+        # "no map set" for a config that plainly sets one sends the author
+        # looking in the wrong place.
+        msg = f"{where}: 'customMatch' is not supported; use 'exactMatchMap' or 'prefixMatchMap'"
+        raise ConfigParseError(msg)
+
+    rule = "prefix" if key in ("prefix_match_map", "prefixMatchMap") else "exact"
+    label = "prefixMatchMap" if rule == "prefix" else "exactMatchMap"
+
+    holder = _obj(value, f"{where}.{label}")
+    _reject_unknown(holder, frozenset({"map"}), f"{where}.{label}")
+    raw = holder.get("map", {})
+    if not isinstance(raw, dict):
+        msg = f"{where}.{label}.map: expected an object"
+        raise ConfigParseError(msg)
+
+    # Sorted so a duplicate-key error names the same key on every run, and so
+    # the loaded config is a deterministic function of the document.
+    entries = tuple(
+        (k, _on_match(raw[k], f"{where}.{label}.map[{k!r}]", depth + 1, action))
+        for k in sorted(raw)
+    )
+
+    return MatcherTreeConfig(input=tree_input, rule=rule, entries=entries)
 
 
 def _field_matcher(
