@@ -120,19 +120,23 @@ x.uma/
 | 7 | xuma-crust: PyO3 Python bindings | ✅ Done |
 | 7.5 | Claude domain: trace + HookMatch compiler (a **feature of `rumi-core`**, not a crate) | ✅ Done |
 | 8 | xuma-crust: wasm-bindgen TypeScript bindings | ✅ Done |
-| 9 | Cross-language benchmarks (all 5 variants) | ⚠️ Unverified |
+| 9 | Cross-language benchmarks (all 5 variants) | ⚠️ Runs, not guarded |
 | 10 | TypedExtensionConfig Registry (`IntoDataInput`, `RegistryBuilder`) | ✅ Done |
 | 11 | Test audit (removed 18 ineffective tests → 216 total) | ✅ Done |
 | 12 | Proto Alignment: buf codegen, `rumi-proto`, `AnyResolver`, xDS Matcher loading | ✅ Done |
 | 13 | Config/Registry across all implementations | ✅ Done |
-| 14 | Config-path benchmarks (all 5 variants) | ⚠️ Unverified |
+| 14 | Config-path benchmarks (all 5 variants) | ⚠️ Runs, not guarded |
 | 15 | Crate restructure + publish prep (0.0.2) | ⚠️ Unverified |
 | — | Semantic matching (cosine similarity via `CustomMatchData`) | Planned |
 | — | RE2 migration: `google-re2` for puma, `re2js` for bumi | ✅ Done |
 
 **Status legend.** ✅ Done means **CI executes something that would fail if it
 regressed**. ⚠️ Unverified means the work exists but nothing checks it, so the
-claim rests on someone's memory.
+claim rests on someone's memory. ⚠️ *Runs, not guarded* is the middle case CI
+now covers for benchmarks: they are executed on every PR, so one that panics or
+measures a vanished API fails — but there is no baseline, so a benchmark that
+got 10x slower still passes. It is not ✅ because the legend says *regressed*,
+and performance is exactly what a benchmark is supposed to guard.
 
 The general rule, learned the expensive way: **any phase whose subject is
 outside CI's reach is unverified by construction.** Phase 12 sat at ✅ for
@@ -145,7 +149,7 @@ What each ⚠️ needs to become ✅:
 | Phase | Blocked on |
 |---|---|
 | ~~7, 8~~ | ~~CI building both crusts~~ — done 2026-08-17; both are built and their 160 tests run on every PR |
-| 9, 14 | benchmarks running somewhere that can fail; they are currently manual |
+| 9, 14 | a committed baseline to compare against. They now run in CI (`just bench-smoke`), so a broken benchmark fails — but nothing yet fails on a *slower* one, which is the guarantee the ✅ implies |
 | 15 | `cargo publish --dry-run` passing without path patching — `PLAN.md` Phase E |
 
 ## Current Work

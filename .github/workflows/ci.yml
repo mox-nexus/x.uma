@@ -73,6 +73,14 @@ jobs:
           cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures
           cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures
 
+      # Not regression detection — no baseline, no threshold, so a benchmark
+      # that got 10x slower passes. It catches a benchmark that has stopped
+      # measuring anything: panics, a vanished API, a config that no longer
+      # parses. `benches/config.rs` spent months timing a config dialect that
+      # had been retired, and nothing noticed.
+      - name: Benchmarks still run
+        run: cargo bench --manifest-path rumi/Cargo.toml --all-features -- --test
+
       - name: Feature combinations
         run: ./scripts/check-features.sh
 
