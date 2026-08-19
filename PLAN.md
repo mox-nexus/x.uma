@@ -1620,7 +1620,14 @@ now.
 - [ ] Every doc code sample carries a `run` / `compile` / `cli` / `future`
       marker, CI enforces each class, and the milestone state the `future` check
       reads from is a real file
-- [ ] Every roadmap ✅ corresponds to something CI runs
+- [x] **Every roadmap ✅ corresponds to something CI runs.** The two benchmark
+      phases were the last holdouts and are now executed on every PR
+      (`just bench-smoke`). They are marked *runs, not guarded* rather than ✅,
+      because there is no committed baseline — a benchmark that got 10x slower
+      would still pass, and the legend says *regressed*. Phase 15 stays ⚠️ by
+      construction: the dependency-ordered `cargo publish --dry-run` chain
+      cannot be proven before publishing, since crate N+1's verification build
+      resolves crate N from crates.io
 - [ ] No path where a config loads clean and returns a wrong answer
 - [ ] The README example compiles unmodified outside the workspace; at M7,
       `cargo add rumi-core` does too

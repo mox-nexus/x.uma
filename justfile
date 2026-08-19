@@ -137,7 +137,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-full test-protojson test-fixture-coverage crust-compiles features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-full test-protojson test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -190,6 +190,22 @@ docs-rust:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Benchmarks
 # ═══════════════════════════════════════════════════════════════════════════════
+
+# Run every benchmark exactly once, to prove it still runs. ~37s.
+#
+# This is NOT regression detection. There is no baseline and no threshold, so a
+# benchmark that gets 10x slower passes here. What it catches is a benchmark
+# that has quietly stopped measuring anything: one that panics, or calls an API
+# that is gone, or carries a config that no longer parses.
+#
+# That last one is why it exists. Until 2026-08-18 `benches/config.rs` measured
+# the parse cost of the terse config dialect — a format retired months earlier
+# by D-026. It was found only because deleting the dialect broke compilation.
+# Had the format merely *changed*, the benchmark would have gone on producing
+# numbers for something nobody ran. Falsified: a typo'd field in that config
+# panics this recipe.
+bench-smoke:
+    cargo bench --manifest-path rumi/Cargo.toml --all-features -- --test
 
 # Run Rust benchmarks (divan)
 bench-rust:
