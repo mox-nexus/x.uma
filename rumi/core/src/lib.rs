@@ -43,7 +43,7 @@
 //! }
 //!
 //! // Build a matcher (OnMatch is an enum: Action or Matcher, per xDS proto)
-//! let matcher: Matcher<Request, String> = Matcher::new(
+//! let matcher: Matcher<Request, String> = Matcher::list(
 //!     vec![
 //!         FieldMatcher::new(
 //!             Predicate::Single(SinglePredicate::new(

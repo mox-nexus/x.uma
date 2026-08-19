@@ -39,7 +39,7 @@ use std::marker::PhantomData;
 /// # Example
 ///
 /// ```ignore
-/// let matcher = Matcher::new(
+/// let matcher = Matcher::list(
 ///     vec![
 ///         FieldMatcher::new(api_path_predicate, OnMatch::action("api".to_string())),
 ///         FieldMatcher::new(static_path_predicate, OnMatch::action("static".to_string())),
@@ -83,8 +83,14 @@ pub enum MatcherKind<Ctx, A: Clone + Send + Sync + 'static> {
 }
 
 impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
-    /// Create a new matcher.
-    pub fn new(
+    /// Create a list matcher — field matchers evaluated in order, first match
+    /// wins.
+    ///
+    /// Named `list` rather than `new` because `Matcher` is an xDS
+    /// `oneof matcher_type`: this builds one of its two shapes, and
+    /// [`tree`](Self::tree) builds the other. A `new` here would read as *the*
+    /// way to construct a `Matcher`, which is true of neither.
+    pub fn list(
         matcher_list: Vec<FieldMatcher<Ctx, A>>,
         on_no_match: Option<OnMatch<Ctx, A>>,
     ) -> Self {
@@ -128,7 +134,7 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
     /// );
     /// ```
     pub fn from_predicate(predicate: Predicate<Ctx>, action: A, on_no_match: Option<A>) -> Self {
-        Self::new(
+        Self::list(
             vec![FieldMatcher::new(predicate, OnMatch::Action(action))],
             on_no_match.map(OnMatch::Action),
         )
@@ -539,7 +545,7 @@ mod tests {
 
     #[test]
     fn test_matcher_first_match_wins() {
-        let matcher = Matcher::new(
+        let matcher = Matcher::list(
             vec![
                 create_field_matcher("hello", "first"),
                 create_field_matcher("hello", "second"), // Also matches, but won't be reached
@@ -557,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_matcher_no_match_fallback() {
-        let matcher = Matcher::new(
+        let matcher = Matcher::list(
             vec![create_field_matcher("hello", "first")],
             Some(OnMatch::action("fallback".to_string())),
         );
@@ -573,7 +579,7 @@ mod tests {
     #[test]
     fn test_matcher_no_match_no_fallback() {
         let matcher: Matcher<TestCtx, String> =
-            Matcher::new(vec![create_field_matcher("hello", "first")], None);
+            Matcher::list(vec![create_field_matcher("hello", "first")], None);
 
         let ctx = TestCtx {
             value: "world".to_string(),
@@ -585,7 +591,7 @@ mod tests {
 
     #[test]
     fn test_matcher_multiple_rules() {
-        let matcher = Matcher::new(
+        let matcher = Matcher::list(
             vec![
                 create_field_matcher("hello", "hello_action"),
                 create_field_matcher("world", "world_action"),
@@ -618,13 +624,13 @@ mod tests {
     #[test]
     fn test_nested_matcher_failure_propagates() {
         // Create a nested matcher that will NOT match
-        let nested = Matcher::new(
+        let nested = Matcher::list(
             vec![create_field_matcher("will_not_match", "nested_action")],
             None, // No fallback in nested
         );
 
         // Parent matcher: predicate matches, but OnMatch is a nested matcher that fails
-        let parent = Matcher::new(
+        let parent = Matcher::list(
             vec![
                 FieldMatcher::new(
                     Predicate::Single(SinglePredicate::new(
@@ -648,14 +654,14 @@ mod tests {
 
     #[test]
     fn test_matcher_depth() {
-        let simple = Matcher::<TestCtx, String>::new(vec![create_field_matcher("x", "y")], None);
+        let simple = Matcher::<TestCtx, String>::list(vec![create_field_matcher("x", "y")], None);
         // Matcher depth 1 + predicate depth 1 = 2
         assert_eq!(simple.depth(), 2);
     }
 
     #[test]
     fn test_validate_shallow_matcher_ok() {
-        let matcher = Matcher::<TestCtx, String>::new(vec![create_field_matcher("x", "y")], None);
+        let matcher = Matcher::<TestCtx, String>::list(vec![create_field_matcher("x", "y")], None);
         assert!(matcher.validate().is_ok());
     }
 
@@ -663,12 +669,12 @@ mod tests {
     fn test_validate_deeply_nested_matcher_fails() {
         // Build a matcher chain deeper than MAX_DEPTH
         let mut current =
-            Matcher::<TestCtx, String>::new(vec![create_field_matcher("leaf", "action")], None);
+            Matcher::<TestCtx, String>::list(vec![create_field_matcher("leaf", "action")], None);
 
         // Nest MAX_DEPTH + 1 times to exceed the limit
         // Each nesting adds 1 to depth (the wrapping Matcher)
         for _ in 0..crate::MAX_DEPTH {
-            current = Matcher::new(
+            current = Matcher::list(
                 vec![FieldMatcher::new(
                     Predicate::Single(SinglePredicate::new(
                         Box::new(ValueInput),
@@ -692,12 +698,12 @@ mod tests {
     fn test_validate_at_max_depth_ok() {
         // Build exactly at MAX_DEPTH — should pass
         let mut current =
-            Matcher::<TestCtx, String>::new(vec![create_field_matcher("leaf", "action")], None);
+            Matcher::<TestCtx, String>::list(vec![create_field_matcher("leaf", "action")], None);
 
         // depth starts at 2 (1 matcher + 1 predicate), each nesting adds 1
         // We need total depth == MAX_DEPTH
         for _ in 0..(crate::MAX_DEPTH - 2) {
-            current = Matcher::new(
+            current = Matcher::list(
                 vec![FieldMatcher::new(
                     Predicate::Single(SinglePredicate::new(
                         Box::new(ValueInput),
@@ -763,7 +769,7 @@ mod tests {
 
     #[test]
     fn trace_first_match_wins() {
-        let matcher = Matcher::new(
+        let matcher = Matcher::list(
             vec![
                 create_field_matcher("hello", "first"),
                 create_field_matcher("hello", "second"),
@@ -786,7 +792,7 @@ mod tests {
 
     #[test]
     fn trace_second_match() {
-        let matcher = Matcher::new(
+        let matcher = Matcher::list(
             vec![
                 create_field_matcher("nope", "first"),
                 create_field_matcher("hello", "second"),
@@ -807,7 +813,7 @@ mod tests {
 
     #[test]
     fn trace_no_match_with_fallback() {
-        let matcher = Matcher::new(
+        let matcher = Matcher::list(
             vec![create_field_matcher("nope", "first")],
             Some(OnMatch::action("fallback".to_string())),
         );
@@ -826,7 +832,7 @@ mod tests {
     #[test]
     fn trace_no_match_no_fallback() {
         let matcher: Matcher<TestCtx, String> =
-            Matcher::new(vec![create_field_matcher("nope", "first")], None);
+            Matcher::list(vec![create_field_matcher("nope", "first")], None);
 
         let ctx = TestCtx {
             value: "hello".into(),
@@ -840,9 +846,9 @@ mod tests {
 
     #[test]
     fn trace_nested_matcher_success() {
-        let nested = Matcher::new(vec![create_field_matcher("hello", "nested_action")], None);
+        let nested = Matcher::list(vec![create_field_matcher("hello", "nested_action")], None);
 
-        let parent = Matcher::new(
+        let parent = Matcher::list(
             vec![FieldMatcher::new(
                 Predicate::Single(SinglePredicate::new(
                     Box::new(ValueInput),
@@ -874,12 +880,12 @@ mod tests {
 
     #[test]
     fn trace_nested_matcher_failure_propagates() {
-        let nested = Matcher::new(
+        let nested = Matcher::list(
             vec![create_field_matcher("will_not_match", "nested_action")],
             None,
         );
 
-        let parent = Matcher::new(
+        let parent = Matcher::list(
             vec![
                 FieldMatcher::new(
                     Predicate::Single(SinglePredicate::new(
@@ -921,21 +927,21 @@ mod tests {
         let cases: Vec<(Matcher<TestCtx, String>, TestCtx)> = vec![
             // Match
             (
-                Matcher::new(vec![create_field_matcher("hello", "hit")], None),
+                Matcher::list(vec![create_field_matcher("hello", "hit")], None),
                 TestCtx {
                     value: "hello".into(),
                 },
             ),
             // No match, no fallback
             (
-                Matcher::new(vec![create_field_matcher("nope", "hit")], None),
+                Matcher::list(vec![create_field_matcher("nope", "hit")], None),
                 TestCtx {
                     value: "hello".into(),
                 },
             ),
             // No match, with fallback
             (
-                Matcher::new(
+                Matcher::list(
                     vec![create_field_matcher("nope", "hit")],
                     Some(OnMatch::action("fallback".into())),
                 ),
@@ -964,7 +970,7 @@ mod tests {
 
     #[test]
     fn trace_on_match_action_captured() {
-        let matcher = Matcher::new(vec![create_field_matcher("hello", "the_action")], None);
+        let matcher = Matcher::list(vec![create_field_matcher("hello", "the_action")], None);
 
         let ctx = TestCtx {
             value: "hello".into(),
@@ -985,7 +991,7 @@ mod tests {
         // clean. Evaluation is recursive, so that was a config-triggerable
         // stack overflow behind the check meant to prevent it. D-045.
         fn tree_chain(levels: usize) -> Matcher<TestCtx, String> {
-            let mut inner = Matcher::new(vec![], Some(OnMatch::Action("leaf".to_string())));
+            let mut inner = Matcher::list(vec![], Some(OnMatch::Action("leaf".to_string())));
             for _ in 0..levels {
                 let tree = crate::MatcherTree::exact(
                     Box::new(ValueInput),
@@ -1099,7 +1105,7 @@ mod tests {
         // Row 4 of the lookup table: a key hit is not the same as a result, so
         // it must still fall through — the same rule a list follows when a
         // nested matcher returns None.
-        let dead_end = Matcher::new(vec![], None);
+        let dead_end = Matcher::list(vec![], None);
         let tree = crate::MatcherTree::exact(
             Box::new(ValueInput),
             [("hit", OnMatch::Matcher(Box::new(dead_end)))],

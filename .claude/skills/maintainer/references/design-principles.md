@@ -10,7 +10,7 @@ These decisions independently converge with master-level patterns:
 |---------------|----------------|--------|
 | `evaluate(&self, ctx: &Ctx)` — stateless evaluation | `&self` for pure queries; `&mut self` only for state tracking | tower (reverted &self → &mut self for backpressure), ripgrep (stateless Matcher::find_at), hyper (`&self` enables full wrapper algebra: `&S`, `Box<S>`, `Arc<S>`) |
 | `MatchingData` type erasure at data level | Data models as contracts between two sides | serde (29-type model), axum (body type erased at boundary), bytes (MatchingDataType ≈ Bytes vtable) |
-| Immutable after construction (`Matcher::new` → `validate` → use) | Immutable objects eliminate concurrency class entirely | crossbeam (mutation causes safety issues), tower (Clone trap), rustls (typestate builder → frozen config), bytes (`BytesMut::freeze()` → `Bytes`) |
+| Immutable after construction (`Matcher::list` → `validate` → use) | Immutable objects eliminate concurrency class entirely | crossbeam (mutation causes safety issues), tower (Clone trap), rustls (typestate builder → frozen config), bytes (`BytesMut::freeze()` → `Bytes`) |
 | Validate at construction, trust at evaluation | Push errors to setup, make hot path infallible | rustls (8/13 codebases confirm), axum (Infallible error type), hyper (state machines over futures) |
 | 1 dependency in core (regex) | Dependencies are liabilities | serde (reverted version_check), ripgrep (hand-rolls when measured), hyper (17K lines futures-util → 150 lines), rust-analyzer ("each dependency is supply chain risk + build cost") |
 | `Matcher<Ctx, A>` — two type params, no more | When a type parameter serves < 5% of users, erase it | axum (removed body type B — infected everything) |

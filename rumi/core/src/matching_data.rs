@@ -606,7 +606,7 @@ mod tests {
             };
 
             // Build matcher: route to different backends based on location
-            let matcher: Matcher<GeoRequest, String> = Matcher::new(
+            let matcher: Matcher<GeoRequest, String> = Matcher::list(
                 vec![
                     // Rule 1: SF area → sf_backend
                     FieldMatcher::new(

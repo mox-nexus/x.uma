@@ -63,7 +63,7 @@ fn regex_field_matcher(pattern: &str, action: &str) -> FieldMatcher<Ctx, String>
 
 #[divan::bench]
 fn exact_match_hit(bencher: divan::Bencher) {
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![field_matcher("/api", "api_backend")],
         Some(OnMatch::Action("default".to_string())),
     );
@@ -76,7 +76,7 @@ fn exact_match_hit(bencher: divan::Bencher) {
 
 #[divan::bench]
 fn exact_match_miss(bencher: divan::Bencher) {
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![field_matcher("/api", "api_backend")],
         Some(OnMatch::Action("default".to_string())),
     );
@@ -93,7 +93,7 @@ fn exact_match_miss(bencher: divan::Bencher) {
 
 #[divan::bench]
 fn prefix_match_hit(bencher: divan::Bencher) {
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![prefix_field_matcher("/api/", "api")],
         Some(OnMatch::Action("default".to_string())),
     );
@@ -110,7 +110,7 @@ fn prefix_match_hit(bencher: divan::Bencher) {
 
 #[divan::bench]
 fn regex_match_hit(bencher: divan::Bencher) {
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![regex_field_matcher(r"^/api/v\d+/users/\d+$", "user_route")],
         Some(OnMatch::Action("default".to_string())),
     );
@@ -123,7 +123,7 @@ fn regex_match_hit(bencher: divan::Bencher) {
 
 #[divan::bench]
 fn regex_match_miss(bencher: divan::Bencher) {
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![regex_field_matcher(r"^/api/v\d+/users/\d+$", "user_route")],
         Some(OnMatch::Action("default".to_string())),
     );
@@ -150,7 +150,7 @@ fn predicate_and_all_match(bencher: divan::Bencher) {
             Box::new(ContainsMatcher::new("world")),
         )),
     ]);
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![FieldMatcher::new(
             pred,
             OnMatch::Action("matched".to_string()),
@@ -176,7 +176,7 @@ fn predicate_and_first_fails(bencher: divan::Bencher) {
             Box::new(ContainsMatcher::new("world")),
         )),
     ]);
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![FieldMatcher::new(
             pred,
             OnMatch::Action("matched".to_string()),
@@ -207,7 +207,7 @@ fn predicate_or_first_matches(bencher: divan::Bencher) {
             Box::new(ExactMatcher::new("world")),
         )),
     ]);
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![FieldMatcher::new(
             pred,
             OnMatch::Action("matched".to_string()),
@@ -232,7 +232,7 @@ fn rule_count_last_match(bencher: divan::Bencher, n: usize) {
         .collect();
     rules.push(field_matcher("target", "found"));
 
-    let matcher = Matcher::new(rules, None);
+    let matcher = Matcher::list(rules, None);
     let ctx = Ctx {
         value: "target".to_string(),
     };
@@ -247,7 +247,7 @@ fn rule_count_miss(bencher: divan::Bencher, n: usize) {
         .map(|i| field_matcher(&format!("rule_{i}"), &format!("action_{i}")))
         .collect();
 
-    let matcher = Matcher::new(rules, Some(OnMatch::Action("fallback".to_string())));
+    let matcher = Matcher::list(rules, Some(OnMatch::Action("fallback".to_string())));
     let ctx = Ctx {
         value: "no_match".to_string(),
     };
@@ -280,7 +280,7 @@ fn depth_nested_and(bencher: divan::Bencher, depth: usize) {
     }
 
     let pred = build_nested(depth);
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![FieldMatcher::new(
             pred,
             OnMatch::Action("matched".to_string()),
@@ -309,7 +309,7 @@ fn and_width(bencher: divan::Bencher, width: usize) {
         })
         .collect();
 
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![FieldMatcher::new(
             Predicate::And(preds),
             OnMatch::Action("matched".to_string()),
@@ -333,7 +333,7 @@ fn miss_heavy_10_rules(bencher: divan::Bencher) {
         .map(|i| field_matcher(&format!("/blocked/{i}"), &format!("block_{i}")))
         .collect();
 
-    let matcher = Matcher::new(rules, Some(OnMatch::Action("allow".to_string())));
+    let matcher = Matcher::list(rules, Some(OnMatch::Action("allow".to_string())));
 
     // 90% of contexts are misses (allowed through)
     let miss_ctx = Ctx {
@@ -349,7 +349,7 @@ fn miss_heavy_10_rules(bencher: divan::Bencher) {
 
 #[divan::bench]
 fn trace_overhead_evaluate(bencher: divan::Bencher) {
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![
             field_matcher("miss1", "a1"),
             field_matcher("miss2", "a2"),
@@ -366,7 +366,7 @@ fn trace_overhead_evaluate(bencher: divan::Bencher) {
 
 #[divan::bench]
 fn trace_overhead_with_trace(bencher: divan::Bencher) {
-    let matcher = Matcher::new(
+    let matcher = Matcher::list(
         vec![
             field_matcher("miss1", "a1"),
             field_matcher("miss2", "a2"),
@@ -387,9 +387,9 @@ fn trace_overhead_with_trace(bencher: divan::Bencher) {
 
 #[divan::bench]
 fn nested_matcher_2_levels(bencher: divan::Bencher) {
-    let inner = Matcher::new(vec![field_matcher("hello", "inner_action")], None);
+    let inner = Matcher::list(vec![field_matcher("hello", "inner_action")], None);
 
-    let outer = Matcher::new(
+    let outer = Matcher::list(
         vec![FieldMatcher::new(
             Predicate::Single(SinglePredicate::new(
                 Box::new(ValueInput),

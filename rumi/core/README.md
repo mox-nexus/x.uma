@@ -30,7 +30,7 @@ impl DataInput<&'static str> for MethodInput {
     }
 }
 
-let matcher = Matcher::new(
+let matcher = Matcher::list(
     vec![FieldMatcher::new(
         Predicate::Single(SinglePredicate::new(
             Box::new(MethodInput),

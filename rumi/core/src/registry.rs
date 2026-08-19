@@ -420,7 +420,7 @@ impl<Ctx: 'static> Registry<Ctx> {
                     .into_iter()
                     .map(|fm| self.load_field_matcher(fm))
                     .collect::<Result<Vec<_>, _>>()?;
-                Matcher::new(matchers, on_no_match)
+                Matcher::list(matchers, on_no_match)
             }
             crate::config::MatcherKindConfig::Tree(tree) => {
                 let tree = self.load_tree(tree, |om| self.load_on_match(om))?;
@@ -474,7 +474,7 @@ impl<Ctx: 'static> Registry<Ctx> {
                     .into_iter()
                     .map(|fm| self.load_typed_field_matcher(fm, actions))
                     .collect::<Result<Vec<_>, _>>()?;
-                Matcher::new(matchers, on_no_match)
+                Matcher::list(matchers, on_no_match)
             }
             crate::config::MatcherKindConfig::Tree(tree) => {
                 let tree = self.load_tree(tree, |om| self.load_typed_on_match(om, actions))?;
