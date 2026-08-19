@@ -670,7 +670,9 @@ impl<Ctx: 'static> Registry<Ctx> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::TypedConfig;
     use crate::MatchingData;
+    use crate::StringMatchSpec;
 
     #[derive(Debug)]
     struct TestCtx {
@@ -728,34 +730,89 @@ mod tests {
         assert!(!registry.contains_matcher("xuma.core.v1.StringMatcher"));
     }
 
+    // ── config builders ──────────────────────────────────────────────────
+    //
+    // The tree-shape config types do not deserialize (see `config.rs`), so a
+    // `MatcherConfig` is built, never parsed. These are deliberately thin: a
+    // helper that decided anything — a default action, an implied predicate —
+    // would hide what the test below it is actually asserting.
+
+    fn typed(type_url: &str, config: serde_json::Value) -> TypedConfig {
+        TypedConfig {
+            type_url: type_url.into(),
+            config,
+        }
+    }
+
+    /// The `ValueInput` reading key `value`, which most tests here use.
+    fn value_input() -> TypedConfig {
+        typed("test.ValueInput", serde_json::json!({ "key": "value" }))
+    }
+
+    /// A single predicate matching with a built-in `StringMatchSpec`.
+    ///
+    /// `ignore_case: false` because the terse dialect these tests were written
+    /// in had no `ignore_case` sibling — it is protojson that carries the flag.
+    /// Passing `false` keeps every assertion below testing what it tested.
+    fn built_in(input: TypedConfig, spec: StringMatchSpec) -> PredicateConfig {
+        PredicateConfig::Single(SinglePredicateConfig {
+            input,
+            matcher: ValueMatchConfig::BuiltIn {
+                spec,
+                ignore_case: false,
+            },
+        })
+    }
+
+    /// A single predicate matching via a registered matcher type URL.
+    fn custom(input: TypedConfig, matcher: TypedConfig) -> PredicateConfig {
+        PredicateConfig::Single(SinglePredicateConfig {
+            input,
+            matcher: ValueMatchConfig::Custom(matcher),
+        })
+    }
+
+    fn act(action: &str) -> OnMatchConfig<String> {
+        OnMatchConfig::Action {
+            action: action.into(),
+        }
+    }
+
+    /// An action resolved through the `ActionRegistry`, for `load_typed_matcher`.
+    fn act_typed(type_url: &str, config: serde_json::Value) -> OnMatchConfig<TypedConfig> {
+        OnMatchConfig::Action {
+            action: typed(type_url, config),
+        }
+    }
+
+    fn field<A>(predicate: PredicateConfig, on_match: OnMatchConfig<A>) -> FieldMatcherConfig<A> {
+        FieldMatcherConfig {
+            predicate,
+            on_match,
+        }
+    }
+
+    /// A matcher of one field matcher and no fallback — the common shape.
+    fn one<A>(predicate: PredicateConfig, on_match: OnMatchConfig<A>) -> MatcherConfig<A> {
+        MatcherConfig {
+            matchers: vec![field(predicate, on_match)],
+            on_no_match: None,
+        }
+    }
+
     #[test]
     fn load_simple_matcher() {
         let registry = RegistryBuilder::<TestCtx>::new()
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": {
-                        "type_url": "test.ValueInput",
-                        "config": { "key": "value" }
-                    },
-                    "value_match": { "Exact": "hello" }
-                },
-                "on_match": {
-                    "type": "action",
-                    "action": "matched!"
-                }
-            }],
-            "on_no_match": {
-                "type": "action",
-                "action": "default"
-            }
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = MatcherConfig {
+            matchers: vec![field(
+                built_in(value_input(), StringMatchSpec::Exact("hello".into())),
+                act("matched!"),
+            )],
+            on_no_match: Some(act("default")),
+        };
         let matcher = registry.load_matcher(config).unwrap();
 
         let ctx = TestCtx {
@@ -794,21 +851,16 @@ mod tests {
             .input::<BoolInput>("test.BoolInput")
             .build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.BoolInput" },
-                    "custom_match": {
-                        "type_url": "xuma.core.v1.BoolMatcher",
-                        "config": { "expected": true }
-                    }
-                },
-                "on_match": { "type": "action", "action": "bool_hit" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            custom(
+                typed("test.BoolInput", serde_json::json!({})),
+                typed(
+                    "xuma.core.v1.BoolMatcher",
+                    serde_json::json!({ "expected": true }),
+                ),
+            ),
+            act("bool_hit"),
+        );
         let matcher = registry.load_matcher(config).unwrap();
 
         assert_eq!(
@@ -832,21 +884,16 @@ mod tests {
             .matcher::<crate::StringMatcher>("xuma.core.v1.StringMatcher")
             .build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                    "custom_match": {
-                        "type_url": "xuma.core.v1.StringMatcher",
-                        "config": { "value": "/API/", "match_type": "prefix", "ignore_case": true }
-                    }
-                },
-                "on_match": { "type": "action", "action": "api_route" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            custom(
+                value_input(),
+                typed(
+                    "xuma.core.v1.StringMatcher",
+                    serde_json::json!({ "value": "/API/", "match_type": "prefix", "ignore_case": true }),
+                ),
+            ),
+            act("api_route"),
+        );
         let matcher = registry.load_matcher(config).unwrap();
 
         assert_eq!(
@@ -867,18 +914,13 @@ mod tests {
     fn unknown_input_type_url() {
         let registry = RegistryBuilder::<TestCtx>::new().build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "unknown.Input", "config": {} },
-                    "value_match": { "Exact": "x" }
-                },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            built_in(
+                typed("unknown.Input", serde_json::json!({})),
+                StringMatchSpec::Exact("x".into()),
+            ),
+            act("x"),
+        );
         let err = registry.load_matcher(config).unwrap_err();
         match err {
             MatcherError::UnknownTypeUrl {
@@ -900,18 +942,13 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "unknown.Input", "config": {} },
-                    "value_match": { "Exact": "x" }
-                },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            built_in(
+                typed("unknown.Input", serde_json::json!({})),
+                StringMatchSpec::Exact("x".into()),
+            ),
+            act("x"),
+        );
         let err = registry.load_matcher(config).unwrap_err();
         match err {
             MatcherError::UnknownTypeUrl { ref available, .. } => {
@@ -933,18 +970,13 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                    "custom_match": { "type_url": "unknown.Matcher", "config": {} }
-                },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            custom(
+                value_input(),
+                typed("unknown.Matcher", serde_json::json!({})),
+            ),
+            act("x"),
+        );
         let err = registry.load_matcher(config).unwrap_err();
         match err {
             MatcherError::UnknownTypeUrl {
@@ -966,21 +998,16 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                    "custom_match": {
-                        "type_url": "xuma.core.v1.BoolMatcher",
-                        "config": { "expected": true }
-                    }
-                },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            custom(
+                value_input(),
+                typed(
+                    "xuma.core.v1.BoolMatcher",
+                    serde_json::json!({ "expected": true }),
+                ),
+            ),
+            act("x"),
+        );
         let err = registry.load_matcher(config).unwrap_err();
         match err {
             MatcherError::IncompatibleTypes {
@@ -1000,68 +1027,25 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": {
-                        "type_url": "test.ValueInput",
-                        "config": { "wrong_field": 42 }
-                    },
-                    "value_match": { "Exact": "x" }
-                },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            built_in(
+                typed("test.ValueInput", serde_json::json!({ "wrong_field": 42 })),
+                StringMatchSpec::Exact("x".into()),
+            ),
+            act("x"),
+        );
         let err = registry.load_matcher(config).unwrap_err();
         assert!(matches!(err, MatcherError::InvalidConfig { .. }));
     }
 
-    #[test]
-    fn value_match_and_custom_match_both_set() {
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                    "value_match": { "Exact": "x" },
-                    "custom_match": { "type_url": "xuma.core.v1.BoolMatcher", "config": {} }
-                },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let result = serde_json::from_value::<MatcherConfig<String>>(json);
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("exactly one"),
-            "expected oneof error, got: {err_msg}"
-        );
-    }
-
-    #[test]
-    fn neither_value_match_nor_custom_match() {
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } }
-                },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let result = serde_json::from_value::<MatcherConfig<String>>(json);
-        assert!(result.is_err());
-        let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("required"),
-            "expected required error, got: {err_msg}"
-        );
-    }
+    // `value_match_and_custom_match_both_set` and
+    // `neither_value_match_nor_custom_match` stood here. Both asserted on the
+    // terse dialect's deserializer, which no longer exists. Neither
+    // requirement was dropped: `ValueMatchConfig` is an enum, so both-set is
+    // now unrepresentable rather than rejected, and neither-set is rejected by
+    // `rumi-proto`'s converter. Both are fixtured in
+    // `spec/tests/07_protojson/08_invalid_configs.yaml`, so five
+    // implementations assert them instead of one.
 
     #[test]
     fn load_and_predicate() {
@@ -1069,28 +1053,15 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "and",
-                    "predicates": [
-                        {
-                            "type": "single",
-                            "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                            "value_match": { "Prefix": "hel" }
-                        },
-                        {
-                            "type": "single",
-                            "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                            "value_match": { "Suffix": "llo" }
-                        }
-                    ]
-                },
-                "on_match": { "type": "action", "action": "both_matched" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            PredicateConfig::And {
+                predicates: vec![
+                    built_in(value_input(), StringMatchSpec::Prefix("hel".into())),
+                    built_in(value_input(), StringMatchSpec::Suffix("llo".into())),
+                ],
+            },
+            act("both_matched"),
+        );
         let matcher = registry.load_matcher(config).unwrap();
 
         assert_eq!(
@@ -1113,31 +1084,18 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                    "value_match": { "Prefix": "" }
+        let config = MatcherConfig {
+            matchers: vec![field(
+                built_in(value_input(), StringMatchSpec::Prefix(String::new())),
+                OnMatchConfig::Matcher {
+                    matcher: Box::new(one(
+                        built_in(value_input(), StringMatchSpec::Exact("deep".into())),
+                        act("nested_hit"),
+                    )),
                 },
-                "on_match": {
-                    "type": "matcher",
-                    "matcher": {
-                        "matchers": [{
-                            "predicate": {
-                                "type": "single",
-                                "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                                "value_match": { "Exact": "deep" }
-                            },
-                            "on_match": { "type": "action", "action": "nested_hit" }
-                        }]
-                    }
-                }
-            }],
-            "on_no_match": { "type": "action", "action": "fallback" }
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+            )],
+            on_no_match: Some(act("fallback")),
+        };
         let matcher = registry.load_matcher(config).unwrap();
 
         assert_eq!(
@@ -1193,32 +1151,19 @@ mod tests {
             .action::<StringActionFactory>("test.StringAction")
             .build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                    "value_match": { "Exact": "hello" }
-                },
-                "on_match": {
-                    "type": "action",
-                    "action": {
-                        "type_url": "test.StringAction",
-                        "config": { "value": "typed_hit" }
-                    }
-                }
-            }],
-            "on_no_match": {
-                "type": "action",
-                "action": {
-                    "type_url": "test.StringAction",
-                    "config": { "value": "typed_miss" }
-                }
-            }
-        });
-
-        let config: MatcherConfig<crate::config::TypedConfig> =
-            serde_json::from_value(json).unwrap();
+        let config = MatcherConfig {
+            matchers: vec![field(
+                built_in(value_input(), StringMatchSpec::Exact("hello".into())),
+                act_typed(
+                    "test.StringAction",
+                    serde_json::json!({ "value": "typed_hit" }),
+                ),
+            )],
+            on_no_match: Some(act_typed(
+                "test.StringAction",
+                serde_json::json!({ "value": "typed_miss" }),
+            )),
+        };
         let matcher = registry.load_typed_matcher(config, &actions).unwrap();
 
         assert_eq!(
@@ -1243,25 +1188,10 @@ mod tests {
 
         let actions: ActionRegistry<String> = ActionRegistryBuilder::new().build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                    "value_match": { "Exact": "x" }
-                },
-                "on_match": {
-                    "type": "action",
-                    "action": {
-                        "type_url": "unknown.Action",
-                        "config": {}
-                    }
-                }
-            }]
-        });
-
-        let config: MatcherConfig<crate::config::TypedConfig> =
-            serde_json::from_value(json).unwrap();
+        let config = one(
+            built_in(value_input(), StringMatchSpec::Exact("x".into())),
+            act_typed("unknown.Action", serde_json::json!({})),
+        );
         let err = registry.load_typed_matcher(config, &actions).unwrap_err();
         match err {
             MatcherError::UnknownTypeUrl {
@@ -1286,37 +1216,18 @@ mod tests {
             .action::<StringActionFactory>("test.StringAction")
             .build();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                    "value_match": { "Prefix": "" }
-                },
-                "on_match": {
-                    "type": "matcher",
-                    "matcher": {
-                        "matchers": [{
-                            "predicate": {
-                                "type": "single",
-                                "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                                "value_match": { "Exact": "deep" }
-                            },
-                            "on_match": {
-                                "type": "action",
-                                "action": {
-                                    "type_url": "test.StringAction",
-                                    "config": { "value": "nested_typed" }
-                                }
-                            }
-                        }]
-                    }
-                }
-            }]
-        });
-
-        let config: MatcherConfig<crate::config::TypedConfig> =
-            serde_json::from_value(json).unwrap();
+        let config = one(
+            built_in(value_input(), StringMatchSpec::Prefix(String::new())),
+            OnMatchConfig::Matcher {
+                matcher: Box::new(one(
+                    built_in(value_input(), StringMatchSpec::Exact("deep".into())),
+                    act_typed(
+                        "test.StringAction",
+                        serde_json::json!({ "value": "nested_typed" }),
+                    ),
+                )),
+            },
+        );
         let matcher = registry.load_typed_matcher(config, &actions).unwrap();
 
         assert_eq!(
@@ -1358,20 +1269,17 @@ mod tests {
             .build();
 
         // Build a config with MAX_FIELD_MATCHERS + 1 field matchers
-        let fm = serde_json::json!({
-            "predicate": {
-                "type": "single",
-                "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                "value_match": { "Exact": "x" }
-            },
-            "on_match": { "type": "action", "action": "x" }
-        });
-        let matchers: Vec<_> = (0..=crate::MAX_FIELD_MATCHERS)
-            .map(|_| fm.clone())
-            .collect();
-        let json = serde_json::json!({ "matchers": matchers });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let fm = || {
+            field(
+                built_in(value_input(), StringMatchSpec::Exact("x".into())),
+                act("x"),
+            )
+        };
+        let matchers: Vec<_> = (0..=crate::MAX_FIELD_MATCHERS).map(|_| fm()).collect();
+        let config = MatcherConfig {
+            matchers,
+            on_no_match: None,
+        };
         let err = registry.load_matcher(config).unwrap_err();
         match err {
             MatcherError::TooManyFieldMatchers { count, max } => {
@@ -1388,23 +1296,11 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let single = serde_json::json!({
-            "type": "single",
-            "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-            "value_match": { "Exact": "x" }
-        });
         let predicates: Vec<_> = (0..=crate::MAX_PREDICATES_PER_COMPOUND)
-            .map(|_| single.clone())
+            .map(|_| built_in(value_input(), StringMatchSpec::Exact("x".into())))
             .collect();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": { "type": "and", "predicates": predicates },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(PredicateConfig::And { predicates }, act("x"));
         let err = registry.load_matcher(config).unwrap_err();
         assert!(
             matches!(err, MatcherError::TooManyPredicates { .. }),
@@ -1418,23 +1314,11 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let single = serde_json::json!({
-            "type": "single",
-            "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-            "value_match": { "Exact": "x" }
-        });
         let predicates: Vec<_> = (0..=crate::MAX_PREDICATES_PER_COMPOUND)
-            .map(|_| single.clone())
+            .map(|_| built_in(value_input(), StringMatchSpec::Exact("x".into())))
             .collect();
 
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": { "type": "or", "predicates": predicates },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(PredicateConfig::Or { predicates }, act("x"));
         let err = registry.load_matcher(config).unwrap_err();
         assert!(
             matches!(err, MatcherError::TooManyPredicates { .. }),
@@ -1449,18 +1333,10 @@ mod tests {
             .build();
 
         let long_pattern = "x".repeat(crate::MAX_PATTERN_LENGTH + 1);
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                    "value_match": { "Exact": long_pattern }
-                },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            built_in(value_input(), StringMatchSpec::Exact(long_pattern)),
+            act("x"),
+        );
         let err = registry.load_matcher(config).unwrap_err();
         match err {
             MatcherError::PatternTooLong { len, max } => {
@@ -1478,18 +1354,10 @@ mod tests {
             .build();
 
         let long_regex = "a".repeat(crate::MAX_REGEX_PATTERN_LENGTH + 1);
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                    "value_match": { "Regex": long_regex }
-                },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            built_in(value_input(), StringMatchSpec::Regex(long_regex)),
+            act("x"),
+        );
         let err = registry.load_matcher(config).unwrap_err();
         match err {
             MatcherError::PatternTooLong { len, max } => {
@@ -1508,18 +1376,10 @@ mod tests {
 
         // Exactly at the limit should succeed
         let pattern = "x".repeat(crate::MAX_PATTERN_LENGTH);
-        let json = serde_json::json!({
-            "matchers": [{
-                "predicate": {
-                    "type": "single",
-                    "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                    "value_match": { "Exact": pattern }
-                },
-                "on_match": { "type": "action", "action": "x" }
-            }]
-        });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let config = one(
+            built_in(value_input(), StringMatchSpec::Exact(pattern)),
+            act("x"),
+        );
         assert!(registry.load_matcher(config).is_ok());
     }
 
@@ -1529,19 +1389,18 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let fm = serde_json::json!({
-            "predicate": {
-                "type": "single",
-                "input": { "type_url": "test.ValueInput", "config": { "key": "value" } },
-                "value_match": { "Exact": "x" }
-            },
-            "on_match": { "type": "action", "action": "x" }
-        });
+        let fm = || {
+            field(
+                built_in(value_input(), StringMatchSpec::Exact("x".into())),
+                act("x"),
+            )
+        };
         // Exactly at the limit
-        let matchers: Vec<_> = (0..crate::MAX_FIELD_MATCHERS).map(|_| fm.clone()).collect();
-        let json = serde_json::json!({ "matchers": matchers });
-
-        let config: MatcherConfig<String> = serde_json::from_value(json).unwrap();
+        let matchers: Vec<_> = (0..crate::MAX_FIELD_MATCHERS).map(|_| fm()).collect();
+        let config = MatcherConfig {
+            matchers,
+            on_no_match: None,
+        };
         assert!(registry.load_matcher(config).is_ok());
     }
 }

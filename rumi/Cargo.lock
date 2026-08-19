@@ -1225,6 +1225,7 @@ dependencies = [
  "divan",
  "regex",
  "rumi-kv",
+ "rumi-proto",
  "rumi-test",
  "serde",
  "serde_json",
