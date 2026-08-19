@@ -21,12 +21,19 @@ Knowledge for working with protobuf, buf, xDS, and wire protocols in x.uma.
 
 ## buf Codegen Layout
 
-x.uma uses **Pattern B** (per-package gen directories), same as Connect-ES:
+x.uma generates **Rust only**, into `rumi/proto/src/gen/`.
+
+puma and bumi have no generated types. Measured 2026-08-18: neither
+betterproto's `from_dict` nor ts-proto's `fromJSON` rejects an unknown field —
+both return the message with defaults — so neither can satisfy the conformance
+fixture saying a typo'd field is a load error rather than a rule that silently
+never fires. Both read protojson by hand instead. See `DECISIONS.md` D-038.
+
+The per-package layout below is what the project used before that, and the
+`puma/proto` and `bumi/proto` directories are gone:
 
 ```
-rumi/proto/src/gen/    # Rust generated code
-puma/proto/src/gen/    # Python generated code
-buma/proto/src/gen/    # TypeScript generated code
+rumi/proto/src/gen/    # Rust generated code (tracked; CI asserts no drift)
 ```
 
 **Pattern A** (monorepo top-level `gen/`) is also valid but x.uma doesn't use it.

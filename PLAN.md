@@ -1597,8 +1597,13 @@ now.
       generated code**, across `rumi/core/src`, `rumi/ext/*/src`, `puma/src` and
       `bumi/src`. That cannot be satisfied by renaming, it decides C4, and it
       catches the third dialect in `fixture.rs` that the grep is blind to
-- [ ] All three `gen/` trees are **tracked**, and `just gen` produces no diff in
-      CI (F20 — the check is vacuous while they are gitignored)
+- [x] **The `gen/` tree is tracked and `just gen` produces no diff in CI.**
+      Restated from "all three": D-038 removed generated types from puma and
+      bumi entirely, so there is one tree, `rumi/proto/src/gen`, and it is
+      tracked (14 files) with a `codegen is current` CI job asserting no drift.
+      The stale `puma/proto` and `bumi/proto` directories that survived D-038 —
+      by then only `__pycache__` bytecode — are deleted, and `.gitattributes`
+      no longer claims they exist
 - [ ] `rumi-proto` compiles, is in the CI test job, and `just test-full` is green
       (F1, F19)
 - [ ] Every doc code sample carries a `run` / `compile` / `cli` / `future`
