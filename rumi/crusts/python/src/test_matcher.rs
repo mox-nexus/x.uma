@@ -78,15 +78,7 @@ impl TestMatcher {
         let ctx = build_context(context);
         let trace = self.inner.evaluate_with_trace(&ctx);
 
-        let steps: Vec<super::matcher::PyTraceStep> = trace
-            .steps
-            .iter()
-            .map(|step| super::matcher::PyTraceStep {
-                index: step.index,
-                matched: step.matched,
-                predicate: format!("{:?}", step.predicate_trace),
-            })
-            .collect();
+        let steps = super::matcher::trace_steps(&trace.steps);
 
         super::matcher::PyTraceResult {
             result: trace.result,

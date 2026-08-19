@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::process;
 
 use rumi::claude::HookContext;
-use rumi::{MatcherConfig, TypedConfig};
+use rumi::{MatcherConfig, MatcherKindConfig, TreeTypeConfig, TypedConfig};
 use rumi_http::HttpRequest;
 use rumi_kv::KvContext;
 use rumi_proto::any_resolver::{AnyResolver, AnyResolverBuilder};
@@ -102,13 +102,26 @@ fn cmd_check(args: &[String]) -> Result<(), String> {
     // this is the information an author wants back — "Config valid" answers a
     // question nobody asked, and cannot distinguish a rule set from an empty
     // one, which for a gate is the difference that matters.
-    let rule_count = config.matchers.len();
     let has_fallback = config.on_no_match.is_some();
-    let mut inputs: Vec<String> = config
-        .matchers
-        .iter()
-        .flat_map(|fm| collect_input_urls(&fm.predicate))
-        .collect();
+    let (rule_count, mut inputs): (usize, Vec<String>) = match &config.kind {
+        MatcherKindConfig::List(matchers) => (
+            matchers.len(),
+            matchers
+                .iter()
+                .flat_map(|fm| collect_input_urls(&fm.predicate))
+                .collect(),
+        ),
+        // A tree has one input and N entries, so "rules" counts entries and
+        // the input list has exactly one member. Reporting zero rules for a
+        // tree would read as an empty config, which for a gate is the
+        // difference that matters.
+        MatcherKindConfig::Tree(tree) => {
+            let entries = match &tree.tree {
+                TreeTypeConfig::ExactMatchMap(e) | TreeTypeConfig::PrefixMatchMap(e) => e.len(),
+            };
+            (entries, vec![tree.input.type_url.clone()])
+        }
+    };
     inputs.sort_unstable();
     inputs.dedup();
 

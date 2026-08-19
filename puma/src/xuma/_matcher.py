@@ -10,9 +10,12 @@ Mirrors rumi's Matcher<Ctx, A> with the same xDS evaluation semantics:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from xuma._predicate import Predicate, predicate_depth
+
+if TYPE_CHECKING:
+    from xuma._types import DataInput
 
 MAX_DEPTH = 32
 
@@ -59,6 +62,67 @@ class FieldMatcher[Ctx, A]:
 
 
 @dataclass(frozen=True, slots=True)
+class MatcherTree[Ctx, A]:
+    """Map-based matching — xDS ``Matcher.MatcherTree``.
+
+    Extracts a key via a DataInput, then looks it up either exactly or by
+    longest matching prefix. The prefix rule is the one behaviour a matcher
+    list cannot express: a list is first-match-wins in written order, so it
+    returns ``/api`` for ``/api/v2`` whenever ``/api`` is listed first.
+
+    Carries no fallback — the enclosing Matcher owns it. See DECISIONS.md
+    D-044.
+
+    rumi backs the prefix rule with a radix tree, O(k) in the key length. This
+    scans the entries instead, O(n·k). The conformance suite pins behaviour,
+    not the data structure, and puma is the readable implementation; if prefix
+    lookup ever shows up in a puma profile, that is when to build the trie.
+    """
+
+    input: DataInput[Ctx]
+    rule: str  # "exact" or "prefix"
+    entries: tuple[tuple[str, OnMatch[Ctx, A]], ...]
+
+    def lookup(self, key: str) -> tuple[str, OnMatch[Ctx, A]] | None:
+        """The entry a key selects, and which entry key won."""
+        if self.rule == "exact":
+            for k, om in self.entries:
+                if k == key:
+                    return (k, om)
+            return None
+
+        best: tuple[str, OnMatch[Ctx, A]] | None = None
+        for k, om in self.entries:
+            if key.startswith(k) and (best is None or len(k) > len(best[0])):
+                best = (k, om)
+        return best
+
+    def key_for(self, ctx: Any) -> str | None:
+        """The lookup key, or None if the input produced no usable string."""
+        data = self.input.get(ctx)
+        return data if isinstance(data, str) else None
+
+    def evaluate(self, ctx: Any) -> A | None:
+        """Look up and dispatch. A miss is None; the Matcher owns the fallback."""
+        key = self.key_for(ctx)
+        if key is None:
+            return None
+        hit = self.lookup(key)
+        if hit is None:
+            return None
+        return _evaluate_on_match(hit[1], ctx)
+
+    def depth(self) -> int:
+        """Deepest nesting reachable through this tree's entries.
+
+        Entries hold OnMatch, which can hold a Matcher, which can hold another
+        tree. Not walking this is what let such a config report depth 1 and
+        pass validation — see DECISIONS.md D-045.
+        """
+        return max((_on_match_depth(om) for _, om in self.entries), default=0)
+
+
+@dataclass(frozen=True, slots=True)
 class Matcher[Ctx, A]:
     """Top-level matcher with first-match-wins semantics.
 
@@ -72,8 +136,10 @@ class Matcher[Ctx, A]:
     INV (Dijkstra): First-match-wins — later matches are never consulted.
     """
 
-    matcher_list: tuple[FieldMatcher[Ctx, A], ...]
+    matcher_list: tuple[FieldMatcher[Ctx, A], ...] = ()
     on_no_match: OnMatch[Ctx, A] | None = None
+    # xDS models this as `oneof matcher_type`: a list or a tree, never both.
+    tree: MatcherTree[Ctx, A] | None = None
 
     def __post_init__(self) -> None:
         self.validate()
@@ -84,12 +150,20 @@ class Matcher[Ctx, A]:
         Returns the matched action, or None if nothing matches and
         there is no on_no_match fallback.
         """
-        for fm in self.matcher_list:
-            if fm.predicate.evaluate(ctx):
-                result = _evaluate_on_match(fm.on_match, ctx)
-                if result is not None:
-                    return result
-                # xDS: nested matcher failure -> continue to next field_matcher
+        if self.tree is not None:
+            # A tree miss and a tree hit whose nested matcher returned None
+            # both arrive as None, and both then reach on_no_match — the same
+            # rule the list follows when it falls off the end.
+            result = self.tree.evaluate(ctx)
+            if result is not None:
+                return result
+        else:
+            for fm in self.matcher_list:
+                if fm.predicate.evaluate(ctx):
+                    result = _evaluate_on_match(fm.on_match, ctx)
+                    if result is not None:
+                        return result
+                    # xDS: nested matcher failure -> continue to the next one.
         if self.on_no_match is not None:
             return _evaluate_on_match(self.on_no_match, ctx)
         return None
@@ -109,16 +183,20 @@ class Matcher[Ctx, A]:
 
     def depth(self) -> int:
         """Calculate the total nesting depth of this matcher tree."""
-        max_predicate = max(
-            (predicate_depth(fm.predicate) for fm in self.matcher_list),
-            default=0,
-        )
-        max_nested = max(
-            (_on_match_depth(fm.on_match) for fm in self.matcher_list),
-            default=0,
-        )
+        if self.tree is not None:
+            body_depth = self.tree.depth()
+        else:
+            max_predicate = max(
+                (predicate_depth(fm.predicate) for fm in self.matcher_list),
+                default=0,
+            )
+            max_nested = max(
+                (_on_match_depth(fm.on_match) for fm in self.matcher_list),
+                default=0,
+            )
+            body_depth = max(max_predicate, max_nested)
         no_match_depth = _on_match_depth(self.on_no_match) if self.on_no_match else 0
-        return 1 + max(max_predicate, max_nested, no_match_depth)
+        return 1 + max(body_depth, no_match_depth)
 
 
 def matcher_from_predicate[Ctx, A](

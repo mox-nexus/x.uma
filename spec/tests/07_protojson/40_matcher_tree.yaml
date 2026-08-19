@@ -1,0 +1,232 @@
+name: tree_exact_match_map
+description: >
+  A `MatcherTree` with an `exactMatchMap` dispatches on an O(1) map lookup
+  rather than a linear predicate scan. This is plan item SF3, and it was
+  unreachable from config in all five implementations until it landed here —
+  `convert.rs` rejected the whole variant with "MatcherTree is not yet
+  supported".
+
+  Note where the fallback lives. xDS puts `on_no_match` on `Matcher`, never on
+  `MatcherTree`, so a tree miss falls through to the matcher-level fallback and
+  there is exactly one place it can come from.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherTree:
+    input:
+      name: role
+      typedConfig:
+        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+        key: role
+    exactMatchMap:
+      map:
+        admin:
+          action:
+            name: allow
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: allow
+        viewer:
+          action:
+            name: read_only
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: read_only
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+cases:
+  - name: exact_key_hits
+    context: { role: admin }
+    expect: allow
+  - name: a_second_key_hits_its_own_entry
+    context: { role: viewer }
+    expect: read_only
+  - name: a_miss_falls_through_to_on_no_match
+    context: { role: auditor }
+    expect: deny
+  - name: an_absent_input_is_a_miss_not_a_crash
+    context: {}
+    expect: deny
+  - name: exact_means_exact_no_prefix_credit
+    context: { role: administrator }
+    expect: deny
+
+---
+name: tree_prefix_match_map
+description: >
+  A `prefixMatchMap` resolves by longest matching prefix, which is the one
+  behaviour a `matcherList` of prefix predicates cannot express — a list is
+  first-match-wins in written order, so it would return `/api` for `/api/v2`
+  whenever `/api` is listed first.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherTree:
+    input:
+      name: path
+      typedConfig:
+        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+        key: path
+    prefixMatchMap:
+      map:
+        /api:
+          action:
+            name: api
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: api
+        /api/v2:
+          action:
+            name: api_v2
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: api_v2
+  onNoMatch:
+    action:
+      name: fallback
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: fallback
+cases:
+  - name: longest_prefix_wins_over_the_shorter_one
+    context: { path: /api/v2/users }
+    expect: api_v2
+  - name: the_shorter_prefix_still_matches_what_only_it_covers
+    context: { path: /api/v1/users }
+    expect: api
+  - name: an_exact_hit_on_a_prefix_key_matches_it
+    context: { path: /api }
+    expect: api
+  - name: no_prefix_matches_falls_through
+    context: { path: /health }
+    expect: fallback
+
+---
+name: a_tree_with_no_map_is_rejected
+description: >
+  `MatcherTree.tree_type` is a oneof, so a tree carrying none of
+  `exactMatchMap` / `prefixMatchMap` / `customMatch` is representable in JSON
+  and must fail to load. This is the sixth absent-oneof site in `convert.rs`,
+  and the only one that was unreachable while `MatcherTree` was rejected
+  wholesale.
+
+  Fail-closed matters more here than the count suggests. An empty tree cannot
+  match anything, so it would fall straight through to `onNoMatch` — silently
+  turning a rule that was written to deny into whatever the fallback says.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherTree:
+    input:
+      name: role
+      typedConfig:
+        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+        key: role
+  onNoMatch:
+    action:
+      name: allow
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: allow
+expect_error: true
+error_contains: matcherTree
+
+---
+name: a_tree_custom_match_is_refused_by_name
+description: >
+  `MatcherTree.tree_type` has a third arm, `customMatch`, which is a
+  `TypedExtensionConfig` naming a caller-supplied tree implementation. rumi has
+  no such extension point, so this must be refused explicitly and by name —
+  not fall through to the absent-oneof branch, which would report "no map set"
+  for a config that plainly sets one.
+
+  The distinction is the whole reason to have both fixtures: the two errors
+  send a config author to two different places.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherTree:
+    input:
+      name: role
+      typedConfig:
+        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+        key: role
+    customMatch:
+      name: my-tree
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: my-tree
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+expect_error: true
+error_contains: customMatch
+
+---
+name: a_tree_nests_into_another_matcher
+description: >
+  A tree's map values are `OnMatch`, so an entry may carry a nested `Matcher`
+  rather than an action — and that nested matcher may itself be a tree. This
+  fixture proves the nesting is reachable and that both levels are traversed.
+
+  It exists because that path is also how the depth limit could be bypassed.
+  `MatcherTree` had no `depth()` at all, and `Matcher::depth()` walked only
+  `matcher_list` and `on_no_match`, so `matcherTree -> onMatch.matcher ->
+  matcherTree -> ...` nested unboundedly and validated clean. Evaluation is
+  still recursive, so `MAX_DEPTH` is the only thing between a config and a
+  stack overflow.
+
+  The 32-level limit itself is asserted in each implementation's unit tests,
+  which can build the nesting programmatically — a fixture would need 33 hand
+  written levels.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherTree:
+    input:
+      name: tier
+      typedConfig:
+        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+        key: tier
+    exactMatchMap:
+      map:
+        premium:
+          matcher:
+            matcherTree:
+              input:
+                name: region
+                typedConfig:
+                  "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                  key: region
+              exactMatchMap:
+                map:
+                  us:
+                    action:
+                      name: premium_us
+                      typedConfig:
+                        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+                        name: premium_us
+            onNoMatch:
+              action:
+                name: premium_other
+                typedConfig:
+                  "@type": type.googleapis.com/xuma.core.v1.NamedAction
+                  name: premium_other
+  onNoMatch:
+    action:
+      name: standard
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: standard
+cases:
+  - name: both_levels_hit
+    context: { tier: premium, region: us }
+    expect: premium_us
+  - name: outer_hits_inner_falls_back
+    context: { tier: premium, region: eu }
+    expect: premium_other
+  - name: outer_misses
+    context: { tier: basic }
+    expect: standard

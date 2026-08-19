@@ -6,18 +6,22 @@
 
 use std::fmt::Display;
 
-use rumi::{EvalTrace, PredicateTrace};
+use rumi::{EvalSteps, EvalTrace, PredicateTrace, TreeKind, TreeLookupTrace};
 
 /// Render a trace to stdout.
 pub fn print<A: Display>(trace: &EvalTrace<A>) {
-    if trace.steps.is_empty() {
-        println!("no rules were evaluated (empty matcher list)");
-    }
-
-    for step in &trace.steps {
-        let mark = if step.matched { "MATCH" } else { "  -  " };
-        println!("[{mark}] rule {}", step.index);
-        print_predicate(&step.predicate_trace, 2);
+    match &trace.steps {
+        EvalSteps::List(steps) => {
+            if steps.is_empty() {
+                println!("no rules were evaluated (empty matcher list)");
+            }
+            for step in steps {
+                let mark = if step.matched { "MATCH" } else { "  -  " };
+                println!("[{mark}] rule {}", step.index);
+                print_predicate(&step.predicate_trace, 2);
+            }
+        }
+        EvalSteps::Tree(lookup) => print_tree_lookup(lookup),
     }
 
     println!();
@@ -27,6 +31,26 @@ pub fn print<A: Display>(trace: &EvalTrace<A>) {
         }
         Some(action) => println!("=> {action}"),
         None => println!("=> (no match, and no on_no_match)"),
+    }
+}
+
+/// A tree does one lookup, so the trace reports the lookup rather than a list
+/// of rules. The three ways it can miss are kept distinct: no usable key at
+/// all, a key that matched nothing, and a key that matched an entry whose
+/// nested matcher then failed. Collapsing them would send a config author
+/// looking in the wrong place.
+fn print_tree_lookup<A: Display>(t: &TreeLookupTrace<A>) {
+    let rule = match t.kind {
+        TreeKind::Exact => "exact",
+        TreeKind::Prefix => "longest-prefix",
+    };
+    println!("[TREE ] {rule} lookup on {}", t.input);
+
+    match (&t.key, &t.matched_key) {
+        (None, _) => println!("  key: (input produced no string — nothing to look up)"),
+        (Some(key), None) => println!("  key: {key:?} — no entry"),
+        (Some(key), Some(hit)) if key == hit => println!("  key: {key:?} — matched"),
+        (Some(key), Some(hit)) => println!("  key: {key:?} — matched entry {hit:?}"),
     }
 }
 

@@ -9,7 +9,7 @@ Read this block first; the rest of the file was written before any of it was don
 | **M1** repo stops asserting what it cannot show | **met** — PR #26 |
 | **M2** a stranger can start | **met** — PR #27 (DX), #29 (reproducibility) |
 | **M3** nothing loads clean and lies | **met** — PR #25, all three blocking security findings fixed |
-| **M4/M5** schema freeze → one schema | **met, bar SF3.** SF0 decided (D-026). One config vocabulary, correct type URLs and field names in all five implementations, protojson the only readable format anywhere, and the terse dialect now a compile error rather than a convention (D-042). `MatcherTree` from config (SF3) is the one gate item left, and it is a feature rather than a migration |
+| **M4/M5** schema freeze → one schema | **met.** SF0 decided (D-026). One config vocabulary, correct type URLs and field names in all five implementations, protojson the only readable format anywhere, and the terse dialect a compile error rather than a convention (D-042). `MatcherTree` loads and dispatches in all three (D-044), which required closing a config-triggerable stack overflow the plan had not anticipated (D-045) |
 | **M6** everything is publishable | **most of the way** — Phase E done, gate needs restating, see below |
 | **M7** released | yours. Publishing is irreversible |
 
@@ -23,11 +23,19 @@ crust CI + README agreement · #29 reproducibility · #30 Claude hook contract �
 `just test-full`, both of which now run in CI and both of which were red for
 months while `just ci` ran default features instead.
 
-**Phases done:** A, B, SF, S, E, F, H1–H3, K, and C bar SF3. **Left: SF3**,
-then G.
+**Phases done:** A, B, SF, C, S, E, F, H1–H3, K. **Left: G**, which is
+the maintainer's.
 
 **Ground rule change:** the maintainer authorised `gh pr merge --admin --squash`
 for these PRs. `just ci` must still be exit 0 before every commit.
+
+**`just ci` now checks that the crusts compile.** It did not until
+2026-08-18, and on that one day three separate changes that `just ci` called
+green broke both crusts — each found only after pushing. The crusts sit outside
+`default-members` and need maturin / wasm-pack to *build*, but `cargo check`
+neither links nor produces a cdylib, so it needs none of that and costs ~3s.
+`just crust-compiles` is in the gate, and the same two commands are a step in
+the CI test job. The full crust suites still run as their own jobs.
 
 **Stacked PRs: do not delete the base branch on merge.** Doing so *closes* the
 child PR rather than retargeting it, and a closed PR cannot be reopened or
@@ -52,8 +60,8 @@ verified converter that emits protojson before anything reads it:
 the mechanical conversion that silently gutted a negative fixture once already;
 the converter is the safer option and its output goes through the real reader.
 
-**Left: SF3 only** — `MatcherTree` / `exact_match_map` from config, unreachable
-in all five implementations. Then Phase G, which is the maintainer's.
+**Phase SF and Phase C are complete.** What is left is Phase G, which is the
+maintainer's: publishing is irreversible.
 
 The next section is what the work so far established, and it changes several
 things this plan says further down. Read it before starting.
@@ -198,9 +206,12 @@ inside `Any` payloads*, which is exactly where the deny-rule keys live.
 Falsifier: `{"@type": ".../HeaderInput", "nmae": "x-admin"}` must fail to load.
 `protojson.rs`'s `unknown_field_inside_a_payload_is_an_error` is that test.
 
-**Add a sixth absent-oneof check** when SF3 goes green: `matcher_tree::TreeType`
-is an `Option` oneof that `convert.rs:86-90` currently never reaches, because it
-rejects `MatcherTree` wholesale.
+**The sixth absent-oneof check is in.** `matcher_tree::TreeType` is now
+reached, and both of its failure modes are fixtured: a tree with no map is
+rejected (`a_tree_with_no_map_is_rejected`), and `customMatch` — the third arm,
+which rumi does not implement — is refused *by name* rather than falling into
+the absent branch (`a_tree_custom_match_is_refused_by_name`). Reporting "no map
+set" for a config that plainly sets one sends the author to the wrong place.
 
 ---
 
@@ -1001,7 +1012,7 @@ deleted. Verified by flipping a fixture to `[python]` and watching Rust fail.
 |---|---|---|
 | ~~SF1~~ | ~~`ignore_case: true` either matches case-insensitively or fails to load~~ **DONE (#38)** — it matches, and the `(?-i)` case fails to load |
 | ~~SF2~~ | ~~`keep_matching: true` behaves as xDS specifies, or is rejected at load~~ **DONE (#38)** — rejected, with the reason in the error |
-| SF3 | a config using `MatcherTree` / `exact_match_map` loads and dispatches | unreachable from config in all five implementations (F3) |
+| ~~SF3~~ | ~~a config using `MatcherTree` / `exact_match_map` loads and dispatches~~ **DONE** — `spec/tests/07_protojson/40_matcher_tree.yaml`, five fixtures, all three implementations. Wiring it required closing a config-triggerable stack overflow first (D-045) |
 | ~~SF4~~ | ~~the test-domain input reads by its declared proto field name~~ **DONE** |
 | ~~SF5~~ | ~~`xuma.core.v1.StringMatcher` resolves to a real proto message~~ **DONE** — it was deleted rather than defined: `valueMatch` already says it. `xuma.core.v1.BoolMatcher` is a real message now |
 | ~~SF6~~ | ~~`custom_match` round-trips, and `register_core_matchers` works in all three languages~~ **DONE** — registered in all three, fixtured in `01_simple_exact.yaml` |

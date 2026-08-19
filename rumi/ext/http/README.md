@@ -20,8 +20,7 @@ use rumi_http::{register_simple, HttpRequest};
 
 let registry = register_simple(RegistryBuilder::new()).build();
 
-let config = MatcherConfig {
-    matchers: vec![FieldMatcherConfig {
+let config = MatcherConfig::list(vec![FieldMatcherConfig {
         predicate: PredicateConfig::Single(SinglePredicateConfig {
             input: TypedConfig {
                 type_url: "xuma.http.v1.PathInput".into(),
@@ -35,9 +34,7 @@ let config = MatcherConfig {
         on_match: OnMatchConfig::Action {
             action: "api_read".to_string(),
         },
-    }],
-    on_no_match: None,
-};
+}]);
 
 let matcher = registry.load_matcher(config).unwrap();
 

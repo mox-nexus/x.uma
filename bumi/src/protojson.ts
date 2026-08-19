@@ -38,6 +38,7 @@ import {
 	FieldMatcherConfig,
 	MatcherConfig,
 	MatcherOnMatchConfig,
+	MatcherTreeConfig,
 	NotPredicateConfig,
 	type OnMatchConfig,
 	OrPredicateConfig,
@@ -228,9 +229,11 @@ function readMatcher(
 
 	const [key, listValue] = chosen;
 	if (key === "matcher_tree" || key === "matcherTree") {
-		// Rejected rather than ignored: a tree that silently became an empty
-		// list would answer every request with onNoMatch.
-		throw new ConfigParseError(`${where}: matcherTree is not implemented; use matcherList`);
+		return new MatcherConfig<string>(
+			[],
+			readMatcherFallback(data, where, depth, action),
+			readMatcherTree(listValue, `${where}.matcherTree`, depth + 1, action),
+		);
 	}
 
 	const listing = asObject(listValue, `${where}.matcherList`);
@@ -244,12 +247,106 @@ function readMatcher(
 		readFieldMatcher(fm, `${where}.matchers[${i}]`, depth + 1, action),
 	);
 
+	return new MatcherConfig(matchers, readMatcherFallback(data, where, depth, action));
+}
+
+/** A Matcher's `onNoMatch`, wherever the matcher_type lands. */
+function readMatcherFallback(
+	data: Record<string, unknown>,
+	where: string,
+	depth: number,
+	action: ActionReader<string>,
+): OnMatchConfig<string> | null {
 	let onNoMatch: OnMatchConfig<string> | null = null;
 	for (const k of ["on_no_match", "onNoMatch"]) {
 		if (k in data) onNoMatch = readOnMatch(data[k], `${where}.onNoMatch`, depth + 1, action);
 	}
+	return onNoMatch;
+}
 
-	return new MatcherConfig(matchers, onNoMatch);
+const TREE_FIELDS = new Set([
+	"input",
+	"exact_match_map",
+	"exactMatchMap",
+	"prefix_match_map",
+	"prefixMatchMap",
+	"custom_match",
+	"customMatch",
+]);
+
+/** Read an xDS `MatcherTree`. */
+function readMatcherTree(
+	value: unknown,
+	where: string,
+	depth: number,
+	action: ActionReader<string>,
+): MatcherTreeConfig<string> {
+	checkDepth(depth, where);
+	const data = asObject(value, where);
+	rejectUnknown(data, TREE_FIELDS, where);
+
+	if (!("input" in data)) {
+		throw new ConfigParseError(`${where}: 'input' is required`);
+	}
+	const treeInput = readTypedExtension(data.input, `${where}.input`);
+
+	const chosen = oneOf(
+		data,
+		[
+			"exact_match_map",
+			"exactMatchMap",
+			"prefix_match_map",
+			"prefixMatchMap",
+			"custom_match",
+			"customMatch",
+		],
+		where,
+	);
+	if (chosen === null) {
+		// Fail closed. An empty tree matches nothing, so it would fall straight
+		// through to onNoMatch and silently turn a deny rule into whatever the
+		// fallback says.
+		throw new ConfigParseError(`${where}: one of 'exactMatchMap' or 'prefixMatchMap' is required`);
+	}
+
+	const [key, mapValue] = chosen;
+	if (key === "custom_match" || key === "customMatch") {
+		// Refused by name rather than falling into the branch above: reporting
+		// "no map set" for a config that plainly sets one sends the author
+		// looking in the wrong place.
+		throw new ConfigParseError(
+			`${where}: 'customMatch' is not supported; use 'exactMatchMap' or 'prefixMatchMap'`,
+		);
+	}
+
+	const rule = key === "prefix_match_map" || key === "prefixMatchMap" ? "prefix" : "exact";
+	const label = rule === "prefix" ? "prefixMatchMap" : "exactMatchMap";
+
+	const holder = asObject(mapValue, `${where}.${label}`);
+	rejectUnknown(holder, new Set(["map"]), `${where}.${label}`);
+	const raw = holder.map ?? {};
+	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+		throw new ConfigParseError(`${where}.${label}.map: expected an object`);
+	}
+
+	// Sorted so a duplicate-key error names the same key on every run, and so
+	// the loaded config is a deterministic function of the document.
+	const entries = Object.keys(raw as Record<string, unknown>)
+		.sort()
+		.map(
+			(k) =>
+				[
+					k,
+					readOnMatch(
+						(raw as Record<string, unknown>)[k],
+						`${where}.${label}.map[${JSON.stringify(k)}]`,
+						depth + 1,
+						action,
+					),
+				] as const,
+		);
+
+	return new MatcherTreeConfig(treeInput, rule, entries);
 }
 
 function readFieldMatcher(

@@ -64,10 +64,14 @@ function walkMatcher(
   parentId: string | null,
 ): string {
   const id = nextId("matcher");
+  // A tree has entries, not field matchers. Counting `matchers` for one would
+  // render a populated config as "Matcher (0)" with no rule nodes — a valid
+  // config drawn as an empty diagram.
+  const count = config.tree ? config.tree.entries.length : config.matchers.length;
   nodes.push({
     id,
     type: "matcher",
-    data: { label: "Matcher", count: config.matchers.length },
+    data: { label: config.tree ? `Matcher (${config.tree.rule} tree)` : "Matcher", count },
   });
 
   if (parentId) {
@@ -78,8 +82,25 @@ function walkMatcher(
     });
   }
 
-  for (const fm of config.matchers) {
-    walkFieldMatcher(fm, nodes, edges, id);
+  if (config.tree) {
+    // Entries render as their key plus whatever the key dispatches to. There
+    // is no predicate to draw: a tree looks a key up rather than evaluating a
+    // condition, and drawing a predicate that is not in the config would make
+    // the diagram a second, wrong source of truth.
+    for (const [key, om] of config.tree.entries) {
+      const entryId = nextId("entry");
+      nodes.push({
+        id: entryId,
+        type: "predicate",
+        data: { label: `${config.tree.rule}: ${key}` },
+      });
+      edges.push({ id: nextId("e"), source: id, target: entryId });
+      walkOnMatch(om, nodes, edges, entryId, false);
+    }
+  } else {
+    for (const fm of config.matchers) {
+      walkFieldMatcher(fm, nodes, edges, id);
+    }
   }
 
   if (config.onNoMatch) {

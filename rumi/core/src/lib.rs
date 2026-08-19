@@ -101,7 +101,7 @@ mod registry;
 pub use data_input::DataInput;
 pub use field_matcher::FieldMatcher;
 pub use input_matcher::InputMatcher;
-pub use matcher::Matcher;
+pub use matcher::{Matcher, MatcherKind};
 pub use matcher_tree::MatcherTree;
 pub use matching_data::{CustomMatchData, MatchingData};
 pub use on_match::OnMatch;
@@ -112,8 +112,9 @@ pub use string_match::StringMatchSpec;
 // Registry (feature-gated)
 #[cfg(feature = "registry")]
 pub use config::{
-    FieldMatcherConfig, MatcherConfig, OnMatchConfig, PredicateConfig, SinglePredicateConfig,
-    TypedConfig, UnitConfig, ValueMatchConfig,
+    FieldMatcherConfig, MatcherConfig, MatcherKindConfig, MatcherTreeConfig, OnMatchConfig,
+    PredicateConfig, SinglePredicateConfig, TreeTypeConfig, TypedConfig, UnitConfig,
+    ValueMatchConfig,
 };
 #[cfg(feature = "registry")]
 pub use registry::{
@@ -122,7 +123,9 @@ pub use registry::{
 };
 
 // Trace types
-pub use trace::{EvalStep, EvalTrace, OnMatchTrace, PredicateTrace};
+pub use trace::{
+    EvalStep, EvalSteps, EvalTrace, OnMatchTrace, PredicateTrace, TreeKind, TreeLookupTrace,
+};
 
 // Concrete matchers
 pub use input_matcher::{
@@ -198,6 +201,19 @@ pub const MAX_DEPTH: usize = 32;
 /// Prevents width-based denial-of-service: a config with millions of field matchers at depth 1
 /// bypasses [`MAX_DEPTH`] but still causes excessive resource consumption.
 pub const MAX_FIELD_MATCHERS: usize = 256;
+
+/// Maximum entries in a single [`MatcherTree`](crate::MatcherTree).
+///
+/// Deliberately **not** [`MAX_FIELD_MATCHERS`], and for a different reason.
+/// That limit is about evaluation: a list is O(n) per request, so its width is
+/// a per-request cost. A tree is O(1) hash or O(k) in the key's length, so its
+/// entry count costs nothing at evaluation time — and large routing tables are
+/// the entire reason to reach for a tree.
+///
+/// What a tree's width does cost is memory at config load. That is what this
+/// bounds, and why it is far larger than 256. Copying `MAX_FIELD_MATCHERS`
+/// here would have frozen a limit whose stated rationale does not apply.
+pub const MAX_TREE_ENTRIES: usize = 65_536;
 
 /// Maximum number of predicates in a single `And` or `Or` compound predicate.
 ///
@@ -285,6 +301,22 @@ pub enum MatcherError {
         /// What was being named, e.g. `"header name"`.
         what: &'static str,
     },
+    /// Two entries of a `MatcherTree` were configured under the same key.
+    ///
+    /// A map silently keeps the last writer, so one of the two rules would
+    /// vanish without a word. On a config path that is a rule the author
+    /// believes is in force and is not.
+    DuplicateTreeKey {
+        /// The key configured more than once.
+        key: String,
+    },
+    /// Too many entries in a single `MatcherTree`.
+    TooManyTreeEntries {
+        /// Actual count of entries.
+        count: usize,
+        /// Maximum allowed.
+        max: usize,
+    },
     /// A string match pattern exceeds the maximum allowed length.
     PatternTooLong {
         /// Actual length of the pattern.
@@ -342,6 +374,16 @@ impl std::fmt::Display for MatcherError {
                     f,
                     "compound predicate has {count} children, but maximum allowed is {max}"
                 )
+            }
+            Self::DuplicateTreeKey { key } => {
+                write!(
+                    f,
+                    "matcher tree has more than one entry for key '{key}'; \
+                     one of them would never be reachable"
+                )
+            }
+            Self::TooManyTreeEntries { count, max } => {
+                write!(f, "matcher tree has {count} entries, maximum is {max}")
             }
             Self::EmptyIdentifier { what } => {
                 write!(f, "{what} must not be empty")

@@ -7,7 +7,7 @@ use rumi::prelude::*;
 use rumi_kv::KvContext;
 use wasm_bindgen::prelude::*;
 
-use crate::matcher::{TraceResultSerde, TraceStepSerde};
+use crate::matcher::TraceResultSerde;
 
 /// An opaque compiled test matcher.
 ///
@@ -62,15 +62,7 @@ impl TestMatcher {
         let ctx = build_context_from_js(&context)?;
         let trace = self.inner.evaluate_with_trace(&ctx);
 
-        let steps: Vec<TraceStepSerde> = trace
-            .steps
-            .iter()
-            .map(|step| TraceStepSerde {
-                index: step.index,
-                matched: step.matched,
-                predicate: format!("{:?}", step.predicate_trace),
-            })
-            .collect();
+        let steps = super::matcher::trace_steps(&trace.steps);
 
         let result = TraceResultSerde {
             result: trace.result,

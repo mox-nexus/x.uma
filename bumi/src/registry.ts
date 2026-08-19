@@ -27,6 +27,7 @@ import {
 	type FieldMatcherConfig,
 	type MatcherConfig,
 	MatcherOnMatchConfig,
+	type MatcherTreeConfig,
 	NotPredicateConfig,
 	type OnMatchConfig,
 	OrPredicateConfig,
@@ -34,7 +35,14 @@ import {
 	SinglePredicateConfig,
 	type ValueMatchConfig,
 } from "./config.ts";
-import { Action, FieldMatcher, Matcher, MatcherError, NestedMatcher } from "./matcher.ts";
+import {
+	Action,
+	FieldMatcher,
+	Matcher,
+	MatcherError,
+	MatcherTree,
+	NestedMatcher,
+} from "./matcher.ts";
 import type { OnMatch } from "./matcher.ts";
 import { And, Not, Or, SinglePredicate } from "./predicate.ts";
 import type { Predicate } from "./predicate.ts";
@@ -59,6 +67,7 @@ export {
 	MAX_PATTERN_LENGTH,
 	MAX_PREDICATES_PER_COMPOUND,
 	MAX_REGEX_PATTERN_LENGTH,
+	MAX_TREE_ENTRIES,
 	PatternTooLongError,
 } from "./limits.ts";
 import {
@@ -66,6 +75,7 @@ import {
 	MAX_PATTERN_LENGTH,
 	MAX_PREDICATES_PER_COMPOUND,
 	MAX_REGEX_PATTERN_LENGTH,
+	MAX_TREE_ENTRIES,
 	PatternTooLongError,
 } from "./limits.ts";
 
@@ -124,6 +134,32 @@ export class TooManyFieldMatchersError extends MatcherError {
  * Caught at load time rather than at evaluation, where the mismatch would look
  * like a rule that simply never fires.
  */
+/**
+ * Two entries of a matcher tree share a key.
+ *
+ * A map keeps the last writer, so one of the two rules would vanish without a
+ * word — a rule the author believes is in force and is not.
+ */
+export class DuplicateTreeKeyError extends MatcherError {
+	constructor(readonly key: string) {
+		super(
+			`matcher tree has more than one entry for key ${JSON.stringify(key)}; one of them would never be reachable`,
+		);
+		this.name = "DuplicateTreeKeyError";
+	}
+}
+
+/** A matcher tree has too many entries (width-based limit). */
+export class TooManyTreeEntriesError extends MatcherError {
+	constructor(
+		readonly count: number,
+		readonly max: number,
+	) {
+		super(`matcher tree has ${count} entries, maximum is ${max}`);
+		this.name = "TooManyTreeEntriesError";
+	}
+}
+
 export class IncompatibleTypesError extends MatcherError {
 	constructor(
 		readonly inputType: string,
@@ -220,18 +256,62 @@ export class Registry<Ctx> {
 	 * validates depth constraints.
 	 */
 	loadMatcher(config: MatcherConfig<string>): Matcher<Ctx, string> {
+		let onNoMatch: OnMatch<Ctx, string> | null = null;
+		if (config.onNoMatch !== null) {
+			onNoMatch = this.loadOnMatch(config.onNoMatch);
+		}
+
+		if (config.tree !== null) {
+			return new Matcher([], onNoMatch, this.loadTree(config.tree));
+		}
+
 		if (config.matchers.length > MAX_FIELD_MATCHERS) {
 			throw new TooManyFieldMatchersError(config.matchers.length, MAX_FIELD_MATCHERS);
 		}
 
 		const matchers = config.matchers.map((fm) => this.loadFieldMatcher(fm));
 
-		let onNoMatch: OnMatch<Ctx, string> | null = null;
-		if (config.onNoMatch !== null) {
-			onNoMatch = this.loadOnMatch(config.onNoMatch);
+		return new Matcher(matchers, onNoMatch);
+	}
+
+	/** Build a MatcherTree, resolving its input and entries. */
+	private loadTree(config: MatcherTreeConfig<string>): MatcherTree<Ctx, string> {
+		// Checked before building, so a config that would blow memory is
+		// rejected rather than materialised and then measured.
+		if (config.entries.length > MAX_TREE_ENTRIES) {
+			throw new TooManyTreeEntriesError(config.entries.length, MAX_TREE_ENTRIES);
 		}
 
-		return new Matcher(matchers, onNoMatch);
+		const factory = this.inputFactories.get(config.input.typeUrl);
+		if (factory === undefined) {
+			throw new UnknownTypeUrlError(config.input.typeUrl, "input", [...this.inputFactories.keys()]);
+		}
+		let treeInput: DataInput<Ctx>;
+		try {
+			treeInput = factory(config.input.config);
+		} catch (e) {
+			throw new InvalidConfigError(String(e));
+		}
+
+		// A tree looks its key up as a string, so an input declaring any other
+		// type can never match. Rejected here rather than silently never
+		// firing. Bounded by dataType defaulting to "string".
+		const declared = treeInput.dataType?.();
+		if (declared !== undefined && declared !== "string") {
+			throw new IncompatibleTypesError(declared, ["string"]);
+		}
+
+		const seen = new Set<string>();
+		const entries: (readonly [string, OnMatch<Ctx, string>])[] = [];
+		for (const [key, om] of config.entries) {
+			if (seen.has(key)) {
+				throw new DuplicateTreeKeyError(key);
+			}
+			seen.add(key);
+			entries.push([key, this.loadOnMatch(om)] as const);
+		}
+
+		return new MatcherTree(treeInput, config.rule, entries);
 	}
 
 	/** Number of registered input types. */

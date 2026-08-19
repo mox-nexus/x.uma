@@ -229,6 +229,7 @@ From official Envoy xDS proto research:
 | **Nested matcher failure** | If nested matcher returns no-match, parent OnMatch fails | Continue to next field_matcher (no fallback) |
 | **on_no_match** | At Matcher level only, not per-OnMatch | `Matcher.on_no_match: Option<OnMatch>` |
 | **First-match-wins** | first match wins; `keep_matching` is **deferred, not implemented** | `Matcher::evaluate()` returns the first match. `keep_matching` appears in the proto and is accepted and ignored — see PLAN.md F2 / SF2 |
+| **MatcherList vs MatcherTree** | `oneof matcher_type` — a list XOR a tree | `enum MatcherKind<Ctx, A> { List(Vec<FieldMatcher>), Tree(MatcherTree) }`. `on_no_match` lives on `Matcher` only, as in the proto — `MatcherTree` has no fallback field (D-044) |
 
 **Key insight**: OnMatch is EXCLUSIVE — action XOR nested matcher, never both. Making illegal states unrepresentable at the type level.
 

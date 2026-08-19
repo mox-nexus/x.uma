@@ -31,6 +31,19 @@ crust-wasm-check:
 # have separate toolchains, so CI runs them as their own jobs.
 crust-check: crust-py-check crust-wasm-check
 
+# Do the crusts still compile? ~3s each, and no maturin, wasm-pack or wasm32
+# target needed — `cargo check` neither links nor builds a cdylib.
+#
+# This IS in `just ci`, unlike the recipes above. Three times in one day a
+# change that `just ci` called green broke both crusts, and each was found only
+# after pushing: deleting a fixture dialect, adding an HTTP domain to the
+# fixture schema, and turning `EvalTrace.steps` into an enum. Every one would
+# have failed here in seconds. The full suites still run as their own CI jobs;
+# what was missing was anything at all locally.
+crust-compiles:
+    cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures
+    cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures
+
 # Check every tool this repo needs is installed. First command in CONTRIBUTING.
 doctor:
     ./scripts/doctor.sh
@@ -124,7 +137,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-full test-protojson test-fixture-coverage features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-full test-protojson test-fixture-coverage crust-compiles features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:

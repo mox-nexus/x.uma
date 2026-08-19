@@ -115,6 +115,27 @@ export class MatcherConfig<A> {
 	constructor(
 		readonly matchers: readonly FieldMatcherConfig<A>[],
 		readonly onNoMatch: OnMatchConfig<A> | null = null,
+		/**
+		 * xDS models this as `oneof matcher_type`: a list or a tree, never
+		 * both. A list is by far the common case, so it stays first.
+		 */
+		readonly tree: MatcherTreeConfig<A> | null = null,
+	) {}
+}
+
+/**
+ * Configuration for a MatcherTree — xDS `Matcher.MatcherTree`.
+ *
+ * Carries no fallback. The proto MatcherTree has no `on_no_match` field; the
+ * enclosing Matcher owns it, so there is exactly one place a miss can be
+ * handled. See DECISIONS.md D-044.
+ */
+export class MatcherTreeConfig<A> {
+	constructor(
+		readonly input: TypedConfig,
+		/** "exact" or "prefix" — which lookup rule applies. */
+		readonly rule: "exact" | "prefix",
+		readonly entries: readonly (readonly [string, OnMatchConfig<A>])[],
 	) {}
 }
 

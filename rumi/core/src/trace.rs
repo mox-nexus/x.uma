@@ -123,11 +123,86 @@ impl fmt::Debug for PredicateTrace {
 pub struct EvalTrace<A> {
     /// The final result (identical to what `evaluate()` returns).
     pub result: Option<A>,
-    /// Trace of each field matcher that was evaluated (in order).
-    /// Stops after the first match (preserves first-match-wins).
-    pub steps: Vec<EvalStep<A>>,
+    /// What the matcher actually did, shaped like the matcher itself.
+    pub steps: EvalSteps<A>,
     /// Whether the `on_no_match` fallback was used.
     pub used_fallback: bool,
+}
+
+/// The traced work, mirroring `MatcherKind`.
+///
+/// A tree does a map lookup, not a predicate evaluation, so there is no
+/// `Predicate` to trace. Synthesizing one would put a `SinglePredicate` in the
+/// output that is not in the config — a trace that invents structure is a
+/// second, wrong source of truth. Reporting no steps at all would be equally
+/// dishonest, and would break the property that a non-fallback result implies
+/// at least one recorded step.
+pub enum EvalSteps<A> {
+    /// Each field matcher evaluated, in order. Stops at the first match.
+    List(Vec<EvalStep<A>>),
+    /// The single lookup a tree performed.
+    Tree(Box<TreeLookupTrace<A>>),
+}
+
+impl<A> EvalSteps<A> {
+    /// The field-matcher steps, if this was a list matcher.
+    #[must_use]
+    pub fn as_list(&self) -> Option<&[EvalStep<A>]> {
+        match self {
+            Self::List(steps) => Some(steps),
+            Self::Tree(_) => None,
+        }
+    }
+}
+
+impl<A: fmt::Debug> fmt::Debug for EvalSteps<A> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::List(steps) => f.debug_tuple("List").field(steps).finish(),
+            Self::Tree(t) => f.debug_tuple("Tree").field(t).finish(),
+        }
+    }
+}
+
+/// Which lookup rule a tree applied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TreeKind {
+    /// Exact key equality.
+    Exact,
+    /// Longest matching prefix.
+    Prefix,
+}
+
+/// One tree lookup, recorded.
+pub struct TreeLookupTrace<A> {
+    /// Which rule was applied.
+    pub kind: TreeKind,
+    /// The `DataInput` that produced the lookup key.
+    pub input: String,
+    /// The key extracted from the context.
+    ///
+    /// `None` means the input produced nothing usable as a string — absent
+    /// data, or an `Int`/`Bool`/`Bytes`. Distinguishing that from a key that
+    /// simply found no entry is the whole point of recording it: otherwise
+    /// three different config faults collapse into one silent miss.
+    pub key: Option<String>,
+    /// The entry key that won, if any. For a prefix tree this is the matched
+    /// prefix rather than the lookup key, which is the non-obvious step.
+    pub matched_key: Option<String>,
+    /// What the winning entry did.
+    pub on_match: Option<OnMatchTrace<A>>,
+}
+
+impl<A: fmt::Debug> fmt::Debug for TreeLookupTrace<A> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TreeLookupTrace")
+            .field("kind", &self.kind)
+            .field("input", &self.input)
+            .field("key", &self.key)
+            .field("matched_key", &self.matched_key)
+            .field("on_match", &self.on_match)
+            .finish()
+    }
 }
 
 impl<A: fmt::Debug> fmt::Debug for EvalTrace<A> {
@@ -244,7 +319,7 @@ mod tests {
     fn eval_trace_debug_format() {
         let trace: EvalTrace<String> = EvalTrace {
             result: Some("matched".into()),
-            steps: vec![],
+            steps: EvalSteps::List(vec![]),
             used_fallback: false,
         };
         let debug = format!("{trace:?}");

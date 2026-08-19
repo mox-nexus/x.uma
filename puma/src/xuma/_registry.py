@@ -32,6 +32,7 @@ from xuma._config import (
     FieldMatcherConfig,
     MatcherConfig,
     MatcherOnMatchConfig,
+    MatcherTreeConfig,
     NotPredicateConfig,
     OrPredicateConfig,
     SinglePredicateConfig,
@@ -41,7 +42,9 @@ from xuma._matcher import (
     FieldMatcher,
     Matcher,
     MatcherError,
+    MatcherTree,
     NestedMatcher,
+    OnMatch,
 )
 from xuma._predicate import And, Not, Or, SinglePredicate
 from xuma._string_matchers import (
@@ -70,6 +73,7 @@ from xuma._limits import MAX_FIELD_MATCHERS as MAX_FIELD_MATCHERS
 from xuma._limits import MAX_PATTERN_LENGTH as MAX_PATTERN_LENGTH
 from xuma._limits import MAX_PREDICATES_PER_COMPOUND as MAX_PREDICATES_PER_COMPOUND
 from xuma._limits import MAX_REGEX_PATTERN_LENGTH as MAX_REGEX_PATTERN_LENGTH
+from xuma._limits import MAX_TREE_ENTRIES as MAX_TREE_ENTRIES
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Error types
@@ -124,6 +128,32 @@ class TooManyPredicatesError(MatcherError):
         self.max = max_
         super().__init__(
             f"too many predicates in compound: {count} exceeds maximum {max_}"
+        )
+
+
+class DuplicateTreeKeyError(MatcherError):
+    """Two entries of a matcher tree share a key.
+
+    A map keeps the last writer, so one of the two rules would vanish without
+    a word — a rule the author believes is in force and is not.
+    """
+
+    def __init__(self, key: str) -> None:
+        self.key = key
+        super().__init__(
+            f"matcher tree has more than one entry for key {key!r}; "
+            f"one of them would never be reachable"
+        )
+
+
+class TooManyTreeEntriesError(MatcherError):
+    """A matcher tree has too many entries (width-based limit)."""
+
+    def __init__(self, count: int, max_: int) -> None:
+        self.count = count
+        self.max = max_
+        super().__init__(
+            f"matcher tree has {count} entries, maximum is {max_}"
         )
 
 
@@ -253,6 +283,16 @@ class Registry[Ctx]:
             PatternTooLongError: pattern exceeds length limit
             MatcherError: depth exceeded
         """
+        on_no_match = None
+        if config.on_no_match is not None:
+            on_no_match = self._load_on_match(config.on_no_match)
+
+        if config.tree is not None:
+            return Matcher(
+                on_no_match=on_no_match,
+                tree=self._load_tree(config.tree),
+            )
+
         if len(config.matchers) > MAX_FIELD_MATCHERS:
             raise TooManyFieldMatchersError(len(config.matchers), MAX_FIELD_MATCHERS)
 
@@ -260,11 +300,43 @@ class Registry[Ctx]:
             self._load_field_matcher(fm) for fm in config.matchers
         )
 
-        on_no_match = None
-        if config.on_no_match is not None:
-            on_no_match = self._load_on_match(config.on_no_match)
-
         return Matcher(matcher_list=matchers, on_no_match=on_no_match)
+
+    def _load_tree(self, config: MatcherTreeConfig[str]) -> MatcherTree[Ctx, str]:
+        """Build a MatcherTree, resolving its input and entries."""
+        # Checked before building, so a config that would blow memory is
+        # rejected rather than materialised and then measured.
+        if len(config.entries) > MAX_TREE_ENTRIES:
+            raise TooManyTreeEntriesError(len(config.entries), MAX_TREE_ENTRIES)
+
+        factory = self._input_factories.get(config.input.type_url)
+        if factory is None:
+            raise UnknownTypeUrlError(
+                config.input.type_url,
+                "input",
+                list(self._input_factories.keys()),
+            )
+        try:
+            tree_input = factory(config.input.config)
+        except Exception as e:
+            raise InvalidConfigError(str(e)) from e
+
+        # A tree looks its key up as a string, so an input that declares any
+        # other type can never match. Rejected here rather than silently never
+        # firing. Bounded by the fact that data_type defaults to "string".
+        declared = getattr(tree_input, "data_type", None)
+        if callable(declared) and declared() != "string":
+            raise IncompatibleTypesError(declared(), ("string",))
+
+        seen: set[str] = set()
+        entries: list[tuple[str, OnMatch[Ctx, str]]] = []
+        for key, om in config.entries:
+            if key in seen:
+                raise DuplicateTreeKeyError(key)
+            seen.add(key)
+            entries.append((key, self._load_on_match(om)))
+
+        return MatcherTree(input=tree_input, rule=config.rule, entries=tuple(entries))
 
     @property
     def input_count(self) -> int:

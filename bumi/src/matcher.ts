@@ -1,4 +1,5 @@
 import { type Predicate, evaluatePredicate, predicateDepth } from "./predicate.ts";
+import type { DataInput } from "./types.ts";
 
 /** Maximum nesting depth for matcher trees. Validated at construction. */
 export const MAX_DEPTH = 32;
@@ -37,21 +38,99 @@ export class FieldMatcher<Ctx, A> {
  *
  * Validates depth at construction (throws MatcherError if > MAX_DEPTH).
  */
+/**
+ * Map-based matching — xDS `Matcher.MatcherTree`.
+ *
+ * Extracts a key via a DataInput, then looks it up either exactly or by
+ * longest matching prefix. The prefix rule is the one behaviour a matcher list
+ * cannot express: a list is first-match-wins in written order, so it returns
+ * `/api` for `/api/v2` whenever `/api` is listed first.
+ *
+ * Carries no fallback — the enclosing Matcher owns it. See DECISIONS.md D-044.
+ *
+ * rumi backs the prefix rule with a radix tree, O(k) in the key length. This
+ * scans the entries instead, O(n·k). The conformance suite pins behaviour, not
+ * the data structure.
+ */
+export class MatcherTree<Ctx, A> {
+	constructor(
+		readonly input: DataInput<Ctx>,
+		readonly rule: "exact" | "prefix",
+		readonly entries: readonly (readonly [string, OnMatch<Ctx, A>])[],
+	) {}
+
+	/** The lookup key, or null if the input produced no usable string. */
+	keyFor(ctx: Ctx): string | null {
+		const data = this.input.get(ctx);
+		return typeof data === "string" ? data : null;
+	}
+
+	/** The entry a key selects, and which entry key won. */
+	lookup(key: string): readonly [string, OnMatch<Ctx, A>] | null {
+		if (this.rule === "exact") {
+			for (const entry of this.entries) {
+				if (entry[0] === key) return entry;
+			}
+			return null;
+		}
+		let best: readonly [string, OnMatch<Ctx, A>] | null = null;
+		for (const entry of this.entries) {
+			if (key.startsWith(entry[0]) && (best === null || entry[0].length > best[0].length)) {
+				best = entry;
+			}
+		}
+		return best;
+	}
+
+	/** Look up and dispatch. A miss is null; the Matcher owns the fallback. */
+	evaluate(ctx: Ctx): A | null {
+		const key = this.keyFor(ctx);
+		if (key === null) return null;
+		const hit = this.lookup(key);
+		if (hit === null) return null;
+		return evaluateOnMatch(hit[1], ctx);
+	}
+
+	/**
+	 * Deepest nesting reachable through this tree's entries.
+	 *
+	 * Entries hold OnMatch, which can hold a Matcher, which can hold another
+	 * tree. Not walking this is what let such a config report depth 1 and pass
+	 * validation — see DECISIONS.md D-045.
+	 */
+	depth(): number {
+		let max = 0;
+		for (const [, om] of this.entries) {
+			max = Math.max(max, onMatchDepth(om));
+		}
+		return max;
+	}
+}
+
 export class Matcher<Ctx, A> {
 	constructor(
 		readonly matchers: readonly FieldMatcher<Ctx, A>[],
 		readonly onNoMatch: OnMatch<Ctx, A> | null = null,
+		readonly tree: MatcherTree<Ctx, A> | null = null,
 	) {
 		this.validate();
 	}
 
 	/** Evaluate in order, return first match. */
 	evaluate(ctx: Ctx): A | null {
-		for (const fm of this.matchers) {
-			if (evaluatePredicate(fm.predicate, ctx)) {
-				const result = evaluateOnMatch(fm.onMatch, ctx);
-				if (result !== null) return result;
-				// xDS: nested matcher failure → continue to next field_matcher
+		if (this.tree !== null) {
+			// A tree miss and a tree hit whose nested matcher returned null
+			// both arrive as null, and both then reach onNoMatch — the same
+			// rule the list follows when it falls off the end.
+			const result = this.tree.evaluate(ctx);
+			if (result !== null) return result;
+		} else {
+			for (const fm of this.matchers) {
+				if (evaluatePredicate(fm.predicate, ctx)) {
+					const result = evaluateOnMatch(fm.onMatch, ctx);
+					if (result !== null) return result;
+					// xDS: nested matcher failure → continue to the next one.
+				}
 			}
 		}
 		if (this.onNoMatch !== null) {
@@ -70,14 +149,16 @@ export class Matcher<Ctx, A> {
 
 	/** Calculate total nesting depth. */
 	depth(): number {
-		let maxPredicate = 0;
-		let maxNested = 0;
-		for (const fm of this.matchers) {
-			maxPredicate = Math.max(maxPredicate, predicateDepth(fm.predicate));
-			maxNested = Math.max(maxNested, onMatchDepth(fm.onMatch));
+		let body = 0;
+		if (this.tree !== null) {
+			body = this.tree.depth();
+		} else {
+			for (const fm of this.matchers) {
+				body = Math.max(body, predicateDepth(fm.predicate), onMatchDepth(fm.onMatch));
+			}
 		}
 		const noMatchD = this.onNoMatch !== null ? onMatchDepth(this.onNoMatch) : 0;
-		return 1 + Math.max(maxPredicate, maxNested, noMatchD);
+		return 1 + Math.max(body, noMatchD);
 	}
 }
 

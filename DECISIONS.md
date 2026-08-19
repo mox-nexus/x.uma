@@ -8,6 +8,115 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-18 · MatcherTree from config (SF3)
+
+### D-044 · `Matcher` is a list XOR a tree, and the tree owns no fallback
+
+xDS models `Matcher` as `oneof matcher_type { MatcherList, MatcherTree }` plus a
+separate `on_no_match`. rumi modelled only the list, as a `pub matcher_list`
+field, and `convert.rs` rejected `MatcherTree` wholesale.
+
+Two shapes were considered. Letting a tree appear only under `OnMatch::Matcher`
+was rejected as **not merely worse but unrepresentable**: `OnMatch::Matcher`
+holds a `Matcher`, so a tree would need a third `OnMatch` variant — on the one
+type whose stated job is mirroring a two-arm oneof — and that variant has no
+protojson spelling. rumi would then load configs puma and bumi cannot express,
+breaking the one artifact holding the five implementations together.
+
+So `Matcher` carries `MatcherKind::{List, Tree}`. A closed enum over a closed
+oneof, not a trait object: a third arm would be an upstream xDS change, and a
+`Box<dyn>` dispatch point would invite matcher kinds no protojson can spell.
+
+**`MatcherTree::on_no_match` is deleted.** The proto `MatcherTree` has exactly
+two members, `input` and the `tree_type` oneof — there is no field to carry a
+tree-level fallback, so it could never survive `convert.rs`. Keeping it would
+have put two fallbacks on one condition with no stated precedence, recreating
+one level up the ambiguity `OnMatch`'s enum exists to prevent.
+
+Nothing is lost. Because `matcher_type` is a oneof, "the tree produced no
+action" *is* "the enclosing `Matcher` produced no action". The one
+distinguishable sub-case — a key hit whose nested matcher returned `None` — is
+closable inside that entry, by giving its nested `Matcher` its own
+`on_no_match`, exactly as the proto's own comment describes.
+
+**Revisit if** `keep_matching` is ever implemented (PLAN.md F2/SF2). It
+reintroduces "matched but continue", a third outcome, which could reopen the
+split.
+
+### D-046 · A tree lookup is one trace step, and does not fake a predicate
+
+`EvalTrace.steps` became `EvalSteps::{List, Tree}`, mirroring `MatcherKind`. A
+tree performs a map lookup, not a predicate evaluation, so there is no
+`Predicate` to trace. Two dishonest options were rejected:
+
+- **Synthesize a `PredicateTrace::Single`.** `rumi --trace` and the playground
+  would then render a predicate that is not in the config. A trace that
+  invents structure is a second, wrong source of truth.
+- **Emit no steps.** That says nothing about the only thing that happened, and
+  it silently invalidates the property that a non-fallback result implies at
+  least one recorded step.
+
+`TreeLookupTrace` records six facts, each corresponding to a distinct
+misconfiguration a reader has to be able to tell apart: the rule applied, the
+input, the extracted key, the entry key that won, what it dispatched to, and
+whether the fallback was consulted. Separating `key: None` (the input produced
+nothing usable as a string) from `key: Some(k), matched_key: None` (a real key
+that found no entry) matters most — those are two different bugs that
+previously collapsed into one silent miss.
+
+`find_all_prefixes` is deliberately **not** used in the trace path. INV-7's
+no-short-circuit rule is scoped to the predicate tree; a trace that performed
+more lookups than `evaluate` would be an invitation for someone to later let it
+influence the result. The winner is recorded, and nothing else.
+
+**Across the FFI**, where the trace is a flat `{index, matched, predicate}`
+list in both crusts, a tree maps to a single step with `index: 0`, `matched`
+set from whether an entry was hit, and the lookup rendered into `predicate`.
+The FFI shape is unchanged, so no consumer breaks. This was the one thing the
+review of `EvalSteps` explicitly did not audit, and it did need handling — the
+crusts failed to compile until it was done, which `just ci` does not catch
+because it does not build them.
+
+---
+
+### D-045 · Making trees config-reachable required closing a stack-overflow path first
+
+`MatcherTree` had no `depth()` and no `validate()`, and `Matcher::depth()` and
+`validate_widths()` traversed only `matcher_list` and `on_no_match`. A tree
+entry holds an `OnMatch`, which can hold a `Matcher`, which can hold another
+tree. So `matcherTree -> onMatch.matcher -> matcherTree -> ...` nests without
+bound, reports `depth() == 1`, passes `validate()`, and then overflows inside
+the recursive `evaluate()`.
+
+`MAX_DEPTH = 32` is the *only* thing preventing that, because iterative
+evaluation is deferred to v0.2. Wiring SF3 without traversing tree entries would
+have handed the bypass to anyone who can write a config — a config-triggerable
+stack exhaustion behind the check that exists to prevent exactly it. Both
+`depth()` and `validate_widths()` now recurse through `MatcherKind::Tree`.
+
+**Width is deliberately not bounded by copying `MAX_FIELD_MATCHERS`.**
+That limit exists because list evaluation is O(n) per request. Tree lookup is
+O(1) hash or O(k) in the input key's length, so entry count does not affect
+evaluation cost, and large routing tables are the whole reason trees exist.
+A bound belongs here for config-parse memory, but with that rationale and its
+own number — reusing 256 would freeze a limit whose stated reason does not
+apply to it.
+
+**Two silent-loss defects fixed in passing**, both of which would have frozen:
+duplicate keys were dropped without a word (`HashMap` collect keeps the last;
+`RadixTree::insert` discarded its `Option` return), and a tree whose input is
+not a string can never match — now rejected at construction, per the
+arch-guild rule that extension points are validated when built, not when
+evaluated.
+
+**Not a defect, checked rather than assumed:** an adversarially deep protojson
+document does *not* exhaust the stack during `convert`. Every entry point routes
+through `parse_matcher`, which calls `AnyResolver::pack`, which enforces
+`MAX_JSON_DEPTH = 128` from depth 0 — so nothing recursive downstream ever sees
+a deeper document.
+
+---
+
 ## 2026-08-18 · Retiring the terse dialect, and checking the READMEs
 
 ### D-043 · A crate README's Rust blocks are doctests
