@@ -1,5 +1,5 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["../chunks/DxNHbxmM.js","../chunks/CnnebwVN.js","../chunks/wDzz0qaB.js","../chunks/DPfMkruS.js","../chunks/JSbxStMO.js","../chunks/2EtD6e53.js","../chunks/BgIZa_E2.js","../chunks/BGJmEYvX.js","../chunks/CylS5w8V.js","../chunks/Cp-IABpG.js","../chunks/DxSwrfjg.js","../chunks/BPQ3VLAy.js","../chunks/CXtECtnM.js","../chunks/COt5Ahok.js","../chunks/brMvHLvt.js","../chunks/DBpX0yWo.js","../chunks/BLtJtn59.js","../chunks/CquLrc37.js","../chunks/DVxCFoDh.js","../chunks/CO1LY3CK.js","../chunks/B6aJPvgy.js","../chunks/Cl8IGKIC.js","../chunks/CxbxFI8M.js","../chunks/DsqENSWP.js","../chunks/CDVJQ6XC.js","../chunks/DZxFcAj9.js","../chunks/BIGW1oBm.js","../chunks/fKv21gyL.js","../chunks/Yzrsuije.js","../chunks/CvQeaAIM.js","../chunks/BfJx3WfE.js","../chunks/Ci3HlJdq.js","../chunks/CTIpn196.js","../chunks/5-zPJDR5.js","../chunks/CmIQRyeF.js","../chunks/C9oPPf7i.js","../chunks/g9-lgVsj.js","../chunks/CnsnAmq5.js","../chunks/Buea-lGh.js","../chunks/CuPHTKiy.js","../chunks/Cvjx9yec.js","../chunks/B7c-h3xW.js","../chunks/BxgE0vQu.js","../chunks/BTifaqeh.js","../chunks/CenWIFCC.js","../chunks/DkwncUOv.js","../chunks/C5YyOfLZ.js","../chunks/CxGSJlkm.js","../chunks/D97Zzqfu.js","../chunks/CSXwinHm.js","../chunks/YqXBG_HV.js","../chunks/BR5kRUq4.js","../chunks/BfQbQz2e.js","../chunks/m17aaUwq.js","../chunks/DaZJ10kq.js","../chunks/CVF7vp9Z.js","../chunks/fuZLfV_i.js","../chunks/DWrx1Km3.js","../chunks/CzTSHFRz.js","../chunks/CaGTHgeg.js","../chunks/Br6cN0cg.js","../chunks/Dntbqd40.js","../chunks/Dspwwk_N.js","../chunks/mKbC49Gk.js","../chunks/DR4elm4u.js","../chunks/COSFr-5U.js","../chunks/C5BYcBs_.js","../chunks/mjskCLCv.js","../chunks/BN7gUcg9.js","../chunks/B1dDrJ26.js","../chunks/B5deFWb1.js","../chunks/DRJZaHtK.js","../chunks/BeH2EWoN.js","../chunks/fbvUeNLU.js","../chunks/0A2p0G4C.js","../chunks/DID_Ax9Y.js","../chunks/BLmx8bSh.js","../chunks/BVQ-GDCI.js","../chunks/CfMaDYuo.js","../chunks/COcwbKMJ.js","../chunks/COsSHYnT.js","../chunks/D1j8_8rp.js","../chunks/CG8Ifv2g.js","../chunks/BqTXFGrv.js","../chunks/D3lLCCz7.js","../chunks/Cq5zzVJU.js","../chunks/sDksUvMU.js","../chunks/BRZ36xJF.js","../chunks/BsS91CYL.js","../chunks/DM8c43g1.js","../chunks/BH7IYjvW.js","../chunks/DgsIRcX7.js","../chunks/CZhp0h8q.js","../chunks/CxLEBnE3.js","../chunks/CckKNcSY.js","../chunks/DfrNm_e6.js","../chunks/C28nlFVT.js","../chunks/DqQDbK_p.js","../chunks/CW8IKDeL.js","../chunks/BEDo0Tqx.js","../chunks/BaaWV1KV.js"])))=>i.map(i=>d[i]);
-import{H as Jl}from"../chunks/-UyI9lYi.js";import{b as ri}from"../chunks/D__AzwYZ.js";import{g as Zl,a as ec,D as as,Q as tc}from"../chunks/CDwJ5Klk.js";import{k as nc,l as rc,c as Te,a as ae,t as ic,s as tn,f as bt}from"../chunks/C7IGVkAW.js";import{h as Ke,J as Da,k as Lr,bj as ac,b as uc,E as sc,b3 as oc,l as lc,d as cc,i as ya,j as wr,q as hc,aC as dc,bk as mc,N as pc,O as fc,Q as gc,w as ee,bl as Li,bm as us,p as wi,y as Ec,f as be,a as Pi,t as Rt,bg as _c,R as we,z as Tc,bn as bc,s as kt,c as nt,$ as Ac,r as rt}from"../chunks/DYiHVAw2.js";import{B as Dc,i as qe}from"../chunks/DOHXvLXS.js";import{h as yc}from"../chunks/IoRnOvJ0.js";import{e as Cc,i as Ic,d as Ln,s as Pr,a as xc}from"../chunks/DcI0cIgz.js";import{s as Ca,p as Sc,r as kc}from"../chunks/DQj2CSf0.js";import{s as Ia}from"../chunks/ghtWklD6.js";import{c as xa,_ as g}from"../chunks/DNngEcdt.js";import{M as Nc}from"../chunks/aeHynfVW.js";function wn(e,t,n,r,i,a){let u=Ke;Ke&&Da();var s=null;Ke&&Lr.nodeType===ac&&(s=Lr,Da());var o=Ke?Lr:e,c=new Dc(o,!1);uc(()=>{const d=t()||null;var h=n||d==="svg"?mc:void 0;if(d===null){c.ensure(null,null);return}return c.ensure(d,p=>{if(d){if(s=Ke?s:oc(d,h),nc(s,s),r){var m=null;Ke&&rc(d)&&s.append(m=document.createComment(""));var f=Ke?lc(s):s.appendChild(cc());Ke&&(f===null?ya(!1):wr(f)),r(s,f),m?.remove()}hc.nodes.end=s,p.before(s)}Ke&&wr(p)}),()=>{}},sc),dc(()=>{}),u&&(ya(!0),wr(o))}const Rc=`# The Matching Pipeline
+import{H as Jl}from"../chunks/-UyI9lYi.js";import{b as ri}from"../chunks/CxbroYdX.js";import{g as Zl,a as ec,D as as,Q as tc}from"../chunks/CDwJ5Klk.js";import{k as nc,l as rc,c as Te,a as ae,t as ic,s as tn,f as bt}from"../chunks/C7IGVkAW.js";import{h as Ke,J as Da,k as Lr,bj as ac,b as uc,E as sc,b3 as oc,l as lc,d as cc,i as ya,j as wr,q as hc,aC as dc,bk as mc,N as pc,O as fc,Q as gc,w as ee,bl as Li,bm as us,p as wi,y as Ec,f as be,a as Pi,t as Rt,bg as _c,R as we,z as Tc,bn as bc,s as kt,c as nt,$ as Ac,r as rt}from"../chunks/DYiHVAw2.js";import{B as Dc,i as qe}from"../chunks/DOHXvLXS.js";import{h as yc}from"../chunks/IoRnOvJ0.js";import{e as Cc,i as Ic,d as Ln,s as Pr,a as xc}from"../chunks/DcI0cIgz.js";import{s as Ca,p as Sc,r as kc}from"../chunks/DQj2CSf0.js";import{s as Ia}from"../chunks/ghtWklD6.js";import{c as xa,_ as g}from"../chunks/DNngEcdt.js";import{M as Nc}from"../chunks/aeHynfVW.js";function wn(e,t,n,r,i,a){let u=Ke;Ke&&Da();var s=null;Ke&&Lr.nodeType===ac&&(s=Lr,Da());var o=Ke?Lr:e,c=new Dc(o,!1);uc(()=>{const d=t()||null;var h=n||d==="svg"?mc:void 0;if(d===null){c.ensure(null,null);return}return c.ensure(d,p=>{if(d){if(s=Ke?s:oc(d,h),nc(s,s),r){var m=null;Ke&&rc(d)&&s.append(m=document.createComment(""));var f=Ke?lc(s):s.appendChild(cc());Ke&&(f===null?ya(!1):wr(f)),r(s,f),m?.remove()}hc.nodes.end=s,p.before(s)}Ke&&wr(p)}),()=>{}},sc),dc(()=>{}),u&&(ya(!0),wr(o))}const Rc=`# The Matching Pipeline
 
 Every evaluation follows the same flow. Understanding this pipeline is understanding x.uma.
 
@@ -78,6 +78,7 @@ assert_eq!(matcher.evaluate(&request), Some("api_backend"));
 
 **TypeScript:**
 \`\`\`typescript
+import { strict as assert } from "node:assert";
 import { SinglePredicate, PrefixMatcher, Matcher, FieldMatcher, Action } from "xuma";
 import { HttpRequest, PathInput } from "xuma/http";
 
@@ -159,6 +160,7 @@ Why does the same \`ExactMatcher\` work for HTTP headers and custom event types?
 
 If \`InputMatcher\` were generic over the context type, every domain would need its own matcher implementations:
 
+<!-- doc-sample: fragment -->
 \`\`\`python
 # If InputMatcher were generic (DON'T DO THIS)
 class InputMatcher[Ctx]:
@@ -174,6 +176,7 @@ event_matcher = ExactMatcher[CloudEvent]("com.example")
 
 Erase the type at the **data level**. Extract the value first, then match the erased value:
 
+<!-- doc-sample: fragment -->
 \`\`\`python
 # DataInput is generic — knows about the context
 class DataInput[Ctx]:
@@ -186,6 +189,7 @@ class InputMatcher:
 
 Now one \`ExactMatcher\` works everywhere:
 
+<!-- doc-sample: fragment -->
 \`\`\`python
 # HTTP path matching
 path_pred = SinglePredicate(input=PathInput(), matcher=ExactMatcher("/api"))
@@ -214,11 +218,13 @@ pub enum MatchingData {
 \`\`\`
 
 **Python:**
+<!-- doc-sample: fragment -->
 \`\`\`python
 type MatchingData = str | int | bool | bytes | None
 \`\`\`
 
 **TypeScript:**
+<!-- doc-sample: fragment -->
 \`\`\`typescript
 type MatchingData = string | number | boolean | Uint8Array | null;
 \`\`\`
@@ -412,7 +418,7 @@ Matchers can be built two ways:
 **Compiler path** — domain-specific DSL produces matchers directly. Ergonomic, type-safe, no serialization overhead.
 
 \`\`\`python
-from xuma.http import HttpRouteMatch, compile_route_matches
+from xuma.http import HttpPathMatch, HttpRouteMatch, compile_route_matches
 
 routes = [HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/api"), method="GET")]
 matcher = compile_route_matches(routes, "api", "not_found")
@@ -1607,11 +1613,13 @@ let matcher = registry.load_matcher(config)?;
 matcher.evaluate(&ctx)
 \`\`\`
 
+<!-- doc-sample: fragment -->
 \`\`\`python
 matcher = registry.load_matcher(config)
 matcher.evaluate(ctx)
 \`\`\`
 
+<!-- doc-sample: fragment -->
 \`\`\`typescript
 const matcher = registry.loadMatcher(config);
 matcher.evaluate(ctx);
