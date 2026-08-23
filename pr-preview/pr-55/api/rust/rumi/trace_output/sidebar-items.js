@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["print","print_predicate","print_tree_lookup"]};
