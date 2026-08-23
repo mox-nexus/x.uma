@@ -6,7 +6,7 @@ Read this block first; the rest of the file was written before any of it was don
 
 | Milestone | State |
 |---|---|
-| **M1** repo stops asserting what it cannot show | **met** — PR #26 |
+| **M1** repo stops asserting what it cannot show | **NOT met — reopened 2026-08-19.** PR #26 repaired the false claims that existed then, and the row read "met" from that day until this one. But M1's stated criterion is the code-sample taxonomy below, and **none of it was ever built**: no `MILESTONES.toml`, zero classified blocks, and the sample gate is far thinner than it looks. `rumi-docs-tests` compiles **3 of the 11 Rust blocks** in `docs/content`; `concepts/type-erasure.md` is included but its only block is `rust,ignore` and is silently skipped, and seven blocks across four other pages are not included at all. `check-doc-commands.mjs` does enforce the taxonomy's `cli` class on 34 commands. What was never built is the markers and the `future` milestone state. Python and TypeScript samples were unchecked, and the 2026-08-19 audit found at least six defects — two of them in `bumi/README.md`, a *pure* implementation, which is why 'the drift is confined to the ungated FFI packages' was a tidy story and a false one — `docs/content/getting-started/python.md:128` and `rumi/crusts/python/README.md:15` both document `load_http_matcher`, which has never existed in the wheel. **2026-08-23: `scripts/check-doc-samples.mjs` closes the Python/TypeScript half.** It executes every block on the getting-started pages *and in the four package READMEs*, in the runtime that owns it, against the shipped packages rather than the sources. Turning it on found seven live defects and all seven are fixed: `load_http_matcher`/`loadHttpMatcher` (never existed — the real API is `HttpMatcher.from_config` / `HttpMatcher.fromConfig`, which takes protojson text, not a path, and needs `await init()` in wasm), `bumi/README.md` calling `new` on two type-only interfaces and passing an options object to `HttpRequest`'s positional constructor, and an `import { parse } from "yaml"` naming a package no implementation depends on. It also found that **every `console.assert` in the TypeScript docs was decorative** — `console.assert` does not throw and does not set an exit code, so the gate would have passed a wrong *value*; replaced with `node:assert`, and the fix is proved by a control that injects a wrong value and watches the gate fail. Still open for M1: the `MILESTONES.toml`/`future` markers, and 8 of the 11 Rust blocks |
 | **M2** a stranger can start | **met** — PR #27 (DX), #29 (reproducibility) |
 | **M3** nothing loads clean and lies | **met** — PR #25, all three blocking security findings fixed |
 | **M4/M5** schema freeze → one schema | **met.** SF0 decided (D-026). One config vocabulary, correct type URLs and field names in all five implementations, protojson the only readable format anywhere, and the terse dialect a compile error rather than a convention (D-042). `MatcherTree` loads and dispatches in all three (D-044), which required closing a config-triggerable stack overflow the plan had not anticipated (D-045) |
@@ -607,7 +607,7 @@ builds and deploys. PR #22 is **merged**; `main` is the baseline now.
 | ~~F15~~ | ~~`CLAUDE.md` calls the packages `puma`/`bumi`~~ **RESOLVED** (#26) | They are `xuma`. `CLAUDE.md:10-11, 95, 98` |
 | ~~F16~~ | ~~HTTP compiler swallows invalid regex~~ **RESOLVED** (#25) — returns `Result`, with regression tests | `rumi/ext/http/src/compiler.rs:77-81` falls back to exact-matching the pattern literal. Route silently disappears. Sibling Claude compiler returns `Result`. |
 | F17 | `data_type()` defaults to `"string"` | `data_input.rs:60-62`. A custom input returning `Int` that forgets to override passes the compatibility check, loads clean, never matches. |
-| ~~F18~~ | ~~Docs snippets are invisible to CI~~ **RESOLVED** (#26) — `rumi-docs-tests` compiles them; it caught four broken snippets immediately | Every Rust block is ```` ```rust,ignore ````; shell blocks are unchecked. This is the root cause of F8. |
+| F18 | Docs snippets are invisible to CI — **PARTIALLY RESOLVED** (#26). Two of the things it named are now checked: `rumi-docs-tests` compiles 3 of the 11 Rust blocks in `docs/content`, and `check-doc-commands.mjs` checks the shape of every `rumi` command. Still unchecked: Python and TypeScript blocks, non-`rumi` shell commands, and the other 8 Rust blocks — including `concepts/type-erasure.md`, whose page *is* included but whose block is `rust,ignore` and is skipped. Verified 2026-08-23 by injecting `THIS IS NOT RUST AT ALL` into it; the suite passed | Every Rust block is ```` ```rust,ignore ````; shell blocks are unchecked. This is the root cause of F8. |
 | ~~F19~~ | ~~**`just test-full` is red** — *partially resolved*~~ **RESOLVED** (#33) | **Fixed** — `just test-full` is green and is now in `just ci` and in CI. `cargo test --all-features` → the same 4 errors as F1, because `--all-features` enables `rumi-test/proto` → `rumi-proto`. `just ci` passes anyway: `just test` uses `default-members` (`rumi/Cargo.toml:6`) and `justfile:68` hard-codes `--exclude rumi-proto`. A shipped `just` target is red and the gate cannot see it. **2026-08-17:** both *compile* failures are fixed (D-028, F23). What remains is two failing tests, and they are **F13** — `unknown field 'key', expected 'value'`. F13 is therefore no longer prose: it is a reproducible test failure, which is what SF4 was going to have to write anyway. |
 | F20 | Generated code is gitignored in **all three** languages | `.gitignore:58-60` covers `rumi/proto/src/gen/`, `puma/proto/src/gen/`, `bumi/proto/src/gen/`. All three exist on disk untracked (28 / 7 / 6 files); nothing imports the Python or TypeScript ones. M5's "all three languages" gate and CI5's no-diff check are both vacuous over untracked trees. |
 | ~~F22~~ | ~~plan cited files a clone does not contain~~ **RESOLVED** (#26) — moved to tracked `reference/` | `.gitignore:63` ignores `scratch/` wholesale, and §0 told the reader to open `scratch/phase-12/prior-art.md`. Fixed 2026-08-17 by moving both cited artifacts to a tracked `reference/`. Left as a row because the *class* recurs: `just verify-clean-clone` (H1) is the check that would catch the next one. |
@@ -1252,15 +1252,53 @@ struct; that catches this whole class.
   config → **2.9 s of CPU** in release, with every declared limit respected.
   Per-item limits with no aggregate. Use `RegexBuilder::size_limit()` with a
   budget drawn from `rumi/core/benches/redos.rs`, not intuition.
-- Empty rule list compiles to a catch-all (`claude/compiler.rs:119`,
-  `http/compiler.rs:138`). Polarity depends entirely on the caller's action
+- Empty rule list compiles to a catch-all (`claude/compiler.rs:126`,
+  `http/compiler.rs:158`). Polarity depends entirely on the caller's action
   assignment: `compile_hook_matches(&[], "allow", Some("deny"))` allows
   everything. The crusts already solved this for the single-rule case with
   `match_all`; extend the same ceremony to the list.
-- `validate()` is never called by either domain compiler (**review F-06**, not
-  §4's F6, which is `ignore_case` — see the numbering map above). The crusts
-  do call it and are currently the only paths enforcing depth on compiler
-  output.
+- **A single all-`None` or typo'd `HttpRouteMatch` is a catch-all, in all three
+  implementations — and the mitigation the review credits on the Claude side is
+  structurally unavailable here.** Not F-05: that is the empty *list*
+  (`from_any`); this is the single rule (`from_all`), which is F-04's mechanism,
+  and the review names it only against `HookMatch` — `grep -n HttpRouteMatch
+  reference/security-review-2026-08-16.md` returns one hit, in S-2, about
+  dependency weight. Verified 2026-08-23:
+
+  | probe | rumi | puma | bumi |
+  |---|---|---|---|
+  | single all-`None` route in a list | ALLOW | ALLOW | ALLOW |
+  | `HttpRouteMatch::default().compile()` | ALLOW | ALLOW | — |
+  | typo'd YAML/JSON field (`pathPrefix:`) | accepted → `DELETE /etc/passwd` = ALLOW | — | ALLOW |
+  | control: same probe on `HookMatch` | **REJECTED** — `unknown field 'tool_nmae'` | — | — |
+
+  The control is the finding. Hardening note #6 of the review credits
+  `#[serde(deny_unknown_fields)]` on `HookMatch` for stopping exactly this.
+  That control **cannot be applied to `HttpRouteMatch`**: it is a third-party
+  type from `k8s-gateway-api` (`rumi/ext/http/src/compiler.rs:8`), re-exported
+  unchanged, and it does not deny unknown fields. In bumi it is a bare
+  TypeScript interface with no runtime schema at all. So the same YAML typo
+  that is a load error on the Claude side is a silent catch-all on the HTTP
+  side. **Blast radius:** the `xuma` PyPI/npm libraries and the Rust crates —
+  *not* the `xuma-crust` wheel, which exposes no `HttpRouteMatch` surface.
+  **Open decision:** the fix diverges from Gateway API, which specifies "no
+  conditions = match all". The `match_all` ceremony the crusts use for
+  `HookMatch` is the reviewed precedent; adopting it here is a deliberate
+  spec divergence and needs to be made before the config format freezes.
+- ~~`validate()` is never called by either domain compiler~~ (**review F-06**).
+  **Stale for rumi since #32** — `claude/compiler.rs:132` and
+  `http/compiler.rs:166` both call `matcher.validate()?`, and it is
+  load-bearing rather than decorative: `Predicate::from_any`/`from_all` are
+  infallible, so the width rejection a 257-route config now produces can only
+  come from that line. What was still open, and is **fixed on this branch**:
+  #32 also moved the *width* limits onto `Matcher::validate`, and puma and bumi
+  were never carried across. Their `validate()` checked depth only, widths lived
+  in the loader, and `compile_route_matches(257 routes)` was accepted in both
+  while rumi rejected it — the exact F-02 shape #32 existed to close, surviving
+  in two of the three implementations with nothing recording it. Regression
+  tests: `puma/tests/test_security.py::TestCompilerWidthLimits`,
+  `bumi/tests/security.test.ts` "compiler width limits", each with a
+  not-inert control.
 - `serde_yaml` is archived upstream (March 2024) and is a **non-optional runtime
   dependency of three published artifacts**. No advisory covers it, which is
   exactly why `cargo audit` is clean and why a clean audit is not the same as
@@ -1417,16 +1455,45 @@ gating does not help.
   A dry-run that does not predict is worse than none.
 
 - **E7. Publish order is a dependency chain and the workflow must respect it.**
-  `rumi-core` → `rumi-proto` → `rumi-kv` → `rumi-http` → `rumi-cli`. Dependents
-  cannot resolve until their dependency is live on crates.io, which can take a
-  minute to index. `release.yml:97-119` currently publishes three crates in
-  sequence with no gate; triggering it today would publish `rumi-core 0.0.2`,
-  then hard-fail — **and crates.io versions can never be re-uploaded.** Add an
-  index-availability wait between steps.
+  ✅ **FIXED 2026-08-23.** `rumi-core` → `rumi-proto` → `rumi-kv` → `rumi-http`
+  → `rumi-cli`. Dependents cannot resolve until their dependency is live on
+  crates.io, which can take a minute to index. `release.yml` published *three*
+  of the five, omitting `rumi-proto` and `rumi-kv` — both publishable, both
+  dependencies of `rumi-cli`. Triggering it would have published `rumi-core`
+  and `rumi-http`, then hard-failed on a crates.io that had never heard of
+  `rumi-kv` — **and crates.io versions can never be re-uploaded.**
+
+  This entry existed, and correctly named all five crates in the right order,
+  for as long as the workflow disagreed with it. Writing the requirement down
+  is not the same as checking it, which is Phase F's whole thesis. So the fix
+  is not just the five steps: the order now lives in one `CRATES:` env list
+  consumed by both the publish and dry-run loops, and
+  `scripts/check-publishable.mjs` asserts on every PR that the list holds every
+  publishable workspace crate, that the order is topological against `cargo
+  metadata`, and that the dry run rehearses the same set. All three failure
+  modes are proved by controls, including the one that matters most — a
+  workflow with no `CRATES:` line fails loudly rather than reporting a vacuous
+  pass.
+
+- **E8. The wasm crust has no path to npm at all.** OPEN, found 2026-08-23.
+  `README.md:42` and `docs/content/getting-started/typescript.md:16` both tell
+  the reader `bun add xuma-crust`, and `release-crust.yml` — the workflow named
+  for it — builds and publishes **only the PyO3 wheel to PyPI**. `grep -rn "npm
+  publish\|bun publish\|wasm-pack publish" .github/workflows/` finds one hit,
+  in `release.yml`, and it is the pure-TypeScript `xuma` package.
+  `rumi/crusts/wasm` is never built, packed, or pushed by any workflow.
+
+  It also has no `README.md`, so the npm listing would be blank if it were
+  published; every other package root has one. The same class as E7 — the
+  release story was written in prose and never executed — and the same fix
+  shape: `check-publishable.mjs` should learn about the non-Cargo artifacts
+  too, so "documented as installable" and "published by a workflow" cannot
+  drift apart again.
 
 **Done when:** `cargo publish --dry-run` passes for all five crates in
-dependency order with no path patching, and no published crate depends on a
-`publish = false` crate.
+dependency order with no path patching, no published crate depends on a
+`publish = false` crate, and every artifact the docs tell a reader to install
+is published by a workflow.
 
 ---
 

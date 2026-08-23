@@ -309,3 +309,48 @@ jobs:
 
       - name: Evaluate the README config everywhere
         run: node scripts/check-readme-agreement.mjs
+
+  doc-samples:
+    name: getting-started and package READMEs run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v5
+      - uses: oven-sh/setup-bun@v2
+
+      # The Rust blocks in docs/content have been compiled since PR #26. The
+      # Python and TypeScript ones never were, and the drift tracked that
+      # exactly: `load_http_matcher` / `loadHttpMatcher` were documented on both
+      # getting-started pages and in the Python crust's README, and neither
+      # function has ever existed. bumi/README.md called `new` on two type-only
+      # interfaces. Reading found none of it; running finds all of it.
+      #
+      # This needs the whole toolchain because the samples import the shipped
+      # packages, not the sources — which is the point. A sample checked against
+      # anything other than the artifact a reader installs proves nothing.
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked --version 0.15.0
+
+      - name: Build the wasm crust
+        working-directory: rumi/crusts/wasm
+        run: |
+          wasm-pack build --target web
+          bun install --frozen-lockfile
+
+      - name: Build the python crust
+        working-directory: rumi/crusts/python
+        run: |
+          uv sync --all-groups
+          uv run maturin develop --uv
+
+      - name: Install pure implementations
+        run: |
+          uv sync --project puma --all-groups
+          bun install --frozen-lockfile
+          bun run --cwd bumi build
+
+      # --require-all: an environment skip becomes a failure. "Checked somewhere
+      # else" is how the crusts broke three times in one day.
+      - name: Every sample runs as written
+        run: node scripts/check-doc-samples.mjs --require-all

@@ -311,7 +311,7 @@ rumi/
 │       ├── lib.rs
 │       ├── matcher.rs, predicate.rs, ...
 │       └── claude/     # Claude Code hooks (feature = "claude")
-├── proto/              # Proto-generated types + conversion (package: rumi-proto, publish=false)
+├── proto/              # Proto-generated types + conversion (package: rumi-proto, published)
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs              # Module tree for generated types
@@ -368,6 +368,43 @@ Principles distilled from 13 elite Rust codebases. Each prevents a form of self-
 ---
 
 ## Working Conventions
+
+### A self-correction is a claim, and needs its own verification
+
+**When you correct yourself, the correction does not ship on your word. Hand it
+to the `mrwolf` agent as a skeptic and have it verified by execution before it
+reaches the user or the repo.**
+
+**Why.** On 2026-08-23 the corrections in this repo turned out to be as
+unreliable as the claims they replaced, and they failed the *same way twice*:
+
+- Told the maintainer `Matcher::new` had "100+ call sites" and used that number
+  to decline a rename. The pattern also matched `FieldMatcher::new`,
+  `ExactMatcher::new`, `StringMatcher::new` — 159 raw hits against 51 real ones.
+- Corrected it, then hours later ran a second sweep with the same defect (no
+  word boundary), read the over-matched output, and nearly repeated the error.
+- Claimed "nothing compiles a code sample in `docs/content` in any language",
+  built an argument on it, and told the maintainer the repo had been declared
+  ready on a false basis. The grep had *errored* — a bad `--include` glob — and
+  the empty output was read as a finding. `rumi-docs-tests` had been compiling
+  the Rust blocks since PR #26.
+
+The pattern is specific and worth naming: **a correction feels like diligence,
+so it gets less scrutiny than the claim it replaces.** It arrives with the
+emotional weight of having caught something, and that weight substitutes for
+evidence. Two of the three above were *false negatives from a broken command* —
+the tool reported nothing and "nothing" was taken as an answer rather than as a
+result needing a control.
+
+**How.** State the correction, then have `mrwolf` verify it as a skeptic: it
+must execute something, not read adjacent code, and it must be free to return
+"your correction is also wrong." Only then does it go in `PLAN.md`,
+`DECISIONS.md`, or a message to the maintainer.
+
+This applies hardest to **claims that something does not exist**. A grep that
+finds nothing and a grep that failed to run are indistinguishable in the
+output, and this repo's whole release cycle has been about removing claims that
+outran their evidence.
 
 ### Scratch Directory
 

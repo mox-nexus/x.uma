@@ -46,6 +46,12 @@ from xuma._matcher import (
     NestedMatcher,
     OnMatch,
 )
+
+# These moved to _matcher so Matcher.validate() can raise them without importing
+# this module, which imports it. Re-exported explicitly (`X as X`) because every
+# existing import expects them here and mypy treats a bare re-import as private.
+from xuma._matcher import TooManyFieldMatchersError as TooManyFieldMatchersError
+from xuma._matcher import TooManyPredicatesError as TooManyPredicatesError
 from xuma._predicate import And, Not, Or, SinglePredicate
 from xuma._string_matchers import (
     BoolMatcher,
@@ -107,28 +113,6 @@ class InvalidConfigError(MatcherError):
     def __init__(self, source: str) -> None:
         self.source = source
         super().__init__(f"invalid config: {source}")
-
-
-class TooManyFieldMatchersError(MatcherError):
-    """Config has too many field matchers (width-based limit)."""
-
-    def __init__(self, count: int, max_: int) -> None:
-        self.count = count
-        self.max = max_
-        super().__init__(
-            f"too many field matchers: {count} exceeds maximum {max_}"
-        )
-
-
-class TooManyPredicatesError(MatcherError):
-    """Compound predicate has too many children (width-based limit)."""
-
-    def __init__(self, count: int, max_: int) -> None:
-        self.count = count
-        self.max = max_
-        super().__init__(
-            f"too many predicates in compound: {count} exceeds maximum {max_}"
-        )
 
 
 class DuplicateTreeKeyError(MatcherError):

@@ -11,11 +11,43 @@ for the native dependency.
 uv add xuma-crust
 ```
 
-```python
-from xuma_crust import load_http_matcher
+`from_config` takes canonical protojson — the same document every x.uma
+implementation reads. If your config is YAML, load it and re-serialise
+(`json.dumps(yaml.safe_load(...))`).
 
-matcher = load_http_matcher(open("routes.yaml").read())
-matcher.evaluate(method="GET", path="/api/users")
+```python
+from xuma_crust import HttpMatcher
+
+CONFIG = """
+{
+  "matcherList": {
+    "matchers": [{
+      "predicate": {
+        "singlePredicate": {
+          "input": {
+            "name": "path",
+            "typedConfig": {"@type": "type.googleapis.com/xuma.http.v1.PathInput"}
+          },
+          "valueMatch": {"prefix": "/api"}
+        }
+      },
+      "onMatch": {
+        "action": {
+          "name": "api",
+          "typedConfig": {
+            "@type": "type.googleapis.com/xuma.core.v1.NamedAction",
+            "name": "api"
+          }
+        }
+      }
+    }]
+  }
+}
+"""
+
+matcher = HttpMatcher.from_config(CONFIG)
+assert matcher.evaluate(method="GET", path="/api/users") == "api"
+assert matcher.evaluate(method="GET", path="/other") is None
 ```
 
 Documentation: https://mox-nexus.github.io/x.uma/

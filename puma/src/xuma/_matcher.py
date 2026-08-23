@@ -12,7 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from xuma._predicate import Predicate, predicate_depth
+from xuma._limits import MAX_FIELD_MATCHERS, MAX_PREDICATES_PER_COMPOUND
+from xuma._predicate import And, Not, Or, Predicate, predicate_depth
 
 if TYPE_CHECKING:
     from xuma._types import DataInput
@@ -22,6 +23,29 @@ MAX_DEPTH = 32
 
 class MatcherError(Exception):
     """Errors from matcher validation."""
+
+
+
+class TooManyFieldMatchersError(MatcherError):
+    """A matcher list is wider than ``MAX_FIELD_MATCHERS``."""
+
+    def __init__(self, count: int, max_: int) -> None:
+        self.count = count
+        self.max = max_
+        super().__init__(
+            f"too many field matchers: {count} exceeds maximum {max_}"
+        )
+
+
+class TooManyPredicatesError(MatcherError):
+    """A compound predicate is wider than ``MAX_PREDICATES_PER_COMPOUND``."""
+
+    def __init__(self, count: int, max_: int) -> None:
+        self.count = count
+        self.max = max_
+        super().__init__(
+            f"too many predicates in compound: {count} exceeds maximum {max_}"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,17 +193,43 @@ class Matcher[Ctx, A]:
         return None
 
     def validate(self) -> None:
-        """Validate matcher depth does not exceed MAX_DEPTH.
+        """Validate matcher depth and width against the declared limits.
 
         Should be called at config load time, not evaluation time.
 
         Raises:
-            MatcherError: If depth exceeds MAX_DEPTH.
+            MatcherError: If depth or any width exceeds its limit.
         """
         d = self.depth()
         if d > MAX_DEPTH:
             msg = f"matcher depth {d} exceeds maximum allowed depth {MAX_DEPTH}"
             raise MatcherError(msg)
+        self._validate_widths()
+
+    def _validate_widths(self) -> None:
+        """Reject a list or compound predicate wider than its limit.
+
+        The widths lived only in the registry, so every path that did not go
+        through ``load_matcher`` — the gateway compiler above all — accepted a
+        matcher of any width. rumi closed this in #32 by moving the checks onto
+        ``Matcher::validate``; puma and bumi were not carried across, and a
+        257-child compound compiled here without complaint until 2026-08-23.
+        The rule the security review named: the type that holds the resource
+        owns the limit on that resource.
+        """
+        if self.tree is None and len(self.matcher_list) > MAX_FIELD_MATCHERS:
+            raise TooManyFieldMatchersError(
+                len(self.matcher_list), MAX_FIELD_MATCHERS
+            )
+        for fm in self.matcher_list:
+            _validate_predicate_width(fm.predicate)
+            if isinstance(fm.on_match, NestedMatcher):
+                fm.on_match.matcher.validate()
+        if isinstance(self.on_no_match, NestedMatcher):
+            self.on_no_match.matcher.validate()
+        # A tree's entries are bounded by MAX_TREE_ENTRIES at load, for a
+        # different reason — see _limits. Its nested matchers still validate
+        # themselves at construction.
 
     def depth(self) -> int:
         """Calculate the total nesting depth of this matcher tree."""
@@ -234,3 +284,17 @@ def _on_match_depth(on_match: OnMatch[Any, Any]) -> int:
         case NestedMatcher(matcher=m):
             return m.depth()
     return 0  # pragma: no cover
+
+
+def _validate_predicate_width(p: Predicate[Any]) -> None:
+    """Recursively bound compound-predicate width. See ``Matcher.validate``."""
+    match p:
+        case And(predicates=ps) | Or(predicates=ps):
+            if len(ps) > MAX_PREDICATES_PER_COMPOUND:
+                raise TooManyPredicatesError(len(ps), MAX_PREDICATES_PER_COMPOUND)
+            for sub in ps:
+                _validate_predicate_width(sub)
+        case Not(predicate=inner):
+            _validate_predicate_width(inner)
+        case _:
+            pass

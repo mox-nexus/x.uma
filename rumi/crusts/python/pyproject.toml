@@ -27,5 +27,9 @@ module-name = "xuma_crust"
 dev = [
     "pytest>=8.0",
     "pytest-benchmark>=5.0",
+    # The getting-started page loads routes.yaml before handing protojson to
+    # HttpMatcher.from_config; the doc-sample gate needs the same parser a
+    # reader would install. Not a runtime dependency of xuma-crust.
+    "pyyaml>=6.0",
     "xuma @ file:///${PROJECT_ROOT}/../../../puma",
 ]

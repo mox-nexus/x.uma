@@ -137,7 +137,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-full test-protojson test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-full test-protojson test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links docs-samples readme-agreement puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -179,6 +179,16 @@ readme-agreement:
 
 docs-links:
     node scripts/check-doc-links.mjs
+
+# Execute every Python/TypeScript code block on the getting-started pages and in
+# the package READMEs, in the runtime that owns it.
+#
+# `rumi-docs-tests` has compiled the *Rust* blocks since PR #26; nothing did the
+# same for the other two languages, and the drift tracked that exactly.
+# `--require-all` turns an environment skip into a failure, so CI cannot pass by
+# quietly not checking the wasm crust.
+docs-samples:
+    node scripts/check-doc-samples.mjs --require-all
 
 docs-check:
     cd docs/experience && bun run check

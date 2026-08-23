@@ -90,7 +90,7 @@ const matcher = new Matcher(
 );
 
 const request = new HttpRequest("GET", "/api/users");
-console.assert(matcher.evaluate(request) === "api_backend");
+assert.equal(matcher.evaluate(request), "api_backend");
 ```
 
 Same structure in all three languages. Same result.

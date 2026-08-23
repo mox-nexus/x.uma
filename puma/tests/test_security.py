@@ -52,3 +52,58 @@ class TestLimitsLiveInTheConstructor:
 
         with pytest.raises(MatcherError):
             RegexMatcher("(a{100}){100}")
+
+
+class TestCompilerWidthLimits:
+    """The gateway compiler enforces the widths, not just the loader.
+
+    rumi moved these onto ``Matcher::validate`` in #32 so that every
+    construction path inherited them. puma was not carried across: until
+    2026-08-23 ``compile_route_matches`` accepted a compound predicate of any
+    width, because ``validate()`` checked depth only and the width limits lived
+    in ``_registry``. A 257-route config compiled without complaint.
+    """
+
+    def test_compiler_rejects_more_routes_than_the_limit(self) -> None:
+        from xuma._limits import MAX_PREDICATES_PER_COMPOUND
+        from xuma._registry import TooManyPredicatesError
+        from xuma.http import HttpPathMatch, HttpRouteMatch, compile_route_matches
+
+        routes = [
+            HttpRouteMatch(path=HttpPathMatch(type="Exact", value=f"/r{i}"))
+            for i in range(MAX_PREDICATES_PER_COMPOUND + 1)
+        ]
+        with pytest.raises(TooManyPredicatesError):
+            compile_route_matches(routes, "hit")
+
+    def test_the_width_guard_is_not_inert(self) -> None:
+        """A compiler that rejected everything would pass the test above."""
+        from xuma._limits import MAX_PREDICATES_PER_COMPOUND
+        from xuma.http import (
+            HttpPathMatch,
+            HttpRequest,
+            HttpRouteMatch,
+            compile_route_matches,
+        )
+
+        routes = [
+            HttpRouteMatch(path=HttpPathMatch(type="Exact", value=f"/r{i}"))
+            for i in range(MAX_PREDICATES_PER_COMPOUND - 1)
+        ]
+        matcher = compile_route_matches(routes, "hit")
+        assert matcher.evaluate(HttpRequest(raw_path="/r0")) == "hit"
+
+    def test_matcher_list_width_is_enforced_at_construction(self) -> None:
+        from xuma import Action, ExactMatcher, FieldMatcher, Matcher, SinglePredicate
+        from xuma._limits import MAX_FIELD_MATCHERS
+        from xuma._registry import TooManyFieldMatchersError
+        from xuma.testing import DictInput
+
+        def fm(i: int) -> FieldMatcher[dict[str, str], str]:
+            return FieldMatcher(
+                SinglePredicate(DictInput("k"), ExactMatcher(f"v{i}")),
+                Action("hit"),
+            )
+
+        with pytest.raises(TooManyFieldMatchersError):
+            Matcher(tuple(fm(i) for i in range(MAX_FIELD_MATCHERS + 1)))

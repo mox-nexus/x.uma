@@ -8,6 +8,40 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-23 · Limits, and the module graph that was hiding them
+
+### D-049 · Widths are validated by `Matcher.validate()` in all three implementations
+
+The security review's F-02 named the rule: *the type that holds the resource
+owns the limit on that resource.* #32 applied it in Rust by moving the width
+checks from `Registry::load_*` onto `Matcher::validate`, so every construction
+path — the domain compilers above all — inherited them.
+
+puma and bumi were never carried across. Their `validate()` checked depth only;
+`MAX_FIELD_MATCHERS` and `MAX_PREDICATES_PER_COMPOUND` stayed in the loader. A
+257-route `compile_route_matches` was rejected by rumi and accepted by both
+others, and nothing recorded the divergence. Fixed here, with regression tests
+that each carry a not-inert control.
+
+**Why it survived is the more useful part.** It was not an oversight of
+intent — it was unreachable. `limits.ts` imported `MatcherError` from
+`matcher.ts`, so `matcher.ts` could not import `limits.ts` back without a
+cycle; puma had the mirror-image arrangement with `_registry`. The file that
+needed the constants could not name them. So `MatcherError` and the two width
+errors moved to `bumi/src/errors.ts` and to `puma/src/xuma/_matcher.py`
+respectively, both re-exported from their old homes so no import breaks.
+
+**The generalisation:** when a limit lives somewhere other than the type that
+owns the resource, check whether the module graph is the reason before assuming
+someone forgot. A cycle is a silent architectural argument against the correct
+placement, and it wins by default.
+
+**Revisit if:** a fourth implementation appears, or the limits gain a
+per-deployment override — at which point they stop being constants and this
+placement stops being obviously right.
+
+---
+
 ## 2026-08-18 · Constructor naming
 
 ### D-047 · `Matcher::list`, not `Matcher::new`
@@ -32,11 +66,23 @@ the reason the sweep goes wider than the source tree:
   saying `Matcher::new` is worse than a stale comment: it is loaded as guidance
   and acted on.
 
-Two occurrences are deliberately **not** updated. `DECISIONS.md:979` and
-`bench/RESULTS.md:222` describe what was true when they were written — a past
-correction and a past benchmark run. A decision log is appended to, not
-rewritten; editing the name inside them would falsify the record to tidy a
-grep.
+Prose occurrences are deliberately **not** updated: they describe what was true
+when written. A decision log is appended to, not rewritten; editing the name
+inside one would falsify the record to tidy a grep.
+
+**Correction, 2026-08-23.** This entry originally said "two occurrences" and
+cited `DECISIONS.md:979`. Both were wrong, and were caught only when a skeptic
+was asked to verify the correction rather than the claim. There are **six**
+surviving prose references — `DECISIONS.md` 13/29/32/1011, `bench/RESULTS.md:222`,
+and `CLAUDE.md:381` — and **line 979 does not contain `Matcher::new` at all**;
+the intended line is 1011. The wrong citation reached this file, the #53 commit
+message, and the maintainer. It is left visible here rather than silently
+patched, because a decision log that quietly repairs its own errors is exactly
+the unreliable narrator this repo keeps finding.
+
+The successor has 51 `Matcher::list` references plus one `Self::list` at
+`rumi/core/src/matcher.rs:137` — invisible to any `Matcher::` pattern, which is
+the same trap this entry warns about two paragraphs up.
 
 ---
 
