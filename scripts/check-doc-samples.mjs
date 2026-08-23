@@ -106,6 +106,17 @@ const PAGES = [
 	"bumi/README.md",
 	"puma/README.md",
 	"rumi/crusts/python/README.md",
+	// Added 2026-08-23, after a `console.assert` repair on `concepts/pipeline.md`
+	// left the block without its `assert` import and nothing noticed. The
+	// original line — gate the getting-started pages only — was drawn to keep
+	// the gate free of fragment noise. The noise turns out to be small and
+	// nameable: seven blocks across these four pages are genuinely illustrative
+	// and now say so in a marker, and everything else is a whole program that
+	// has to run.
+	"docs/content/concepts/pipeline.md",
+	"docs/content/concepts/type-erasure.md",
+	"docs/content/explain/architecture.md",
+	"docs/content/how-to/share-config.md",
 ];
 
 /** CI passes this: an environment-skipped block becomes a failure. */

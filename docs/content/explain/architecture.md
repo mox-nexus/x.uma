@@ -126,7 +126,7 @@ Matchers can be built two ways:
 **Compiler path** — domain-specific DSL produces matchers directly. Ergonomic, type-safe, no serialization overhead.
 
 ```python
-from xuma.http import HttpRouteMatch, compile_route_matches
+from xuma.http import HttpPathMatch, HttpRouteMatch, compile_route_matches
 
 routes = [HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/api"), method="GET")]
 matcher = compile_route_matches(routes, "api", "not_found")
