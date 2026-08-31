@@ -142,6 +142,50 @@ order.forEach((name, i) => {
 	}
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Do the API-doc builds document exactly the published crates?
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// `cargo doc` with no crate list documents `default-members`, which put two
+// `publish = false` internals on the public site and left out `rumi-proto`.
+// The fix is a named list — which now exists in three places (`just doc`,
+// `just docs-rust`, and `docs.yml`, which cannot call `just` because no
+// workflow in this repo has it on the image). Three hand-maintained copies of
+// a list is precisely the shape that drifted for `release.yml`, so it is
+// checked rather than trusted. Order is not compared: `-p` order is irrelevant
+// to cargo.
+
+const DOC_SOURCES = ["justfile", ".github/workflows/docs.yml"];
+const publishedNames = new Set(wanted);
+let docCommands = 0;
+
+for (const file of DOC_SOURCES) {
+	const text = readFileSync(join(ROOT, file), "utf8");
+	for (const line of text.split("\n")) {
+		if (!line.includes("cargo doc")) continue;
+		if (line.trimStart().startsWith("#")) continue; // a comment about the command
+		docCommands += 1;
+		const named = new Set([...line.matchAll(/-p\s+([A-Za-z0-9_-]+)/g)].map((m) => m[1]));
+		if (named.size === 0) {
+			problems.push(`${file}: a \`cargo doc\` names no crates, so it documents default-members`);
+			continue;
+		}
+		for (const n of publishedNames) {
+			if (!named.has(n)) problems.push(`${file}: \`cargo doc\` omits ${n}, which is published`);
+		}
+		for (const n of named) {
+			if (!publishedNames.has(n)) problems.push(`${file}: \`cargo doc\` documents ${n}, which is not published`);
+		}
+	}
+}
+
+// A control for the loop itself: if the commands are renamed away, this check
+// silently passes on zero input, which is the failure mode it exists to catch.
+if (docCommands === 0) {
+	problems.push(`no \`cargo doc\` command found in ${DOC_SOURCES.join(", ")} — this check saw nothing`);
+}
+
+console.log(`api docs: ${docCommands} \`cargo doc\` command(s), all naming the ${publishedNames.size} published crates`);
 console.log(`release.yml order: ${order.join(" -> ")}`);
 
 if (problems.length) {

@@ -49,9 +49,15 @@ jobs:
       # Named crates, not a bare `cargo doc`: that documents `default-members`,
       # which put `rumi_docs_tests` and `rumi_test` — both `publish = false`
       # internals — on the public site, and left out `rumi-proto`, which is
-      # published. Mirrors `just docs-rust`.
+      # published.
+      #
+      # Spelled out rather than `just docs-rust`, because no workflow in this
+      # repo has `just` on the image (see ci.yml's codegen job, which calls
+      # scripts/gen.sh for the same reason). The duplication with `just
+      # docs-rust` is not left to vigilance: check-publishable.mjs asserts both
+      # lists equal the set of publishable crates.
       - name: Build Rust API docs
-        run: just docs-rust
+        run: cargo doc --manifest-path rumi/Cargo.toml --no-deps -p rumi-core -p rumi-proto -p rumi-kv -p rumi-http -p rumi-cli
 
       - name: Assemble site
         run: |
