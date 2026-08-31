@@ -2,8 +2,9 @@
 
 Generated from source, so it cannot drift from the code.
 
-**Rust** — browse the published crates at [`/api/rust`](/api/rust), built and
-deployed with the rest of this site. To build them locally:
+**Rust** — browse the published crates at
+[mox-nexus.github.io/x.uma/api/rust](https://mox-nexus.github.io/x.uma/api/rust),
+built and deployed with the rest of this site. To build them locally:
 
 ```bash
 just doc

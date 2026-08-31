@@ -67,12 +67,14 @@ function manifestSlugs() {
 /**
  * Absolute paths the site serves that are not manifest pages.
  *
- * `/api/rust` is rustdoc output, copied into the build by `docs.yml`. It has no
- * SvelteKit route and never appears in the manifest, so it has to be declared —
- * and declaring it here is the point: an absolute link to anything *not* on this
- * list or in the manifest is now a failure rather than a silent pass.
+ * Deliberately does **not** include `/api/rust`. Rustdoc output is assembled
+ * into the site after the SvelteKit build, so a bare `](/api/rust)` fails
+ * prerender — and it would be wrong in production anyway: the site is served
+ * under a base path (`/x.uma` on Pages), which a hand-written absolute link
+ * ignores. Link the full URL instead. Both failure modes were introduced and
+ * caught on 2026-08-31; leaving the root undeclared is what keeps them caught.
  */
-const STATIC_ROOTS = new Set(["/", "/docs", "/playground", "/api/rust"]);
+const STATIC_ROOTS = new Set(["/", "/docs", "/playground"]);
 
 const files = manifestFiles();
 const slugs = manifestSlugs();
