@@ -34,13 +34,20 @@ SPEC_DIR = Path(__file__).resolve().parent.parent.parent / "spec" / "tests"
 
 @dataclass
 class HttpFixtureCase:
-    """A single test case from an HTTP conformance fixture."""
+    """A single test case from an HTTP conformance fixture.
+
+    Either an evaluation case (matcher + request + expect) or a compile-error
+    case, in which case matcher and request are None and error_contains carries
+    the substring the failure must mention.
+    """
 
     fixture_name: str
     case_name: str
-    matcher: Matcher[Any, str]
-    request: HttpRequest
+    matcher: Matcher[Any, str] | None
+    request: HttpRequest | None
     expect: str | None
+    error_contains: str | None = None
+    doc: dict[str, Any] | None = None
 
 
 # ─── YAML → puma type conversion ────────────────────────────────────────────
@@ -67,6 +74,26 @@ def _load_http_file(path: Path) -> list[HttpFixtureCase]:
             fixture_name = doc["name"]
             action = doc["action"]
             on_no_match = doc.get("on_no_match")
+
+            # A fixture may assert that the config is *refused*. `error_contains`
+            # is required rather than optional: without it the fixture passes on
+            # any failure at all, so one that starts failing earlier — a typo in
+            # the fixture itself — stays green while no longer testing what it
+            # was written for. The protojson runner learned this the hard way.
+            if doc.get("expect_error", False):
+                cases.append(
+                    HttpFixtureCase(
+                        fixture_name=fixture_name,
+                        case_name="compile_is_refused",
+                        matcher=None,
+                        request=None,
+                        expect=None,
+                        error_contains=doc["error_contains"],
+                        doc=doc,
+                    )
+                )
+                continue
+
             matcher = _compile_http_fixture(doc, action, on_no_match)
 
             for case in doc["cases"]:

@@ -115,28 +115,31 @@ cases:
     expect: null
 
 ---
-name: "http_empty_routes_matches_all"
-description: "Empty route matches array matches everything"
+name: "http_empty_routes_is_refused"
+description: |
+  An empty route-matches array must be refused, not treated as a catch-all.
+
+  This fixture asserted the opposite until 2026-08-31, and that made the
+  fail-open a cross-language *contract* rather than an oversight: every
+  implementation was conformant precisely by matching everything.
+
+  Two things are wrong with the old behaviour. xDS is explicit that an empty
+  matcher list is a no-match — "if no matcher above matched and this field is
+  not populated, the match will be considered unsuccessful" — and the config
+  path has always honoured that; only the Gateway API compiler disagreed with
+  the engine underneath it. And the polarity of the mistake is caller-supplied:
+  `([], "allow", "deny")` and `([], "deny", "allow")` are opposite outcomes
+  from the same empty input, so the library cannot pick a safe one. An empty
+  list is also almost never written on purpose — it is a config that failed to
+  load, or a filter that removed every rule.
+
+  A catch-all stays reachable through `compile_catch_all`, by name.
 
 http_route_matches: []
 
 action: "catch_all"
 
-cases:
-  - name: "any_path_matches"
-    http_request:
-      method: GET
-      path: /anything
-    expect: "catch_all"
+expect_error: true
+error_contains: "no route matches"
 
-  - name: "root_matches"
-    http_request:
-      method: GET
-      path: /
-    expect: "catch_all"
-
-  - name: "any_method_matches"
-    http_request:
-      method: DELETE
-      path: /resource/123
-    expect: "catch_all"
+cases: []

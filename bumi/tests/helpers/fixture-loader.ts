@@ -46,9 +46,14 @@ export interface FixtureCase {
 export interface HttpFixtureCase {
 	fixtureName: string;
 	caseName: string;
-	matcher: Matcher<HttpRequest, string>;
-	request: HttpRequest;
+	/** Null on a compile-error fixture; `compile` carries the retry instead. */
+	matcher: Matcher<HttpRequest, string> | null;
+	request: HttpRequest | null;
 	expect: string | null;
+	/** Set when the fixture asserts the config is refused. */
+	errorContains?: string;
+	/** Re-attempts the compile so the test can inspect the failure. */
+	compile?: () => void;
 }
 
 // ─── YAML → bumi type conversion ──────────────────────────────────
@@ -134,6 +139,27 @@ function loadHttpFile(path: string): HttpFixtureCase[] {
 		const fixtureName: string = d.name;
 		const action: string = d.action;
 		const onNoMatch: string | undefined = d.on_no_match;
+
+		// A fixture may assert that the config is *refused*. `error_contains` is
+		// required rather than optional: without it the fixture passes on any
+		// failure at all, so one that starts failing earlier — a typo in the
+		// fixture itself — stays green while no longer testing what it was
+		// written for. The protojson runner learned this the hard way.
+		if (d.expect_error === true) {
+			cases.push({
+				fixtureName,
+				caseName: "compile_is_refused",
+				matcher: null,
+				request: null,
+				expect: null,
+				errorContains: d.error_contains,
+				compile: () => {
+					compileHttpFixture(d, action, onNoMatch);
+				},
+			});
+			continue;
+		}
+
 		const matcher = compileHttpFixture(d, action, onNoMatch);
 
 		// biome-ignore lint/suspicious/noExplicitAny: YAML case parsing

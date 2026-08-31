@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
-from xuma._matcher import Matcher, matcher_from_predicate
+from xuma._matcher import Matcher, MatcherError, matcher_from_predicate
 from xuma._predicate import Predicate, SinglePredicate, and_predicate, or_predicate
 from xuma._string_matchers import ExactMatcher, PrefixMatcher, RegexMatcher
 from xuma.http._inputs import HeaderInput, MethodInput, PathInput, QueryParamInput
@@ -82,6 +82,24 @@ class HttpRouteMatch:
         for query_match in self.query_params:
             predicates.append(_compile_query_param_match(query_match))
 
+        # An empty conjunction is vacuously true, so and_predicate would hand
+        # back _catch_all(). Reaching this is rarely deliberate: every field is
+        # optional and nothing rejects an unknown one, so a config saying
+        # `pathPrefix:` where it meant `path:` arrives here with nothing set and
+        # no signal that anything went wrong.
+        #
+        # This is also the only moment the mistake is visible. After
+        # substitution the predicate is PrefixMatcher("") on the path, which is
+        # indistinguishable from a deliberate catch-all — which is why
+        # Matcher.validate() cannot catch it and never could.
+        if not predicates:
+            msg = (
+                "HttpRouteMatch has no conditions, so it matches every request "
+                "— check for a misspelled field. Use compile_catch_all() if a "
+                "catch-all is intended."
+            )
+            raise MatcherError(msg)
+
         return and_predicate(predicates, _catch_all())
 
 
@@ -93,13 +111,46 @@ def compile_route_matches[A](
     """Compile multiple HttpRouteMatch entries into a single Matcher.
 
     Multiple matches are ORed together per Gateway API semantics.
+
+    Raises:
+        MatcherError: If the list is empty, or if any entry has no conditions.
+            Both are catch-alls.
     """
+    # Substituting a catch-all here was never spec behaviour. xDS is explicit:
+    # "if no matcher above matched and this field is not populated, the match
+    # will be considered unsuccessful" — an empty list is a *no-match*. The
+    # config path already gets this right; only this convenience layer
+    # disagreed with the engine underneath it.
+    #
+    # Not fixed by copying the loader, because there on_no_match is config the
+    # operator wrote, while here it is an argument: ([], "allow", "deny") and
+    # ([], "deny", "allow") are opposite outcomes from the same empty input.
+    # An empty list is also almost never written on purpose — it is a config
+    # that failed to load, or a filter that removed every rule.
+    if not matches:
+        msg = (
+            "no route matches, which would match every request. Use "
+            "compile_catch_all() if that is intended, or on_no_match for a "
+            "default route."
+        )
+        raise MatcherError(msg)
+
     predicates = [m.to_predicate() for m in matches]
     return matcher_from_predicate(
         or_predicate(predicates, _catch_all()),
         action,
         on_no_match,
     )
+
+
+def compile_catch_all[A](action: A) -> Matcher[HttpRequest, A]:
+    """Build a matcher that matches every request.
+
+    The explicit form of what compile_route_matches() now refuses to do by
+    accident. A catch-all is a legitimate route; it just has to be asked for,
+    and it is greppable when someone later asks why a gate admits everything.
+    """
+    return matcher_from_predicate(_catch_all(), action)
 
 
 def _compile_path_match(path_match: HttpPathMatch) -> SinglePredicate[HttpRequest]:

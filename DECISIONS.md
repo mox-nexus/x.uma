@@ -8,6 +8,69 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-31 · The catch-all becomes a ceremony
+
+### D-050 · A matcher that matches everything must be asked for by name
+
+`and_predicate([], catch_all())` returns a catch-all, because an empty
+conjunction is vacuously true. Same for the empty disjunction. So a rule with no
+conditions, and a rule list with no rules, both compiled to "match everything"
+in all three implementations. Pointed at an allowlist, `DELETE /etc/passwd`
+returned ALLOW. The realistic way in is not writing `HttpRouteMatch::default()`
+on purpose — it is a typo'd field name in YAML.
+
+Both are now errors. `compile_catch_all` / `compileCatchAll` is the explicit
+form, and `HookMatch` gains a `match_all` flag — pushing down the ceremony the
+crusts have had since the security review, which guarded the FFI while the Rust
+API underneath stayed open.
+
+**Four things this turned up that are worth more than the fix.**
+
+*The conformance suite asserted the bug.* `http_empty_routes_matches_all`
+required every implementation to match everything on an empty list. So this was
+not an oversight that survived the suite; it was a **contract the suite
+enforced**, and each implementation was conformant precisely by failing open.
+Now `http_empty_routes_is_refused`, which required teaching both HTTP runners
+`expect_error` — with `error_contains` mandatory, the lesson the protojson
+runner had already learned.
+
+*It was never a spec divergence, in either direction.* The framing while fixing
+it was "we diverge from Gateway API, which says no conditions = match all." xDS
+says the opposite on the field itself: *"if no matcher above matched and this
+field is not populated, the match will be considered unsuccessful."* And Envoy
+enforces the same thing a layer up — `RouteMatch.path_specifier` carries
+`option (validate.required) = true`
+(`data-plane-api/envoy/config/route/v3/route_components.proto:622`), so a route
+with no path specifier is a config error there too. The fix **aligns with the
+reference implementation** rather than departing from a spec. The comments
+asserting a Gateway API divergence were written, then corrected before they
+became the record.
+
+*The engine was right the whole time.* An empty `matcherList` loaded through the
+registry falls to `on_no_match` — verified by execution. Only the convenience
+layer disagreed with the engine underneath it, which is the inversion of where
+you would look for it. The layer the project calls the door handle was the one
+that failed open.
+
+*It could not have been caught at load, and that is structural.* Substitution
+destroys the evidence. Afterwards the predicate is `PrefixMatcher("")` and a
+compiled catch-all is byte-for-byte a deliberate one. `Matcher::validate` sees a
+valid matcher because it *is* a valid matcher. The only moment the mistake
+exists as information is inside the compiler, at the substitution — which is why
+the check lives there and nowhere else.
+
+**Why not just copy the loader's semantics** (empty → no-match → `on_no_match`)?
+Because there `on_no_match` is config the operator wrote, while in the compiler
+it is an argument. `([], "allow", "deny")` and `([], "deny", "allow")` are
+opposite outcomes from the same empty input; the library cannot pick the safe
+one. Refusing is the only answer that does not guess.
+
+**Revisit if:** a consumer has a legitimate need for a vacuous rule inside a
+list — the `on_no_match` slot covers the default-route case today, and
+`compile_catch_all` covers the rest.
+
+---
+
 ## 2026-08-23 · Limits, and the module graph that was hiding them
 
 ### D-049 · Widths are validated by `Matcher.validate()` in all three implementations

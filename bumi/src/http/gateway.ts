@@ -48,16 +48,44 @@ export function compileRouteMatch<A>(
 /**
  * Compile multiple route matches (ORed) into a single Matcher.
  *
- * An empty `matches` array creates a catch-all matcher that matches every
- * request (Gateway API semantics: no conditions = match all).
+ * Substituting a catch-all for an empty array was never spec behaviour. xDS is
+ * explicit: "if no matcher above matched and this field is not populated, the
+ * match will be considered unsuccessful" — an empty list is a *no-match*. The
+ * config path already honours that; only this convenience layer disagreed with
+ * the engine underneath it.
+ *
+ * Not fixed by copying the loader, because there `onNoMatch` is config the
+ * operator wrote, while here it is an argument: `([], "allow", "deny")` and
+ * `([], "deny", "allow")` are opposite outcomes from the same empty input. An
+ * empty list is also almost never written on purpose — it is a config that
+ * failed to load, or a filter that removed every rule.
+ *
+ * @throws {MatcherError} if `matches` is empty, or any entry has no conditions.
  */
 export function compileRouteMatches<A>(
 	matches: readonly HttpRouteMatch[],
 	action: A,
 	onNoMatch?: A,
 ): Matcher<HttpRequest, A> {
+	if (matches.length === 0) {
+		throw new MatcherError(
+			"no route matches, which would match every request. Use compileCatchAll() " +
+				"if that is intended, or onNoMatch for a default route.",
+		);
+	}
 	const predicates = matches.map((m) => routeMatchToPredicate(m));
 	return matcherFromPredicate(orPredicate(predicates, catchAll()), action, onNoMatch);
+}
+
+/**
+ * Build a matcher that matches every request.
+ *
+ * The explicit form of what `compileRouteMatches` now refuses to do by
+ * accident. A catch-all is a legitimate route; it just has to be asked for, and
+ * it is greppable when someone later asks why a gate admits everything.
+ */
+export function compileCatchAll<A>(action: A): Matcher<HttpRequest, A> {
+	return matcherFromPredicate(catchAll(), action);
 }
 
 /** A catch-all predicate that matches any HTTP request. */
@@ -79,6 +107,23 @@ function routeMatchToPredicate(rm: HttpRouteMatch): Predicate<HttpRequest> {
 	}
 	for (const q of rm.queryParams ?? []) {
 		predicates.push(compileQueryParamMatch(q));
+	}
+
+	// An empty conjunction is vacuously true, so andPredicate would hand back
+	// catchAll(). Reaching this is rarely deliberate: HttpRouteMatch is an
+	// interface with every field optional and no runtime schema at all, so a
+	// JSON config saying `pathPrefix` where it meant `path` arrives here with
+	// nothing set and nothing to signal it.
+	//
+	// This is also the only moment the mistake is visible. After substitution
+	// the predicate is PrefixMatcher("") on the path and is indistinguishable
+	// from a deliberate catch-all, which is why Matcher.validate() cannot catch
+	// it and never could.
+	if (predicates.length === 0) {
+		throw new MatcherError(
+			"HttpRouteMatch has no conditions, so it matches every request — check " +
+				"for a misspelled field. Use compileCatchAll() if a catch-all is intended.",
+		);
 	}
 
 	return andPredicate(predicates, catchAll());

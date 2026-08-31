@@ -147,9 +147,14 @@ onNoMatch:
       name: deny
 ```
 
-An empty `matcherList.matchers` list matches everything, so the polarity comes
-entirely from how you assign actions. `rumi check` tells you which case you are
-in — it prints the fallback, and says so explicitly when there are zero rules.
+An empty `matcherList.matchers` list matches **nothing**, and falls through to
+`onNoMatch`. This page said the opposite until 2026-08-31. xDS is explicit —
+*"if no matcher above matched and this field is not populated, the match will
+be considered unsuccessful"* — and the config path has always honoured it; the
+sentence was describing the Gateway API compiler's behaviour, which was a bug
+and is now an error. So a config that fails to load leaves you with your
+fallback, not with open access. `rumi check` prints the fallback, and says so
+explicitly when there are zero rules.
 
 ## The rule that catches people
 

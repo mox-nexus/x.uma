@@ -142,7 +142,7 @@ just test-all
 
 ### Envoy (C++) — The Original
 
-Location: `~/oss/envoy/source/common/matcher/`
+Location: `~/oss/reference/envoy/source/common/matcher/`
 
 | File | What to learn |
 |------|---------------|
@@ -155,7 +155,7 @@ Location: `~/oss/envoy/source/common/matcher/`
 
 ### xDS Protos — The Spec
 
-Location: `~/oss/xds/xds/type/matcher/v3/`
+Location: `~/oss/reference/cncf-xds/xds/type/matcher/v3/`
 
 | File | Defines |
 |------|---------|

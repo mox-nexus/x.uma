@@ -76,6 +76,27 @@ impl HttpRouteMatchExt for HttpRouteMatch {
             }
         }
 
+        // An empty conjunction is vacuously true, so `from_all` would hand back
+        // `catch_all()`. Reaching this is rarely deliberate: `HttpRouteMatch`
+        // is `k8s_gateway_api`'s type, every field is optional, and it carries
+        // no `deny_unknown_fields` — so a YAML file that says `pathPrefix:`
+        // where it meant `path:` deserializes to exactly this, in silence. The
+        // sibling `HookMatch` is ours and does deny unknown fields, which is
+        // why the same typo is a load error there and was not here.
+        //
+        // This is also the only moment the mistake is visible. After
+        // substitution the predicate is `PrefixMatcher("")` on the path and is
+        // indistinguishable from a deliberate catch-all, which is why
+        // `Matcher::validate` cannot catch it.
+        if predicates.is_empty() {
+            return Err(MatcherError::InvalidConfig {
+                source: "HttpRouteMatch has no conditions, so it matches every \
+                         request — check for a misspelled field. Use \
+                         `compile_catch_all` if a catch-all is intended."
+                    .into(),
+            });
+        }
+
         Ok(Predicate::from_all(predicates, catch_all()))
     }
 }
@@ -149,6 +170,29 @@ pub fn compile_route_matches<A: Clone + Send + Sync + 'static>(
     action: A,
     on_no_match: Option<A>,
 ) -> Result<Matcher<HttpMessage, A>, MatcherError> {
+    // Substituting a catch-all here was never spec behaviour. xDS is explicit:
+    // "if no matcher above matched and this field is not populated, the match
+    // will be considered unsuccessful" — an empty list is a *no-match*, not a
+    // match-all. The config path already gets this right; an empty `matcherList`
+    // loaded through the registry falls to `on_no_match`. Only this convenience
+    // layer disagreed with the engine underneath it.
+    //
+    // The fix is not to copy the loader's semantics, though. There, `on_no_match`
+    // is config the operator wrote. Here it is an argument, so the polarity is
+    // whatever the caller passed — `(&[], "allow", Some("deny"))` and
+    // `(&[], "deny", Some("allow"))` are opposite outcomes from the same empty
+    // input, and the library cannot tell which was meant. An empty rule list is
+    // also almost never written on purpose: it is a config that failed to load,
+    // or a filter that removed every rule. So: refuse, and name the alternative.
+    if matches.is_empty() {
+        return Err(MatcherError::InvalidConfig {
+            source: "no route matches, which would match every request. Use \
+                     `compile_catch_all` if that is intended, or `on_no_match` \
+                     for a default route."
+                .into(),
+        });
+    }
+
     let predicates: Vec<Predicate<HttpMessage>> = matches
         .iter()
         .map(HttpRouteMatchExt::to_predicate)
@@ -163,6 +207,24 @@ pub fn compile_route_matches<A: Clone + Send + Sync + 'static>(
     // The compiler is the door handle this project tells people to use, so it
     // owes the same structural guarantees the config loader gives. Without this
     // it returned a matcher that had passed no check at all.
+    matcher.validate()?;
+    Ok(matcher)
+}
+
+/// Build a matcher that matches every request.
+///
+/// The explicit form of what [`compile_route_matches`] now refuses to do by
+/// accident. A catch-all is a legitimate route; it just has to be asked for,
+/// and it is greppable when someone later asks why a gate admits everything.
+///
+/// # Errors
+///
+/// Returns [`MatcherError`] only if the resulting matcher fails validation,
+/// which it cannot at this depth. The `Result` is kept for symmetry.
+pub fn compile_catch_all<A: Clone + Send + Sync + 'static>(
+    action: A,
+) -> Result<Matcher<HttpMessage, A>, MatcherError> {
+    let matcher = Matcher::from_predicate(catch_all(), action, None);
     matcher.validate()?;
     Ok(matcher)
 }
@@ -229,10 +291,23 @@ mod tests {
     }
 
     #[test]
-    fn test_compile_empty_match() {
-        let route_match = HttpRouteMatch::default();
-        let predicate = route_match.to_predicate().unwrap();
-        assert!(matches!(predicate, Predicate::Single(_)));
+    fn empty_route_match_is_rejected() {
+        // Used to assert this compiled to a single catch-all predicate. That
+        // was true, and was the bug. `HttpRouteMatch` is k8s-gateway-api's
+        // type: every field optional, no `deny_unknown_fields`, so a config
+        // saying `pathPrefix:` where it meant `path:` arrives here as
+        // `default()` with nothing to signal the typo.
+        let err = HttpRouteMatch::default().to_predicate().unwrap_err();
+        assert!(matches!(err, MatcherError::InvalidConfig { .. }), "{err:?}");
+    }
+
+    #[test]
+    fn a_typod_route_cannot_smuggle_in_a_catch_all() {
+        // The falsifying test from the finding, kept as a regression: an
+        // allowlist built from one typo'd rule used to return ALLOW for
+        // `DELETE /etc/passwd`.
+        let routes = [HttpRouteMatch::default()];
+        assert!(compile_route_matches(&routes, "ALLOW", Some("DENY")).is_err());
     }
 
     #[test]
@@ -555,8 +630,20 @@ mod tests {
     }
 
     #[test]
-    fn e2e_empty_matches_matches_everything() {
-        let matcher = compile_route_matches::<&str>(&[], "catch_all", None).unwrap();
+    fn e2e_empty_match_list_is_rejected() {
+        // Gateway API reads an empty `matches` as "match all". Deliberate
+        // divergence: the library cannot tell a routing table from a gate, and
+        // the usual route to an empty list is a config that failed to load.
+        let err = compile_route_matches::<&str>(&[], "catch_all", None).unwrap_err();
+        assert!(matches!(err, MatcherError::InvalidConfig { .. }), "{err:?}");
+    }
+
+    #[test]
+    fn compile_catch_all_is_the_explicit_form() {
+        // The escape hatch the error message points at. If this ever stops
+        // matching everything, the guard above has become a wall and the two
+        // tests must be read together.
+        let matcher = compile_catch_all("catch_all").unwrap();
 
         let msg = RequestBuilder::new().path("/anything").build();
         assert_eq!(matcher.evaluate(&msg), Some("catch_all"));

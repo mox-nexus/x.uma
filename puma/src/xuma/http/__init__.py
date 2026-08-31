@@ -10,6 +10,7 @@ from xuma.http._gateway import (
     HttpPathMatch,
     HttpQueryParamMatch,
     HttpRouteMatch,
+    compile_catch_all,
     compile_route_matches,
 )
 from xuma.http._inputs import HeaderInput, MethodInput, PathInput, QueryParamInput
@@ -29,6 +30,7 @@ __all__ = [
     "HttpHeaderMatch",
     "HttpQueryParamMatch",
     "HttpRouteMatch",
+    "compile_catch_all",
     "compile_route_matches",
     # Registry
     "register",

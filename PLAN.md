@@ -1257,34 +1257,39 @@ struct; that catches this whole class.
   assignment: `compile_hook_matches(&[], "allow", Some("deny"))` allows
   everything. The crusts already solved this for the single-rule case with
   `match_all`; extend the same ceremony to the list.
-- **A single all-`None` or typo'd `HttpRouteMatch` is a catch-all, in all three
-  implementations — and the mitigation the review credits on the Claude side is
-  structurally unavailable here.** Not F-05: that is the empty *list*
-  (`from_any`); this is the single rule (`from_all`), which is F-04's mechanism,
-  and the review names it only against `HookMatch` — `grep -n HttpRouteMatch
-  reference/security-review-2026-08-16.md` returns one hit, in S-2, about
-  dependency weight. Verified 2026-08-23:
+- ~~A single all-`None` or typo'd `HttpRouteMatch` is a catch-all~~ ✅ **FIXED
+  2026-08-31 (D-050),** together with the empty-list case the review filed as
+  F-05 and the identical hole in `HookMatch`. Both are now errors in all three
+  implementations; `compile_catch_all` / `compileCatchAll` is the explicit form,
+  and `HookMatch` gained the `match_all` flag the crusts already had.
 
-  | probe | rumi | puma | bumi |
-  |---|---|---|---|
-  | single all-`None` route in a list | ALLOW | ALLOW | ALLOW |
-  | `HttpRouteMatch::default().compile()` | ALLOW | ALLOW | — |
-  | typo'd YAML/JSON field (`pathPrefix:`) | accepted → `DELETE /etc/passwd` = ALLOW | — | ALLOW |
-  | control: same probe on `HookMatch` | **REJECTED** — `unknown field 'tool_nmae'` | — | — |
+  Four things the fix turned up, each worth more than the bug:
 
-  The control is the finding. Hardening note #6 of the review credits
-  `#[serde(deny_unknown_fields)]` on `HookMatch` for stopping exactly this.
-  That control **cannot be applied to `HttpRouteMatch`**: it is a third-party
-  type from `k8s-gateway-api` (`rumi/ext/http/src/compiler.rs:8`), re-exported
-  unchanged, and it does not deny unknown fields. In bumi it is a bare
-  TypeScript interface with no runtime schema at all. So the same YAML typo
-  that is a load error on the Claude side is a silent catch-all on the HTTP
-  side. **Blast radius:** the `xuma` PyPI/npm libraries and the Rust crates —
-  *not* the `xuma-crust` wheel, which exposes no `HttpRouteMatch` surface.
-  **Open decision:** the fix diverges from Gateway API, which specifies "no
-  conditions = match all". The `match_all` ceremony the crusts use for
-  `HookMatch` is the reviewed precedent; adopting it here is a deliberate
-  spec divergence and needs to be made before the config format freezes.
+  1. **The conformance suite asserted it.** `http_empty_routes_matches_all`
+     required every implementation to match everything on an empty list. This
+     was not an oversight that survived the suite — it was a *contract the suite
+     enforced*, and each implementation was conformant precisely by failing
+     open. Now `http_empty_routes_is_refused`, which needed `expect_error` +
+     mandatory `error_contains` taught to both HTTP runners.
+  2. **It was never a spec divergence, in either direction.** The working
+     framing — "we diverge from Gateway API, which says no conditions = match
+     all" — was wrong. xDS says the opposite on the field itself: *"if no
+     matcher above matched and this field is not populated, the match will be
+     considered unsuccessful."* And Envoy enforces the same thing one layer up:
+     `RouteMatch.path_specifier` carries `option (validate.required) = true`
+     (`data-plane-api/envoy/config/route/v3/route_components.proto:622`), so a
+     route with no path specifier is a config error there too. The fix aligns
+     with the reference implementation rather than departing from a spec.
+  3. **The engine was right the whole time.** An empty `matcherList` loaded
+     through the registry falls to `on_no_match` — verified. Only the
+     convenience layer disagreed with the engine underneath it, which is the
+     inversion of where you would look for it.
+  4. **It could not have been caught at load, structurally.** Substitution
+     destroys the evidence: afterwards the predicate is `PrefixMatcher("")` and
+     a compiled catch-all is byte-for-byte a deliberate one. `validate()` sees a
+     valid matcher because it *is* one. The only moment the mistake exists as
+     information is inside the compiler.
+
 - ~~`validate()` is never called by either domain compiler~~ (**review F-06**).
   **Stale for rumi since #32** — `claude/compiler.rs:132` and
   `http/compiler.rs:166` both call `matcher.validate()?`, and it is

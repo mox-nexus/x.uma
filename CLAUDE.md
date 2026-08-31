@@ -191,7 +191,7 @@ in `measure.ts` (D-006 to D-009, D-024).
 | Envoy | C++ | Original, production-proven |
 | rumi | Rust | Our reference |
 
-Envoy source: `~/oss/envoy/source/common/matcher/`
+Envoy source: `~/oss/reference/envoy/source/common/matcher/`
 
 ## rumi Type System (Envoy-Inspired)
 
