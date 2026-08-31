@@ -13,8 +13,14 @@
 //!
 //! Stays `publish = false`, deliberately. Nothing user-facing depends on it.
 
+#[cfg(feature = "fixtures")]
+pub mod implementations;
+
 #[cfg(all(feature = "fixtures", feature = "registry"))]
 pub mod proto_fixture;
+
+#[cfg(all(feature = "fixtures", feature = "http"))]
+pub mod http_fixture;
 
 // The conformance suite refers to the domain by these names, so they are
 // re-exported rather than duplicated. `rumi-kv` is the single definition.

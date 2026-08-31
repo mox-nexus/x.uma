@@ -12,11 +12,12 @@ A matcher engine implementing the xDS Unified Matcher API across multiple langua
 | **xuma-crust** | Python | Rust bindings via PyO3 (from `rumi/crusts/python/`) |
 | **xuma-crust** | TypeScript | Rust bindings via wasm-bindgen (from `rumi/crusts/wasm/`) |
 
-All five implementations pass `spec/tests/07_protojson/` — the canonical
-config suite. `spec/tests/05_http/` (Gateway API route matches through the
-domain compiler) runs in **puma and bumi only**; rumi covers that ground in
-its own unit tests and the crusts expose no compiler surface. Verified
-2026-08-31 by grepping each runner for the directory it loads.
+All five implementations pass `spec/tests/07_protojson/`, the canonical config
+suite. `spec/tests/05_http/` (Gateway API route matches through the domain
+compiler) runs in rumi, puma and bumi — the three that have a compiler; neither
+crust exposes that surface. Both suites carry the `implementations:` ledger, and
+every runner enforces it in **both** directions: a fixture that omits you must
+also fail for you, so a stale exception cannot hide a finished migration.
 
 ## Design Philosophy: ACES
 
@@ -448,10 +449,12 @@ a *contract the suite enforced* and each implementation was conformant by
 failing open (D-050). When a fixture and a security property disagree, the
 fixture is the thing that is wrong.
 
-Coverage is not uniform, and the split is deliberate rather than accidental:
-`07_protojson/` runs in all five (and carries an `implementations:` ledger CI
-enforces in both directions); `05_http/` runs in puma and bumi only, and has
-no such ledger.
+Coverage is deliberate rather than accidental: `07_protojson/` runs in all five;
+`05_http/` runs in the three implementations that have a Gateway API compiler.
+Both carry the `implementations:` ledger and every runner enforces it in both
+directions. Until 2026-08-31 `05_http/` had neither a ledger nor a rumi runner,
+which is how the fixture above got to require a fail-open of everyone while the
+reference implementation was not reading the file that said so.
 
 ### Session Start
 

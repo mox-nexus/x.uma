@@ -1480,18 +1480,30 @@ gating does not help.
   workflow with no `CRATES:` line fails loudly rather than reporting a vacuous
   pass.
 
-- **CONF1. `05_http` is a two-implementation suite with no ledger.** OPEN, found
-  2026-08-31. `07_protojson/` runs in all five and carries an `implementations:`
-  list CI enforces in both directions. `05_http/` is loaded only by
-  `puma/tests/conftest.py` and `bumi/tests/helpers/fixture-loader.ts` — rumi
-  covers that ground in unit tests instead, and neither crust exposes a compiler
-  surface at all. The fixture files carry no `implementations:` key, so INV-SUITE
-  is not watching, and "all implementations pass all fixtures in `spec/tests/`"
-  was true of one of the two directories. Docs corrected; the ledger is not.
+- ~~**CONF1. `05_http` is a two-implementation suite with no ledger.**~~ ✅
+  **FIXED 2026-08-31.** `07_protojson/` ran in all five and carried an
+  `implementations:` list CI enforced in both directions. `05_http/` was loaded
+  only by puma's and bumi's runners, had no ledger key at all, and had **no
+  runner in the reference implementation** — so "all implementations pass all
+  fixtures in `spec/tests/`" was true of one directory and unexamined for the
+  other.
 
-  Sharpened by D-050: the suite is the source of truth, and this one asserted a
-  fail-open. A source of truth that is only enforced on part of the tree, with
-  nothing saying which part, is the shape that let that survive.
+  Not academic. `http_empty_routes_matches_all` required an empty route list to
+  match everything (D-050), so the suite was enforcing a fail-open — and rumi
+  was not reading the file that said so.
+
+  Now: `rumi-test` gains an `http` feature and a `http_conformance` test that
+  runs all 19 fixtures through `compile_route_matches`, in `just ci` and CI. The
+  `Implementation` ledger moved out of `proto_fixture` into a shared
+  `implementations` module, because a ledger that covers half a suite is the
+  shape that let this survive. All three runners enforce it in both directions.
+
+  Controls, all executed: a wrong `expect` fails; a fixture that omits an
+  implementation fails *in that implementation* if it can still run it; and the
+  runner asserts it found fixtures at all, since one that silently loaded none
+  would pass.
+
+  The crusts stay out by construction — neither exposes a compiler surface.
 
 - **E8. The wasm crust has no path to npm at all.** OPEN, found 2026-08-23.
   `README.md:42` and `docs/content/getting-started/typescript.md:16` both tell

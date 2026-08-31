@@ -22,6 +22,21 @@ _HTTP_FIXTURES = load_http_fixtures()
 )
 def test_http_conformance(fixture: HttpFixtureCase) -> None:
     """Each HTTP fixture case must produce the expected action (or None)."""
+    if fixture.unlisted:
+        assert fixture.doc is not None
+        from tests.conftest import _compile_http_fixture
+
+        with pytest.raises(Exception):  # noqa: B017,PT011 - any failure is the point
+            _compile_http_fixture(
+                fixture.doc, fixture.doc["action"], fixture.doc.get("on_no_match")
+            )
+            pytest.fail(
+                f"fixture {fixture.fixture_name!r} does not list python, but python "
+                f"compiles it. Add python to `implementations` — a stale exception "
+                f"hides a finished migration."
+            )
+        return
+
     if fixture.error_contains is not None:
         assert fixture.doc is not None
         from tests.conftest import _compile_http_fixture

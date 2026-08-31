@@ -8,6 +8,11 @@ const fixtures = loadHttpFixtures();
 describe("http conformance", () => {
 	for (const fixture of fixtures) {
 		it(`${fixture.fixtureName}::${fixture.caseName}`, () => {
+			if (fixture.unlisted === true) {
+				// Must not work here. See the ledger note in fixture-loader.ts.
+				expect(fixture.compile).toThrow();
+				return;
+			}
 			if (fixture.errorContains !== undefined) {
 				expect(fixture.compile).toThrow(fixture.errorContains);
 				return;

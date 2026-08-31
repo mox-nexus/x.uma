@@ -95,6 +95,12 @@ jobs:
       - name: Conformance fixtures (protojson)
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test proto_conformance --features rumi-test/registry,rumi-test/fixtures
 
+      # spec/tests/05_http through the Gateway API compiler. Had runners in
+      # puma and bumi and none in the reference implementation until 2026-08-31,
+      # while one of its fixtures required a fail-open of everyone. PLAN.md CONF1.
+      - name: Conformance fixtures (Gateway API compiler)
+        run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test http_conformance --features rumi-test/http,rumi-test/fixtures
+
       # Every config message is fixtured, or listed as a gap with a reason.
       # See DECISIONS.md D-038 for why this check is not optional.
       - name: Fixture coverage spans the schema

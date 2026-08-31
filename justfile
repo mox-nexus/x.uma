@@ -137,7 +137,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-full test-protojson test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links docs-samples readme-agreement puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-full test-protojson test-http-conformance test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links docs-samples readme-agreement puma-check bumi-check docs-check docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -320,6 +320,15 @@ bumi-check: bumi-lint bumi-fmt-check bumi-typecheck bumi-test
 # quietly starts working is caught as well as one that quietly starts failing.
 test-protojson:
     cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test proto_conformance --features rumi-test/registry,rumi-test/fixtures
+
+# spec/tests/05_http through rumi's Gateway API compiler.
+#
+# This suite had runners in puma and bumi and none in the reference
+# implementation, so "all implementations pass all fixtures" was true of
+# 07_protojson and merely assumed here — while one of its fixtures was
+# requiring a fail-open of everyone (D-050). PLAN.md CONF1.
+test-http-conformance:
+    cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test http_conformance --features rumi-test/http,rumi-test/fixtures
 
 # Does the fixture corpus span the schema?
 #

@@ -52,6 +52,8 @@ export interface HttpFixtureCase {
 	expect: string | null;
 	/** Set when the fixture asserts the config is refused. */
 	errorContains?: string;
+	/** Set when the fixture does not list bumi — the compile must then fail. */
+	unlisted?: boolean;
 	/** Re-attempts the compile so the test can inspect the failure. */
 	compile?: () => void;
 }
@@ -139,6 +141,27 @@ function loadHttpFile(path: string): HttpFixtureCase[] {
 		const fixtureName: string = d.name;
 		const action: string = d.action;
 		const onNoMatch: string | undefined = d.on_no_match;
+
+		// The migration ledger, same rule as the protojson runner: a fixture
+		// that does not list us must not work here either. A skip that quietly
+		// starts passing is as much a defect as one that quietly starts
+		// failing — it means the list reports on work already done. `05_http`
+		// had no ledger at all until 2026-08-31.
+		const expected: string[] = d.implementations ?? ["rust", "python", "typescript"];
+		if (!expected.includes("typescript")) {
+			cases.push({
+				fixtureName,
+				caseName: "not_listed_for_typescript",
+				matcher: null,
+				request: null,
+				expect: null,
+				unlisted: true,
+				compile: () => {
+					compileHttpFixture(d, action, onNoMatch);
+				},
+			});
+			continue;
+		}
 
 		// A fixture may assert that the config is *refused*. `error_contains` is
 		// required rather than optional: without it the fixture passes on any
