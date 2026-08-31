@@ -167,7 +167,7 @@ Both paths produce the same `Matcher`. The compiler path is for programmatic con
 | **xuma-crust** | Python | Rust core via PyO3 |
 | **xuma-crust** | TypeScript | Rust core via WASM |
 
-All five pass the same conformance test suite. Same config format, same evaluation semantics, same results. Choose based on your runtime and performance needs.
+All five pass the same conformance suite for the config format — `spec/tests/07_protojson/`, which is the document every implementation reads. Same config, same evaluation semantics, same results. Choose based on your runtime and performance needs.
 
 ## Next
 

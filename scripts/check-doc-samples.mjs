@@ -106,6 +106,7 @@ const PAGES = [
 	"bumi/README.md",
 	"puma/README.md",
 	"rumi/crusts/python/README.md",
+	"rumi/crusts/wasm/README.md",
 	// Added 2026-08-23, after a `console.assert` repair on `concepts/pipeline.md`
 	// left the block without its `assert` import and nothing noticed. The
 	// original line — gate the getting-started pages only — was drawn to keep

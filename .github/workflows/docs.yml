@@ -46,8 +46,12 @@ jobs:
           BASE_PATH: ${{ github.event_name == 'pull_request' && format('/x.uma/pr-preview/pr-{0}', github.event.number) || '/x.uma' }}
         run: bun install && bun run build
 
+      # Named crates, not a bare `cargo doc`: that documents `default-members`,
+      # which put `rumi_docs_tests` and `rumi_test` — both `publish = false`
+      # internals — on the public site, and left out `rumi-proto`, which is
+      # published. Mirrors `just docs-rust`.
       - name: Build Rust API docs
-        run: cargo doc --manifest-path rumi/Cargo.toml --no-deps
+        run: just docs-rust
 
       - name: Assemble site
         run: |

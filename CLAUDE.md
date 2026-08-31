@@ -12,7 +12,11 @@ A matcher engine implementing the xDS Unified Matcher API across multiple langua
 | **xuma-crust** | Python | Rust bindings via PyO3 (from `rumi/crusts/python/`) |
 | **xuma-crust** | TypeScript | Rust bindings via wasm-bindgen (from `rumi/crusts/wasm/`) |
 
-All implementations pass the same conformance test suite (`spec/tests/`).
+All five implementations pass `spec/tests/07_protojson/` — the canonical
+config suite. `spec/tests/05_http/` (Gateway API route matches through the
+domain compiler) runs in **puma and bumi only**; rumi covers that ground in
+its own unit tests and the crusts expose no compiler surface. Verified
+2026-08-31 by grepping each runner for the directory it loads.
 
 ## Design Philosophy: ACES
 
@@ -159,11 +163,24 @@ What each ⚠️ needs to become ✅:
 Decisions of record live in [`DECISIONS.md`](DECISIONS.md). Read it before
 revisiting anything below.
 
-**Publish status — nothing is published yet.** Names are *chosen, not reserved*:
-`rumi-core` on crates.io (lib name = `rumi`), `rumi-http`, `rumi-cli`; `xuma` on
-PyPI; `xuma-crust` on PyPI/npm. All resolve 404 today. Both release workflows are
-`workflow_dispatch` and have never been run. README and getting-started pages
-carry pre-release notes until a release lands (D-015).
+**Publish status — nothing is published yet.** Names are *chosen, not reserved*.
+There are **five** crates, not three: `rumi-core` (lib name = `rumi`),
+`rumi-proto`, `rumi-kv`, `rumi-http`, `rumi-cli`. This paragraph listed three
+until 2026-08-31, and `release.yml` published the same three — omitting two that
+`rumi-cli` depends on. `scripts/check-publishable.mjs` now derives the list from
+`cargo metadata` and fails if the workflow disagrees, so the two cannot drift
+again.
+
+Outside Cargo: `xuma` on PyPI and npm, `xuma-crust` on PyPI and npm. Checked
+2026-08-31 — all four are **unclaimed (404)**. The crates.io names could *not* be
+checked: the registry answered 403, which is a rejected request, not an absent
+crate.
+
+Both release workflows are `workflow_dispatch` and have never been run, and
+**`release-crust.yml` publishes only the PyPI wheel** — no workflow builds,
+packs, or publishes the wasm crust to npm, though two documents tell readers to
+`bun add xuma-crust` (`PLAN.md` E8). README and getting-started pages carry
+pre-release notes until a release lands (D-015).
 
 **Docsite** runs on SvelteKit, the cix pattern
 (`docs/content/` + `docs/experience/`), register `cix · operator`, brand tokens
@@ -305,13 +322,13 @@ Workspace with core + extension crates:
 ```
 rumi/
 ├── Cargo.toml          # Workspace manifest
-├── core/               # Core engine (package: rumi)
+├── core/               # Core engine (package: rumi-core, lib name: rumi) ▲
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs
 │       ├── matcher.rs, predicate.rs, ...
 │       └── claude/     # Claude Code hooks (feature = "claude")
-├── proto/              # Proto-generated types + conversion (package: rumi-proto, published)
+├── proto/              # Proto types + conversion (package: rumi-proto) ▲
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs              # Module tree for generated types
@@ -319,12 +336,24 @@ rumi/
 │       ├── convert.rs          # Proto Matcher → MatcherConfig conversion
 │       └── gen/                # buf-generated prost + prost-serde code
 ├── ext/
-│   ├── test/           # rumi-test (conformance, publish=false)
-│   └── http/           # rumi-http (HTTP matching)
-└── crusts/             # Language bindings (🦀 crustacean → crusty, publish=false)
-    ├── python/         # PyO3 → xuma-crust wheel (maturin)
-    └── wasm/           # wasm-bindgen → xuma-crust (wasm-pack)
+│   ├── kv/             # rumi-kv (string-map matching) ▲
+│   ├── http/           # rumi-http (HTTP matching) ▲
+│   └── test/           # rumi-test (conformance harness)
+├── cli/                # rumi-cli — binary `rumi` ▲
+├── docs-tests/         # compiles the Rust blocks in docs/content
+└── crusts/             # Language bindings (🦀 crustacean → crusty)
+    ├── python/         # PyO3 → xuma-crust wheel on PyPI (maturin)
+    └── wasm/           # wasm-bindgen → xuma-crust on npm (wasm-pack)
 ```
+
+**▲ marks the five crates published to crates.io**, in dependency order:
+`rumi-core` → `rumi-proto` → `rumi-kv` → `rumi-http` → `rumi-cli`. That is the
+order `release.yml` uses and `scripts/check-publishable.mjs` enforces.
+
+The rest are `publish = false` *as Cargo crates*, which is not the same as
+unpublished: both crusts ship to PyPI and npm through `release-crust.yml` and
+`wasm-pack`. This diagram listed neither `kv` nor `cli` until 2026-08-31, so two
+published crates were absent from the only structural map of the workspace.
 
 **Extension pattern:** Claude is a feature, HTTP is a separate crate:
 
@@ -412,7 +441,17 @@ outran their evidence.
 
 ### Conformance Tests
 
-All implementations must pass all fixtures in `spec/tests/`. The fixture suite is the source of truth for correctness.
+The fixture suite is the source of truth for correctness — which is exactly
+why it has to be right. `http_empty_routes_matches_all` required every
+implementation to treat an empty route list as a catch-all, so a fail-open was
+a *contract the suite enforced* and each implementation was conformant by
+failing open (D-050). When a fixture and a security property disagree, the
+fixture is the thing that is wrong.
+
+Coverage is not uniform, and the split is deliberate rather than accidental:
+`07_protojson/` runs in all five (and carries an `implementations:` ledger CI
+enforces in both directions); `05_http/` runs in puma and bumi only, and has
+no such ledger.
 
 ### Session Start
 

@@ -1,7 +1,8 @@
 # x.uma
 
 [![Docs](https://img.shields.io/badge/docs-x.uma-4da6ff)](https://mox-nexus.github.io/x.uma/)
-[![CI](https://github.com/mox-nexus/x.uma/actions/workflows/docs.yml/badge.svg)](https://github.com/mox-nexus/x.uma/actions/workflows/docs.yml)
+[![CI](https://github.com/mox-nexus/x.uma/actions/workflows/ci.yml/badge.svg)](https://github.com/mox-nexus/x.uma/actions/workflows/ci.yml)
+[![Docs build](https://github.com/mox-nexus/x.uma/actions/workflows/docs.yml/badge.svg)](https://github.com/mox-nexus/x.uma/actions/workflows/docs.yml)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](LICENSE-MIT)
 
 > **Alpha (0.0.2)** — API is stabilizing. Expect breaking changes before 1.0.

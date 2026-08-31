@@ -143,9 +143,16 @@ ci: fmt-check lint-strict test test-full test-protojson test-fixture-coverage cr
 lint-strict:
     cargo clippy --manifest-path rumi/Cargo.toml --all-targets -- -D warnings
 
-# Build and open Rust documentation
+# Build and open Rust documentation.
+#
+# Named crates, not `--workspace`: the two crusts both produce a lib called
+# `xuma_crust` and rustdoc refuses to write them to the same path, so
+# `--workspace` fails outright. `--exclude rumi-proto` did not help — it excluded
+# the wrong crate, and this command had been broken for as long as the docs told
+# readers to run it. The list is exactly the published crates, which is also what
+# a reader wants.
 doc:
-    cargo doc --manifest-path rumi/Cargo.toml --workspace --exclude rumi-proto --no-deps --open
+    cargo doc --manifest-path rumi/Cargo.toml --no-deps -p rumi-core -p rumi-proto -p rumi-http -p rumi-kv -p rumi-cli --open
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Documentation
@@ -193,9 +200,13 @@ docs-samples:
 docs-check:
     cd docs/experience && bun run check
 
-# Generate Rust API docs (assembled into the site at /api/rust by CI)
+# Generate Rust API docs (assembled into the site at /api/rust by CI).
+#
+# Same crate list as `just doc`. A bare `cargo doc` documents `default-members`,
+# which published `rumi_docs_tests` and `rumi_test` — both `publish = false`
+# internals — to the public site while omitting `rumi-proto`, which is published.
 docs-rust:
-    cargo doc --manifest-path rumi/Cargo.toml --no-deps
+    cargo doc --manifest-path rumi/Cargo.toml --no-deps -p rumi-core -p rumi-proto -p rumi-http -p rumi-kv -p rumi-cli
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Benchmarks
