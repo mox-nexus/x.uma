@@ -295,6 +295,14 @@ jobs:
           bun install --frozen-lockfile
           bun test
 
+      # The npm artifact is assembled by wasm-pack, whose generated `files`
+      # array omitted both licence files — so a package declaring
+      # `MIT OR Apache-2.0` would have shipped with neither. Checked on every
+      # PR rather than at release time, because release time is after the
+      # version is spent: npm never lets one be re-uploaded.
+      - name: The npm tarball is what the package promises
+        run: node scripts/pack-wasm-crust.mjs
+
   agreement:
     name: runtimes agree with the README
     runs-on: ubuntu-latest

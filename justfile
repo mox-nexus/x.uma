@@ -40,6 +40,11 @@ crust-check: crust-py-check crust-wasm-check
 # fixture schema, and turning `EvalTrace.steps` into an enum. Every one would
 # have failed here in seconds. The full suites still run as their own CI jobs;
 # what was missing was anything at all locally.
+# Assert the npm tarball for xuma-crust contains exactly what it promises.
+# Needs `wasm-pack build --target web` to have run. See the script's header.
+crust-pack:
+    node scripts/pack-wasm-crust.mjs
+
 crust-compiles:
     cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures
     cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures

@@ -177,11 +177,12 @@ Outside Cargo: `xuma` on PyPI and npm, `xuma-crust` on PyPI and npm. Checked
 checked: the registry answered 403, which is a rejected request, not an absent
 crate.
 
-Both release workflows are `workflow_dispatch` and have never been run, and
-**`release-crust.yml` publishes only the PyPI wheel** — no workflow builds,
-packs, or publishes the wasm crust to npm, though two documents tell readers to
-`bun add xuma-crust` (`PLAN.md` E8). README and getting-started pages carry
-pre-release notes until a release lands (D-015).
+Both release workflows are `workflow_dispatch` and have never been run.
+`release-crust.yml` published only the PyPI wheel until 2026-09-01, while two
+documents told readers to `bun add xuma-crust`; it now has an npm job on OIDC
+trusted publishing, which **must be configured on npm before the first run**
+(`PLAN.md` E8). README and getting-started pages carry pre-release notes until a
+release lands (D-015).
 
 **Docsite** runs on SvelteKit, the cix pattern
 (`docs/content/` + `docs/experience/`), register `cix · operator`, brand tokens

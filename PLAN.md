@@ -1505,20 +1505,45 @@ gating does not help.
 
   The crusts stay out by construction — neither exposes a compiler surface.
 
-- **E8. The wasm crust has no path to npm at all.** OPEN, found 2026-08-23.
-  `README.md:42` and `docs/content/getting-started/typescript.md:16` both tell
-  the reader `bun add xuma-crust`, and `release-crust.yml` — the workflow named
-  for it — builds and publishes **only the PyO3 wheel to PyPI**. `grep -rn "npm
-  publish\|bun publish\|wasm-pack publish" .github/workflows/` finds one hit,
-  in `release.yml`, and it is the pure-TypeScript `xuma` package.
-  `rumi/crusts/wasm` is never built, packed, or pushed by any workflow.
+- ~~**E8. The wasm crust has no path to npm at all.**~~ ✅ **FIXED 2026-09-01.**
+  `README.md:42` and `getting-started/typescript.md:16` both told readers
+  `bun add xuma-crust`, while `release-crust.yml` — the workflow named for the
+  crusts — built and published only the PyO3 wheel. `grep -rn "npm publish\|bun
+  publish\|wasm-pack publish" .github/workflows/` found one hit, in
+  `release.yml`, and it was the pure-TypeScript `xuma` package. Nothing built,
+  packed or pushed `rumi/crusts/wasm`.
 
-  It also has no `README.md`, so the npm listing would be blank if it were
-  published; every other package root has one. The same class as E7 — the
-  release story was written in prose and never executed — and the same fix
-  shape: `check-publishable.mjs` should learn about the non-Cargo artifacts
-  too, so "documented as installable" and "published by a workflow" cannot
-  drift apart again.
+  Now a `npm` job in `release-crust.yml`, on OIDC trusted publishing to match
+  the PyPI job: the name is unclaimed, so there is no migration cost to starting
+  without a long-lived token. **Needs a trusted publisher configured on npm for
+  this repo and workflow before the first run.**
+
+  Two things fixing it turned up:
+
+  1. **The package had no README**, so the npm listing would have been blank.
+     Written, and its sample is in the doc-sample gate — the one place a README
+     for an unpublished package can be checked at all.
+  2. **The licences would not have shipped.** wasm-pack copies `LICENSE-MIT` and
+     `LICENSE-APACHE` into `pkg/` but its generated `files` array omits them,
+     and npm's implicit include covers `README` and `LICENSE`, not a suffixed
+     variant. `npm pack --dry-run` showed 5 files and no licence — a package
+     declaring `MIT OR Apache-2.0` carrying neither. `scripts/pack-wasm-crust.mjs`
+     adds them and then asserts the tarball is *exactly* the promised set, so an
+     unexpected file fails as loudly as a missing one. It runs on every PR, not
+     at release: release time is after the version is spent, and npm never lets
+     one be re-uploaded.
+
+  Controls, executed: a licence removed from `pkg/`, a stray file added to
+  `files`, and a version that disagrees with the workspace each fail.
+
+  **And the class is closed, not just the instance.** `check-publishable.mjs`
+  now asserts every install command in the docs has a workflow that publishes
+  it. Writing that check produced the sharpest finding of the pair: the first
+  version keyed on package *name*, so the PyPI wheel satisfied `bun add
+  xuma-crust` and the check reported E8's exact state as fine. It only surfaced
+  because the control — delete the npm job, expect a failure — came back green.
+  `xuma-crust` and `xuma` each name two different artifacts in two registries;
+  the key is `registry:name`. A check whose control passes is not a check.
 
 **Done when:** `cargo publish --dry-run` passes for all five crates in
 dependency order with no path patching, no published crate depends on a

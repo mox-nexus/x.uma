@@ -186,6 +186,101 @@ if (docCommands === 0) {
 }
 
 console.log(`api docs: ${docCommands} \`cargo doc\` command(s), all naming the ${publishedNames.size} published crates`);
+// ═══════════════════════════════════════════════════════════════════════════
+// Is every package the docs tell you to install actually published by a workflow?
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// This is the gap E8 was. Two documents said `bun add xuma-crust` for four
+// months while no workflow built, packed or pushed it — a promise with nothing
+// behind it, and nothing that could notice. The Cargo half of this file already
+// derives its answer from `cargo metadata`; the npm and PyPI artifacts had no
+// equivalent, which is exactly why they were the half that drifted.
+//
+// An install line in the docs is a promise. This asserts each one has a
+// publisher.
+
+const INSTALL = /^\s*(uv add|pip install|bun add|npm install|cargo add|cargo install)\s+([a-z0-9@][a-z0-9@/._-]*)/gm;
+
+const DOC_ROOTS = [
+	"README.md",
+	"docs/content/getting-started/python.md",
+	"docs/content/getting-started/typescript.md",
+	"docs/content/getting-started/rust.md",
+	"puma/README.md",
+	"bumi/README.md",
+	"rumi/core/README.md",
+	"rumi/cli/README.md",
+	"rumi/crusts/python/README.md",
+	"rumi/crusts/wasm/README.md",
+];
+
+/**
+ * What each workflow publishes, keyed by **registry and name**, not name alone.
+ *
+ * That distinction is the whole check. `xuma-crust` is published to PyPI *and*
+ * to npm — two different artifacts sharing one name — and `xuma` likewise. A
+ * set keyed on the bare name would have counted the PyPI wheel as satisfying
+ * `bun add xuma-crust`, which is precisely the state E8 was in: the wheel
+ * shipped for months while nothing published the npm package, and a name-keyed
+ * check would have reported that as fine. Caught here by removing the npm job
+ * and watching this check stay green.
+ */
+const workflows = [".github/workflows/release.yml", ".github/workflows/release-crust.yml"]
+	.map((f) => readFileSync(join(ROOT, f), "utf8"))
+	.join("\n");
+
+/** `registry:name` for everything a workflow actually pushes. */
+const published = new Set(order.map((n) => `crates.io:${n}`));
+
+// PyPI: the pure Python package, and the PyO3 wheel matrix.
+if (/packages-dir:\s*puma\/dist/.test(workflows)) published.add("pypi:xuma");
+if (/packages-dir:\s*dist\//.test(workflows)) published.add("pypi:xuma-crust");
+// npm: the pure TypeScript package, and the wasm crust.
+if (/bun publish/.test(workflows) && /working-directory:\s*bumi/.test(workflows)) {
+	published.add("npm:xuma");
+}
+if (/npm publish/.test(workflows) && /crusts\/wasm\/pkg/.test(workflows)) {
+	published.add("npm:xuma-crust");
+}
+
+/** Which registry an install command reaches for. */
+const REGISTRY = {
+	"uv add": "pypi",
+	"pip install": "pypi",
+	"bun add": "npm",
+	"npm install": "npm",
+	"cargo add": "crates.io",
+	"cargo install": "crates.io",
+};
+
+// `cargo install --path .` is a build-from-source instruction, not a registry
+// package, and `rumi` is the binary rumi-cli installs.
+const NOT_A_PACKAGE = new Set([".", "--path", "rumi"]);
+
+const promises = new Map();
+for (const file of DOC_ROOTS) {
+	const text = readFileSync(join(ROOT, file), "utf8");
+	for (const m of text.matchAll(INSTALL)) {
+		const [name, tool] = [m[2], m[1]];
+		if (NOT_A_PACKAGE.has(name)) continue;
+		const key = `${REGISTRY[tool]}:${name}`;
+		if (!promises.has(key)) promises.set(key, file);
+	}
+}
+
+if (promises.size === 0) {
+	problems.push(`no install commands found in ${DOC_ROOTS.length} documents — this check saw nothing`);
+}
+
+for (const [key, where] of promises) {
+	if (!published.has(key)) {
+		const [registry, name] = key.split(/:(.*)/);
+		problems.push(`${where} says to install \`${name}\` from ${registry}, but no release workflow publishes it there`);
+	}
+}
+
+console.log(`install promises: ${promises.size} package(s) named in docs, all published by a workflow`);
+
 console.log(`release.yml order: ${order.join(" -> ")}`);
 
 if (problems.length) {
