@@ -142,7 +142,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-full test-protojson test-http-conformance test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links docs-samples readme-agreement puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-full test-protojson test-http-conformance test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links docs-samples readme-agreement puma-check bumi-check docs-check docs-test docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -204,6 +204,15 @@ docs-samples:
 
 docs-check:
     cd docs/experience && bun run check
+
+# The playground's diagram must describe the config it was given.
+#
+# `docs/experience` had no tests at all until 2026-09-01 — `docs-check` is
+# svelte-check, which checks types and not truth. A diagram that drew the
+# fallback branch as the match branch type-checked perfectly, and the playground
+# is the one surface a visitor actually touches.
+docs-test:
+    cd docs/experience && bun test tests/
 
 # Generate Rust API docs (assembled into the site at /api/rust by CI).
 #

@@ -1505,6 +1505,37 @@ gating does not help.
 
   The crusts stay out by construction — neither exposes a compiler surface.
 
+- **PG1. The playground had no tests, and two defects behind that.** Found and
+  fixed 2026-09-01. `docs/experience` is ~2,400 lines carrying the one surface a
+  visitor actually touches, and it had **zero tests** — `just docs-check` is
+  `svelte-check`, which checks types rather than truth.
+
+  Two things were living behind that:
+
+  1. **The diagram drew the fallback branch as the match branch.**
+     `walkOnMatch` dropped its `isFallback` flag when an `onNoMatch` held a
+     nested matcher rather than a bare action, so everything below it rendered
+     with `type: "action"` and no `no-match` edge. Confirmed by execution before
+     the fix and after. For a tool whose only job is answering "why did this
+     match?", the diagram was answering wrongly.
+  2. **Both "Claude Code hook" presets ship a config that cannot run as one.**
+     They use `xuma.kv.v1.MapInput`; `rumi run claude` registers
+     `xuma.claude.v1.*` and rejects the rest — verified by feeding the preset's
+     exact config to the CLI, which fails at load. Not fixable by using the real
+     type URLs: the playground evaluates in the browser through bumi, and the
+     Claude domain is a `rumi-core` feature with no TypeScript implementation.
+     So the presets now describe what they are — the rule *shape*, in the domain
+     the playground can evaluate — which is the transferable part anyway.
+
+  `docs/experience/tests/` now exists, in `just ci` and CI. Controls: reverting
+  the `isFallback` fix fails, and so does the lazy over-correction that marks
+  every nested matcher as a fallback — a fix that passes the first control and
+  is just as wrong.
+
+  Worth keeping: `bun test` passed while the new test called `configToGraph`
+  with the wrong arity, and `svelte-check` caught it. Types and truth are
+  different gates and the repo needs both.
+
 - ~~**E8. The wasm crust has no path to npm at all.**~~ ✅ **FIXED 2026-09-01.**
   `README.md:42` and `getting-started/typescript.md:16` both told readers
   `bun add xuma-crust`, while `release-crust.yml` — the workflow named for the

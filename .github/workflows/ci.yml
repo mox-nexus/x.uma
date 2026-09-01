@@ -195,6 +195,14 @@ jobs:
         working-directory: docs/experience
         run: bun run check
 
+      # Types are not truth. The playground's diagram drew the fallback branch
+      # identically to the match branch and type-checked perfectly; it is the
+      # one surface a visitor touches, and it had no tests at all until
+      # 2026-09-01.
+      - name: Playground tests
+        working-directory: docs/experience
+        run: bun test tests/
+
       # `build` runs scripts/verify-base-path.mjs, so a base-path mistake fails
       # here rather than shipping a blank page.
       - name: Build
