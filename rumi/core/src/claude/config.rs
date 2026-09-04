@@ -53,6 +53,19 @@ pub struct HookMatch {
     pub cwd: Option<StringMatch>,
     /// Match on git branch.
     pub git_branch: Option<StringMatch>,
+    /// Confirm that a rule with no conditions is meant to match everything.
+    ///
+    /// A `HookMatch` with every field `None` compiles to a catch-all, because
+    /// an empty conjunction is vacuously true. In an allowlist that is a total
+    /// bypass, and the usual way to reach it is not writing `HookMatch::default()`
+    /// on purpose — it is a typo'd field name, or a field the engine accepted
+    /// and then dropped (see `session_id` above, which was exactly that).
+    ///
+    /// So the empty rule is an error unless this says otherwise. Both crusts
+    /// have carried this flag since the security review; it lived one level too
+    /// shallow, guarding the FFI while the Rust API underneath stayed open.
+    #[serde(default)]
+    pub match_all: bool,
 }
 
 /// Match a specific tool argument by name.

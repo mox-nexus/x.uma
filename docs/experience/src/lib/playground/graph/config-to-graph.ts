@@ -62,6 +62,12 @@ function walkMatcher(
   nodes: GraphNode[],
   edges: GraphEdge[],
   parentId: string | null,
+  // Everything reachable from an `onNoMatch` is on the fallback path, however
+  // deep. Without this the flag stopped at the first nested matcher, so a
+  // fallback that nests instead of ending in a bare action was drawn exactly
+  // like a match — same node type, no `no-match` edge. In a tool whose whole
+  // job is "why did this match?", that is the diagram answering wrongly.
+  isFallback = false,
 ): string {
   const id = nextId("matcher");
   // A tree has entries, not field matchers. Counting `matchers` for one would
@@ -79,6 +85,7 @@ function walkMatcher(
       id: nextId("e"),
       source: parentId,
       target: id,
+      kind: isFallback ? "no-match" : undefined,
     });
   }
 
@@ -95,11 +102,11 @@ function walkMatcher(
         data: { label: `${config.tree.rule}: ${key}` },
       });
       edges.push({ id: nextId("e"), source: id, target: entryId });
-      walkOnMatch(om, nodes, edges, entryId, false);
+      walkOnMatch(om, nodes, edges, entryId, isFallback);
     }
   } else {
     for (const fm of config.matchers) {
-      walkFieldMatcher(fm, nodes, edges, id);
+      walkFieldMatcher(fm, nodes, edges, id, isFallback);
     }
   }
 
@@ -115,6 +122,7 @@ function walkFieldMatcher(
   nodes: GraphNode[],
   edges: GraphEdge[],
   matcherId: string,
+  isFallback: boolean,
 ): void {
   const predId = walkPredicate(fm.predicate, nodes, edges);
 
@@ -124,7 +132,7 @@ function walkFieldMatcher(
     target: predId,
   });
 
-  walkOnMatch(fm.onMatch, nodes, edges, predId, false);
+  walkOnMatch(fm.onMatch, nodes, edges, predId, isFallback);
 }
 
 function walkPredicate(
@@ -234,7 +242,7 @@ function walkOnMatch(
   }
 
   if (onMatch instanceof MatcherOnMatchConfig) {
-    walkMatcher(onMatch.matcher, nodes, edges, sourceId);
+    walkMatcher(onMatch.matcher, nodes, edges, sourceId, isFallback);
   }
 }
 

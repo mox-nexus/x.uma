@@ -5,11 +5,19 @@
     "": {
       "name": "bumi-crusty-tests",
       "devDependencies": {
+        "@types/js-yaml": "^4.0",
+        "js-yaml": "^4.1",
         "mitata": "^1.0.34",
       },
     },
   },
   "packages": {
+    "@types/js-yaml": ["@types/js-yaml@4.0.9", "", {}, "sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg=="],
+
+    "argparse": ["argparse@2.0.1", "", {}, "sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q=="],
+
+    "js-yaml": ["js-yaml@4.3.1", "", { "dependencies": { "argparse": "^2.0.1" }, "bin": { "js-yaml": "bin/js-yaml.js" } }, "sha512-CY6crGq313MX8GkwvB7tzgp99vjQxY1++5y10/BKN/GUfHqWaOGQMNZkBvqSzsZKWk/ijwHlWzzkLulsGHhjWQ=="],
+
     "mitata": ["mitata@1.0.34", "", {}, "sha512-Mc3zrtNBKIMeHSCQ0XqRLo1vbdIx1wvFV9c8NJAiyho6AjNfMY8bVhbS12bwciUdd1t4rj8099CH3N3NFahaUA=="],
   }
 }

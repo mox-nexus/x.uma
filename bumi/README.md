@@ -50,19 +50,20 @@ matcher.evaluate({ name: "eve" });   // "guest"
 ### Example 2: HTTP Route Matching
 
 ```typescript
-import { HttpRequest, HttpRouteMatch, HttpPathMatch, compileRouteMatches } from "xuma/http";
+import { HttpRequest, compileRouteMatches } from "xuma/http";
+import type { HttpRouteMatch } from "xuma/http";
 
-const matcher = compileRouteMatches(
-    [
-        new HttpRouteMatch({ path: new HttpPathMatch("PathPrefix", "/api"), method: "GET" }),
-        new HttpRouteMatch({ path: new HttpPathMatch("PathPrefix", "/admin") }),
-    ],
-    "matched",
-    "404",
-);
+// Route matches are plain objects — HttpRouteMatch and HttpPathMatch are
+// interfaces, so there is nothing to construct.
+const routes: HttpRouteMatch[] = [
+    { path: { type: "PathPrefix", value: "/api" }, method: "GET" },
+    { path: { type: "PathPrefix", value: "/admin" } },
+];
 
-matcher.evaluate(new HttpRequest({ method: "GET", rawPath: "/api/users" })); // "matched"
-matcher.evaluate(new HttpRequest({ method: "POST", rawPath: "/api/users" })); // "404"
+const matcher = compileRouteMatches(routes, "matched", "404");
+
+matcher.evaluate(new HttpRequest("GET", "/api/users"));  // "matched"
+matcher.evaluate(new HttpRequest("POST", "/api/users")); // "404"
 ```
 
 ### Example 3: Config-Driven Matchers

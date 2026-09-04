@@ -6,6 +6,7 @@ Why does the same `ExactMatcher` work for HTTP headers and custom event types? B
 
 If `InputMatcher` were generic over the context type, every domain would need its own matcher implementations:
 
+<!-- doc-sample: fragment -->
 ```python
 # If InputMatcher were generic (DON'T DO THIS)
 class InputMatcher[Ctx]:
@@ -21,6 +22,7 @@ event_matcher = ExactMatcher[CloudEvent]("com.example")
 
 Erase the type at the **data level**. Extract the value first, then match the erased value:
 
+<!-- doc-sample: fragment -->
 ```python
 # DataInput is generic — knows about the context
 class DataInput[Ctx]:
@@ -33,6 +35,7 @@ class InputMatcher:
 
 Now one `ExactMatcher` works everywhere:
 
+<!-- doc-sample: fragment -->
 ```python
 # HTTP path matching
 path_pred = SinglePredicate(input=PathInput(), matcher=ExactMatcher("/api"))
@@ -61,11 +64,13 @@ pub enum MatchingData {
 ```
 
 **Python:**
+<!-- doc-sample: fragment -->
 ```python
 type MatchingData = str | int | bool | bytes | None
 ```
 
 **TypeScript:**
+<!-- doc-sample: fragment -->
 ```typescript
 type MatchingData = string | number | boolean | Uint8Array | null;
 ```

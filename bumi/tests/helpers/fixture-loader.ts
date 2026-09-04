@@ -46,9 +46,16 @@ export interface FixtureCase {
 export interface HttpFixtureCase {
 	fixtureName: string;
 	caseName: string;
-	matcher: Matcher<HttpRequest, string>;
-	request: HttpRequest;
+	/** Null on a compile-error fixture; `compile` carries the retry instead. */
+	matcher: Matcher<HttpRequest, string> | null;
+	request: HttpRequest | null;
 	expect: string | null;
+	/** Set when the fixture asserts the config is refused. */
+	errorContains?: string;
+	/** Set when the fixture does not list bumi — the compile must then fail. */
+	unlisted?: boolean;
+	/** Re-attempts the compile so the test can inspect the failure. */
+	compile?: () => void;
 }
 
 // ─── YAML → bumi type conversion ──────────────────────────────────
@@ -134,6 +141,48 @@ function loadHttpFile(path: string): HttpFixtureCase[] {
 		const fixtureName: string = d.name;
 		const action: string = d.action;
 		const onNoMatch: string | undefined = d.on_no_match;
+
+		// The migration ledger, same rule as the protojson runner: a fixture
+		// that does not list us must not work here either. A skip that quietly
+		// starts passing is as much a defect as one that quietly starts
+		// failing — it means the list reports on work already done. `05_http`
+		// had no ledger at all until 2026-08-31.
+		const expected: string[] = d.implementations ?? ["rust", "python", "typescript"];
+		if (!expected.includes("typescript")) {
+			cases.push({
+				fixtureName,
+				caseName: "not_listed_for_typescript",
+				matcher: null,
+				request: null,
+				expect: null,
+				unlisted: true,
+				compile: () => {
+					compileHttpFixture(d, action, onNoMatch);
+				},
+			});
+			continue;
+		}
+
+		// A fixture may assert that the config is *refused*. `error_contains` is
+		// required rather than optional: without it the fixture passes on any
+		// failure at all, so one that starts failing earlier — a typo in the
+		// fixture itself — stays green while no longer testing what it was
+		// written for. The protojson runner learned this the hard way.
+		if (d.expect_error === true) {
+			cases.push({
+				fixtureName,
+				caseName: "compile_is_refused",
+				matcher: null,
+				request: null,
+				expect: null,
+				errorContains: d.error_contains,
+				compile: () => {
+					compileHttpFixture(d, action, onNoMatch);
+				},
+			});
+			continue;
+		}
+
 		const matcher = compileHttpFixture(d, action, onNoMatch);
 
 		// biome-ignore lint/suspicious/noExplicitAny: YAML case parsing

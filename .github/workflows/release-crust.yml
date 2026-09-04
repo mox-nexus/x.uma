@@ -103,3 +103,64 @@ jobs:
       - name: Dry run
         if: inputs.dry-run == true
         run: echo "Would publish $(ls dist/ | wc -l) artifacts"
+
+  # ── WASM (xuma-crust) → npm ───────────────────────────────────────
+  #
+  # This job did not exist until 2026-09-01, while README.md and
+  # getting-started/typescript.md both told readers `bun add xuma-crust`. The
+  # workflow named for the crusts built and published only the PyO3 wheel, so
+  # one of the two artifacts it is named for had no path to a registry at all
+  # (PLAN.md E8).
+  #
+  # OIDC rather than a token, matching the PyPI job above: `xuma-crust` is
+  # unclaimed on npm, so there is no migration cost to starting with trusted
+  # publishing and one fewer long-lived secret in a workflow that publishes.
+  # Requires a trusted publisher configured on npm for this repo and workflow
+  # before the first run, and npm >= 11.5.1, which is why the setup-node step
+  # pins a newer npm than the runner ships.
+  npm:
+    name: Publish xuma-crust to npm
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # trusted publisher OIDC
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: npm with trusted publishing support
+        run: npm install -g npm@latest
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked --version 0.15.0
+
+      # No `--features fixtures`: that feature exists to run the conformance
+      # suite and pulls a YAML loader into the artifact. CI builds it with
+      # fixtures to test; a release must not ship it.
+      - name: Build
+        working-directory: rumi/crusts/wasm
+        run: wasm-pack build --target web
+
+      # Adds the licences to the `files` array — npm's implicit include covers
+      # README but not a suffixed LICENSE — then asserts the tarball contains
+      # exactly what this package promises. A published version can never be
+      # re-uploaded, so the check is a hard gate rather than a warning.
+      - name: Verify the tarball
+        run: node scripts/pack-wasm-crust.mjs
+
+      - name: Publish
+        if: inputs.dry-run == false
+        working-directory: rumi/crusts/wasm/pkg
+        run: npm publish --access public
+
+      - name: Dry run
+        if: inputs.dry-run == true
+        working-directory: rumi/crusts/wasm/pkg
+        run: npm publish --access public --dry-run

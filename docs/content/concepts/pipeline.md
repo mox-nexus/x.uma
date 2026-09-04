@@ -77,6 +77,7 @@ assert_eq!(matcher.evaluate(&request), Some("api_backend"));
 
 **TypeScript:**
 ```typescript
+import { strict as assert } from "node:assert";
 import { SinglePredicate, PrefixMatcher, Matcher, FieldMatcher, Action } from "xuma";
 import { HttpRequest, PathInput } from "xuma/http";
 
@@ -90,7 +91,7 @@ const matcher = new Matcher(
 );
 
 const request = new HttpRequest("GET", "/api/users");
-console.assert(matcher.evaluate(request) === "api_backend");
+assert.equal(matcher.evaluate(request), "api_backend");
 ```
 
 Same structure in all three languages. Same result.

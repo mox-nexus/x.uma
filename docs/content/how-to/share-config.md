@@ -39,11 +39,13 @@ let matcher = registry.load_matcher(config)?;
 matcher.evaluate(&ctx)
 ```
 
+<!-- doc-sample: fragment -->
 ```python
 matcher = registry.load_matcher(config)
 matcher.evaluate(ctx)
 ```
 
+<!-- doc-sample: fragment -->
 ```typescript
 const matcher = registry.loadMatcher(config);
 matcher.evaluate(ctx);

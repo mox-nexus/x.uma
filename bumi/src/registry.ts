@@ -114,20 +114,12 @@ export class InvalidConfigError extends MatcherError {
 	}
 }
 
-/** Config has too many field matchers (width-based limit). */
-export class TooManyFieldMatchersError extends MatcherError {
-	readonly count: number;
-	readonly max: number;
+// TooManyFieldMatchersError and TooManyPredicatesError now live in errors.ts,
+// so `matcher.ts` can throw them from `validate()` without importing this
+// module. Re-exported here because every existing import expects them here.
+import { TooManyFieldMatchersError, TooManyPredicatesError } from "./errors.ts";
+export { TooManyFieldMatchersError, TooManyPredicatesError } from "./errors.ts";
 
-	constructor(count: number, max: number) {
-		super(`too many field matchers: ${count} exceeds maximum ${max}`);
-		this.name = "TooManyFieldMatchersError";
-		this.count = count;
-		this.max = max;
-	}
-}
-
-/** Compound predicate has too many children (width-based limit). */
 /**
  * An input's data type is not one the matcher can compare.
  *
@@ -169,18 +161,6 @@ export class IncompatibleTypesError extends MatcherError {
 			`input produces "${inputType}" data but matcher supports [${matcherTypes.map((t) => `'${t}'`).join(", ")}]`,
 		);
 		this.name = "IncompatibleTypesError";
-	}
-}
-
-export class TooManyPredicatesError extends MatcherError {
-	readonly count: number;
-	readonly max: number;
-
-	constructor(count: number, max: number) {
-		super(`too many predicates in compound: ${count} exceeds maximum ${max}`);
-		this.name = "TooManyPredicatesError";
-		this.count = count;
-		this.max = max;
 	}
 }
 

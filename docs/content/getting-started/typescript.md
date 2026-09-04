@@ -97,9 +97,10 @@ not_found
 The pure TypeScript implementation loads the same config:
 
 ```typescript
+import { strict as assert } from "node:assert";
 import { parseProtojson, RegistryBuilder } from "xuma";
 import { HttpRequest, register } from "xuma/http";
-import { parse } from "yaml";
+import yaml from "js-yaml";
 
 // Build registry with HTTP inputs
 const builder = new RegistryBuilder();
@@ -107,28 +108,35 @@ register(builder);
 const registry = builder.build();
 
 // Load config: canonical protojson in, runtime Matcher out
-const yaml = await Bun.file("routes.yaml").text();
-const config = parseProtojson(parse(yaml));
+const config = parseProtojson(yaml.load(await Bun.file("routes.yaml").text()));
 const matcher = registry.loadMatcher(config);
 
 // Evaluate
 const request = new HttpRequest("GET", "/api/users");
-console.assert(matcher.evaluate(request) === "api_read");
+assert.equal(matcher.evaluate(request), "api_read");
 ```
+
+`xuma` reads protojson, not YAML — bring your own parser (`bun add js-yaml`).
 
 ## Load in Your App (xuma-crust)
 
 The WASM-backed bindings use the same config format:
 
 ```typescript
-import { loadHttpMatcher, type HttpMatcher } from "xuma-crust";
+import { strict as assert } from "node:assert";
+import init, { HttpMatcher } from "xuma-crust";
+import yaml from "js-yaml";
 
-// Load config and build matcher in one call
-const matcher: HttpMatcher = loadHttpMatcher("routes.yaml");
+// The WASM module must be initialised before any class is used.
+await init();
 
-// Evaluate with method + path
-console.assert(matcher.evaluate("GET", "/api/users") === "api_read");
-console.assert(matcher.evaluate("DELETE", "/other") === "not_found");
+// fromConfig takes canonical protojson as a string, so the YAML becomes JSON.
+const config = yaml.load(await Bun.file("routes.yaml").text());
+const matcher = HttpMatcher.fromConfig(JSON.stringify(config));
+
+// Evaluate with a request object
+assert.equal(matcher.evaluate({ method: "GET", path: "/api/users" }), "api_read");
+assert.equal(matcher.evaluate({ method: "DELETE", path: "/other" }), "not_found");
 ```
 
 `xuma-crust` is 3-10x faster than pure TypeScript for evaluation.
@@ -138,6 +146,7 @@ console.assert(matcher.evaluate("DELETE", "/other") === "not_found");
 For type-safe HTTP matching without config files:
 
 ```typescript
+import { strict as assert } from "node:assert";
 import { compileRouteMatches, HttpRequest } from "xuma/http";
 import type { HttpRouteMatch } from "xuma/http";
 
@@ -154,14 +163,15 @@ const routes: HttpRouteMatch[] = [
 
 const matcher = compileRouteMatches(routes, "allowed", "denied");
 
-console.assert(matcher.evaluate(new HttpRequest("GET", "/api/users")) === "allowed");
-console.assert(matcher.evaluate(new HttpRequest("DELETE", "/api/users")) === "denied");
+assert.equal(matcher.evaluate(new HttpRequest("GET", "/api/users")), "allowed");
+assert.equal(matcher.evaluate(new HttpRequest("DELETE", "/api/users")), "denied");
 ```
 
 Within a single `HttpRouteMatch`, all conditions are ANDed. Multiple routes are ORed. First match wins.
 
 ## Integration: Bun HTTP Server
 
+<!-- doc-sample: compile -->
 ```typescript
 import { compileRouteMatches, HttpRequest } from "xuma/http";
 

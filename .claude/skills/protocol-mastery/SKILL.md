@@ -306,7 +306,7 @@ message QueryParameterInput {
 This skill synthesizes from:
 - buf.build documentation (codegen patterns, managed mode)
 - xDS protocol specification (ECDS, TypedExtensionConfig)
-- Envoy source code (`~/oss/envoy/source/common/matcher/`)
+- Envoy source code (`~/oss/reference/envoy/source/common/matcher/`)
 - x.uma project conventions (CLAUDE.md, MEMORY.md)
 - Connect-ES codegen patterns (protobuf-es + Connect-ES 2.0)
 

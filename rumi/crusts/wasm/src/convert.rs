@@ -115,6 +115,12 @@ pub fn convert_hook_match_from_js(val: &JsValue) -> Result<HookMatch, JsValue> {
         session_id,
         cwd,
         git_branch,
+        // Carried through rather than dropped: core's `HookMatch` now refuses a
+        // rule with no conditions unless this says the catch-all is intended.
+        // The flag existed here since the security review and stopped at the
+        // FFI boundary, which left the Rust API underneath open — the exact
+        // "one level too shallow" the review named.
+        match_all,
     })
 }
 

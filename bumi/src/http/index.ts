@@ -1,6 +1,6 @@
 export { HttpRequest } from "./request.ts";
 export { HeaderInput, MethodInput, PathInput, QueryParamInput } from "./inputs.ts";
-export { compileRouteMatch, compileRouteMatches } from "./gateway.ts";
+export { compileCatchAll, compileRouteMatch, compileRouteMatches } from "./gateway.ts";
 export type {
 	HttpHeaderMatch,
 	HttpPathMatch,

@@ -95,6 +95,12 @@ jobs:
       - name: Conformance fixtures (protojson)
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test proto_conformance --features rumi-test/registry,rumi-test/fixtures
 
+      # spec/tests/05_http through the Gateway API compiler. Had runners in
+      # puma and bumi and none in the reference implementation until 2026-08-31,
+      # while one of its fixtures required a fail-open of everyone. PLAN.md CONF1.
+      - name: Conformance fixtures (Gateway API compiler)
+        run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test http_conformance --features rumi-test/http,rumi-test/fixtures
+
       # Every config message is fixtured, or listed as a gap with a reason.
       # See DECISIONS.md D-038 for why this check is not optional.
       - name: Fixture coverage spans the schema
@@ -188,6 +194,14 @@ jobs:
       - name: Type-check
         working-directory: docs/experience
         run: bun run check
+
+      # Types are not truth. The playground's diagram drew the fallback branch
+      # identically to the match branch and type-checked perfectly; it is the
+      # one surface a visitor touches, and it had no tests at all until
+      # 2026-09-01.
+      - name: Playground tests
+        working-directory: docs/experience
+        run: bun test tests/
 
       # `build` runs scripts/verify-base-path.mjs, so a base-path mistake fails
       # here rather than shipping a blank page.
@@ -289,6 +303,14 @@ jobs:
           bun install --frozen-lockfile
           bun test
 
+      # The npm artifact is assembled by wasm-pack, whose generated `files`
+      # array omitted both licence files — so a package declaring
+      # `MIT OR Apache-2.0` would have shipped with neither. Checked on every
+      # PR rather than at release time, because release time is after the
+      # version is spent: npm never lets one be re-uploaded.
+      - name: The npm tarball is what the package promises
+        run: node scripts/pack-wasm-crust.mjs
+
   agreement:
     name: runtimes agree with the README
     runs-on: ubuntu-latest
@@ -309,3 +331,48 @@ jobs:
 
       - name: Evaluate the README config everywhere
         run: node scripts/check-readme-agreement.mjs
+
+  doc-samples:
+    name: getting-started and package READMEs run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v5
+      - uses: oven-sh/setup-bun@v2
+
+      # The Rust blocks in docs/content have been compiled since PR #26. The
+      # Python and TypeScript ones never were, and the drift tracked that
+      # exactly: `load_http_matcher` / `loadHttpMatcher` were documented on both
+      # getting-started pages and in the Python crust's README, and neither
+      # function has ever existed. bumi/README.md called `new` on two type-only
+      # interfaces. Reading found none of it; running finds all of it.
+      #
+      # This needs the whole toolchain because the samples import the shipped
+      # packages, not the sources — which is the point. A sample checked against
+      # anything other than the artifact a reader installs proves nothing.
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked --version 0.15.0
+
+      - name: Build the wasm crust
+        working-directory: rumi/crusts/wasm
+        run: |
+          wasm-pack build --target web
+          bun install --frozen-lockfile
+
+      - name: Build the python crust
+        working-directory: rumi/crusts/python
+        run: |
+          uv sync --all-groups
+          uv run maturin develop --uv
+
+      - name: Install pure implementations
+        run: |
+          uv sync --project puma --all-groups
+          bun install --frozen-lockfile
+          bun run --cwd bumi build
+
+      # --require-all: an environment skip becomes a failure. "Checked somewhere
+      # else" is how the crusts broke three times in one day.
+      - name: Every sample runs as written
+        run: node scripts/check-doc-samples.mjs --require-all

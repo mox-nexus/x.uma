@@ -43,24 +43,9 @@ pub enum Domain {
     Http,
 }
 
-/// An implementation that may be expected to run a fixture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Implementation {
-    /// rumi, the Rust reference implementation.
-    Rust,
-    /// puma, the pure Python implementation.
-    Python,
-    /// bumi, the pure TypeScript implementation.
-    Typescript,
-}
-
-/// Every implementation the suite covers. The migration's finish line.
-pub const ALL: [Implementation; 3] = [
-    Implementation::Rust,
-    Implementation::Python,
-    Implementation::Typescript,
-];
+// Both moved to `crate::implementations` so `05_http` can share the ledger.
+// Re-exported here because every existing path expects them here.
+pub use crate::implementations::{all_implementations, Implementation, ALL};
 
 /// A fixture whose matcher is written in canonical protojson.
 #[derive(Debug, Deserialize)]
@@ -108,10 +93,6 @@ pub struct ProtoFixture {
     /// and passing.
     #[serde(default)]
     pub error_contains: Option<String>,
-}
-
-fn all_implementations() -> Vec<Implementation> {
-    ALL.to_vec()
 }
 
 /// One evaluation against a key-value context.

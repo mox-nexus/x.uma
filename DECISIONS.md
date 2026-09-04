@@ -8,6 +8,103 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-08-31 · The catch-all becomes a ceremony
+
+### D-050 · A matcher that matches everything must be asked for by name
+
+`and_predicate([], catch_all())` returns a catch-all, because an empty
+conjunction is vacuously true. Same for the empty disjunction. So a rule with no
+conditions, and a rule list with no rules, both compiled to "match everything"
+in all three implementations. Pointed at an allowlist, `DELETE /etc/passwd`
+returned ALLOW. The realistic way in is not writing `HttpRouteMatch::default()`
+on purpose — it is a typo'd field name in YAML.
+
+Both are now errors. `compile_catch_all` / `compileCatchAll` is the explicit
+form, and `HookMatch` gains a `match_all` flag — pushing down the ceremony the
+crusts have had since the security review, which guarded the FFI while the Rust
+API underneath stayed open.
+
+**Four things this turned up that are worth more than the fix.**
+
+*The conformance suite asserted the bug.* `http_empty_routes_matches_all`
+required every implementation to match everything on an empty list. So this was
+not an oversight that survived the suite; it was a **contract the suite
+enforced**, and each implementation was conformant precisely by failing open.
+Now `http_empty_routes_is_refused`, which required teaching both HTTP runners
+`expect_error` — with `error_contains` mandatory, the lesson the protojson
+runner had already learned.
+
+*It was never a spec divergence, in either direction.* The framing while fixing
+it was "we diverge from Gateway API, which says no conditions = match all." xDS
+says the opposite on the field itself: *"if no matcher above matched and this
+field is not populated, the match will be considered unsuccessful."* And Envoy
+enforces the same thing a layer up — `RouteMatch.path_specifier` carries
+`option (validate.required) = true`
+(`data-plane-api/envoy/config/route/v3/route_components.proto:622`), so a route
+with no path specifier is a config error there too. The fix **aligns with the
+reference implementation** rather than departing from a spec. The comments
+asserting a Gateway API divergence were written, then corrected before they
+became the record.
+
+*The engine was right the whole time.* An empty `matcherList` loaded through the
+registry falls to `on_no_match` — verified by execution. Only the convenience
+layer disagreed with the engine underneath it, which is the inversion of where
+you would look for it. The layer the project calls the door handle was the one
+that failed open.
+
+*It could not have been caught at load, and that is structural.* Substitution
+destroys the evidence. Afterwards the predicate is `PrefixMatcher("")` and a
+compiled catch-all is byte-for-byte a deliberate one. `Matcher::validate` sees a
+valid matcher because it *is* a valid matcher. The only moment the mistake
+exists as information is inside the compiler, at the substitution — which is why
+the check lives there and nowhere else.
+
+**Why not just copy the loader's semantics** (empty → no-match → `on_no_match`)?
+Because there `on_no_match` is config the operator wrote, while in the compiler
+it is an argument. `([], "allow", "deny")` and `([], "deny", "allow")` are
+opposite outcomes from the same empty input; the library cannot pick the safe
+one. Refusing is the only answer that does not guess.
+
+**Revisit if:** a consumer has a legitimate need for a vacuous rule inside a
+list — the `on_no_match` slot covers the default-route case today, and
+`compile_catch_all` covers the rest.
+
+---
+
+## 2026-08-23 · Limits, and the module graph that was hiding them
+
+### D-049 · Widths are validated by `Matcher.validate()` in all three implementations
+
+The security review's F-02 named the rule: *the type that holds the resource
+owns the limit on that resource.* #32 applied it in Rust by moving the width
+checks from `Registry::load_*` onto `Matcher::validate`, so every construction
+path — the domain compilers above all — inherited them.
+
+puma and bumi were never carried across. Their `validate()` checked depth only;
+`MAX_FIELD_MATCHERS` and `MAX_PREDICATES_PER_COMPOUND` stayed in the loader. A
+257-route `compile_route_matches` was rejected by rumi and accepted by both
+others, and nothing recorded the divergence. Fixed here, with regression tests
+that each carry a not-inert control.
+
+**Why it survived is the more useful part.** It was not an oversight of
+intent — it was unreachable. `limits.ts` imported `MatcherError` from
+`matcher.ts`, so `matcher.ts` could not import `limits.ts` back without a
+cycle; puma had the mirror-image arrangement with `_registry`. The file that
+needed the constants could not name them. So `MatcherError` and the two width
+errors moved to `bumi/src/errors.ts` and to `puma/src/xuma/_matcher.py`
+respectively, both re-exported from their old homes so no import breaks.
+
+**The generalisation:** when a limit lives somewhere other than the type that
+owns the resource, check whether the module graph is the reason before assuming
+someone forgot. A cycle is a silent architectural argument against the correct
+placement, and it wins by default.
+
+**Revisit if:** a fourth implementation appears, or the limits gain a
+per-deployment override — at which point they stop being constants and this
+placement stops being obviously right.
+
+---
+
 ## 2026-08-18 · Constructor naming
 
 ### D-047 · `Matcher::list`, not `Matcher::new`
@@ -32,11 +129,23 @@ the reason the sweep goes wider than the source tree:
   saying `Matcher::new` is worse than a stale comment: it is loaded as guidance
   and acted on.
 
-Two occurrences are deliberately **not** updated. `DECISIONS.md:979` and
-`bench/RESULTS.md:222` describe what was true when they were written — a past
-correction and a past benchmark run. A decision log is appended to, not
-rewritten; editing the name inside them would falsify the record to tidy a
-grep.
+Prose occurrences are deliberately **not** updated: they describe what was true
+when written. A decision log is appended to, not rewritten; editing the name
+inside one would falsify the record to tidy a grep.
+
+**Correction, 2026-08-23.** This entry originally said "two occurrences" and
+cited `DECISIONS.md:979`. Both were wrong, and were caught only when a skeptic
+was asked to verify the correction rather than the claim. There are **six**
+surviving prose references — `DECISIONS.md` 13/29/32/1011, `bench/RESULTS.md:222`,
+and `CLAUDE.md:381` — and **line 979 does not contain `Matcher::new` at all**;
+the intended line is 1011. The wrong citation reached this file, the #53 commit
+message, and the maintainer. It is left visible here rather than silently
+patched, because a decision log that quietly repairs its own errors is exactly
+the unreliable narrator this repo keeps finding.
+
+The successor has 51 `Matcher::list` references plus one `Self::list` at
+`rumi/core/src/matcher.rs:137` — invisible to any `Matcher::` pattern, which is
+the same trap this entry warns about two paragraphs up.
 
 ---
 

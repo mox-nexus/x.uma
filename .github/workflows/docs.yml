@@ -46,8 +46,18 @@ jobs:
           BASE_PATH: ${{ github.event_name == 'pull_request' && format('/x.uma/pr-preview/pr-{0}', github.event.number) || '/x.uma' }}
         run: bun install && bun run build
 
+      # Named crates, not a bare `cargo doc`: that documents `default-members`,
+      # which put `rumi_docs_tests` and `rumi_test` — both `publish = false`
+      # internals — on the public site, and left out `rumi-proto`, which is
+      # published.
+      #
+      # Spelled out rather than `just docs-rust`, because no workflow in this
+      # repo has `just` on the image (see ci.yml's codegen job, which calls
+      # scripts/gen.sh for the same reason). The duplication with `just
+      # docs-rust` is not left to vigilance: check-publishable.mjs asserts both
+      # lists equal the set of publishable crates.
       - name: Build Rust API docs
-        run: cargo doc --manifest-path rumi/Cargo.toml --no-deps
+        run: cargo doc --manifest-path rumi/Cargo.toml --no-deps -p rumi-core -p rumi-proto -p rumi-kv -p rumi-http -p rumi-cli
 
       - name: Assemble site
         run: |

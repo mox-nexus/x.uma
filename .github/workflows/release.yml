@@ -66,6 +66,18 @@ jobs:
     name: Publish Rust crates
     needs: tag
     runs-on: ubuntu-latest
+    env:
+      # Publish order — dependencies first. `cargo publish` runs a verification
+      # build that resolves from crates.io, so a crate cannot go up before the
+      # crates it depends on, and a half-finished release cannot be retried:
+      # a version, once uploaded, can never be re-used.
+      #
+      # This list is the single source of that order. It is not trusted on its
+      # own — `scripts/check-publishable.mjs` asserts on every PR that it holds
+      # every publishable workspace crate and that the order is topological.
+      # It previously held three of the five, and rumi-cli depends on both of
+      # the missing ones.
+      CRATES: rumi/core rumi/proto rumi/ext/kv rumi/ext/http rumi/cli
     steps:
       - uses: actions/checkout@v4
 
@@ -80,43 +92,28 @@ jobs:
             rumi/target/
           key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Publish rumi-core
+      - name: Dry run all crates
+        if: inputs.dry-run == true
+        run: |
+          for CRATE in $CRATES; do
+            echo "::group::dry-run $CRATE"
+            cargo publish --manifest-path "$CRATE/Cargo.toml" --dry-run
+            echo "::endgroup::"
+          done
+
+      - name: Publish all crates
         if: inputs.dry-run == false
-        run: cargo publish --manifest-path rumi/core/Cargo.toml
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-      - name: Dry run rumi-core
-        if: inputs.dry-run == true
-        run: cargo publish --manifest-path rumi/core/Cargo.toml --dry-run
-
-      - name: Wait for crates.io index
-        if: inputs.dry-run == false
-        run: sleep 30
-
-      - name: Publish rumi-http
-        if: inputs.dry-run == false
-        run: cargo publish --manifest-path rumi/ext/http/Cargo.toml
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-      - name: Dry run rumi-http
-        if: inputs.dry-run == true
-        run: cargo publish --manifest-path rumi/ext/http/Cargo.toml --dry-run
-
-      - name: Wait for crates.io index
-        if: inputs.dry-run == false
-        run: sleep 30
-
-      - name: Publish rumi-cli
-        if: inputs.dry-run == false
-        run: cargo publish --manifest-path rumi/cli/Cargo.toml
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-      - name: Dry run rumi-cli
-        if: inputs.dry-run == true
-        run: cargo publish --manifest-path rumi/cli/Cargo.toml --dry-run
+        run: |
+          for CRATE in $CRATES; do
+            echo "::group::publish $CRATE"
+            cargo publish --manifest-path "$CRATE/Cargo.toml"
+            echo "::endgroup::"
+            # crates.io indexes asynchronously; the next crate's verification
+            # build resolves this one from the index, not from the local path.
+            sleep 30
+          done
 
   # ── Python (xuma) → PyPI ──────────────────────────────────────────
   python:

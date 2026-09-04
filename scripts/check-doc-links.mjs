@@ -14,6 +14,13 @@
  * exactly one of them, as a prefetch 404, and nothing failed.
  *
  * PLAN.md A4 / CI4.
+ *
+ * Two link syntaxes, both checked. Only the `.md` one was, until 2026-08-31,
+ * while the summary line read "all internal links resolve to routable pages" —
+ * an absolute `](/anything)` was not merely unresolved, it was not counted.
+ * Proved by injecting `](/reference/nope)` and watching the count stay at 25.
+ * A gate that silently declines to look at a whole syntax is worse than no
+ * gate, because the summary reads like coverage.
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -45,7 +52,32 @@ function markdownFiles(dir) {
 	return out;
 }
 
+/** Every `slug:` in the manifest — the set of `/docs/<slug>` URLs. */
+function manifestSlugs() {
+	const src = readFileSync(MANIFEST, "utf8");
+	const slugs = new Set();
+	for (const m of src.matchAll(/slug:\s*'([^']+)'/g)) slugs.add(`/docs/${m[1]}`);
+	if (slugs.size === 0) {
+		console.error("check-doc-links: parsed no `slug:` entries — the manifest format changed");
+		process.exit(1);
+	}
+	return slugs;
+}
+
+/**
+ * Absolute paths the site serves that are not manifest pages.
+ *
+ * Deliberately does **not** include `/api/rust`. Rustdoc output is assembled
+ * into the site after the SvelteKit build, so a bare `](/api/rust)` fails
+ * prerender — and it would be wrong in production anyway: the site is served
+ * under a base path (`/x.uma` on Pages), which a hand-written absolute link
+ * ignores. Link the full URL instead. Both failure modes were introduced and
+ * caught on 2026-08-31; leaving the root undeclared is what keeps them caught.
+ */
+const STATIC_ROOTS = new Set(["/", "/docs", "/playground"]);
+
 const files = manifestFiles();
+const slugs = manifestSlugs();
 const problems = [];
 let checked = 0;
 
@@ -61,6 +93,18 @@ for (const file of markdownFiles(CONTENT)) {
 			const line = text.slice(0, m.index).split("\n").length;
 			problems.push(
 				`${relative(ROOT, file)}:${line}: '${m[1]}' resolves to '${target}', which is not in the docs manifest`,
+			);
+		}
+	}
+
+	// Absolute site links: `](/docs/some-slug)`, `](/api/rust)`.
+	for (const m of text.matchAll(/\]\((\/[A-Za-z0-9._/-]*)(#[^)]*)?\)/g)) {
+		checked += 1;
+		const href = m[1].replace(/\/$/, "") || "/";
+		if (!slugs.has(href) && !STATIC_ROOTS.has(href)) {
+			const line = text.slice(0, m.index).split("\n").length;
+			problems.push(
+				`${relative(ROOT, file)}:${line}: '${m[1]}' is not a manifest slug or a declared static root`,
 			);
 		}
 	}

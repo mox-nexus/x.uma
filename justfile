@@ -40,6 +40,11 @@ crust-check: crust-py-check crust-wasm-check
 # fixture schema, and turning `EvalTrace.steps` into an enum. Every one would
 # have failed here in seconds. The full suites still run as their own CI jobs;
 # what was missing was anything at all locally.
+# Assert the npm tarball for xuma-crust contains exactly what it promises.
+# Needs `wasm-pack build --target web` to have run. See the script's header.
+crust-pack:
+    node scripts/pack-wasm-crust.mjs
+
 crust-compiles:
     cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures
     cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures
@@ -137,15 +142,22 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-full test-protojson test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links readme-agreement puma-check bumi-check docs-check docs-build audit
+ci: fmt-check lint-strict test test-full test-protojson test-http-conformance test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links docs-samples readme-agreement puma-check bumi-check docs-check docs-test docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
     cargo clippy --manifest-path rumi/Cargo.toml --all-targets -- -D warnings
 
-# Build and open Rust documentation
+# Build and open Rust documentation.
+#
+# Named crates, not `--workspace`: the two crusts both produce a lib called
+# `xuma_crust` and rustdoc refuses to write them to the same path, so
+# `--workspace` fails outright. `--exclude rumi-proto` did not help — it excluded
+# the wrong crate, and this command had been broken for as long as the docs told
+# readers to run it. The list is exactly the published crates, which is also what
+# a reader wants.
 doc:
-    cargo doc --manifest-path rumi/Cargo.toml --workspace --exclude rumi-proto --no-deps --open
+    cargo doc --manifest-path rumi/Cargo.toml --no-deps -p rumi-core -p rumi-proto -p rumi-http -p rumi-kv -p rumi-cli --open
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Documentation
@@ -180,12 +192,35 @@ readme-agreement:
 docs-links:
     node scripts/check-doc-links.mjs
 
+# Execute every Python/TypeScript code block on the getting-started pages and in
+# the package READMEs, in the runtime that owns it.
+#
+# `rumi-docs-tests` has compiled the *Rust* blocks since PR #26; nothing did the
+# same for the other two languages, and the drift tracked that exactly.
+# `--require-all` turns an environment skip into a failure, so CI cannot pass by
+# quietly not checking the wasm crust.
+docs-samples:
+    node scripts/check-doc-samples.mjs --require-all
+
 docs-check:
     cd docs/experience && bun run check
 
-# Generate Rust API docs (assembled into the site at /api/rust by CI)
+# The playground's diagram must describe the config it was given.
+#
+# `docs/experience` had no tests at all until 2026-09-01 — `docs-check` is
+# svelte-check, which checks types and not truth. A diagram that drew the
+# fallback branch as the match branch type-checked perfectly, and the playground
+# is the one surface a visitor actually touches.
+docs-test:
+    cd docs/experience && bun test tests/
+
+# Generate Rust API docs (assembled into the site at /api/rust by CI).
+#
+# Same crate list as `just doc`. A bare `cargo doc` documents `default-members`,
+# which published `rumi_docs_tests` and `rumi_test` — both `publish = false`
+# internals — to the public site while omitting `rumi-proto`, which is published.
 docs-rust:
-    cargo doc --manifest-path rumi/Cargo.toml --no-deps
+    cargo doc --manifest-path rumi/Cargo.toml --no-deps -p rumi-core -p rumi-proto -p rumi-http -p rumi-kv -p rumi-cli
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Benchmarks
@@ -299,6 +334,15 @@ bumi-check: bumi-lint bumi-fmt-check bumi-typecheck bumi-test
 # quietly starts working is caught as well as one that quietly starts failing.
 test-protojson:
     cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test proto_conformance --features rumi-test/registry,rumi-test/fixtures
+
+# spec/tests/05_http through rumi's Gateway API compiler.
+#
+# This suite had runners in puma and bumi and none in the reference
+# implementation, so "all implementations pass all fixtures" was true of
+# 07_protojson and merely assumed here — while one of its fixtures was
+# requiring a fail-open of everyone (D-050). PLAN.md CONF1.
+test-http-conformance:
+    cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test http_conformance --features rumi-test/http,rumi-test/fixtures
 
 # Does the fixture corpus span the schema?
 #

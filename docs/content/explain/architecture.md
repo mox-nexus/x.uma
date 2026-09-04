@@ -126,7 +126,7 @@ Matchers can be built two ways:
 **Compiler path** — domain-specific DSL produces matchers directly. Ergonomic, type-safe, no serialization overhead.
 
 ```python
-from xuma.http import HttpRouteMatch, compile_route_matches
+from xuma.http import HttpPathMatch, HttpRouteMatch, compile_route_matches
 
 routes = [HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/api"), method="GET")]
 matcher = compile_route_matches(routes, "api", "not_found")
@@ -167,7 +167,7 @@ Both paths produce the same `Matcher`. The compiler path is for programmatic con
 | **xuma-crust** | Python | Rust core via PyO3 |
 | **xuma-crust** | TypeScript | Rust core via WASM |
 
-All five pass the same conformance test suite. Same config format, same evaluation semantics, same results. Choose based on your runtime and performance needs.
+All five pass the same conformance suite for the config format — `spec/tests/07_protojson/`, the document every implementation reads. The three with a Gateway API compiler (rumi, puma, bumi) also pass `spec/tests/05_http/`. Same config, same evaluation semantics, same results. Choose based on your runtime and performance needs.
 
 ## Next
 

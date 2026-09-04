@@ -12,7 +12,12 @@ A matcher engine implementing the xDS Unified Matcher API across multiple langua
 | **xuma-crust** | Python | Rust bindings via PyO3 (from `rumi/crusts/python/`) |
 | **xuma-crust** | TypeScript | Rust bindings via wasm-bindgen (from `rumi/crusts/wasm/`) |
 
-All implementations pass the same conformance test suite (`spec/tests/`).
+All five implementations pass `spec/tests/07_protojson/`, the canonical config
+suite. `spec/tests/05_http/` (Gateway API route matches through the domain
+compiler) runs in rumi, puma and bumi — the three that have a compiler; neither
+crust exposes that surface. Both suites carry the `implementations:` ledger, and
+every runner enforces it in **both** directions: a fixture that omits you must
+also fail for you, so a stale exception cannot hide a finished migration.
 
 ## Design Philosophy: ACES
 
@@ -159,11 +164,25 @@ What each ⚠️ needs to become ✅:
 Decisions of record live in [`DECISIONS.md`](DECISIONS.md). Read it before
 revisiting anything below.
 
-**Publish status — nothing is published yet.** Names are *chosen, not reserved*:
-`rumi-core` on crates.io (lib name = `rumi`), `rumi-http`, `rumi-cli`; `xuma` on
-PyPI; `xuma-crust` on PyPI/npm. All resolve 404 today. Both release workflows are
-`workflow_dispatch` and have never been run. README and getting-started pages
-carry pre-release notes until a release lands (D-015).
+**Publish status — nothing is published yet.** Names are *chosen, not reserved*.
+There are **five** crates, not three: `rumi-core` (lib name = `rumi`),
+`rumi-proto`, `rumi-kv`, `rumi-http`, `rumi-cli`. This paragraph listed three
+until 2026-08-31, and `release.yml` published the same three — omitting two that
+`rumi-cli` depends on. `scripts/check-publishable.mjs` now derives the list from
+`cargo metadata` and fails if the workflow disagrees, so the two cannot drift
+again.
+
+Outside Cargo: `xuma` on PyPI and npm, `xuma-crust` on PyPI and npm. Checked
+2026-08-31 — all four are **unclaimed (404)**. The crates.io names could *not* be
+checked: the registry answered 403, which is a rejected request, not an absent
+crate.
+
+Both release workflows are `workflow_dispatch` and have never been run.
+`release-crust.yml` published only the PyPI wheel until 2026-09-01, while two
+documents told readers to `bun add xuma-crust`; it now has an npm job on OIDC
+trusted publishing, which **must be configured on npm before the first run**
+(`PLAN.md` E8). README and getting-started pages carry pre-release notes until a
+release lands (D-015).
 
 **Docsite** runs on SvelteKit, the cix pattern
 (`docs/content/` + `docs/experience/`), register `cix · operator`, brand tokens
@@ -191,7 +210,7 @@ in `measure.ts` (D-006 to D-009, D-024).
 | Envoy | C++ | Original, production-proven |
 | rumi | Rust | Our reference |
 
-Envoy source: `~/oss/envoy/source/common/matcher/`
+Envoy source: `~/oss/reference/envoy/source/common/matcher/`
 
 ## rumi Type System (Envoy-Inspired)
 
@@ -305,13 +324,13 @@ Workspace with core + extension crates:
 ```
 rumi/
 ├── Cargo.toml          # Workspace manifest
-├── core/               # Core engine (package: rumi)
+├── core/               # Core engine (package: rumi-core, lib name: rumi) ▲
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs
 │       ├── matcher.rs, predicate.rs, ...
 │       └── claude/     # Claude Code hooks (feature = "claude")
-├── proto/              # Proto-generated types + conversion (package: rumi-proto, publish=false)
+├── proto/              # Proto types + conversion (package: rumi-proto) ▲
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs              # Module tree for generated types
@@ -319,12 +338,24 @@ rumi/
 │       ├── convert.rs          # Proto Matcher → MatcherConfig conversion
 │       └── gen/                # buf-generated prost + prost-serde code
 ├── ext/
-│   ├── test/           # rumi-test (conformance, publish=false)
-│   └── http/           # rumi-http (HTTP matching)
-└── crusts/             # Language bindings (🦀 crustacean → crusty, publish=false)
-    ├── python/         # PyO3 → xuma-crust wheel (maturin)
-    └── wasm/           # wasm-bindgen → xuma-crust (wasm-pack)
+│   ├── kv/             # rumi-kv (string-map matching) ▲
+│   ├── http/           # rumi-http (HTTP matching) ▲
+│   └── test/           # rumi-test (conformance harness)
+├── cli/                # rumi-cli — binary `rumi` ▲
+├── docs-tests/         # compiles the Rust blocks in docs/content
+└── crusts/             # Language bindings (🦀 crustacean → crusty)
+    ├── python/         # PyO3 → xuma-crust wheel on PyPI (maturin)
+    └── wasm/           # wasm-bindgen → xuma-crust on npm (wasm-pack)
 ```
+
+**▲ marks the five crates published to crates.io**, in dependency order:
+`rumi-core` → `rumi-proto` → `rumi-kv` → `rumi-http` → `rumi-cli`. That is the
+order `release.yml` uses and `scripts/check-publishable.mjs` enforces.
+
+The rest are `publish = false` *as Cargo crates*, which is not the same as
+unpublished: both crusts ship to PyPI and npm through `release-crust.yml` and
+`wasm-pack`. This diagram listed neither `kv` nor `cli` until 2026-08-31, so two
+published crates were absent from the only structural map of the workspace.
 
 **Extension pattern:** Claude is a feature, HTTP is a separate crate:
 
@@ -369,13 +400,62 @@ Principles distilled from 13 elite Rust codebases. Each prevents a form of self-
 
 ## Working Conventions
 
+### A self-correction is a claim, and needs its own verification
+
+**When you correct yourself, the correction does not ship on your word. Hand it
+to the `mrwolf` agent as a skeptic and have it verified by execution before it
+reaches the user or the repo.**
+
+**Why.** On 2026-08-23 the corrections in this repo turned out to be as
+unreliable as the claims they replaced, and they failed the *same way twice*:
+
+- Told the maintainer `Matcher::new` had "100+ call sites" and used that number
+  to decline a rename. The pattern also matched `FieldMatcher::new`,
+  `ExactMatcher::new`, `StringMatcher::new` — 159 raw hits against 51 real ones.
+- Corrected it, then hours later ran a second sweep with the same defect (no
+  word boundary), read the over-matched output, and nearly repeated the error.
+- Claimed "nothing compiles a code sample in `docs/content` in any language",
+  built an argument on it, and told the maintainer the repo had been declared
+  ready on a false basis. The grep had *errored* — a bad `--include` glob — and
+  the empty output was read as a finding. `rumi-docs-tests` had been compiling
+  the Rust blocks since PR #26.
+
+The pattern is specific and worth naming: **a correction feels like diligence,
+so it gets less scrutiny than the claim it replaces.** It arrives with the
+emotional weight of having caught something, and that weight substitutes for
+evidence. Two of the three above were *false negatives from a broken command* —
+the tool reported nothing and "nothing" was taken as an answer rather than as a
+result needing a control.
+
+**How.** State the correction, then have `mrwolf` verify it as a skeptic: it
+must execute something, not read adjacent code, and it must be free to return
+"your correction is also wrong." Only then does it go in `PLAN.md`,
+`DECISIONS.md`, or a message to the maintainer.
+
+This applies hardest to **claims that something does not exist**. A grep that
+finds nothing and a grep that failed to run are indistinguishable in the
+output, and this repo's whole release cycle has been about removing claims that
+outran their evidence.
+
 ### Scratch Directory
 
 `scratch/` is for session notes, research synthesis, and working documents.
 
 ### Conformance Tests
 
-All implementations must pass all fixtures in `spec/tests/`. The fixture suite is the source of truth for correctness.
+The fixture suite is the source of truth for correctness — which is exactly
+why it has to be right. `http_empty_routes_matches_all` required every
+implementation to treat an empty route list as a catch-all, so a fail-open was
+a *contract the suite enforced* and each implementation was conformant by
+failing open (D-050). When a fixture and a security property disagree, the
+fixture is the thing that is wrong.
+
+Coverage is deliberate rather than accidental: `07_protojson/` runs in all five;
+`05_http/` runs in the three implementations that have a Gateway API compiler.
+Both carry the `implementations:` ledger and every runner enforces it in both
+directions. Until 2026-08-31 `05_http/` had neither a ledger nor a rumi runner,
+which is how the fixture above got to require a fail-open of everyone while the
+reference implementation was not reading the file that said so.
 
 ### Session Start
 

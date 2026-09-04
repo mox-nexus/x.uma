@@ -122,10 +122,14 @@ assert matcher.evaluate(request) == "api_read"
 The Rust-backed bindings use the same config format:
 
 ```python
-from xuma_crust import load_http_matcher, HttpMatcher
+import json
 
-# Load config and build matcher in one call
-matcher: HttpMatcher = load_http_matcher("routes.yaml")
+import yaml
+from xuma_crust import HttpMatcher
+
+# from_config takes canonical protojson as a string, so the YAML becomes JSON.
+with open("routes.yaml") as f:
+    matcher = HttpMatcher.from_config(json.dumps(yaml.safe_load(f)))
 
 # Evaluate with method + path
 assert matcher.evaluate("GET", "/api/users") == "api_read"

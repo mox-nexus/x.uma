@@ -85,6 +85,21 @@ impl HookMatchExt for HookMatch {
             predicates.push(branch_match.to_predicate(Box::new(GitBranchInput))?);
         }
 
+        // An empty conjunction is vacuously true, so `from_all` would hand back
+        // `catch_all()` — a rule the operator believes is scoped, silently
+        // matching every context. This is the only moment the mistake is
+        // visible: after substitution the predicate is `PrefixMatcher("")` and
+        // is indistinguishable from a deliberate catch-all, which is why
+        // `Matcher::validate` cannot catch it and never could.
+        if predicates.is_empty() && !self.match_all {
+            return Err(MatcherError::InvalidConfig {
+                source: "HookMatch has no conditions, so it matches every hook \
+                         invocation. Set `match_all: true` if that is intended, \
+                         or constrain the rule."
+                    .into(),
+            });
+        }
+
         Ok(Predicate::from_all(predicates, catch_all()))
     }
 }
@@ -112,12 +127,32 @@ fn compile_argument_match(
 ///
 /// # Errors
 ///
-/// Returns [`MatcherError`] if any regex pattern is invalid.
+/// Returns [`MatcherError`] if any regex pattern is invalid, if the rule list
+/// is empty, or if any rule has no conditions without `match_all`. The last two
+/// are catch-alls, and this is the path that gates agent tool calls.
 pub fn compile_hook_matches<A: Clone + Send + Sync + 'static>(
     matches: &[HookMatch],
     action: A,
     on_no_match: Option<A>,
 ) -> Result<Matcher<HookContext, A>, MatcherError> {
+    // An empty disjunction is vacuously true in the same way an empty
+    // conjunction is — and xDS says the opposite, explicitly: "if no matcher
+    // above matched ... the match will be considered unsuccessful." The config
+    // path already honours that. This convenience layer contradicted it.
+    //
+    // Not fixed by copying the loader, because here `on_no_match` is an
+    // argument rather than config: `(&[], "allow", Some("deny"))` and
+    // `(&[], "deny", Some("allow"))` are opposite outcomes from the same empty
+    // input. The usual route to an empty list is not writing one — it is a
+    // config file that failed to load, or a filter that removed every rule.
+    if matches.is_empty() {
+        return Err(MatcherError::InvalidConfig {
+            source: "no hook rules, which would match every hook invocation. \
+                     Use `compile_catch_all` if that is intended."
+                .into(),
+        });
+    }
+
     let predicates: Vec<Predicate<HookContext>> = matches
         .iter()
         .map(HookMatchExt::to_predicate)
@@ -129,6 +164,25 @@ pub fn compile_hook_matches<A: Clone + Send + Sync + 'static>(
     // See the note in rumi-http's compiler: a compiled matcher must carry the
     // same guarantees as a loaded one, and this is the path that gates agent
     // tool calls.
+    matcher.validate()?;
+    Ok(matcher)
+}
+
+/// Build a matcher that matches every hook invocation.
+///
+/// The explicit form of what [`compile_hook_matches`] now refuses to do by
+/// accident. Nothing here is unsafe — a catch-all is a legitimate rule — but it
+/// has to be asked for, and it is greppable when someone later asks why an
+/// allowlist admits everything.
+///
+/// # Errors
+///
+/// Returns [`MatcherError`] only if the resulting matcher fails validation,
+/// which it cannot at this depth. The `Result` is kept for symmetry.
+pub fn compile_catch_all<A: Clone + Send + Sync + 'static>(
+    action: A,
+) -> Result<Matcher<HookContext, A>, MatcherError> {
+    let matcher = Matcher::from_predicate(catch_all(), action, None);
     matcher.validate()?;
     Ok(matcher)
 }
@@ -259,8 +313,21 @@ mod tests {
     // ========== Predicate Structure Tests ==========
 
     #[test]
-    fn empty_hook_match_compiles_to_single_predicate() {
-        let m = HookMatch::default();
+    fn empty_hook_match_is_rejected() {
+        // Used to assert this compiled to a single catch-all predicate. That
+        // was true, and was the bug: a rule with no conditions matched every
+        // hook invocation.
+        let err = HookMatch::default().to_predicate().unwrap_err();
+        assert!(matches!(err, MatcherError::InvalidConfig { .. }), "{err:?}");
+    }
+
+    #[test]
+    fn empty_hook_match_compiles_when_match_all_is_set() {
+        // The guard must be a ceremony, not a wall — a catch-all is legitimate.
+        let m = HookMatch {
+            match_all: true,
+            ..Default::default()
+        };
         let predicate = m.to_predicate().unwrap();
         assert!(matches!(predicate, Predicate::Single(_)));
     }
@@ -480,6 +547,7 @@ mod tests {
             session_id: Some(StringMatch::Exact("sess-1".into())),
             cwd: Some(StringMatch::Prefix("/home".into())),
             git_branch: Some(StringMatch::Exact("main".into())),
+            match_all: false,
         };
         let matcher = m.compile("full_match").unwrap();
 
@@ -557,10 +625,18 @@ mod tests {
     // ========== E2E: Empty Match ==========
 
     #[test]
-    fn e2e_empty_match_matches_everything() {
-        let m = HookMatch::default();
-        let matcher = m.compile("catch_all").unwrap();
+    fn e2e_empty_match_is_rejected_but_match_all_still_works() {
+        // This test asserted the opposite until 2026-08-31, and the review
+        // cited it as evidence the catch-all was intended. It was intended;
+        // what was not intended is reaching it by a typo'd field name in a
+        // config file. So the behaviour survives, behind a word.
+        assert!(HookMatch::default().compile("catch_all").is_err());
 
+        let m = HookMatch {
+            match_all: true,
+            ..Default::default()
+        };
+        let matcher = m.compile("catch_all").unwrap();
         assert_eq!(
             matcher.evaluate(&HookContext::pre_tool_use("Bash")),
             Some("catch_all")
@@ -620,13 +696,26 @@ mod tests {
     }
 
     #[test]
-    fn e2e_empty_rules_matches_everything() {
-        let matcher = compile_hook_matches::<&str>(&[], "catch_all", None).unwrap();
+    fn e2e_empty_rule_list_is_rejected() {
+        // `compile_hook_matches(&[], "allow", Some("deny"))` allowed every tool
+        // call in every session. A rule list becomes empty by accident far more
+        // often than on purpose: a config file that failed to load, a
+        // control-plane push that returned nothing, a filter that matched none.
+        let err = compile_hook_matches::<&str>(&[], "catch_all", None).unwrap_err();
+        assert!(matches!(err, MatcherError::InvalidConfig { .. }), "{err:?}");
+    }
 
+    #[test]
+    fn compile_catch_all_is_the_explicit_form() {
+        // The escape hatch the error message points at. If this ever stops
+        // matching everything, the guard above has become a wall and the two
+        // tests must be read together.
+        let matcher = compile_catch_all("catch_all").unwrap();
         assert_eq!(
             matcher.evaluate(&HookContext::pre_tool_use("anything")),
             Some("catch_all")
         );
+        assert_eq!(matcher.evaluate(&HookContext::stop()), Some("catch_all"));
     }
 
     // ========== Error Cases ==========

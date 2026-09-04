@@ -1,16 +1,12 @@
-import { type Predicate, evaluatePredicate, predicateDepth } from "./predicate.ts";
+import { MatcherError, TooManyFieldMatchersError, TooManyPredicatesError } from "./errors.ts";
+import { MAX_FIELD_MATCHERS, MAX_PREDICATES_PER_COMPOUND } from "./limits.ts";
+import { And, Not, Or, type Predicate, evaluatePredicate, predicateDepth } from "./predicate.ts";
 import type { DataInput } from "./types.ts";
+
+export { MatcherError } from "./errors.ts";
 
 /** Maximum nesting depth for matcher trees. Validated at construction. */
 export const MAX_DEPTH = 32;
-
-/** Thrown for matcher construction errors (depth exceeded, invalid regex pattern). */
-export class MatcherError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "MatcherError";
-	}
-}
 
 /** Terminal action — emit this value on match. */
 export class Action<A> {
@@ -139,12 +135,38 @@ export class Matcher<Ctx, A> {
 		return null;
 	}
 
-	/** Validate depth does not exceed MAX_DEPTH. */
+	/** Validate depth and width against the declared limits. */
 	validate(): void {
 		const d = this.depth();
 		if (d > MAX_DEPTH) {
 			throw new MatcherError(`matcher depth ${d} exceeds maximum allowed depth ${MAX_DEPTH}`);
 		}
+		this.validateWidths();
+	}
+
+	/**
+	 * Reject a list or compound predicate wider than its declared limit.
+	 *
+	 * The widths lived only in the registry, so every path that did not go
+	 * through `loadMatcher` — the gateway compiler above all — accepted a
+	 * matcher of any width. rumi closed this in #32 by moving the checks onto
+	 * `Matcher::validate`; puma and bumi were not carried across, and a
+	 * 257-child compound compiled here without complaint until 2026-08-23.
+	 * The rule the security review named: the type that holds the resource
+	 * owns the limit on that resource.
+	 */
+	private validateWidths(): void {
+		if (this.tree === null && this.matchers.length > MAX_FIELD_MATCHERS) {
+			throw new TooManyFieldMatchersError(this.matchers.length, MAX_FIELD_MATCHERS);
+		}
+		for (const fm of this.matchers) {
+			validatePredicateWidth(fm.predicate);
+			if (fm.onMatch instanceof NestedMatcher) fm.onMatch.matcher.validate();
+		}
+		if (this.onNoMatch instanceof NestedMatcher) this.onNoMatch.matcher.validate();
+		// A tree's entries are bounded by MAX_TREE_ENTRIES at load, for a
+		// different reason — see limits.ts. Its nested matchers still validate
+		// themselves at construction.
 	}
 
 	/** Calculate total nesting depth. */
@@ -160,6 +182,18 @@ export class Matcher<Ctx, A> {
 		const noMatchD = this.onNoMatch !== null ? onMatchDepth(this.onNoMatch) : 0;
 		return 1 + Math.max(body, noMatchD);
 	}
+}
+
+/** Recursively bound compound-predicate width. See `Matcher.validateWidths`. */
+function validatePredicateWidth<Ctx>(p: Predicate<Ctx>): void {
+	if (p instanceof And || p instanceof Or) {
+		if (p.predicates.length > MAX_PREDICATES_PER_COMPOUND) {
+			throw new TooManyPredicatesError(p.predicates.length, MAX_PREDICATES_PER_COMPOUND);
+		}
+		for (const sub of p.predicates) validatePredicateWidth(sub);
+		return;
+	}
+	if (p instanceof Not) validatePredicateWidth(p.predicate);
 }
 
 /**

@@ -25,7 +25,16 @@ module-name = "xuma_crust"
 
 [dependency-groups]
 dev = [
+    # maturin is in [build-system].requires, which uv resolves in an isolated
+    # build env — it is not installed into the venv, so `uv run maturin` cannot
+    # find it. CI needs it present to build the extension before the doc
+    # samples import it.
+    "maturin>=1.0,<2.0",
     "pytest>=8.0",
     "pytest-benchmark>=5.0",
+    # The getting-started page loads routes.yaml before handing protojson to
+    # HttpMatcher.from_config; the doc-sample gate needs the same parser a
+    # reader would install. Not a runtime dependency of xuma-crust.
+    "pyyaml>=6.0",
     "xuma @ file:///${PROJECT_ROOT}/../../../puma",
 ]

@@ -9,7 +9,7 @@
  * `registry.ts` re-exports every name here, so existing imports keep working.
  */
 
-import { MatcherError } from "./matcher.ts";
+import { MatcherError } from "./errors.ts";
 
 /** Maximum field matchers in one matcher list. */
 export const MAX_FIELD_MATCHERS = 256;

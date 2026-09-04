@@ -5,10 +5,15 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { compileRouteMatch } from "../src/http/gateway.ts";
+import { TooManyFieldMatchersError, TooManyPredicatesError } from "../src/errors.ts";
+import { compileRouteMatch, compileRouteMatches } from "../src/http/gateway.ts";
+import type { HttpRouteMatch } from "../src/http/gateway.ts";
 import { HttpRequest } from "../src/http/request.ts";
-import { MatcherError } from "../src/matcher.ts";
-import { RegexMatcher } from "../src/string-matchers.ts";
+import { MAX_FIELD_MATCHERS, MAX_PREDICATES_PER_COMPOUND } from "../src/limits.ts";
+import { Action, FieldMatcher, Matcher, MatcherError } from "../src/matcher.ts";
+import { SinglePredicate } from "../src/predicate.ts";
+import { ExactMatcher, RegexMatcher } from "../src/string-matchers.ts";
+import { DictInput } from "../src/testing.ts";
 
 describe("prototype pollution", () => {
 	it("query param __proto__ does not pollute prototype", () => {
@@ -51,5 +56,44 @@ describe("gateway error types", () => {
 				"action",
 			),
 		).toThrow(MatcherError);
+	});
+});
+
+/**
+ * The gateway compiler enforces the widths, not just the loader.
+ *
+ * rumi moved these onto `Matcher::validate` in #32 so that every construction
+ * path inherited them. bumi was not carried across: until 2026-08-23
+ * `compileRouteMatches` accepted a compound predicate of any width, because
+ * `validate()` checked depth only and the width limits lived in `registry.ts`.
+ * A 257-route config compiled without complaint.
+ */
+describe("compiler width limits", () => {
+	const route = (i: number): HttpRouteMatch => ({
+		path: { type: "Exact", value: `/r${i}` },
+	});
+
+	it("rejects more routes than the limit", () => {
+		const routes = Array.from({ length: MAX_PREDICATES_PER_COMPOUND + 1 }, (_, i) => route(i));
+		expect(() => compileRouteMatches(routes, "hit")).toThrow(TooManyPredicatesError);
+	});
+
+	it("the width guard is not inert", () => {
+		// A compiler that rejected everything would pass the test above.
+		const routes = Array.from({ length: MAX_PREDICATES_PER_COMPOUND - 1 }, (_, i) => route(i));
+		const matcher = compileRouteMatches(routes, "hit");
+		expect(matcher.evaluate(new HttpRequest("GET", "/r0"))).toBe("hit");
+	});
+
+	it("matcher list width is enforced at construction", () => {
+		const matchers = Array.from(
+			{ length: MAX_FIELD_MATCHERS + 1 },
+			(_, i) =>
+				new FieldMatcher<Record<string, string>, string>(
+					new SinglePredicate(new DictInput("k"), new ExactMatcher(`v${i}`)),
+					new Action("hit"),
+				),
+		);
+		expect(() => new Matcher(matchers)).toThrow(TooManyFieldMatchersError);
 	});
 });
