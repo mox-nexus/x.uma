@@ -127,13 +127,16 @@ summary(() => {
 		null,
 	);
 
-	const bumiHitCtx: HookCtx = { event: "PreToolUse" };
-	const bumiMissCtx: HookCtx = { event: "PostToolUse" };
-
+	// Both sides construct their context inside the measured region. Until
+	// 2026-09-05 the bumi side reused a context hoisted out of the loop while the
+	// crusty side built a fresh object every iteration and marshalled it across
+	// the WASM boundary, so the pair timed two different amounts of work and every
+	// ratio drawn from it was unearned. Allocating on both sides is the workload a
+	// caller actually has: a request arrives, a context is built, a match is run.
 	bench("crusty_exact_hit", () => crusty.evaluate({ event: "PreToolUse" }));
-	bench("bumi_exact_hit", () => bumi.evaluate(bumiHitCtx));
+	bench("bumi_exact_hit", () => bumi.evaluate({ event: "PreToolUse" }));
 	bench("crusty_exact_miss", () => crusty.evaluate({ event: "PostToolUse" }));
-	bench("bumi_exact_miss", () => bumi.evaluate(bumiMissCtx));
+	bench("bumi_exact_miss", () => bumi.evaluate({ event: "PostToolUse" }));
 });
 
 // ── Evaluate benchmarks (regex) ──────────────────────────────────────────────
@@ -156,17 +159,19 @@ summary(() => {
 		null,
 	);
 
-	const bumiHitCtx: HookCtx = { event: "PreToolUse", toolName: "mcp__db__query" };
-	const bumiMissCtx: HookCtx = { event: "PreToolUse", toolName: "Write" };
-
+	// Symmetric context construction — see the note in the exact-match group.
 	bench("crusty_regex_hit", () =>
 		crusty.evaluate({ event: "PreToolUse", toolName: "mcp__db__query" }),
 	);
-	bench("bumi_regex_hit", () => bumi.evaluate(bumiHitCtx));
+	bench("bumi_regex_hit", () =>
+		bumi.evaluate({ event: "PreToolUse", toolName: "mcp__db__query" }),
+	);
 	bench("crusty_regex_miss", () =>
 		crusty.evaluate({ event: "PreToolUse", toolName: "Write" }),
 	);
-	bench("bumi_regex_miss", () => bumi.evaluate(bumiMissCtx));
+	bench("bumi_regex_miss", () =>
+		bumi.evaluate({ event: "PreToolUse", toolName: "Write" }),
+	);
 });
 
 // ── Evaluate benchmarks (complex multi-field) ────────────────────────────────
@@ -198,17 +203,11 @@ summary(() => {
 		new Action("allowed"),
 	);
 
-	const bumiHitCtx: HookCtx = {
-		event: "PreToolUse",
-		toolName: "mcp__db__exec",
-		command: "DROP TABLE users",
-	};
-	const bumiMissCtx: HookCtx = {
-		event: "PostToolUse",
-		toolName: "mcp__db__exec",
-		command: "DROP TABLE users",
-	};
-
+	// Symmetric context construction — see the note in the exact-match group. The
+	// two sides still differ in shape (`arguments: {command}` vs a flat `command`)
+	// because the two APIs differ, so the crusty side allocates one more object
+	// than bumi does. That asymmetry is inherent to the interfaces rather than an
+	// artefact of the harness, and it is small next to the boundary crossing.
 	bench("crusty_complex_hit", () =>
 		crusty.evaluate({
 			event: "PreToolUse",
@@ -216,7 +215,13 @@ summary(() => {
 			arguments: { command: "DROP TABLE users" },
 		}),
 	);
-	bench("bumi_complex_hit", () => bumi.evaluate(bumiHitCtx));
+	bench("bumi_complex_hit", () =>
+		bumi.evaluate({
+			event: "PreToolUse",
+			toolName: "mcp__db__exec",
+			command: "DROP TABLE users",
+		}),
+	);
 	bench("crusty_complex_miss", () =>
 		crusty.evaluate({
 			event: "PostToolUse",
@@ -224,7 +229,13 @@ summary(() => {
 			arguments: { command: "DROP TABLE users" },
 		}),
 	);
-	bench("bumi_complex_miss", () => bumi.evaluate(bumiMissCtx));
+	bench("bumi_complex_miss", () =>
+		bumi.evaluate({
+			event: "PostToolUse",
+			toolName: "mcp__db__exec",
+			command: "DROP TABLE users",
+		}),
+	);
 });
 
 // ── Trace overhead (crusty only — bumi doesn't have trace) ───────────────────

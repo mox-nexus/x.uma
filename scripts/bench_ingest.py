@@ -39,7 +39,16 @@ CREATE TABLE IF NOT EXISTS bench_results (
     scenario    VARCHAR NOT NULL,
     phase       VARCHAR NOT NULL,
     mean_ns     DOUBLE NOT NULL,
-    stddev_ns   DOUBLE,
+    -- Median is stored because it is the robust statistic: on Apple Silicon
+    -- the 24MHz mach timebase quantises perf_counter at ~41.7ns, and rows the
+    -- harness settles at 1 iteration carry that as pure instrument noise.
+    median_ns   DOUBLE,
+    -- Dispersion is NOT comparable across harnesses: divan and pytest-benchmark
+    -- report a true standard deviation, mitata reports no stddev at all so we
+    -- store its interquartile range. A variance gate that compares the two is
+    -- comparing different statistics, so the kind travels with the number.
+    dispersion_ns   DOUBLE,
+    dispersion_kind VARCHAR,
     min_ns      DOUBLE,
     max_ns      DOUBLE,
     iterations  BIGINT,
@@ -100,7 +109,9 @@ def parse_divan_json(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "scenario": scenario,
             "phase": phase,
             "mean_ns": time.get("mean", 0),
-            "stddev_ns": time.get("stddev"),
+            "median_ns": time.get("median"),
+            "dispersion_ns": time.get("stddev"),
+            "dispersion_kind": "stddev",
             "min_ns": time.get("min"),
             "max_ns": time.get("max"),
             "iterations": entry.get("iterations"),
@@ -108,23 +119,41 @@ def parse_divan_json(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return results
 
 
-def parse_pytest_benchmark_json(data: dict[str, Any], variant: str) -> list[dict[str, Any]]:
+KNOWN_PHASES = {"compile", "evaluate", "trace", "load"}
+
+
+def split_name(raw: str, variants: dict[str, str]) -> tuple[str, str, str]:
+    """Split a benchmark name into (variant, scenario, phase).
+
+    A single benchmark FILE holds both sides of a comparison —
+    `test_bench_puma_evaluate_exact_hit` and `test_bench_crusty_evaluate_exact_hit`
+    live in `test_bench_crusty.py` together. Labelling every row in that file with
+    one variant, which is what this module did until 2026-09-05, files the pure
+    implementation's measurements under the binding's name. A generated report then
+    states the opposite of what was measured, with a provenance line attached.
+
+    The leading token names the variant. The rest is kept intact as the scenario,
+    so the two sides of a pair join on equality; stripping a `crusty_`/`puma_`
+    prefix into the scenario is what made the report's FFI section return no rows.
+    """
+    clean = raw.removeprefix("test_bench_")
+    head, _, rest = clean.partition("_")
+    if head in variants and rest:
+        variant, scenario = variants[head], rest
+    else:
+        # Unprefixed name: fall back to the file's sole declared variant.
+        variant, scenario = next(iter(variants.values())), clean
+    phase = next((t for t in scenario.split("_") if t in KNOWN_PHASES), "evaluate")
+    return variant, scenario, phase
+
+
+def parse_pytest_benchmark_json(
+    data: dict[str, Any], variants: dict[str, str]
+) -> list[dict[str, Any]]:
     """Parse pytest-benchmark JSON output into normalized results."""
     results = []
     for bench in data.get("benchmarks", []):
-        name = bench.get("name", "")
-        # Convention: test_bench_{scenario}_{phase} or test_bench_{scenario}
-        clean = name.removeprefix("test_bench_")
-        parts = clean.rsplit("_", 1)
-
-        # Try to separate scenario from phase
-        known_phases = {"compile", "evaluate", "trace"}
-        if len(parts) == 2 and parts[1] in known_phases:
-            scenario, phase = parts
-        else:
-            scenario = clean
-            phase = "evaluate"
-
+        variant, scenario, phase = split_name(bench.get("name", ""), variants)
         stats = bench.get("stats", {})
         # pytest-benchmark reports in seconds, convert to nanoseconds
         to_ns = 1_000_000_000
@@ -133,7 +162,9 @@ def parse_pytest_benchmark_json(data: dict[str, Any], variant: str) -> list[dict
             "scenario": scenario,
             "phase": phase,
             "mean_ns": stats.get("mean", 0) * to_ns,
-            "stddev_ns": (stats.get("stddev") or 0) * to_ns,
+            "median_ns": (stats.get("median") or 0) * to_ns or None,
+            "dispersion_ns": (stats.get("stddev") or 0) * to_ns,
+            "dispersion_kind": "stddev",
             "min_ns": stats.get("min", 0) * to_ns,
             "max_ns": stats.get("max", 0) * to_ns,
             "iterations": stats.get("iterations"),
@@ -141,26 +172,32 @@ def parse_pytest_benchmark_json(data: dict[str, Any], variant: str) -> list[dict
     return results
 
 
-def parse_mitata_json(data: dict[str, Any], variant: str) -> list[dict[str, Any]]:
+def parse_mitata_json(
+    data: dict[str, Any], variants: dict[str, str]
+) -> list[dict[str, Any]]:
     """Parse mitata JSON output into normalized results."""
     results = []
     for bench in data.get("benchmarks", []):
-        name = bench.get("name", "")
-        parts = name.rsplit("/", 1)
-        if len(parts) == 2:
-            scenario = parts[0]
-            phase = parts[1]
-        else:
-            scenario = parts[0]
-            phase = "evaluate"
-
-        stats = bench.get("stats", {})
+        # mitata 1.0.34 emits `alias` (not `name`) and nests stats one level down
+        # under `runs[]`. This parser read `bench["name"]` and `bench["stats"]`,
+        # which are both absent — so it produced zero rows against real mitata
+        # output. Shape confirmed by running mitata and reading what it printed.
+        runs = bench.get("runs") or [{}]
+        stats = runs[0].get("stats") or {}
+        raw_name = bench.get("alias") or runs[0].get("name", "")
+        variant, scenario, phase = split_name(raw_name, variants)
         results.append({
             "variant": variant,
             "scenario": scenario,
             "phase": phase,
             "mean_ns": stats.get("avg", 0),
-            "stddev_ns": stats.get("p75", 0) - stats.get("p25", 0),  # IQR as proxy
+            "median_ns": stats.get("p50"),
+            # mitata reports no standard deviation. This is an IQR and is labelled
+            # as one — it was previously stored in a column called stddev_ns and
+            # printed as "Stddev", so any variance comparison put an IQR next to a
+            # real standard deviation and called them the same thing.
+            "dispersion_ns": stats.get("p75", 0) - stats.get("p25", 0),
+            "dispersion_kind": "iqr",
             "min_ns": stats.get("min", 0),
             "max_ns": stats.get("max", 0),
             "iterations": stats.get("samples"),
@@ -168,12 +205,22 @@ def parse_mitata_json(data: dict[str, Any], variant: str) -> list[dict[str, Any]
     return results
 
 
-FILE_PARSERS: dict[str, tuple[str, Any]] = {
-    "rust.json": ("rumi", parse_divan_json),
-    "python.json": ("puma", parse_pytest_benchmark_json),
-    "typescript.json": ("bumi", parse_mitata_json),
-    "xuma-crust-python.json": ("xuma-crust-python", parse_pytest_benchmark_json),
-    "xuma-crust-wasm.json": ("xuma-crust-wasm", parse_mitata_json),
+# filename -> ({leading name token: variant}, parser).
+#
+# The crust files carry BOTH sides of each comparison, which is why the map is
+# per-token rather than per-file. See split_name.
+FILE_PARSERS: dict[str, tuple[dict[str, str], Any]] = {
+    "rust.json": ({"rumi": "rumi"}, parse_divan_json),
+    "python.json": ({"puma": "puma"}, parse_pytest_benchmark_json),
+    "typescript.json": ({"bumi": "bumi"}, parse_mitata_json),
+    "xuma-crust-python.json": (
+        {"crusty": "xuma-crust-python", "puma": "puma"},
+        parse_pytest_benchmark_json,
+    ),
+    "xuma-crust-wasm.json": (
+        {"crusty": "xuma-crust-wasm", "bumi": "bumi"},
+        parse_mitata_json,
+    ),
 }
 
 
@@ -198,33 +245,37 @@ def main(db: str, notes: str | None, raw_dir: str) -> None:
     run_id = create_run(con, notes)
     total = 0
 
+    unknown: list[str] = []
     for json_file in sorted(json_files):
         fname = json_file.name
         if fname not in FILE_PARSERS:
-            click.echo(f"  Skipping unknown file: {fname}")
+            unknown.append(fname)
             continue
 
-        variant, parser = FILE_PARSERS[fname]
+        variants, parser = FILE_PARSERS[fname]
         data = json.loads(json_file.read_text())
 
         # Parsers have different signatures
         if fname == "rust.json":
             rows = parser(data)
         else:
-            rows = parser(data, variant)
+            rows = parser(data, variants)
 
         for row in rows:
             con.execute(
                 """INSERT INTO bench_results
-                   (run_id, variant, scenario, phase, mean_ns, stddev_ns, min_ns, max_ns, iterations)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (run_id, variant, scenario, phase, mean_ns, median_ns, dispersion_ns,
+                    dispersion_kind, min_ns, max_ns, iterations)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 [
                     run_id,
                     row["variant"],
                     row["scenario"],
                     row["phase"],
                     row["mean_ns"],
-                    row["stddev_ns"],
+                    row["median_ns"],
+                    row["dispersion_ns"],
+                    row["dispersion_kind"],
                     row["min_ns"],
                     row["max_ns"],
                     row["iterations"],
@@ -232,9 +283,28 @@ def main(db: str, notes: str | None, raw_dir: str) -> None:
             )
             total += 1
 
-        click.echo(f"  Ingested {len(rows)} results from {fname} ({variant})")
+        found = sorted({r["variant"] for r in rows})
+        click.echo(f"  Ingested {len(rows)} results from {fname} ({', '.join(found)})")
 
     con.close()
+
+    # An ingest that recognises nothing used to print its skips and exit 0, so a
+    # renamed or unwritten file produced a successful-looking run with no data in
+    # it — and the report built from that run would be stale rows under today's
+    # commit SHA. Nothing downstream can tell that apart from a clean run, so it
+    # has to fail here.
+    if unknown:
+        click.echo(f"Unrecognised files in {raw_path}: {', '.join(unknown)}", err=True)
+    if total == 0:
+        click.echo(
+            f"No results ingested from {raw_path}. Expected one or more of: "
+            f"{', '.join(sorted(FILE_PARSERS))}",
+            err=True,
+        )
+        sys.exit(1)
+    if unknown:
+        sys.exit(1)
+
     click.echo(f"\nRun #{run_id}: {total} results ingested into {db}")
 
 

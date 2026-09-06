@@ -2,12 +2,16 @@
 
 Compares identical workloads through both implementations to isolate:
 1. FFI overhead — crusty's boundary crossing cost
-2. Regex engine — Python `re` (backtracking) vs Rust `regex` (linear time)
+2. Regex engine — google-re2 (linear time) vs Rust `regex` (linear time).
+   Both are RE2-class. puma stopped using the backtracking `re` module at the
+   RE2 migration; this line said otherwise until 2026-09-05, which made the
+   regex rows look like a safety comparison when they are a speed comparison
+   between two linear-time engines.
 3. Compile cost — Python dataclass construction vs Rust struct compilation
 
 Run:
   cd rumi/crusts/python
-  maturin develop
+  maturin develop --release   # a debug build inverts the verdict
   uv run pytest tests/test_bench_crusty.py --benchmark-only
 """
 
@@ -208,12 +212,12 @@ def puma_regex():
 
 
 def test_bench_crusty_evaluate_regex_hit(benchmark, crusty_regex):
-    """Crusty: evaluate regex match (hit) — Rust linear-time regex."""
+    """Crusty: evaluate regex match (hit) — Rust `regex`, linear time."""
     benchmark(crusty_regex.evaluate, event="PreToolUse", tool_name="mcp__db__query")
 
 
 def test_bench_puma_evaluate_regex_hit(benchmark, puma_regex):
-    """Puma: evaluate regex match (hit) — Python backtracking re."""
+    """Puma: evaluate regex match (hit) — google-re2, also linear time."""
     ctx = HookCtx(event="PreToolUse", tool_name="mcp__db__query")
     benchmark(puma_regex.evaluate, ctx)
 

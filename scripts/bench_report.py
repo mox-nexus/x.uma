@@ -31,12 +31,22 @@ def fmt_ns(ns: float) -> str:
     return f"{ns / 1_000_000_000:.2f}s"
 
 
-def fmt_speedup(slow: float, fast: float) -> str:
-    """Format speedup ratio."""
-    if fast <= 0:
+def fmt_comparison(pure_ns: float, crusty_ns: float, crusty_label: str) -> str:
+    """Format a pure-vs-binding comparison as a direction plus a magnitude.
+
+    This used to be `fmt_speedup(slow, fast) -> f"{slow/fast:.1f}x"`, called as
+    `fmt_speedup(pure_ns, crusty_ns)` under a column headed "Speedup". When the
+    binding is slower — which is the measured case for the WASM crust, by roughly
+    two orders of magnitude — that renders "0.0x", which reads as *no speedup
+    measured* rather than *far slower*. A generated report is only worth having if
+    it cannot restate the very inversion it was built to prevent, so the direction
+    is computed and named rather than implied by a column title.
+    """
+    if pure_ns <= 0 or crusty_ns <= 0:
         return "N/A"
-    ratio = slow / fast
-    return f"{ratio:.1f}x"
+    if crusty_ns < pure_ns:
+        return f"{crusty_label} {pure_ns / crusty_ns:.2f}x faster"
+    return f"pure {crusty_ns / pure_ns:.2f}x faster"
 
 
 @click.command()
@@ -45,7 +55,7 @@ def fmt_speedup(slow: float, fast: float) -> str:
 def main(db: str, output: str) -> None:
     """Generate benchmark report from DuckDB."""
     if not Path(db).exists():
-        click.echo(f"Database {db} not found. Run `just bench-ingest` first.", err=True)
+        click.echo(f"Database {db} not found. Run `just bench-collect` first.", err=True)
         sys.exit(1)
 
     con = duckdb.connect(db, read_only=True)
@@ -63,7 +73,7 @@ def main(db: str, output: str) -> None:
 
     # Get all results for this run
     results = con.execute(
-        """SELECT variant, scenario, phase, mean_ns, stddev_ns, min_ns, max_ns, iterations
+        """SELECT variant, scenario, phase, mean_ns, dispersion_ns, dispersion_kind, min_ns, max_ns, iterations
            FROM bench_results
            WHERE run_id = ?
            ORDER BY scenario, phase, mean_ns""",
@@ -94,13 +104,15 @@ def main(db: str, output: str) -> None:
 
     for (scenario, phase), rows in sorted(scenarios.items()):
         lines.append(f"### {scenario} ({phase})\n")
-        lines.append("| Variant | Mean | Stddev | Min | Max | Iterations |")
-        lines.append("|---------|------|--------|-----|-----|------------|")
+        # Dispersion kind is printed because it is not the same statistic across
+        # harnesses: mitata supplies an IQR, divan and pytest-benchmark a stddev.
+        lines.append("| Variant | Mean | Dispersion | Min | Max | Iterations |")
+        lines.append("|---------|------|------------|-----|-----|------------|")
 
         for row in rows:
-            variant, _, _, mean, stddev, min_ns, max_ns, iters = row
+            variant, _, _, mean, disp, disp_kind, min_ns, max_ns, iters = row
             lines.append(
-                f"| {variant} | {fmt_ns(mean)} | {fmt_ns(stddev or 0)} "
+                f"| {variant} | {fmt_ns(mean)} | {fmt_ns(disp or 0)} ({disp_kind or '?'}) "
                 f"| {fmt_ns(min_ns or 0)} | {fmt_ns(max_ns or 0)} "
                 f"| {iters or 'N/A'} |"
             )
@@ -129,12 +141,12 @@ def main(db: str, output: str) -> None:
 
         if ffi_results:
             lines.append(f"### {pure} vs {crusty}\n")
-            lines.append("| Scenario | Phase | Pure | Crusty | Speedup |")
-            lines.append("|----------|-------|------|--------|---------|")
+            lines.append(f"| Scenario | Phase | {pure} | {crusty} | Result |")
+            lines.append("|----------|-------|------|--------|--------|")
             for scenario, phase, pure_ns, crusty_ns in ffi_results:
                 lines.append(
                     f"| {scenario} | {phase} | {fmt_ns(pure_ns)} "
-                    f"| {fmt_ns(crusty_ns)} | {fmt_speedup(pure_ns, crusty_ns)} |"
+                    f"| {fmt_ns(crusty_ns)} | {fmt_comparison(pure_ns, crusty_ns, crusty)} |"
                 )
             lines.append("")
 

@@ -257,8 +257,14 @@ bench-bumi:
     cd bumi && bun run bench/config.bench.ts
 
 # Run xuma-crust (Python) vs puma comparison benchmarks
+#
+# --release is load-bearing, not tidiness. Without it maturin installs a debug
+# extension, and the debug crust measures SLOWER than pure Python in 10 of 11
+# pairs — the exact opposite verdict. This recipe omitted the flag until
+# 2026-09-05, so anyone who re-checked the documented performance claims by
+# running the documented command got a confidently wrong answer.
 bench-xuma-crust-py:
-    cd rumi/crusts/python && maturin develop && uv run pytest tests/test_bench_crusty.py tests/test_bench_config.py --benchmark-only --benchmark-disable-gc
+    cd rumi/crusts/python && maturin develop --release && uv run pytest tests/test_bench_crusty.py tests/test_bench_config.py --benchmark-only --benchmark-disable-gc
 
 # Run xuma-crust (WASM) vs bumi comparison benchmarks
 bench-xuma-crust-wasm:
