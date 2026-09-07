@@ -1,5 +1,27 @@
 # Release plan — x.uma 0.1.0
 
+> ## ⛔ READ FIRST — 2026-09-07
+>
+> **The architecture changed. `DECISIONS.md` D-051: one ACES engine in `rumi`,
+> with thin crusts for Python and TypeScript as extension / DX layers. The
+> pure-Python engine in `puma/` and the pure-TypeScript engine in `bumi/` are
+> retired.** Write new engine and domain code in `rumi` only.
+>
+> Most of this file predates that decision and still reads as though five peer
+> implementations are the design. Treat its Phase and F-number entries as
+> accurate about *defects* and stale about *structure*.
+>
+> **Session cursor: `scratch/HANDOFF-2026-09-07.md`** — current branch state,
+> what is blocking and in what order, how to query the rust-mastery corpus, and
+> the traps this repo has already paid for. Untracked, so it is a cursor and not
+> a record; the records are here and in `DECISIONS.md`.
+>
+> Immediate state: branch `fix/benchmark-claims`, **4 commits, none pushed**,
+> `just ci` green on each. Four fabricated performance claims are still live in
+> `README.md` and the getting-started pages. The TypeScript boundary is the gate
+> on everything downstream — pure TS still beats the WASM binding 68x on
+> `exact_hit`.
+
 ## Where this stands (2026-08-18)
 
 Read this block first; the rest of the file was written before any of it was done.
