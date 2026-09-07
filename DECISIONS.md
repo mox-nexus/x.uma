@@ -8,6 +8,70 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-09-06 · One core
+
+### D-051 · The duplicate engines are retired; `xuma` becomes the binding
+
+**Decided.** `rumi` is the engine. Python and TypeScript get a binding plus a DX
+layer over it, not a reimplementation. The pure-Python engine in `puma/` and the
+pure-TypeScript engine in `bumi/` are debt and will be retired.
+
+**Why.** One core with ports and adapters is what `CLAUDE.md`'s architecture
+diagram has always described. The three-engine reality was never decided: on
+`55df2d21` a roadmap table cell changed from "PyO3/maturin bindings" to "Pure
+Python implementation" and the bindings moved to a new `p.uma[crusty]` slot,
+which `c9afb7e0` then built. `a01790f0` renamed `puma`→`xuma` and
+`puma-crusty`→`xuma-crust`, and the shipped names stopped showing any of it.
+Six months of documents inherited the result as though it were the design.
+
+The cost is measured, not theoretical. Three engines do not cross-check a
+misreading of the spec — they triplicate it. D-050's fail-open was live in all
+three compilers simultaneously, and the `#32` width limits reached Rust only.
+Every spec change lands three times, and this repo has spent four PRs finding
+places where it landed twice.
+
+**Why now.** Nothing is published. Checked 2026-09-06: all nine names —
+`rumi-core`, `rumi-proto`, `rumi-kv`, `rumi-http`, `rumi-cli` on crates.io;
+`xuma` and `xuma-crust` on PyPI and npm — return 404. Retiring a package nobody
+has installed costs nothing. After a release it costs a deprecation cycle, and
+`xuma` on both registries is currently the *pure* implementation, so the rename
+would be a breaking change to a published API rather than a bookkeeping one.
+
+**What it entails, stated plainly rather than discovered later.**
+
+The TypeScript binding is presently much slower than the engine it replaces:
+after the `d006b241` boundary fix, pure TS still wins `exact_hit` 68x, and only
+`regex_hit` goes to the binding (3.46x). So this decision makes the boundary
+work **blocking**, not opportunistic — `xuma` on npm cannot ship at 68x slower
+than the code it replaced. The known remaining items are typed `extern`
+accessors with `final` in place of `Reflect::get`, `OnceCell` for the two
+registries `fromConfig` rebuilds per call, and the returned-`String` transcode.
+The floor is nowhere near reached: raw JS→wasm calls were measured at ~4.5ns in
+2018 and we are at 780ns.
+
+Python is not in the same position — the PyO3 binding already wins everywhere
+except `compile_complex`, and by ~10x on regex.
+
+The conformance suite changes in kind, not in value. "Five implementations
+agree" becomes "the engine and its bindings agree", which is still a real check:
+`F14` found `xuma.http.v1.PathInput` bound to two different semantics in Rust,
+where both crusts took the path that made `/admin?x=1` match `{Exact: "/admin"}`
+and the native path did not. Bindings diverge. The `implementations:` ledger
+stays; its membership shrinks.
+
+**What would justify revisiting.** A runtime where the binding cannot go —
+an edge runtime that forbids WASM, or a Python environment that forbids native
+extensions — carrying enough usage to be worth a second engine. That is a
+distribution constraint, and it is the only argument that survives; "it is
+faster today" is an argument for fixing the boundary, which is now the plan.
+
+**Not yet decided:** the order of retirement, whether `bumi/` is deleted or
+frozen as a conformance oracle, and what `xuma` on npm ships in the interval
+before the boundary work lands. Those are sequencing questions and belong in
+`PLAN.md`.
+
+---
+
 ## 2026-08-31 · The catch-all becomes a ceremony
 
 ### D-050 · A matcher that matches everything must be asked for by name

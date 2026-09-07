@@ -44,10 +44,28 @@ protojson directly (D-039), and they install with no native extension. As of
 the opposite of what the docs claimed for six months — see `bench/RESULTS.md`
 and the boundary work in `rumi/crusts/wasm/src/matcher.rs`.
 
-**Do not resolve this by drift.** Either the duplicate engines are the design
-and this section says so with a reason, or they are debt and there is a plan to
-retire them. Both are legitimate; picking neither is how it got here. Whichever
-it becomes goes in `DECISIONS.md` with the history above as evidence.
+**Decided 2026-09-06 (D-051): the duplicate engines are retired.** `rumi` is the
+engine; Python and TypeScript get a binding plus a DX layer, not a
+reimplementation. Nothing is published yet — all nine names returned 404 on
+2026-09-06 — so this costs no user anything today and would cost a deprecation
+cycle after a release.
+
+Two consequences worth knowing before you touch anything here:
+
+- **The boundary work is now blocking, not opportunistic.** After `d006b241`,
+  pure TypeScript still beats the WASM binding 68x on `exact_hit`; only
+  `regex_hit` goes the other way. `xuma` on npm cannot ship slower than the code
+  it replaces. Remaining known work: typed `extern` accessors with `final`
+  instead of `Reflect::get`, `OnceCell` for the two registries `fromConfig`
+  rebuilds per call, and the returned-`String` transcode. Python is not in this
+  position — the PyO3 binding already wins everywhere except `compile_complex`.
+- **Write new domain and engine code in `rumi` only.** Do not add a feature to
+  `puma/src` or `bumi/src` that `rumi` does not have. They are being retired;
+  adding to them deepens the debt this decision exists to pay off.
+
+Sequencing — retirement order, whether `bumi/` is frozen as a conformance oracle
+rather than deleted, and what `xuma` ships in the interval — is open and lives in
+`PLAN.md`.
 
 All five implementations pass `spec/tests/07_protojson/`, the canonical config
 suite. `spec/tests/05_http/` (Gateway API route matches through the domain
