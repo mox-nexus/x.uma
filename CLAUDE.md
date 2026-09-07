@@ -4,13 +4,50 @@
 
 A matcher engine implementing the xDS Unified Matcher API across multiple languages and domains.
 
-| Package | Language | Notes |
-|---------|----------|-------|
-| **rumi** | Rust | Core engine (reference implementation) |
-| **puma** | Python | Python implementation, no protobuf runtime (dir: `puma/`, **package `xuma`**) |
-| **bumi** | Bun/TypeScript | Pure TypeScript implementation (dir: `bumi/`, **package `xuma`**) |
-| **xuma-crust** | Python | Rust bindings via PyO3 (from `rumi/crusts/python/`) |
-| **xuma-crust** | TypeScript | Rust bindings via wasm-bindgen (from `rumi/crusts/wasm/`) |
+### The intended architecture, and what is actually built
+
+**Intent: one core, with thin DX layers per runtime.** `rumi` is the engine;
+Python and TypeScript get an extension layer over it, and domains plug in at
+`TypedExtensionConfig`. That is what the ACES diagram below describes, and it is
+the design this project is steered by.
+
+**Reality: three complete engines.** `rumi`, `puma` and `bumi` each contain a
+full independent implementation — matcher, predicate, tree, string matchers,
+config loading. The bindings sit alongside them rather than being the only path
+to the core. So the diagram below is the target, not a description of the tree.
+
+| Package | Language | What it actually is |
+|---------|----------|---------------------|
+| **rumi** | Rust | The core engine (reference implementation) |
+| **puma** | Python | **A second engine**, reimplemented in Python (dir: `puma/`, package `xuma`) |
+| **bumi** | Bun/TypeScript | **A third engine**, reimplemented in TypeScript (dir: `bumi/`, package `xuma`) |
+| **xuma-crust** | Python | Binding to the core via PyO3 (from `rumi/crusts/python/`) |
+| **xuma-crust** | TypeScript | Binding to the core via wasm-bindgen (from `rumi/crusts/wasm/`) |
+
+**How the gap opened.** `puma` was originally the PyO3 binding — `55df2d21`
+changed one roadmap table cell from "PyO3/maturin bindings" to "Pure Python
+implementation" and pushed the bindings to a new `p.uma[crusty]` slot, which
+`c9afb7e0` then built. No decision was recorded, because the change was made by
+editing a table rather than by deciding something. Everything downstream
+inherited the result as though it had always been the design. `a01790f0` later
+renamed `puma`→`xuma` and `puma-crusty`→`xuma-crust`, which is why the shipped
+names no longer show any of this.
+
+**What it costs, concretely.** Every spec change lands three times. The
+empty-route fail-open (D-050) existed in all three compilers at once; the width
+limits from #32 were applied to Rust only. Three engines do not cross-check a
+shared misreading of the spec — they triplicate it.
+
+**What it earns.** `puma` and `bumi` carry no protobuf runtime and read
+protojson directly (D-039), and they install with no native extension. As of
+2026-09-06 they are also *faster* than the bindings on most workloads, which is
+the opposite of what the docs claimed for six months — see `bench/RESULTS.md`
+and the boundary work in `rumi/crusts/wasm/src/matcher.rs`.
+
+**Do not resolve this by drift.** Either the duplicate engines are the design
+and this section says so with a reason, or they are debt and there is a plan to
+retire them. Both are legitimate; picking neither is how it got here. Whichever
+it becomes goes in `DECISIONS.md` with the history above as evidence.
 
 All five implementations pass `spec/tests/07_protojson/`, the canonical config
 suite. `spec/tests/05_http/` (Gateway API route matches through the domain
@@ -26,6 +63,11 @@ also fail for you, so a stale exception cannot hide a finished migration.
 x.uma follows ACES principles using hexagonal architecture (ports & adapters) to achieve **sustainable excellence** — no rewrites needed.
 
 ### Architecture
+
+**This is the target.** One CORE with ports and adapters around it. `puma` and
+`bumi` are not adapters onto this core today — each contains its own copy of it.
+See "The intended architecture, and what is actually built" above before
+reasoning about where code should live.
 
 ```
                     ┌─────────────────────────────────┐
