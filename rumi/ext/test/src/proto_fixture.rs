@@ -43,9 +43,7 @@ pub enum Domain {
     Http,
 }
 
-// Both moved to `crate::implementations` so `05_http` can share the ledger.
-// Re-exported here because every existing path expects them here.
-pub use crate::implementations::{all_implementations, Implementation, ALL};
+pub use crate::implementations::{Implementation, ALL};
 
 /// A fixture whose matcher is written in canonical protojson.
 #[derive(Debug, Deserialize)]
@@ -59,12 +57,11 @@ pub struct ProtoFixture {
     /// The matcher, as canonical protojson for `xds.type.matcher.v3.Matcher`.
     pub proto_matcher: serde_json::Value,
 
-    /// Which implementations are expected to run this fixture.
+    /// Which implementations are expected to run this fixture. Required.
     ///
-    /// Absent means all three, which is the end state. A shorter list is an
-    /// **expiring exception**: it says the others have not been migrated yet,
-    /// and CI holds it to that in both directions.
-    #[serde(default = "all_implementations")]
+    /// A shorter list than [`ALL`] is an **expiring exception**: it says the
+    /// others have not been migrated yet, and CI holds it to that in both
+    /// directions.
     pub implementations: Vec<Implementation>,
 
     /// Cases to evaluate. Empty when `expect_error` is set.
@@ -154,5 +151,20 @@ impl ProtoFixture {
     #[must_use]
     pub fn expects(&self, who: Implementation) -> bool {
         self.implementations.contains(&who)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ProtoFixture;
+
+    #[test]
+    fn a_fixture_without_a_ledger_is_rejected() {
+        let keyless = "name: keyless\nproto_matcher: {}\ncases: []\n";
+        let err = ProtoFixture::from_yaml(keyless).expect_err("the ledger key is required");
+        assert!(
+            err.to_string().contains("implementations"),
+            "the error should name the missing key, got: {err}"
+        );
     }
 }

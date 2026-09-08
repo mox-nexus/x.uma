@@ -1,4 +1,5 @@
 name: "http_header_exact"
+implementations: [rust, python, typescript]
 description: "Gateway API exact header matching"
 
 http_route_match:
@@ -42,6 +43,7 @@ cases:
 
 ---
 name: "http_header_regex"
+implementations: [rust, python, typescript]
 description: "Gateway API regex header matching"
 
 http_route_match:
@@ -85,6 +87,7 @@ cases:
 
 ---
 name: "http_multiple_headers_and"
+implementations: [rust, python, typescript]
 description: "Multiple headers are ANDed together"
 
 http_route_match:

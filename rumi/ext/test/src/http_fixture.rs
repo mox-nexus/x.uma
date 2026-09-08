@@ -44,11 +44,10 @@ pub struct HttpFixture {
     #[serde(default)]
     pub on_no_match: Option<String>,
 
-    /// Which implementations are expected to run this fixture.
+    /// Which implementations are expected to run this fixture. Required.
     ///
-    /// Absent means all three, which is the end state. A shorter list is an
-    /// expiring exception, held in both directions by the runners.
-    #[serde(default = "crate::implementations::all_implementations")]
+    /// A shorter list than [`crate::implementations::ALL`] is an expiring
+    /// exception, held in both directions by the runners.
     pub implementations: Vec<Implementation>,
 
     /// The compile must fail. `cases` is then ignored.
@@ -144,5 +143,20 @@ impl HttpFixture {
             (None, Some(many)) => many.iter().map(Into::into).collect(),
             _ => Vec::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HttpFixture;
+
+    #[test]
+    fn a_fixture_without_a_ledger_is_rejected() {
+        let keyless = "name: keyless\naction: hit\ncases: []\n";
+        let err = HttpFixture::all_from_yaml(keyless).expect_err("the ledger key is required");
+        assert!(
+            err.to_string().contains("implementations"),
+            "the error should name the missing key, got: {err}"
+        );
     }
 }

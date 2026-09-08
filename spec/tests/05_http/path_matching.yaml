@@ -1,4 +1,5 @@
 name: "http_path_prefix"
+implementations: [rust, python, typescript]
 description: "Gateway API PathPrefix matching semantics"
 
 # HTTP fixture format uses http_request context
@@ -48,6 +49,7 @@ cases:
 
 ---
 name: "http_path_exact"
+implementations: [rust, python, typescript]
 description: "Gateway API Exact path matching semantics"
 
 http_route_match:
@@ -90,6 +92,7 @@ cases:
 
 ---
 name: "http_path_regex"
+implementations: [rust, python, typescript]
 description: "Gateway API RegularExpression path matching"
 
 http_route_match:

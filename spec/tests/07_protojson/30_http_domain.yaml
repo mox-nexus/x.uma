@@ -1,4 +1,5 @@
 name: "http_config_path_all_inputs"
+implementations: [rust, python, typescript]
 description: >
   Every HTTP input, reached through the config path rather than the Gateway API
   compiler.
@@ -114,6 +115,7 @@ cases:
 
 ---
 name: "http_authority_and_scheme"
+implementations: [rust, python, typescript]
 description: >
   The two pseudo-header inputs, which the main HTTP fixture does not reach.
 

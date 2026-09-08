@@ -1,4 +1,5 @@
 name: "http_path_exact_ignores_query"
+implementations: [rust, python, typescript]
 description: >
   A query string is not part of the path. Exact path matching must ignore it,
   and every implementation must agree that it does.

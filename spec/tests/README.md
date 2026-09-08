@@ -71,10 +71,12 @@ Because the string has to match in every implementation, it also holds the
 error *wording* to cross-language agreement. When Rust and puma disagreed, the
 messages were harmonized rather than the assertion weakened.
 
-### `implementations:` — the migration ledger
+### `implementations:` — the conformance ledger
 
-Omit it and every implementation must run the fixture. That is the state today,
-and the field can be deleted once nothing needs it.
+Required on every fixture: the implementations expected to run it. There is no
+default, because a default is a coverage claim nobody has to provide — this
+suite's `05_http/` had no ledger and no runner in the reference implementation
+while one of its fixtures required a fail-open of everyone (D-050).
 
 A shorter list is an **expiring exception**, and CI holds it in *both*
 directions: a listed implementation that fails is a failure, and one that is
