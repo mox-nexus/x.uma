@@ -39,8 +39,10 @@ def out(cmd: list[str], cwd: Path = ROOT) -> str:
 
 def hardware() -> dict:
     cpu = out(["sysctl", "-n", "machdep.cpu.brand_string"]) if platform.system() == "Darwin" else platform.processor()
+    load = os.getloadavg()[0] if hasattr(os, "getloadavg") else None
     return {"os": f"{platform.system()} {platform.release()}", "arch": platform.machine(),
-            "cpu": cpu, "cores": os.cpu_count()}
+            "cpu": cpu, "cores": os.cpu_count(),
+            "load_average_at_start": None if load is None else round(load, 2)}
 
 
 def toolchains() -> dict:

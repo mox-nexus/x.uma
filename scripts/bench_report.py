@@ -53,7 +53,9 @@ def main() -> None:
                  f"G = max(1.20, 1 + 3·CV). Two numbers whose ratio lies inside [1/G, G] are indistinguishable.")
     lines.append("")
     hw = art["hardware"]; tc = art["toolchains"]
-    lines.append(f"Hardware: {hw['cpu']}, {hw['cores']} cores, {hw['os']} {hw['arch']}. "
+    load = hw.get("load_average_at_start")
+    load_note = "" if load is None else f" Load average at start: {load}."
+    lines.append(f"Hardware: {hw['cpu']}, {hw['cores']} cores, {hw['os']} {hw['arch']}.{load_note} "
                  f"Toolchains: {tc['rustc']}; {tc['wasm-pack']}; {tc['maturin']}; bun {tc['bun']}; {tc['python']}. "
                  f"Profile: {art['profile']}.")
     if art["gates_nothing"]:
