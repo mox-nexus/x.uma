@@ -10,13 +10,11 @@ Matcher configs can come from untrusted sources — user-provided routing rules,
 
 **Threat:** Regular expression Denial of Service. A crafted regex pattern causes exponential backtracking, consuming CPU indefinitely.
 
-**Mitigation:** All implementations use RE2-class linear-time regex engines:
+**Mitigation:** The engine uses a linear-time regex engine, and both bindings run the engine:
 
-| Implementation | Regex Engine | Guarantee |
-|----------------|-------------|-----------|
+| Runtime | Regex Engine | Guarantee |
+|---------|-------------|-----------|
 | rumi (Rust) | `regex` crate (DFA) | Linear time, proven |
-| xuma (Python) | `google-re2` (C++ RE2 binding) | Linear time, Google RE2 |
-| xuma (TypeScript) | `re2js` (pure JS RE2 port) | Linear time, RE2 semantics |
 | xuma-crust (Python) | Rust `regex` via PyO3 | Same as rumi |
 | xuma-crust (TypeScript) | Rust `regex` via WASM | Same as rumi |
 
@@ -59,8 +57,7 @@ This is a security invariant, not a convenience feature. It ensures fail-closed 
 **Mitigation:**
 
 - **Rust:** All core types are `Send + Sync`. Matchers are immutable after construction and safe to share via `Arc<Matcher>`.
-- **Python:** All types use `@dataclass(frozen=True)`. Fields cannot be reassigned after construction.
-- **TypeScript:** All types use `readonly` fields.
+- **Bindings:** A compiled matcher is an opaque handle with no setters. The Python class is `#[pyclass(frozen)]`; the WebAssembly class exposes only `evaluate` and `trace`.
 - **Registry:** Immutable after `.build()`. The builder produces the registry, then the builder is consumed. No runtime registration.
 
 ## Construction-Time Validation

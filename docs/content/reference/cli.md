@@ -20,7 +20,7 @@ The CLI supports three matching domains. Each domain has its own registry of typ
 
 | Domain | Context | Description |
 |--------|---------|-------------|
-| *(default)* | Key-value pairs | Test domain (`xuma.kv.v1.*`) |
+| *(default)* | Key-value pairs | Key-value domain (`xuma.kv.v1.*`) |
 | `http` | HTTP request | Method, path, headers, query params (`xuma.http.v1.*`) |
 | `claude` | Hook event | Claude Code hook events (`xuma.claude.v1.*`) |
 
@@ -30,7 +30,7 @@ The CLI supports three matching domains. Each domain has its own registry of typ
 
 Run a config file against a context and print the resulting action.
 
-**Test domain (default):**
+**Key-value domain (default):**
 
 ```bash
 rumi run config.yaml --context method=GET path=/api
@@ -86,7 +86,7 @@ rumi check claude hooks.yaml
 
 Loads the config against the domain's registry (including type URL resolution and depth validation). Catches: unknown type URLs, invalid regex patterns, depth limit violations, malformed config.
 
-Prints `Config valid` on success. Exits with non-zero status on error.
+Prints `Config valid`, then the rule count, the input type URLs it resolved, and whether a fallback is set. Exits with non-zero status on error.
 
 ### info
 

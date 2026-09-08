@@ -3,9 +3,9 @@
 Rust-backed bindings for the [x.uma](https://github.com/mox-nexus/x.uma) matcher
 engine, built with PyO3.
 
-Same API surface as the pure-Python `xuma` package, and the same conformance
-suite. Reach for this when evaluation is hot enough that the Rust engine pays
-for the native dependency.
+The engine itself, in a wheel: the same protojson config the `rumi` CLI reads,
+and the same conformance suite (`spec/tests/07_protojson/`). A compiled matcher
+is an opaque, frozen handle; evaluation never leaves Rust.
 
 ```bash
 uv add xuma-crust

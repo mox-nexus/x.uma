@@ -24,15 +24,15 @@ The split happens at `MatchingData`. Above it, domain-specific code that knows a
 
 ## Why This Works
 
-The insight comes from Envoy, where it runs at Google scale. Envoy's xDS Unified Matcher API uses the same split — domain-specific inputs feed type-erased data into generic matchers. x.uma implements these semantics in Rust, Python, and TypeScript.
+The insight comes from Envoy, where it runs at Google scale. Envoy's xDS Unified Matcher API uses the same split — domain-specific inputs feed type-erased data into generic matchers. x.uma implements these semantics once, in Rust, and binds that engine to Python and TypeScript.
 
 What the seam buys:
 
 **Write a matcher once, use it everywhere.** `PrefixMatcher("/api")` matches HTTP paths, event source URIs, file paths — anything that produces a string through `MatchingData`. Five string matchers (`Exact`, `Prefix`, `Suffix`, `Contains`, `Regex`) cover most matching needs across all domains.
 
-**Add a domain without touching core.** HTTP matching, Claude Code hooks, and the test domain all plug in by implementing `DataInput` — a single method that extracts a value from the context. The core engine never changes.
+**Add a domain without touching core.** HTTP matching, Claude Code hooks, and the key-value domain all plug in by implementing `DataInput` — a single method that extracts a value from the context. The core engine never changes.
 
-**Share config across languages.** The same JSON/YAML config produces the same matcher tree in Rust, Python, and TypeScript. `MatchingData` is the same name, same semantics, in all three.
+**Share config across languages.** The same protojson document loads in the CLI, the Python binding and the TypeScript binding and produces the same decision, because one engine reads it in all three.
 
 ## The Shape
 
@@ -74,7 +74,7 @@ The architecture follows four properties:
 
 ## What Core Owns
 
-The core engine (`rumi` in Rust, `xuma` in Python/TypeScript) provides:
+The core engine, `rumi`, provides:
 
 - **Matcher** — first-match-wins evaluation over a list of field matchers
 - **Predicate** — Boolean tree (Single, And, Or, Not) with short-circuit evaluation

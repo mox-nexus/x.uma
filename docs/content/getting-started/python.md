@@ -73,6 +73,9 @@ onNoMatch:
 ```bash
 $ rumi check http routes.yaml
 Config valid
+  rules:     2
+  inputs:    xuma.http.v1.MethodInput, xuma.http.v1.PathInput
+  fallback:  yes
 ```
 
 ## Run with the CLI

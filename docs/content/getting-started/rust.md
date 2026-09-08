@@ -95,6 +95,9 @@ for the full schema.
 ```bash
 $ rumi check http routes.yaml
 Config valid
+  rules:     2
+  inputs:    xuma.http.v1.MethodInput, xuma.http.v1.PathInput
+  fallback:  yes
 ```
 
 Catches unknown type URLs, invalid regex patterns, and depth limit violations at load time.
@@ -200,12 +203,11 @@ let matcher = compile_route_matches(&routes, "allowed", Some("denied")).unwrap()
 // See the note below on getting one.
 ```
 
-`compile_route_matches` produces a `Matcher<HttpMessage, _>`, and `HttpMessage`
-is currently only constructible from an ext_proc `ProcessingRequest` — there is
-no public builder. So the Gateway API compiler is usable today from inside an
-ext_proc filter, but not from a scratch program. If you want to experiment
-locally, use the config path above with `HttpRequest`, which does have a
-builder.
+`compile_route_matches` produces a `Matcher<HttpMessage, _>`. Build an
+`HttpMessage` with `HttpMessageBuilder` (feature `message`) to evaluate from a
+plain program; an ext_proc filter gets one from the `ProcessingRequest` it is
+handed (feature `ext-proc`). The config path above uses `HttpRequest`, the
+simpler context the bindings expose; the two contexts merge under D-059.
 
 This requires `rumi-http` with the `gateway` feature. Nothing is enabled by
 default — `default = []` — so ask for what you need:

@@ -760,7 +760,7 @@ fn parse_claude_args(args: &[String]) -> Result<ClaudeArgs, String> {
     Ok(result)
 }
 
-/// Parse `--context key=value...` pairs (test domain).
+/// Parse `--context key=value...` pairs (key-value domain).
 fn parse_context_pairs(args: &[String]) -> Result<HashMap<String, String>, String> {
     let mut map = HashMap::new();
     let mut i = 0;

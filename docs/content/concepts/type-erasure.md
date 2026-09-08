@@ -53,13 +53,13 @@ let event_pred = SinglePredicate::new(Box::new(EventTypeInput), Box::new(ExactMa
 // `Arc::ptr_eq` identity comparison possible, and `CustomMatchData` carries the
 // `Send + Sync + Debug` bounds the FFI boundary needs.
 pub enum MatchingData {
-    None,
     String(String),
     Int(i64),
     Bool(bool),
     Bytes(Vec<u8>),
     Custom(Arc<dyn CustomMatchData>),
 }
+// Absence is not a variant. `DataInput::get` returns `Option<MatchingData>`.
 ```
 
 A `DataInput` produces it; an `InputMatcher` consumes it. Nothing else touches
