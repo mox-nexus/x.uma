@@ -1,4 +1,4 @@
-"""Tests for xuma-crust TestMatcher.
+"""Tests for xuma-crust KvMatcher.
 
 Covers:
 - Config-driven matcher loading from JSON
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from xuma_crust import TestMatcher as CrustTestMatcher
+from xuma_crust import KvMatcher as CrustTestMatcher
 
 
 FIXTURES_DIR = Path(__file__).resolve().parents[4] / "spec" / "tests" / "07_protojson"
@@ -408,4 +408,4 @@ class TestDeveloperExperience:
             }],
         }))
         matcher = CrustTestMatcher.from_config(config)
-        assert "TestMatcher" in repr(matcher)
+        assert "KvMatcher" in repr(matcher)

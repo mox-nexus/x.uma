@@ -150,8 +150,9 @@ pub struct SimpleAuthorityInput;
 
 impl DataInput<HttpRequest> for SimpleAuthorityInput {
     fn get(&self, ctx: &HttpRequest) -> MatchingData {
-        ctx.header(":authority")
-            .map_or(MatchingData::None, |a| MatchingData::String(a.to_string()))
+        ctx.header(":authority").map_or(MatchingData::Absent, |a| {
+            MatchingData::String(a.to_string())
+        })
     }
 }
 
@@ -161,8 +162,9 @@ pub struct SimpleSchemeInput;
 
 impl DataInput<HttpRequest> for SimpleSchemeInput {
     fn get(&self, ctx: &HttpRequest) -> MatchingData {
-        ctx.header(":scheme")
-            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
+        ctx.header(":scheme").map_or(MatchingData::Absent, |s| {
+            MatchingData::String(s.to_string())
+        })
     }
 }
 
@@ -183,8 +185,9 @@ impl SimpleHeaderInput {
 
 impl DataInput<HttpRequest> for SimpleHeaderInput {
     fn get(&self, ctx: &HttpRequest) -> MatchingData {
-        ctx.header(&self.name)
-            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
+        ctx.header(&self.name).map_or(MatchingData::Absent, |s| {
+            MatchingData::String(s.to_string())
+        })
     }
 }
 
@@ -204,7 +207,9 @@ impl SimpleQueryParamInput {
 impl DataInput<HttpRequest> for SimpleQueryParamInput {
     fn get(&self, ctx: &HttpRequest) -> MatchingData {
         ctx.query_param(&self.name)
-            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
+            .map_or(MatchingData::Absent, |s| {
+                MatchingData::String(s.to_string())
+            })
     }
 }
 
@@ -230,7 +235,7 @@ pub struct SimpleQueryParamInputConfig {
 }
 
 #[cfg(feature = "registry")]
-impl rumi::IntoDataInput<HttpRequest> for SimplePathInput {
+impl rumi::DataInputFactory<HttpRequest> for SimplePathInput {
     type Config = rumi::UnitConfig;
 
     fn from_config(
@@ -241,7 +246,7 @@ impl rumi::IntoDataInput<HttpRequest> for SimplePathInput {
 }
 
 #[cfg(feature = "registry")]
-impl rumi::IntoDataInput<HttpRequest> for SimpleMethodInput {
+impl rumi::DataInputFactory<HttpRequest> for SimpleMethodInput {
     type Config = rumi::UnitConfig;
 
     fn from_config(
@@ -252,7 +257,7 @@ impl rumi::IntoDataInput<HttpRequest> for SimpleMethodInput {
 }
 
 #[cfg(feature = "registry")]
-impl rumi::IntoDataInput<HttpRequest> for SimpleAuthorityInput {
+impl rumi::DataInputFactory<HttpRequest> for SimpleAuthorityInput {
     type Config = rumi_proto::xuma::http::v1::AuthorityInput;
 
     fn from_config(
@@ -263,7 +268,7 @@ impl rumi::IntoDataInput<HttpRequest> for SimpleAuthorityInput {
 }
 
 #[cfg(feature = "registry")]
-impl rumi::IntoDataInput<HttpRequest> for SimpleSchemeInput {
+impl rumi::DataInputFactory<HttpRequest> for SimpleSchemeInput {
     type Config = rumi_proto::xuma::http::v1::SchemeInput;
 
     fn from_config(
@@ -274,7 +279,7 @@ impl rumi::IntoDataInput<HttpRequest> for SimpleSchemeInput {
 }
 
 #[cfg(feature = "registry")]
-impl rumi::IntoDataInput<HttpRequest> for SimpleHeaderInput {
+impl rumi::DataInputFactory<HttpRequest> for SimpleHeaderInput {
     type Config = SimpleHeaderInputConfig;
 
     fn from_config(
@@ -285,7 +290,7 @@ impl rumi::IntoDataInput<HttpRequest> for SimpleHeaderInput {
 }
 
 #[cfg(feature = "registry")]
-impl rumi::IntoDataInput<HttpRequest> for SimpleQueryParamInput {
+impl rumi::DataInputFactory<HttpRequest> for SimpleQueryParamInput {
     type Config = SimpleQueryParamInputConfig;
 
     fn from_config(

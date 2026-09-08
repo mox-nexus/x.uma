@@ -22,7 +22,7 @@ Launch the constraint-auditor agent to perform a comprehensive audit of the x.um
 3. Type Registry Immutable
 4. Send + Sync + Debug
 5. Iterative Evaluation
-6. DataInput None → false
+6. DataInput Absent → false
 7. OnMatch is Exclusive
 8. Action: 'static
 9. Action: Clone + Send + Sync

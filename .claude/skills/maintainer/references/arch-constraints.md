@@ -8,7 +8,7 @@ Indexed list of x.uma's protocol obligations. Inspired by rust-analyzer's 26 lab
 
 | # | Invariant | Enforcement |
 |---|-----------|-------------|
-| INV-1 | `DataInput::get() → None` → predicate evaluates to `false` | Conformance tests |
+| INV-1 | `DataInput::get() → Absent` → predicate evaluates to `false` | Conformance tests |
 | INV-2 | First-match-wins in `Matcher::evaluate()` | Conformance tests |
 | INV-3 | `EvalTrace.result` always equals `evaluate()` result | Unit test assertion |
 | INV-4 | `OnMatch` is exclusive — Action XOR Matcher, never both | Rust enum (type-level) |
@@ -29,7 +29,7 @@ When adding code that touches the evaluation or config-loading pipeline, verify 
 | 3 | **Type Registry Immutable** | Vector, Lamport | Thread-safety: no runtime registration |
 | 4 | **Send + Sync + Debug** | Lamport, Wolf | FFI requirement for all public types |
 | 5 | **Iterative Evaluation** | Taleb, Dijkstra | Prevent recursion-induced stack overflow |
-| 6 | **DataInput None → false** | Dijkstra | Missing data fails fast, doesn't panic |
+| 6 | **DataInput Absent → false** | Dijkstra | Missing data fails fast, doesn't panic |
 | 7 | **OnMatch is Exclusive** | xDS spec, Dijkstra | Action XOR Matcher, not both |
 | 8 | **Action: 'static** | Wolf | Lifetime simplicity for FFI |
 | 9 | **Action: Clone + Send + Sync** | Wolf | Clone needed for first-match-wins |
@@ -109,7 +109,7 @@ grep -r "\.evaluate(" rumi/src/
 
 **Why:** Deep recursion causes stack overflow. Use explicit stack/queue for tree traversal.
 
-### 6. DataInput None → false
+### 6. DataInput Absent → false
 
 **Check:** Conformance tests verify this behavior.
 

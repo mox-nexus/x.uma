@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::process;
 
 use rumi::claude::HookContext;
-use rumi::{MatcherConfig, MatcherKindConfig, TreeTypeConfig, TypedConfig};
+use rumi::{MatcherIr, MatcherKindIr, TreeTypeIr, TypedExtensionConfig};
 use rumi_http::HttpRequest;
 use rumi_kv::KvContext;
 use rumi_proto::any_resolver::{AnyResolver, AnyResolverBuilder};
@@ -104,7 +104,7 @@ fn cmd_check(args: &[String]) -> Result<(), String> {
     // one, which for a gate is the difference that matters.
     let has_fallback = config.on_no_match.is_some();
     let (rule_count, mut inputs): (usize, Vec<String>) = match &config.kind {
-        MatcherKindConfig::List(matchers) => (
+        MatcherKindIr::List(matchers) => (
             matchers.len(),
             matchers
                 .iter()
@@ -115,9 +115,9 @@ fn cmd_check(args: &[String]) -> Result<(), String> {
         // the input list has exactly one member. Reporting zero rules for a
         // tree would read as an empty config, which for a gate is the
         // difference that matters.
-        MatcherKindConfig::Tree(tree) => {
+        MatcherKindIr::Tree(tree) => {
             let entries = match &tree.tree {
-                TreeTypeConfig::ExactMatchMap(e) | TreeTypeConfig::PrefixMatchMap(e) => e.len(),
+                TreeTypeIr::ExactMatchMap(e) | TreeTypeIr::PrefixMatchMap(e) => e.len(),
             };
             (entries, vec![tree.input.type_url.clone()])
         }
@@ -171,8 +171,8 @@ fn cmd_check(args: &[String]) -> Result<(), String> {
 }
 
 /// Collect the input type URLs a predicate tree references, recursively.
-fn collect_input_urls(predicate: &rumi::PredicateConfig) -> Vec<String> {
-    use rumi::PredicateConfig as P;
+fn collect_input_urls(predicate: &rumi::PredicateIr) -> Vec<String> {
+    use rumi::PredicateIr as P;
     match predicate {
         P::Single(single) => vec![single.input.type_url.clone()],
         P::And { predicates } | P::Or { predicates } => {
@@ -592,7 +592,7 @@ fn build_resolver() -> AnyResolver {
 /// a CLI that gates tool calls the caller then decides polarity by accident.
 struct NamedActionFactory;
 
-impl rumi::IntoAction<String> for NamedActionFactory {
+impl rumi::ActionFactory<String> for NamedActionFactory {
     type Config = rumi_proto::xuma::core::v1::NamedAction;
 
     fn from_config(config: Self::Config) -> Result<String, rumi::MatcherError> {
@@ -616,7 +616,7 @@ fn build_actions() -> rumi::ActionRegistry<String> {
 /// YAML and JSON are both accepted and both parse to the same document before
 /// anything interprets it, so the two syntaxes cannot mean different things.
 #[cfg(test)]
-fn load_config_str(yaml: &str) -> Result<MatcherConfig<TypedConfig>, String> {
+fn load_config_str(yaml: &str) -> Result<MatcherIr<TypedExtensionConfig>, String> {
     let document: serde_json::Value =
         serde_yaml::from_str(yaml).map_err(|e| format!("YAML parse error: {e}"))?;
     let resolver = build_resolver();
@@ -624,7 +624,7 @@ fn load_config_str(yaml: &str) -> Result<MatcherConfig<TypedConfig>, String> {
     convert_matcher(&proto, &resolver).map_err(|e| format!("{e}"))
 }
 
-fn load_config(path: &str) -> Result<MatcherConfig<TypedConfig>, String> {
+fn load_config(path: &str) -> Result<MatcherIr<TypedExtensionConfig>, String> {
     let content =
         std::fs::read_to_string(path).map_err(|e| format!("failed to read \"{path}\": {e}"))?;
 

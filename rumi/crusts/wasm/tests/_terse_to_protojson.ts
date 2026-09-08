@@ -2,7 +2,7 @@
  * Translates the retired terse config dialect into canonical protojson.
  *
  * Test-only, and deliberately so: the *shipped* schema is protojson, full
- * stop -- rumi's MatcherConfig knows nothing else. This module exists because these crust tests were
+ * stop -- rumi reads nothing else. This module exists because these crust tests were
  * written against the terse dialect's compact literal shape, and rewriting a
  * thousand lines of nested object literals by hand is exactly the kind of
  * transcription work that introduces the bug it's supposed to avoid -- the

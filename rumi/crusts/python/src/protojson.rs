@@ -1,6 +1,6 @@
 //! Loading a config over FFI: canonical protojson, in.
 //!
-//! `from_config` used to accept the terse dialect via `MatcherConfig<String>`'s
+//! `from_config` used to accept the terse dialect via `MatcherIr<String>`'s
 //! `Deserialize` impl. That dialect is retired — DECISIONS.md D-026 — so this
 //! is the only door now: protojson in, `Matcher` out, using the same
 //! `AnyResolver` and `convert_matcher` rumi and the CLI use.
@@ -16,7 +16,7 @@ use rumi_proto::protojson::parse_matcher;
 /// Everything a crust config can name.
 ///
 /// An `AnyResolver` decodes `Any` payloads and never touches a matching
-/// context, so one resolver serves both `TestMatcher` and `HttpMatcher`.
+/// context, so one resolver serves both `KvMatcher` and `HttpMatcher`.
 pub fn resolver() -> AnyResolver {
     use rumi_proto::xuma;
 
@@ -39,7 +39,7 @@ pub fn resolver() -> AnyResolver {
 /// false — no decision. This one makes the rule *fire* and return `""`.
 struct NamedActionFactory;
 
-impl rumi::IntoAction<String> for NamedActionFactory {
+impl rumi::ActionFactory<String> for NamedActionFactory {
     type Config = rumi_proto::xuma::core::v1::NamedAction;
 
     fn from_config(config: Self::Config) -> Result<String, rumi::MatcherError> {
@@ -58,13 +58,13 @@ pub fn actions() -> rumi::ActionRegistry<String> {
         .build()
 }
 
-/// Parse a JSON string as canonical protojson into the runtime `MatcherConfig`
+/// Parse a JSON string as canonical protojson into the runtime `MatcherIr`
 /// the registry consumes.
 ///
 /// # Errors
 ///
 /// If the JSON does not parse, or is not a valid `xds.type.matcher.v3.Matcher`.
-pub fn load(json_config: &str) -> Result<rumi::MatcherConfig<rumi::TypedConfig>, String> {
+pub fn load(json_config: &str) -> Result<rumi::MatcherIr<rumi::TypedExtensionConfig>, String> {
     let document: serde_json::Value =
         serde_json::from_str(json_config).map_err(|e| format!("invalid config JSON: {e}"))?;
     let resolver = resolver();

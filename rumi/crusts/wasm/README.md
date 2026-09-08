@@ -55,7 +55,7 @@ matcher.evaluate({ method: "GET", path: "/api/users" }); // "api"
 matcher.evaluate({ method: "GET", path: "/other" });     // undefined
 ```
 
-`HookMatcher` compiles Claude Code hook rules the same way, and `TestMatcher`
+`HookMatcher` compiles Claude Code hook rules the same way, and `KvMatcher`
 runs conformance fixtures.
 
 ## A rule with no conditions is refused

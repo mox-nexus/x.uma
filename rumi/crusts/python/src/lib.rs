@@ -7,16 +7,16 @@
 //!
 //! - [`HookMatcher`] — Claude Code hook matching (typed Python config)
 //! - [`HttpMatcher`] — HTTP request matching (JSON config via registry)
-//! - [`TestMatcher`] — Key-value matching for conformance testing (JSON config via registry)
+//! - [`KvMatcher`] — key-value matching over `xuma.kv.v1` inputs; the conformance domain
 
 mod config;
 mod convert;
 #[cfg(feature = "fixtures")]
 mod fixtures;
 mod http_matcher;
+mod kv_matcher;
 pub(crate) mod matcher;
 mod protojson;
-mod test_matcher;
 
 use pyo3::prelude::*;
 
@@ -30,7 +30,7 @@ fn xuma_crust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Compiled matchers
     m.add_class::<matcher::HookMatcher>()?;
     m.add_class::<http_matcher::HttpMatcher>()?;
-    m.add_class::<test_matcher::TestMatcher>()?;
+    m.add_class::<kv_matcher::KvMatcher>()?;
 
     // Trace types (shared across all matchers)
     m.add_class::<matcher::PyTraceResult>()?;

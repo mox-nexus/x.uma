@@ -151,7 +151,7 @@ Non-negotiable. Every change must preserve these:
 
 | # | Invariant | What Breaks If Violated |
 |---|-----------|------------------------|
-| INV-1 | `DataInput::get() → None` → predicate evaluates to `false` | Fail-open security — missing data could match |
+| INV-1 | `DataInput::get() → Absent` → predicate evaluates to `false` | Fail-open security — missing data could match |
 | INV-2 | First-match-wins in `Matcher::evaluate()` | Semantic change — different action returned |
 | INV-3 | `EvalTrace.result` always equals `evaluate()` result | Debug output lies — trace shows wrong result |
 | INV-4 | `OnMatch` is exclusive — Action XOR Matcher, never both | Ambiguous semantics — which takes precedence? |
@@ -201,7 +201,7 @@ Config (JSON/Python dict/JS object) → Compile in Rust → Evaluate in Rust →
 | `thiserror` or manual? | Manual `Display` + `Error` | ripgrep, rust-analyzer, hyper all hand-write errors |
 | Add a type parameter? | Only if it serves >5% of uses | axum removed `B` (body type) because it infected everything |
 | Optimize evaluation? | Measure first. 33ns is the baseline. | ripgrep: buffer size matters more than algorithm |
-| Change `MatcherConfig` shape? | **Never.** Format is frozen. | rust-analyzer: "by the time you have first users, it is already de-facto stable" |
+| Change the protojson schema? | **Never after publish.** `MatcherIr` is internal and may change; what `from_config` accepts may not (D-053). | rust-analyzer: "by the time you have first users, it is already de-facto stable" |
 | Feature flag behavior? | Strictly additive. | tokio, rustls: features add capabilities, never change semantics |
 | `&self` or `&mut self`? | `&self` for core traits. | hyper: `&self` enables the full wrapper algebra. `&mut self` breaks FFI. |
 | Clone action in hot path? | `action.clone()` is fine at 33ns. | Measure before switching to `Arc<str>`. |

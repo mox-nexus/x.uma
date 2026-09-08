@@ -12,10 +12,10 @@
 //!
 //! - [`xds`] — Upstream xDS types (Matcher, StringMatcher, TypedExtensionConfig)
 //! - [`xuma`] — x.uma extension types (domain inputs, contexts, actions)
-//! - [`any_resolver`] — Decodes `Any` payloads into `TypedConfig` for registry use
+//! - [`any_resolver`] — Decodes `Any` payloads into `TypedExtensionConfig` for registry use
 //! - [`protojson`] — Supplies the one part of canonical protojson that static
 //!   codegen cannot: `@type` expansion for `Any`
-//! - [`convert`] — Converts proto `Matcher` to `MatcherConfig<TypedConfig>`
+//! - [`convert`] — Converts proto `Matcher` to `MatcherIr<TypedExtensionConfig>`
 
 #![allow(
     clippy::all,

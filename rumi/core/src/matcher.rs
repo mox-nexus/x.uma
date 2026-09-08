@@ -499,14 +499,8 @@ impl<Ctx, A: Clone + Send + Sync + Debug + 'static> Debug for Matcher<Ctx, A> {
     }
 }
 
-// A `Clone` impl bounded on `FieldMatcher<Ctx, A>: Clone` stood here. It could
-// never be instantiated: `FieldMatcher` holds a `Predicate`, which holds a
-// `Box<dyn DataInput<Ctx>>`, and a trait object is not `Clone` for any `Ctx`.
-// Nothing in five implementations ever cloned a `Matcher`.
-
-// Note: No unsafe impl needed — compiler derives Send/Sync automatically
-// because all fields (Vec<FieldMatcher>, Option<OnMatch>, PhantomData) are Send/Sync
-// when their type parameters are.
+// `Send` and `Sync` are derived, never `unsafe impl`'d, so the FFI bound is
+// proved by the compiler rather than promised.
 
 #[cfg(test)]
 mod tests {
@@ -1060,7 +1054,7 @@ mod tests {
         struct AbsentInput;
         impl DataInput<TestCtx> for AbsentInput {
             fn get(&self, _ctx: &TestCtx) -> MatchingData {
-                MatchingData::None
+                MatchingData::Absent
             }
         }
 

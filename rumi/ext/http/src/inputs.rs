@@ -14,8 +14,9 @@ pub struct PathInput;
 
 impl DataInput<HttpMessage> for PathInput {
     fn get(&self, ctx: &HttpMessage) -> MatchingData {
-        ctx.path()
-            .map_or(MatchingData::None, |p| MatchingData::String(p.to_string()))
+        ctx.path().map_or(MatchingData::Absent, |p| {
+            MatchingData::String(p.to_string())
+        })
     }
 }
 
@@ -27,8 +28,9 @@ pub struct MethodInput;
 
 impl DataInput<HttpMessage> for MethodInput {
     fn get(&self, ctx: &HttpMessage) -> MatchingData {
-        ctx.method()
-            .map_or(MatchingData::None, |m| MatchingData::String(m.to_string()))
+        ctx.method().map_or(MatchingData::Absent, |m| {
+            MatchingData::String(m.to_string())
+        })
     }
 }
 
@@ -64,8 +66,9 @@ impl HeaderInput {
 
 impl DataInput<HttpMessage> for HeaderInput {
     fn get(&self, ctx: &HttpMessage) -> MatchingData {
-        ctx.header(&self.name)
-            .map_or(MatchingData::None, |v| MatchingData::String(v.to_string()))
+        ctx.header(&self.name).map_or(MatchingData::Absent, |v| {
+            MatchingData::String(v.to_string())
+        })
     }
 }
 
@@ -99,7 +102,9 @@ impl QueryParamInput {
 impl DataInput<HttpMessage> for QueryParamInput {
     fn get(&self, ctx: &HttpMessage) -> MatchingData {
         ctx.query_param(&self.name)
-            .map_or(MatchingData::None, |v| MatchingData::String(v.to_string()))
+            .map_or(MatchingData::Absent, |v| {
+                MatchingData::String(v.to_string())
+            })
     }
 }
 
@@ -109,8 +114,9 @@ pub struct SchemeInput;
 
 impl DataInput<HttpMessage> for SchemeInput {
     fn get(&self, ctx: &HttpMessage) -> MatchingData {
-        ctx.scheme()
-            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
+        ctx.scheme().map_or(MatchingData::Absent, |s| {
+            MatchingData::String(s.to_string())
+        })
     }
 }
 
@@ -120,8 +126,9 @@ pub struct AuthorityInput;
 
 impl DataInput<HttpMessage> for AuthorityInput {
     fn get(&self, ctx: &HttpMessage) -> MatchingData {
-        ctx.authority()
-            .map_or(MatchingData::None, |a| MatchingData::String(a.to_string()))
+        ctx.authority().map_or(MatchingData::Absent, |a| {
+            MatchingData::String(a.to_string())
+        })
     }
 }
 
@@ -153,7 +160,7 @@ mod configs {
     /// still need a `Config` type — their proto messages are empty ones.
     macro_rules! unit_input {
         ($input:ty, $config:ty) => {
-            impl rumi::IntoDataInput<HttpMessage> for $input {
+            impl rumi::DataInputFactory<HttpMessage> for $input {
                 type Config = $config;
 
                 fn from_config(
@@ -170,7 +177,7 @@ mod configs {
     unit_input!(SchemeInput, proto::SchemeInput);
     unit_input!(AuthorityInput, proto::AuthorityInput);
 
-    impl rumi::IntoDataInput<HttpMessage> for HeaderInput {
+    impl rumi::DataInputFactory<HttpMessage> for HeaderInput {
         type Config = proto::HeaderInput;
 
         fn from_config(
@@ -180,7 +187,7 @@ mod configs {
         }
     }
 
-    impl rumi::IntoDataInput<HttpMessage> for QueryParamInput {
+    impl rumi::DataInputFactory<HttpMessage> for QueryParamInput {
         type Config = proto::QueryParamInput;
 
         fn from_config(
@@ -277,7 +284,7 @@ mod tests {
     fn path_input_returns_none_when_missing() {
         let msg = ProcessingRequestBuilder::new().method("GET").build();
         let input = PathInput;
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), MatchingData::Absent);
     }
 
     #[test]
@@ -314,7 +321,7 @@ mod tests {
     fn method_input_returns_none_when_missing() {
         let msg = ProcessingRequestBuilder::new().path("/").build();
         let input = MethodInput;
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), MatchingData::Absent);
     }
 
     // ========== HeaderInput Tests ==========
@@ -347,7 +354,7 @@ mod tests {
             .header("content-type", "text/plain")
             .build();
         let input = HeaderInput::new("authorization").unwrap();
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), MatchingData::Absent);
     }
 
     #[test]
@@ -397,21 +404,21 @@ mod tests {
     fn query_param_input_returns_none_when_missing() {
         let msg = ProcessingRequestBuilder::new().path("/api?page=1").build();
         let input = QueryParamInput::new("limit").unwrap();
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), MatchingData::Absent);
     }
 
     #[test]
     fn query_param_input_returns_none_when_no_query_string() {
         let msg = ProcessingRequestBuilder::new().path("/api").build();
         let input = QueryParamInput::new("page").unwrap();
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), MatchingData::Absent);
     }
 
     #[test]
     fn query_param_input_returns_none_when_no_path() {
         let msg = ProcessingRequestBuilder::new().method("GET").build();
         let input = QueryParamInput::new("page").unwrap();
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), MatchingData::Absent);
     }
 
     // ========== SchemeInput Tests ==========
@@ -434,7 +441,7 @@ mod tests {
     fn scheme_input_returns_none_when_missing() {
         let msg = ProcessingRequestBuilder::new().path("/").build();
         let input = SchemeInput;
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), MatchingData::Absent);
     }
 
     // ========== AuthorityInput Tests ==========
@@ -464,7 +471,7 @@ mod tests {
     fn authority_input_returns_none_when_missing() {
         let msg = ProcessingRequestBuilder::new().path("/").build();
         let input = AuthorityInput;
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), MatchingData::Absent);
     }
 
     // ========== Combined/Integration Tests ==========
@@ -513,17 +520,17 @@ mod tests {
         // An empty message: no transport needed to assert INV-1.
         let msg = HttpMessageBuilder::new().build();
 
-        assert_eq!(PathInput.get(&msg), MatchingData::None);
-        assert_eq!(MethodInput.get(&msg), MatchingData::None);
-        assert_eq!(SchemeInput.get(&msg), MatchingData::None);
-        assert_eq!(AuthorityInput.get(&msg), MatchingData::None);
+        assert_eq!(PathInput.get(&msg), MatchingData::Absent);
+        assert_eq!(MethodInput.get(&msg), MatchingData::Absent);
+        assert_eq!(SchemeInput.get(&msg), MatchingData::Absent);
+        assert_eq!(AuthorityInput.get(&msg), MatchingData::Absent);
         assert_eq!(
             HeaderInput::new("any").unwrap().get(&msg),
-            MatchingData::None
+            MatchingData::Absent
         );
         assert_eq!(
             QueryParamInput::new("any").unwrap().get(&msg),
-            MatchingData::None
+            MatchingData::Absent
         );
     }
 }

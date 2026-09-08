@@ -422,13 +422,13 @@ impl InputMatcher for StringMatcher {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// IntoInputMatcher impls (feature = "registry")
+// InputMatcherFactory impls (feature = "registry")
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[cfg(feature = "registry")]
 mod into_input_matcher {
     use super::{BoolMatcher, InputMatcher, StringMatcher};
-    use crate::registry::IntoInputMatcher;
+    use crate::registry::InputMatcherFactory;
     use crate::MatcherError;
     use serde::Deserialize;
 
@@ -441,7 +441,7 @@ mod into_input_matcher {
         pub expected: bool,
     }
 
-    impl IntoInputMatcher for BoolMatcher {
+    impl InputMatcherFactory for BoolMatcher {
         type Config = BoolMatcherConfig;
 
         fn from_config(config: Self::Config) -> Result<Box<dyn InputMatcher>, MatcherError> {
@@ -484,7 +484,7 @@ mod into_input_matcher {
         pub ignore_case: bool,
     }
 
-    impl IntoInputMatcher for StringMatcher {
+    impl InputMatcherFactory for StringMatcher {
         type Config = StringMatcherConfig;
 
         fn from_config(config: Self::Config) -> Result<Box<dyn InputMatcher>, MatcherError> {
@@ -520,7 +520,7 @@ mod tests {
         assert!(matcher.matches(&"hello".into()));
         assert!(!matcher.matches(&"Hello".into()));
         assert!(!matcher.matches(&"hello world".into()));
-        assert!(!matcher.matches(&MatchingData::None));
+        assert!(!matcher.matches(&MatchingData::Absent));
         assert!(!matcher.matches(&MatchingData::Int(42)));
     }
 
@@ -530,7 +530,7 @@ mod tests {
         assert!(matcher.matches(&"/api/users".into()));
         assert!(matcher.matches(&"/api/".into()));
         assert!(!matcher.matches(&"/users".into()));
-        assert!(!matcher.matches(&MatchingData::None));
+        assert!(!matcher.matches(&MatchingData::Absent));
     }
 
     #[test]

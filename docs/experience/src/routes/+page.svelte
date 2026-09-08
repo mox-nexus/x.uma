@@ -62,12 +62,12 @@ matcher.evaluate(&ctx)   // Some("read-handler")`
 		},
 		{
 			lang: 'Python',
-			code: `matcher = TestMatcher.from_config(config)
+			code: `matcher = KvMatcher.from_config(config)
 matcher.evaluate(ctx)    # "read-handler"`
 		},
 		{
 			lang: 'TypeScript',
-			code: `const matcher = TestMatcher.fromConfig(config);
+			code: `const matcher = KvMatcher.fromConfig(config);
 matcher.evaluate(ctx);   // "read-handler"`
 		}
 	];

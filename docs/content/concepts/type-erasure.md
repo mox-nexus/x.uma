@@ -100,7 +100,7 @@ one implementation, every language.
 
 ## The None Convention
 
-When a `DataInput` returns `MatchingData::None` (data not present), the predicate evaluates to `false` without calling the matcher.
+When a `DataInput` returns `MatchingData::Absent` (data not present), the predicate evaluates to `false` without calling the matcher.
 
 ```rust
 use rumi::prelude::*;
@@ -116,7 +116,7 @@ let request = HttpRequest::builder().method("GET").path("/").build();
 assert!(!predicate.evaluate(&request));
 ```
 
-The matcher never sees `None`. Missing data is handled upstream. This is a security guarantee: missing data never accidentally matches, in the engine and therefore in every binding.
+The matcher never sees `Absent`. Missing data is handled upstream. This is a security guarantee: missing data never accidentally matches, in the engine and therefore in every binding.
 
 ## Next
 

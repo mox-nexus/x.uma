@@ -20,7 +20,7 @@
 //! 2. **Non-generic `InputMatcher`**: The same `ExactMatcher` works for HTTP, Claude,
 //!    test contexts, etc. Matchers are domain-agnostic.
 //!
-//! 3. **`DataInput` None → false**: When a `DataInput` returns `MatchingData::None`,
+//! 3. **`DataInput` Absent → false**: When a `DataInput` returns `MatchingData::Absent`,
 //!    the predicate evaluates to `false`. This is a critical invariant.
 //!
 //! # Example
@@ -69,10 +69,6 @@
 //! - [`rumi-http`](https://docs.rs/rumi-http) — HTTP request matching (separate crate)
 //! - [`rumi-test`](https://docs.rs/rumi-test) — Test domain for conformance (internal)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Modules
-// ═══════════════════════════════════════════════════════════════════════════════
-
 mod data_input;
 mod field_matcher;
 mod input_matcher;
@@ -89,15 +85,10 @@ mod trace;
 pub mod claude;
 
 #[cfg(feature = "registry")]
-mod config;
+mod ir;
 #[cfg(feature = "registry")]
 mod registry;
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Public API
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Core types
 pub use data_input::DataInput;
 pub use field_matcher::FieldMatcher;
 pub use input_matcher::InputMatcher;
@@ -109,32 +100,24 @@ pub use predicate::{Predicate, SinglePredicate};
 pub use radix_tree::RadixTree;
 pub use string_match::StringMatchSpec;
 
-// Registry (feature-gated)
 #[cfg(feature = "registry")]
-pub use config::{
-    FieldMatcherConfig, MatcherConfig, MatcherKindConfig, MatcherTreeConfig, OnMatchConfig,
-    PredicateConfig, SinglePredicateConfig, TreeTypeConfig, TypedConfig, UnitConfig,
-    ValueMatchConfig,
+pub use ir::{
+    FieldMatcherIr, MatcherIr, MatcherKindIr, MatcherTreeIr, OnMatchIr, PredicateIr,
+    SinglePredicateIr, TreeTypeIr, TypedExtensionConfig, UnitConfig, ValueMatchIr,
 };
 #[cfg(feature = "registry")]
 pub use registry::{
-    register_core_matchers, ActionRegistry, ActionRegistryBuilder, IntoAction, IntoDataInput,
-    IntoInputMatcher, Registry, RegistryBuilder,
+    register_core_matchers, ActionFactory, ActionRegistry, ActionRegistryBuilder, DataInputFactory,
+    InputMatcherFactory, Registry, RegistryBuilder,
 };
 
-// Trace types
 pub use trace::{
     EvalStep, EvalSteps, EvalTrace, OnMatchTrace, PredicateTrace, TreeKind, TreeLookupTrace,
 };
 
-// Concrete matchers
 pub use input_matcher::{
     BoolMatcher, ContainsMatcher, ExactMatcher, PrefixMatcher, StringMatcher, SuffixMatcher,
 };
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Prelude
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Prelude module for convenient imports.
 ///
@@ -143,52 +126,24 @@ pub use input_matcher::{
 /// ```
 pub mod prelude {
     pub use crate::{
-        // Concrete matchers
-        BoolMatcher,
-        ContainsMatcher,
-        // Traits
-        CustomMatchData,
-        DataInput,
-        // Trace types
-        EvalStep,
-        EvalTrace,
-        ExactMatcher,
-        // Core types
-        FieldMatcher,
-        InputMatcher,
-        Matcher,
-        // Errors
-        MatcherError,
-        MatcherTree,
-        MatchingData,
-        OnMatch,
-        OnMatchTrace,
-        Predicate,
-        PredicateTrace,
-        PrefixMatcher,
-        RadixTree,
-        SinglePredicate,
-        // Config types
-        StringMatchSpec,
-        StringMatcher,
-        SuffixMatcher,
+        BoolMatcher, ContainsMatcher, CustomMatchData, DataInput, EvalStep, EvalTrace,
+        ExactMatcher, FieldMatcher, InputMatcher, Matcher, MatcherError, MatcherTree, MatchingData,
+        OnMatch, OnMatchTrace, Predicate, PredicateTrace, PrefixMatcher, RadixTree,
+        SinglePredicate, StringMatchSpec, StringMatcher, SuffixMatcher,
     };
 
     /// Registry types, so `use rumi::prelude::*` is enough to load a config.
     ///
-    /// `MatcherConfig` is deliberately absent: the config format is moving to
+    /// `MatcherIr` is deliberately absent: the config format is moving to
     /// protojson and the hand-written type is being retired, so exporting it
     /// here would add a name in one release and remove it in the next. Import
-    /// it directly as `rumi::MatcherConfig` until the replacement lands.
+    /// it directly as `rumi::MatcherIr` until the replacement lands.
     #[cfg(feature = "registry")]
     pub use crate::{
-        IntoDataInput, IntoInputMatcher, Registry, RegistryBuilder, TypedConfig, UnitConfig,
+        DataInputFactory, InputMatcherFactory, Registry, RegistryBuilder, TypedExtensionConfig,
+        UnitConfig,
     };
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Constants
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Maximum allowed depth for nested matchers.
 ///
@@ -230,10 +185,6 @@ pub const MAX_PATTERN_LENGTH: usize = 8192;
 /// Shorter limit than [`MAX_PATTERN_LENGTH`] because regex complexity scales
 /// faster than literal matching.
 pub const MAX_REGEX_PATTERN_LENGTH: usize = 4096;
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Errors
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Errors from matcher construction and validation.
 ///

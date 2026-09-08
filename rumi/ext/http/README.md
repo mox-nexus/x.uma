@@ -13,25 +13,25 @@ the same matcher directly, so it stays self-contained:
 # #[cfg(feature = "registry")] {
 use rumi::prelude::*;
 use rumi::{
-    FieldMatcherConfig, MatcherConfig, OnMatchConfig, PredicateConfig, RegistryBuilder,
-    SinglePredicateConfig, StringMatchSpec, TypedConfig, ValueMatchConfig,
+    FieldMatcherIr, MatcherIr, OnMatchIr, PredicateIr, RegistryBuilder,
+    SinglePredicateIr, StringMatchSpec, TypedExtensionConfig, ValueMatchIr,
 };
 use rumi_http::{register_simple, HttpRequest};
 
 let registry = register_simple(RegistryBuilder::new()).build();
 
-let config = MatcherConfig::list(vec![FieldMatcherConfig {
-        predicate: PredicateConfig::Single(SinglePredicateConfig {
-            input: TypedConfig {
+let config = MatcherIr::list(vec![FieldMatcherIr {
+        predicate: PredicateIr::Single(SinglePredicateIr {
+            input: TypedExtensionConfig {
                 type_url: "xuma.http.v1.PathInput".into(),
                 config: serde_json::json!({}),
             },
-            matcher: ValueMatchConfig::BuiltIn {
+            matcher: ValueMatchIr::BuiltIn {
                 spec: StringMatchSpec::Prefix("/api".into()),
                 ignore_case: false,
             },
         }),
-        on_match: OnMatchConfig::Action {
+        on_match: OnMatchIr::Action {
             action: "api_read".to_string(),
         },
 }]);

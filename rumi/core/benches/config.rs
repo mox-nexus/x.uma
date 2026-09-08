@@ -6,7 +6,7 @@
 //! These configs are canonical protojson, and the benchmark walks the whole
 //! shipping path: `parse_matcher` (which expands `@type` bodies) then
 //! `load_proto_matcher`. Until 2026-08-18 it instead measured a terser JSON
-//! dialect deserialized straight into `MatcherConfig`, which was always
+//! dialect deserialized straight into `MatcherIr`, which was always
 //! cheaper than what any caller actually ran and, once that dialect was
 //! retired, measured nothing that existed.
 
@@ -200,7 +200,7 @@ fn resolver() -> AnyResolver {
 /// `NamedAction` -> `String`, mirroring what the conformance runner registers.
 struct NamedActionFactory;
 
-impl rumi::IntoAction<String> for NamedActionFactory {
+impl rumi::ActionFactory<String> for NamedActionFactory {
     type Config = rumi_proto::xuma::core::v1::NamedAction;
 
     fn from_config(config: Self::Config) -> Result<String, rumi::MatcherError> {

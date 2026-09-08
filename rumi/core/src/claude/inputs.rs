@@ -51,8 +51,9 @@ impl ToolArgInput {
 
 impl DataInput<HookContext> for ToolArgInput {
     fn get(&self, ctx: &HookContext) -> MatchingData {
-        ctx.argument(&self.name)
-            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
+        ctx.argument(&self.name).map_or(MatchingData::Absent, |s| {
+            MatchingData::String(s.to_string())
+        })
     }
 }
 
@@ -82,8 +83,9 @@ pub struct GitBranchInput;
 
 impl DataInput<HookContext> for GitBranchInput {
     fn get(&self, ctx: &HookContext) -> MatchingData {
-        ctx.git_branch()
-            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
+        ctx.git_branch().map_or(MatchingData::Absent, |s| {
+            MatchingData::String(s.to_string())
+        })
     }
 }
 
@@ -100,7 +102,7 @@ pub struct ToolArgInputConfig {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for EventTypeInput {
+impl crate::DataInputFactory<HookContext> for EventTypeInput {
     type Config = crate::UnitConfig;
 
     fn from_config(
@@ -111,7 +113,7 @@ impl crate::IntoDataInput<HookContext> for EventTypeInput {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for ToolNameInput {
+impl crate::DataInputFactory<HookContext> for ToolNameInput {
     type Config = crate::UnitConfig;
 
     fn from_config(
@@ -122,7 +124,7 @@ impl crate::IntoDataInput<HookContext> for ToolNameInput {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for ToolArgInput {
+impl crate::DataInputFactory<HookContext> for ToolArgInput {
     type Config = ToolArgInputConfig;
 
     fn from_config(
@@ -133,7 +135,7 @@ impl crate::IntoDataInput<HookContext> for ToolArgInput {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for SessionIdInput {
+impl crate::DataInputFactory<HookContext> for SessionIdInput {
     type Config = crate::UnitConfig;
 
     fn from_config(
@@ -144,7 +146,7 @@ impl crate::IntoDataInput<HookContext> for SessionIdInput {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for CwdInput {
+impl crate::DataInputFactory<HookContext> for CwdInput {
     type Config = crate::UnitConfig;
 
     fn from_config(
@@ -155,7 +157,7 @@ impl crate::IntoDataInput<HookContext> for CwdInput {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for GitBranchInput {
+impl crate::DataInputFactory<HookContext> for GitBranchInput {
     type Config = crate::UnitConfig;
 
     fn from_config(
@@ -238,7 +240,7 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash");
         assert_eq!(
             ToolArgInput::new("command").unwrap().get(&ctx),
-            MatchingData::None
+            MatchingData::Absent
         );
     }
 
@@ -272,6 +274,6 @@ mod tests {
     #[test]
     fn git_branch_input_absent() {
         let ctx = HookContext::pre_tool_use("Bash");
-        assert_eq!(GitBranchInput.get(&ctx), MatchingData::None);
+        assert_eq!(GitBranchInput.get(&ctx), MatchingData::Absent);
     }
 }

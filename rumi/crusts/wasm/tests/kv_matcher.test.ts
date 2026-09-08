@@ -1,8 +1,8 @@
 /**
- * Tests for xuma-crust TestMatcher.
+ * Tests for xuma-crust KvMatcher.
  *
  * Config-driven key-value matching via Rust registry, exposed through wasm-bindgen.
- * Mirrors xuma-crust (Python)'s test_test_matcher.py tests.
+ * Mirrors xuma-crust (Python)'s test_kv_matcher.py tests.
  * Includes conformance fixture validation.
  */
 
@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "bun:test";
 import { pj } from "./_terse_to_protojson.ts";
 // @ts-expect-error — generated WASM package has no TS project reference
-import init, { TestMatcher } from "../pkg/xuma_crust.js";
+import init, { KvMatcher } from "../pkg/xuma_crust.js";
 
 beforeAll(async () => {
   await init();
@@ -33,7 +33,7 @@ describe("Basic Matching", () => {
         on_match: { type: "action", action: "admin_route" },
       }],
     }));
-    const matcher = TestMatcher.fromConfig(config);
+    const matcher = KvMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin" })).toBe("admin_route");
     expect(matcher.evaluate({ role: "user" })).toBeUndefined();
   });
@@ -49,7 +49,7 @@ describe("Basic Matching", () => {
         on_match: { type: "action", action: "api_route" },
       }],
     }));
-    const matcher = TestMatcher.fromConfig(config);
+    const matcher = KvMatcher.fromConfig(config);
     expect(matcher.evaluate({ path: "/api/users" })).toBe("api_route");
     expect(matcher.evaluate({ path: "/health" })).toBeUndefined();
   });
@@ -65,7 +65,7 @@ describe("Basic Matching", () => {
         on_match: { type: "action", action: "admin_route" },
       }],
     }));
-    const matcher = TestMatcher.fromConfig(config);
+    const matcher = KvMatcher.fromConfig(config);
     expect(matcher.evaluate({ org: "acme" })).toBeUndefined();
   });
 });
@@ -96,7 +96,7 @@ describe("Compound Predicates", () => {
         on_match: { type: "action", action: "acme_admin" },
       }],
     }));
-    const matcher = TestMatcher.fromConfig(config);
+    const matcher = KvMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin", org: "acme" })).toBe("acme_admin");
     expect(matcher.evaluate({ role: "admin", org: "other" })).toBeUndefined();
     expect(matcher.evaluate({ role: "user", org: "acme" })).toBeUndefined();
@@ -123,7 +123,7 @@ describe("Compound Predicates", () => {
         on_match: { type: "action", action: "elevated" },
       }],
     }));
-    const matcher = TestMatcher.fromConfig(config);
+    const matcher = KvMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin" })).toBe("elevated");
     expect(matcher.evaluate({ role: "superadmin" })).toBe("elevated");
     expect(matcher.evaluate({ role: "user" })).toBeUndefined();
@@ -143,7 +143,7 @@ describe("Compound Predicates", () => {
         on_match: { type: "action", action: "authenticated" },
       }],
     }));
-    const matcher = TestMatcher.fromConfig(config);
+    const matcher = KvMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin" })).toBe("authenticated");
     expect(matcher.evaluate({ role: "guest" })).toBeUndefined();
   });
@@ -177,7 +177,7 @@ describe("Nesting & Fallback", () => {
         },
       }],
     }));
-    const matcher = TestMatcher.fromConfig(config);
+    const matcher = KvMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin", org: "acme" })).toBe("acme_admin");
     expect(matcher.evaluate({ role: "admin", org: "other" })).toBeUndefined();
     expect(matcher.evaluate({ role: "user", org: "acme" })).toBeUndefined();
@@ -195,7 +195,7 @@ describe("Nesting & Fallback", () => {
       }],
       on_no_match: { type: "action", action: "default" },
     }));
-    const matcher = TestMatcher.fromConfig(config);
+    const matcher = KvMatcher.fromConfig(config);
     expect(matcher.evaluate({ role: "admin" })).toBe("admin");
     expect(matcher.evaluate({ role: "user" })).toBe("default");
   });
@@ -220,7 +220,7 @@ describe("Conformance Fixtures", () => {
   for (const file of fixtureFiles) {
     test(`fixture: ${file}`, () => {
       const yaml = readFileSync(join(fixtureDir, file), "utf-8");
-      const results = TestMatcher.runFixtures(yaml);
+      const results = KvMatcher.runFixtures(yaml);
 
       for (const result of results) {
         expect(result.passed).toBe(true);
@@ -249,7 +249,7 @@ proto_matcher:
             typedConfig: {"@type": "type.googleapis.com/xuma.core.v1.NamedAction", name: hit}
 cases: []
 `;
-    const results = TestMatcher.runFixtures(omitsTypescript);
+    const results = KvMatcher.runFixtures(omitsTypescript);
     expect(results).toEqual([
       {
         fixture: "omits_typescript",
@@ -267,7 +267,7 @@ cases: []
 
 describe("Errors", () => {
   test("invalid JSON", () => {
-    expect(() => TestMatcher.fromConfig("not json")).toThrow(/invalid config JSON/);
+    expect(() => KvMatcher.fromConfig("not json")).toThrow(/invalid config JSON/);
   });
 
   test("unknown input type", () => {
@@ -281,7 +281,7 @@ describe("Errors", () => {
         on_match: { type: "action", action: "test" },
       }],
     }));
-    expect(() => TestMatcher.fromConfig(config)).toThrow();
+    expect(() => KvMatcher.fromConfig(config)).toThrow();
   });
 
   test("invalid regex", () => {
@@ -295,7 +295,7 @@ describe("Errors", () => {
         on_match: { type: "action", action: "test" },
       }],
     }));
-    expect(() => TestMatcher.fromConfig(config)).toThrow(/regex/);
+    expect(() => KvMatcher.fromConfig(config)).toThrow(/regex/);
   });
 });
 
@@ -316,7 +316,7 @@ describe("Trace", () => {
       }],
       on_no_match: { type: "action", action: "default" },
     }));
-    const matcher = TestMatcher.fromConfig(config);
+    const matcher = KvMatcher.fromConfig(config);
     const ctx = { role: "admin" };
     expect(matcher.trace(ctx).result).toBe(matcher.evaluate(ctx));
   });
@@ -332,7 +332,7 @@ describe("Trace", () => {
         on_match: { type: "action", action: "admin" },
       }],
     }));
-    const matcher = TestMatcher.fromConfig(config);
+    const matcher = KvMatcher.fromConfig(config);
     const trace = matcher.trace({ role: "admin" });
     expect(trace.steps.length).toBeGreaterThan(0);
     expect(typeof trace.steps[0].index).toBe("number");
@@ -352,7 +352,7 @@ describe("Trace", () => {
       }],
       on_no_match: { type: "action", action: "default" },
     }));
-    const matcher = TestMatcher.fromConfig(config);
+    const matcher = KvMatcher.fromConfig(config);
     const trace = matcher.trace({ role: "user" });
     expect(trace.result).toBe("default");
     expect(trace.usedFallback).toBe(true);

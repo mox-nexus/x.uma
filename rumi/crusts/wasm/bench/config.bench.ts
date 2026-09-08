@@ -18,7 +18,7 @@
 
 import { bench, run, summary } from "mitata";
 
-import init, { HttpMatcher, TestMatcher } from "../pkg/xuma_crust.js";
+import init, { HttpMatcher, KvMatcher } from "../pkg/xuma_crust.js";
 await init();
 
 // ── Configs ──────────────────────────────────────────────────────────────────
@@ -91,17 +91,17 @@ const HTTP_SIMPLE_CONFIG = JSON.stringify({
 // ── Load: key-value domain ───────────────────────────────────────────────────
 
 summary(() => {
-	bench("crusty_config_load_simple", () => TestMatcher.fromConfig(SIMPLE_CONFIG));
+	bench("crusty_config_load_simple", () => KvMatcher.fromConfig(SIMPLE_CONFIG));
 });
 
 summary(() => {
-	bench("crusty_config_load_compound", () => TestMatcher.fromConfig(COMPOUND_CONFIG));
+	bench("crusty_config_load_compound", () => KvMatcher.fromConfig(COMPOUND_CONFIG));
 });
 
 // ── Evaluate: key-value domain ───────────────────────────────────────────────
 
 summary(() => {
-	const crusty = TestMatcher.fromConfig(SIMPLE_CONFIG);
+	const crusty = KvMatcher.fromConfig(SIMPLE_CONFIG);
 	const ctx = { role: "admin" };
 
 	bench("crusty_config_evaluate_simple", () => crusty.evaluate(ctx));

@@ -36,7 +36,7 @@ use std::fmt::Debug;
 ///     fn get(&self, ctx: &HttpRequest) -> MatchingData {
 ///         ctx.headers.get(&self.name)
 ///             .map(|v| MatchingData::String(v.clone()))
-///             .unwrap_or(MatchingData::None)
+///             .unwrap_or(MatchingData::Absent)
 ///     }
 /// }
 /// ```
@@ -49,8 +49,8 @@ use std::fmt::Debug;
 pub trait DataInput<Ctx>: Send + Sync + Debug {
     /// Extract data from the given context.
     ///
-    /// Returns [`MatchingData::None`] if the requested data is not present.
-    /// This is important for the INV (Dijkstra): None → predicate evaluates to false.
+    /// Returns [`MatchingData::Absent`] if the requested data is not present.
+    /// Absent makes the predicate `false` (INV-1).
     fn get(&self, ctx: &Ctx) -> MatchingData;
 
     /// Returns a static string describing the type of data this input produces.
@@ -62,7 +62,6 @@ pub trait DataInput<Ctx>: Send + Sync + Debug {
     }
 }
 
-// Blanket implementation for boxed DataInputs
 #[diagnostic::do_not_recommend]
 impl<Ctx> DataInput<Ctx> for Box<dyn DataInput<Ctx>> {
     fn get(&self, ctx: &Ctx) -> MatchingData {

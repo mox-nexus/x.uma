@@ -20,7 +20,7 @@ import json
 
 import pytest
 
-from xuma_crust import HttpMatcher, TestMatcher
+from xuma_crust import HttpMatcher, KvMatcher
 
 # ── Configs ──────────────────────────────────────────────────────────────────
 
@@ -107,11 +107,11 @@ HTTP_SIMPLE_CONFIG = json.dumps(
 
 
 def test_bench_crusty_config_load_simple(benchmark):
-    benchmark(TestMatcher.from_config, SIMPLE_CONFIG)
+    benchmark(KvMatcher.from_config, SIMPLE_CONFIG)
 
 
 def test_bench_crusty_config_load_compound(benchmark):
-    benchmark(TestMatcher.from_config, COMPOUND_CONFIG)
+    benchmark(KvMatcher.from_config, COMPOUND_CONFIG)
 
 
 # ── Evaluate: key-value domain ───────────────────────────────────────────────
@@ -119,7 +119,7 @@ def test_bench_crusty_config_load_compound(benchmark):
 
 @pytest.fixture
 def crusty_config_matcher():
-    return TestMatcher.from_config(SIMPLE_CONFIG)
+    return KvMatcher.from_config(SIMPLE_CONFIG)
 
 
 def test_bench_crusty_config_evaluate_simple(benchmark, crusty_config_matcher):

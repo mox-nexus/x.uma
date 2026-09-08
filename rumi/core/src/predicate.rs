@@ -12,9 +12,9 @@ use std::fmt::Debug;
 /// The `SinglePredicate` extracts data from the context using the input, then
 /// passes it to the matcher for evaluation.
 ///
-/// # INV (Dijkstra): None → false
+/// # INV-1: Absent → false
 ///
-/// If the `DataInput` returns [`MatchingData::None`], the predicate evaluates to `false`.
+/// If the `DataInput` returns [`MatchingData::Absent`], the predicate evaluates to `false`.
 /// This is a critical invariant that simplifies reasoning about matcher behavior.
 ///
 /// # Example
@@ -55,12 +55,12 @@ impl<Ctx> SinglePredicate<Ctx> {
     /// # Returns
     ///
     /// - `true` if the input produces data and the matcher matches
-    /// - `false` if the input returns `None` (INV: None → false)
+    /// - `false` if the input returns `Absent` (INV-1)
     /// - `false` if the matcher doesn't match
     pub fn evaluate(&self, ctx: &Ctx) -> bool {
         let data = self.input.get(ctx);
         match data {
-            MatchingData::None => false, // INV: None → false
+            MatchingData::Absent => false, // INV-1
             _ => self.matcher.matches(&data),
         }
     }
@@ -73,7 +73,7 @@ impl<Ctx> SinglePredicate<Ctx> {
     pub fn evaluate_with_trace(&self, ctx: &Ctx) -> PredicateTrace {
         let data = self.input.get(ctx);
         let matched = match &data {
-            MatchingData::None => false,
+            MatchingData::Absent => false,
             _ => self.matcher.matches(&data),
         };
         PredicateTrace::Single {
@@ -332,7 +332,7 @@ mod tests {
 
     impl DataInput<TestContext> for NoneInput {
         fn get(&self, _ctx: &TestContext) -> MatchingData {
-            MatchingData::None
+            MatchingData::Absent
         }
     }
 
@@ -566,7 +566,7 @@ mod tests {
 
         assert!(!trace.matched());
         if let PredicateTrace::Single { data, .. } = &trace {
-            assert!(data.contains("None"));
+            assert!(data.contains("Absent"));
         } else {
             panic!("expected Single trace");
         }

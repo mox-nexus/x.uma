@@ -210,7 +210,7 @@ message TypedStruct {
     ├── gen/           # Generated code (committed)
     │   ├── xds/
     │   └── xuma/
-    ├── convert.{rs,py,ts}       # proto Matcher → native MatcherConfig
+    ├── convert.{rs,py,ts}       # proto Matcher → native MatcherIr
     └── any_resolver.{rs,py,ts}  # Any bytes → native config objects
 ```
 

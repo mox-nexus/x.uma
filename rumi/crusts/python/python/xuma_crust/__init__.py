@@ -8,7 +8,7 @@ from xuma_crust.xuma_crust import (
     HttpMatcher,
     PyHookMatch as HookMatch,
     PyStringMatch as StringMatch,
-    TestMatcher,
+    KvMatcher,
 )
 
-__all__ = ["HookMatcher", "HookMatch", "HttpMatcher", "StringMatch", "TestMatcher"]
+__all__ = ["HookMatcher", "HookMatch", "HttpMatcher", "StringMatch", "KvMatcher"]

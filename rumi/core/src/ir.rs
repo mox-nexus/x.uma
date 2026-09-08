@@ -1,9 +1,9 @@
-//! Config types for generic matcher construction.
+//! The matcher IR: what a protojson reader builds and the registry loads.
 //!
 //! These mirror the runtime matcher types and are what
 //! [`Registry::load_matcher()`] consumes. They are **built, not parsed**: the
-//! authored config format is canonical protojson, read by `rumi-proto` into
-//! xDS proto types and converted here.
+//! config format is canonical protojson, read by `rumi-proto` into xDS proto
+//! types and lowered to these.
 //!
 //! None of the tree-shape types below derives `Deserialize`, and that is the
 //! enforcement rather than a style choice. While they did, a second, terser
@@ -11,125 +11,125 @@
 //! implementation could read, and nothing documented. Removing the impl makes
 //! writing that dialect a compile error instead of a convention.
 //!
-//! The payload types keep theirs: a `TypedConfig.config` body is deserialized
+//! The payload types keep theirs: a `TypedExtensionConfig.config` body is deserialized
 //! as the registered factory's `Config` associated type, which is the
 //! extension seam working as designed.
 //!
 //! # Relationship to runtime types
 //!
-//! | Config type | Runtime type | Loader method |
+//! | IR type | Runtime type | Loader method |
 //! |-------------|-------------|---------------|
-//! | [`MatcherConfig`] | [`Matcher`](crate::Matcher) | `Registry::load_matcher()` |
-//! | [`FieldMatcherConfig`] | [`FieldMatcher`](crate::FieldMatcher) | `Registry::load_field_matcher()` |
-//! | [`PredicateConfig`] | [`Predicate`](crate::Predicate) | `Registry::load_predicate()` |
-//! | [`SinglePredicateConfig`] | [`SinglePredicate`](crate::SinglePredicate) | `Registry::load_single()` |
-//! | [`ValueMatchConfig`] | `Box<dyn InputMatcher>` | built-in or via registry factory |
-//! | [`OnMatchConfig`] | [`OnMatch`](crate::OnMatch) | `Registry::load_on_match()` |
-//! | [`TypedConfig`] | `Box<dyn DataInput<Ctx>>` or `Box<dyn InputMatcher>` | via registry factory |
+//! | [`MatcherIr`] | [`Matcher`](crate::Matcher) | `Registry::load_matcher()` |
+//! | [`FieldMatcherIr`] | [`FieldMatcher`](crate::FieldMatcher) | `Registry::load_field_matcher()` |
+//! | [`PredicateIr`] | [`Predicate`](crate::Predicate) | `Registry::load_predicate()` |
+//! | [`SinglePredicateIr`] | [`SinglePredicate`](crate::SinglePredicate) | `Registry::load_single()` |
+//! | [`ValueMatchIr`] | `Box<dyn InputMatcher>` | built-in or via registry factory |
+//! | [`OnMatchIr`] | [`OnMatch`](crate::OnMatch) | `Registry::load_on_match()` |
+//! | [`TypedExtensionConfig`] | `Box<dyn DataInput<Ctx>>` or `Box<dyn InputMatcher>` | via registry factory |
 
 use crate::StringMatchSpec;
 use serde::Deserialize;
 
-/// Configuration for a [`Matcher`](crate::Matcher).
+/// The IR of a [`Matcher`](crate::Matcher).
 ///
 /// Built by a protojson reader, then loaded into a runtime `Matcher` via
 /// [`Registry::load_matcher()`](crate::Registry::load_matcher).
 #[derive(Debug, Clone)]
-pub struct MatcherConfig<A> {
+pub struct MatcherIr<A> {
     /// A list of field matchers, or a lookup tree. Never both.
-    pub kind: MatcherKindConfig<A>,
+    pub kind: MatcherKindIr<A>,
 
     /// Fallback when nothing matched.
-    pub on_no_match: Option<OnMatchConfig<A>>,
+    pub on_no_match: Option<OnMatchIr<A>>,
 }
 
-impl<A> MatcherConfig<A> {
+impl<A> MatcherIr<A> {
     /// A list matcher, which is what most configs are.
     #[must_use]
-    pub fn list(matchers: Vec<FieldMatcherConfig<A>>) -> Self {
+    pub fn list(matchers: Vec<FieldMatcherIr<A>>) -> Self {
         Self {
-            kind: MatcherKindConfig::List(matchers),
+            kind: MatcherKindIr::List(matchers),
             on_no_match: None,
         }
     }
 
     /// Set the fallback.
     #[must_use]
-    pub fn with_fallback(mut self, on_no_match: Option<OnMatchConfig<A>>) -> Self {
+    pub fn with_fallback(mut self, on_no_match: Option<OnMatchIr<A>>) -> Self {
         self.on_no_match = on_no_match;
         self
     }
 }
 
-/// Config mirror of [`MatcherKind`](crate::MatcherKind) — xDS `oneof matcher_type`.
+/// The IR of [`MatcherKind`](crate::MatcherKind): xDS `oneof matcher_type`.
 #[derive(Debug, Clone)]
-pub enum MatcherKindConfig<A> {
+pub enum MatcherKindIr<A> {
     /// Field matchers evaluated in order.
-    List(Vec<FieldMatcherConfig<A>>),
+    List(Vec<FieldMatcherIr<A>>),
     /// A single map lookup.
-    Tree(MatcherTreeConfig<A>),
+    Tree(MatcherTreeIr<A>),
 }
 
-/// Config for a [`MatcherTree`](crate::MatcherTree).
+/// The IR of a [`MatcherTree`](crate::MatcherTree).
 ///
 /// Carries no fallback: the proto `MatcherTree` has no such field and the
 /// enclosing `Matcher` owns it. See `DECISIONS.md` D-044.
 #[derive(Debug, Clone)]
-pub struct MatcherTreeConfig<A> {
+pub struct MatcherTreeIr<A> {
     /// The input producing the lookup key, resolved via the registry.
-    pub input: TypedConfig,
+    pub input: TypedExtensionConfig,
     /// Which lookup rule applies, and the entries it applies to.
-    pub tree: TreeTypeConfig<A>,
+    pub tree: TreeTypeIr<A>,
 }
 
-/// Config mirror of xDS `MatcherTree.tree_type`.
+/// The IR of xDS `MatcherTree.tree_type`.
 #[derive(Debug, Clone)]
-pub enum TreeTypeConfig<A> {
+pub enum TreeTypeIr<A> {
     /// O(1) exact key lookup.
-    ExactMatchMap(Vec<(String, OnMatchConfig<A>)>),
+    ExactMatchMap(Vec<(String, OnMatchIr<A>)>),
     /// O(k) longest-prefix lookup.
-    PrefixMatchMap(Vec<(String, OnMatchConfig<A>)>),
+    PrefixMatchMap(Vec<(String, OnMatchIr<A>)>),
 }
 
-/// Configuration for a [`FieldMatcher`](crate::FieldMatcher).
+/// The IR of a [`FieldMatcher`](crate::FieldMatcher).
 #[derive(Debug, Clone)]
-pub struct FieldMatcherConfig<A> {
+pub struct FieldMatcherIr<A> {
     /// The predicate that gates this field matcher.
-    pub predicate: PredicateConfig,
+    pub predicate: PredicateIr,
 
     /// What to do when the predicate matches.
-    pub on_match: OnMatchConfig<A>,
+    pub on_match: OnMatchIr<A>,
 }
 
-/// Configuration for a [`Predicate`](crate::Predicate).
+/// The IR of a [`Predicate`](crate::Predicate).
 ///
 /// Mirrors xDS `Matcher.MatcherList.Predicate`, whose `oneof match_type` is
 /// these four arms.
 #[derive(Debug, Clone)]
-pub enum PredicateConfig {
+pub enum PredicateIr {
     /// A single predicate: input + value match.
-    Single(SinglePredicateConfig),
+    Single(SinglePredicateIr),
 
     /// All predicates must match (logical AND).
     And {
         /// Child predicates (all must match).
-        predicates: Vec<PredicateConfig>,
+        predicates: Vec<PredicateIr>,
     },
 
     /// Any predicate must match (logical OR).
     Or {
         /// Child predicates (any must match).
-        predicates: Vec<PredicateConfig>,
+        predicates: Vec<PredicateIr>,
     },
 
     /// Inverts the inner predicate (logical NOT).
     Not {
         /// The predicate to negate.
-        predicate: Box<PredicateConfig>,
+        predicate: Box<PredicateIr>,
     },
 }
 
-/// How to match the extracted value in a [`SinglePredicateConfig`].
+/// How to match the extracted value in a [`SinglePredicateIr`].
 ///
 /// Mirrors Envoy's `oneof matcher` in `SinglePredicate`:
 /// - `BuiltIn` — built-in string matching (Envoy: `StringMatcher value_match`)
@@ -137,7 +137,7 @@ pub enum PredicateConfig {
 ///
 /// The enum makes illegal states unrepresentable: exactly one variant is active.
 #[derive(Debug, Clone)]
-pub enum ValueMatchConfig {
+pub enum ValueMatchIr {
     /// Built-in string matching (exact, prefix, suffix, contains, regex).
     BuiltIn {
         /// The pattern and how to apply it.
@@ -150,10 +150,10 @@ pub enum ValueMatchConfig {
         ignore_case: bool,
     },
     /// Custom matcher resolved via the registry's matcher factories.
-    Custom(TypedConfig),
+    Custom(TypedExtensionConfig),
 }
 
-/// Configuration for a [`SinglePredicate`](crate::SinglePredicate).
+/// The IR of a [`SinglePredicate`](crate::SinglePredicate).
 ///
 /// Combines a typed input reference (resolved via registry) with a value
 /// matcher. Mirrors xDS `SinglePredicate`, whose `oneof matcher` is either a
@@ -163,13 +163,13 @@ pub enum ValueMatchConfig {
 /// `oneof` makes both-set unrepresentable, and `rumi-proto`'s converter
 /// rejects neither-set.
 #[derive(Debug, Clone)]
-pub struct SinglePredicateConfig {
+pub struct SinglePredicateIr {
     /// The input to extract data from context.
     /// Resolved at load time via the registry's `type_url` lookup.
-    pub input: TypedConfig,
+    pub input: TypedExtensionConfig,
 
     /// How to match the extracted value.
-    pub matcher: ValueMatchConfig,
+    pub matcher: ValueMatchIr,
 }
 
 /// Reference to a registered type with its configuration.
@@ -178,7 +178,7 @@ pub struct SinglePredicateConfig {
 /// - `type_url` identifies the registered type (input, matcher, or action)
 /// - `config` carries the type-specific configuration payload
 #[derive(Debug, Clone)]
-pub struct TypedConfig {
+pub struct TypedExtensionConfig {
     /// The type URL identifying the registered type.
     /// Must match a `type_url` registered in the [`Registry`](crate::Registry).
     pub type_url: String,
@@ -191,7 +191,7 @@ pub struct TypedConfig {
 /// Empty configuration for [`DataInput`](crate::DataInput) types that need no configuration.
 ///
 /// Accepts any JSON value (`{}`, `null`, etc.) and ignores it.
-/// Use as the `Config` associated type in [`IntoDataInput`](crate::IntoDataInput)
+/// Use as the `Config` associated type in [`DataInputFactory`](crate::DataInputFactory)
 /// for inputs that are self-contained (no construction parameters).
 #[derive(Debug, Clone, Copy)]
 pub struct UnitConfig;
@@ -203,12 +203,12 @@ impl<'de> Deserialize<'de> for UnitConfig {
     }
 }
 
-/// Configuration for [`OnMatch`](crate::OnMatch).
+/// The IR of an [`OnMatch`](crate::OnMatch).
 ///
 /// Either an action (leaf) or a nested matcher (tree).
 /// `OnMatch` exclusivity is enforced by the enum: action XOR matcher.
 #[derive(Debug, Clone)]
-pub enum OnMatchConfig<A> {
+pub enum OnMatchIr<A> {
     /// Return this action when the predicate matches.
     Action {
         /// The action value.
@@ -218,14 +218,6 @@ pub enum OnMatchConfig<A> {
     /// Evaluate a nested matcher when the predicate matches.
     Matcher {
         /// The nested matcher configuration.
-        matcher: Box<MatcherConfig<A>>,
+        matcher: Box<MatcherIr<A>>,
     },
 }
-
-// The test module that lived here tested only the terse dialect's
-// deserializer — `deserialize_simple_config`, `deserialize_and_predicate`,
-// `deserialize_not_predicate`, `deserialize_nested_matcher`,
-// `typed_config_defaults_to_empty_object`, `no_on_no_match_is_none`. With the
-// impls gone their subject is gone; each requirement is now a protojson
-// fixture in `spec/tests/07_protojson/`, asserted in all five implementations
-// rather than one.

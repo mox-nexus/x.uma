@@ -88,8 +88,9 @@ impl StringInput {
 
 impl DataInput<KvContext> for StringInput {
     fn get(&self, ctx: &KvContext) -> MatchingData {
-        ctx.get(&self.key)
-            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
+        ctx.get(&self.key).map_or(MatchingData::Absent, |s| {
+            MatchingData::String(s.to_string())
+        })
     }
 }
 
@@ -110,7 +111,7 @@ pub mod prelude {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[cfg(feature = "registry")]
-impl rumi::IntoDataInput<KvContext> for StringInput {
+impl rumi::DataInputFactory<KvContext> for StringInput {
     type Config = rumi_proto::xuma::kv::v1::MapInput;
 
     fn from_config(
@@ -164,7 +165,7 @@ mod tests {
         let ctx = KvContext::new();
         let input = StringInput::new("missing").unwrap();
 
-        assert_eq!(input.get(&ctx), MatchingData::None);
+        assert_eq!(input.get(&ctx), MatchingData::Absent);
     }
 
     #[test]
@@ -196,43 +197,40 @@ mod config_tests {
     use super::*;
 
     use rumi::{
-        FieldMatcherConfig, OnMatchConfig, PredicateConfig, SinglePredicateConfig, StringMatchSpec,
-        TypedConfig, ValueMatchConfig,
+        FieldMatcherIr, OnMatchIr, PredicateIr, SinglePredicateIr, StringMatchSpec,
+        TypedExtensionConfig, ValueMatchIr,
     };
 
-    // `MatcherConfig` and friends are built, never parsed — see rumi's
+    // `MatcherIr` and friends are built, never parsed — see rumi's
     // `config` module. These keep the tests below readable without deciding
     // anything on their behalf.
 
-    fn built_in(key: &str, spec: StringMatchSpec) -> PredicateConfig {
-        PredicateConfig::Single(SinglePredicateConfig {
-            input: TypedConfig {
+    fn built_in(key: &str, spec: StringMatchSpec) -> PredicateIr {
+        PredicateIr::Single(SinglePredicateIr {
+            input: TypedExtensionConfig {
                 type_url: "xuma.kv.v1.MapInput".into(),
                 config: serde_json::json!({ "key": key }),
             },
-            matcher: ValueMatchConfig::BuiltIn {
+            matcher: ValueMatchIr::BuiltIn {
                 spec,
                 ignore_case: false,
             },
         })
     }
 
-    fn act(action: &str) -> OnMatchConfig<String> {
-        OnMatchConfig::Action {
+    fn act(action: &str) -> OnMatchIr<String> {
+        OnMatchIr::Action {
             action: action.into(),
         }
     }
 
-    fn field(
-        predicate: PredicateConfig,
-        on_match: OnMatchConfig<String>,
-    ) -> FieldMatcherConfig<String> {
-        FieldMatcherConfig {
+    fn field(predicate: PredicateIr, on_match: OnMatchIr<String>) -> FieldMatcherIr<String> {
+        FieldMatcherIr {
             predicate,
             on_match,
         }
     }
-    use rumi::MatcherConfig;
+    use rumi::MatcherIr;
 
     #[test]
     fn register_builds_with_proto_configs() {
@@ -247,7 +245,7 @@ mod config_tests {
     fn load_matcher_with_map_input() {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
-        let config = MatcherConfig::list(vec![field(
+        let config = MatcherIr::list(vec![field(
             built_in("role", StringMatchSpec::Exact("admin".into())),
             act("allow"),
         )])
@@ -265,8 +263,8 @@ mod config_tests {
     fn load_matcher_with_and_predicate() {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
-        let config = MatcherConfig::list(vec![field(
-            PredicateConfig::And {
+        let config = MatcherIr::list(vec![field(
+            PredicateIr::And {
                 predicates: vec![
                     built_in("role", StringMatchSpec::Exact("admin".into())),
                     built_in("org", StringMatchSpec::Prefix("acme".into())),

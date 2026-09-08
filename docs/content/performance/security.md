@@ -48,7 +48,7 @@ No implementation uses a backtracking regex engine. Patterns that would cause ca
 
 **Threat:** Missing data accidentally matching a rule. If a header doesn't exist, it should not match `ExactMatcher("secret")`.
 
-**Mitigation:** When `DataInput.get()` returns `None`/`null`, the predicate evaluates to `false`. The `InputMatcher` is never called. This is enforced in all five implementations.
+**Mitigation:** When `DataInput.get()` returns `Absent`, the predicate evaluates to `false` and the `InputMatcher` is never called. This is enforced in the engine, and therefore in every binding.
 
 This is a security invariant, not a convenience feature. It ensures fail-closed behavior: missing data means no match.
 

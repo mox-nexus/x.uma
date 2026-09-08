@@ -507,7 +507,6 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash").with_git_branch("feature/x");
         assert_eq!(matcher.evaluate(&ctx), None);
 
-        // No git branch → None → false
         let ctx = HookContext::pre_tool_use("Bash");
         assert_eq!(matcher.evaluate(&ctx), None);
     }

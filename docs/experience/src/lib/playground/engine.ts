@@ -5,7 +5,7 @@
  * WebAssembly instantiates asynchronously, so callers await `ready()` once
  * before evaluating. Evaluation itself is synchronous.
  */
-import init, { HttpMatcher, TestMatcher } from "xuma-crust";
+import init, { HttpMatcher, KvMatcher } from "xuma-crust";
 import wasmUrl from "xuma-crust/xuma_crust_bg.wasm?url";
 import type { EvalResult } from "./types.js";
 
@@ -20,7 +20,7 @@ export function ready(): Promise<void> {
 /** Evaluate a protojson matcher config against a key-value context. */
 export function evaluateKv(configJson: string, context: Record<string, string>): EvalResult {
   return attempt(() => {
-    const matcher = TestMatcher.fromConfig(configJson);
+    const matcher = KvMatcher.fromConfig(configJson);
     try {
       return matcher.evaluate(context);
     } finally {

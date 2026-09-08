@@ -1,7 +1,7 @@
 //! Config-driven HTTP matcher exposed to Python.
 //!
 //! Takes a JSON config string, compiles it via Rust registry, and evaluates
-//! against HTTP request contexts. Same `MatcherConfig<String>` format used
+//! against HTTP request contexts. Same `MatcherIr<String>` format used
 //! by all implementations.
 
 use std::collections::HashMap;

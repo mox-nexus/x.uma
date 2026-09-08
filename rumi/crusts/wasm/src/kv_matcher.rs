@@ -1,7 +1,7 @@
-//! Config-driven test matcher exposed to TypeScript via wasm-bindgen.
+//! The key-value matcher exposed to TypeScript via wasm-bindgen.
 //!
-//! Takes a JSON config string, compiles it via Rust registry, and evaluates
-//! against key-value contexts passed as plain JS objects.
+//! Compiles a protojson document over `xuma.kv.v1` inputs and evaluates
+//! key-value contexts: the domain the conformance suite runs in.
 
 use rumi::prelude::*;
 use rumi_kv::KvContext;
@@ -9,17 +9,17 @@ use wasm_bindgen::prelude::*;
 
 use crate::matcher::TraceResultSerde;
 
-/// An opaque compiled test matcher.
+/// An opaque compiled key-value matcher.
 ///
-/// Created via `TestMatcher.fromConfig()`, immutable after construction.
+/// Created via `KvMatcher.fromConfig()`, immutable after construction.
 /// Evaluates key-value contexts against compiled matcher trees.
 #[wasm_bindgen]
-pub struct TestMatcher {
+pub struct KvMatcher {
     inner: Matcher<KvContext, String>,
 }
 
 #[wasm_bindgen]
-impl TestMatcher {
+impl KvMatcher {
     /// Load a matcher from a canonical protojson config string.
     ///
     /// protojson is the format all x.uma implementations use — protobuf's own
@@ -29,7 +29,7 @@ impl TestMatcher {
     ///
     /// - `xuma.kv.v1.MapInput` — string lookup by key (`{"key": "..."}`)
     #[wasm_bindgen(js_name = "fromConfig")]
-    pub fn from_config(json_config: &str) -> Result<TestMatcher, JsValue> {
+    pub fn from_config(json_config: &str) -> Result<KvMatcher, JsValue> {
         let config = crate::protojson::load(json_config).map_err(|e| JsValue::from_str(&e))?;
 
         let registry = build_test_registry();

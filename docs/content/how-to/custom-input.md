@@ -31,7 +31,7 @@ impl DataInput<MyRequest> for RegionInput {
     fn get(&self, ctx: &MyRequest) -> MatchingData {
         match ctx.region() {
             Some(r) => MatchingData::String(r.to_string()),
-            None => MatchingData::None,
+            None => MatchingData::Absent,
         }
     }
 
@@ -41,7 +41,7 @@ impl DataInput<MyRequest> for RegionInput {
 }
 ```
 
-Return `MatchingData::None` when the value is absent. The predicate will evaluate
+Return `MatchingData::Absent` when the value is absent. The predicate will evaluate
 to `false`, which is what you want. Do not panic, and do not substitute a
 sentinel like the empty string, because a rule matching `""` would then fire on
 missing data.
@@ -89,8 +89,8 @@ proximity matching or similarity scoring would live.
 
 A custom input is a new extension point in your config surface. Every consumer of
 that config now needs the same input registered, or loading fails. Keep custom
-inputs few and name their type URLs carefully, because the config format is
-frozen across all five implementations.
+inputs few and name their type URLs carefully, because the config format
+freezes at publish, and every binding reads the same document.
 
 ## Next
 

@@ -17,7 +17,7 @@
 //!         ↓ evaluate()
 //! HttpMessage (indexed from ext_proc ProcessingRequest)
 //!
-//! JSON MatcherConfig (config)                [registry feature]
+//! JSON MatcherIr (config)                [registry feature]
 //!         ↓ register_simple() + load_matcher()
 //! rumi Matcher<HttpRequest, A>               [always available]
 //!         ↓ evaluate()
@@ -138,8 +138,8 @@ pub fn register(builder: rumi::RegistryBuilder<HttpMessage>) -> rumi::RegistryBu
 mod proto_tests {
     use super::*;
     use rumi::{
-        FieldMatcherConfig, MatcherConfig, OnMatchConfig, PredicateConfig, SinglePredicateConfig,
-        StringMatchSpec, TypedConfig, ValueMatchConfig,
+        FieldMatcherIr, MatcherIr, OnMatchIr, PredicateIr, SinglePredicateIr, StringMatchSpec,
+        TypedExtensionConfig, ValueMatchIr,
     };
 
     // Built via HttpMessageBuilder rather than an ext_proc ProcessingRequest.
@@ -153,34 +153,34 @@ mod proto_tests {
             .build()
     }
 
-    // `MatcherConfig` and friends are built, never parsed — see rumi's
+    // `MatcherIr` and friends are built, never parsed — see rumi's
     // `config` module.
 
-    fn input(type_url: &str, config: serde_json::Value) -> TypedConfig {
-        TypedConfig {
+    fn input(type_url: &str, config: serde_json::Value) -> TypedExtensionConfig {
+        TypedExtensionConfig {
             type_url: type_url.into(),
             config,
         }
     }
 
-    fn built_in(input: TypedConfig, spec: StringMatchSpec) -> PredicateConfig {
-        PredicateConfig::Single(SinglePredicateConfig {
+    fn built_in(input: TypedExtensionConfig, spec: StringMatchSpec) -> PredicateIr {
+        PredicateIr::Single(SinglePredicateIr {
             input,
-            matcher: ValueMatchConfig::BuiltIn {
+            matcher: ValueMatchIr::BuiltIn {
                 spec,
                 ignore_case: false,
             },
         })
     }
 
-    fn act(action: &str) -> OnMatchConfig<String> {
-        OnMatchConfig::Action {
+    fn act(action: &str) -> OnMatchIr<String> {
+        OnMatchIr::Action {
             action: action.into(),
         }
     }
 
-    fn one(predicate: PredicateConfig, on_match: OnMatchConfig<String>) -> MatcherConfig<String> {
-        MatcherConfig::list(vec![FieldMatcherConfig {
+    fn one(predicate: PredicateIr, on_match: OnMatchIr<String>) -> MatcherIr<String> {
+        MatcherIr::list(vec![FieldMatcherIr {
             predicate,
             on_match,
         }])
@@ -203,7 +203,7 @@ mod proto_tests {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
         // PathInput is an empty proto message — no config fields
-        let config = MatcherConfig::list(vec![FieldMatcherConfig {
+        let config = MatcherIr::list(vec![FieldMatcherIr {
             predicate: built_in(
                 input("xuma.http.v1.PathInput", serde_json::json!({})),
                 StringMatchSpec::Prefix("/api".into()),
@@ -249,7 +249,7 @@ mod proto_tests {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
         let config = one(
-            PredicateConfig::And {
+            PredicateIr::And {
                 predicates: vec![
                     built_in(
                         input("xuma.http.v1.PathInput", serde_json::json!({})),

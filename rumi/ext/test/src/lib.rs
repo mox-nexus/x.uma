@@ -1,15 +1,7 @@
 //! Conformance fixture loading. Test apparatus, not a shipped domain.
 //!
-//! This crate used to contain the key-value matching domain as well. That made
-//! it unpublishable — a YAML fixture loader has no business in a released
-//! artifact — and since `rumi-cli` depended on it for the *domain*, the CLI
-//! could not be published either. The domain is now `rumi-kv`; what remains
-//! here is only the machinery that reads `spec/tests/*.yaml`.
-//!
-//! It also used to carry three more fixture dialects — a terse `config:` shape
-//! and a native `matcher:` shape, each with its own loader and its own
-//! `MatcherConfig` type. All three are gone; `spec/tests/07_protojson/` is the
-//! format, and `proto_fixture` is the only reader.
+//! Only the machinery that reads `spec/tests/*.yaml`: the key-value domain is
+//! `rumi-kv`, and `07_protojson/` is the one fixture format (D-042).
 //!
 //! Stays `publish = false`, deliberately. Nothing user-facing depends on it.
 

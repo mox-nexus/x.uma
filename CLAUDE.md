@@ -134,7 +134,7 @@ x.uma/
 | 7.5 | Claude domain: trace + HookMatch compiler (a **feature of `rumi-core`**, not a crate) | ✅ Done |
 | 8 | xuma-crust: wasm-bindgen TypeScript bindings | ✅ Done |
 | 9 | Benchmarks: engine and both bindings | ⚠️ Runs, not guarded |
-| 10 | TypedExtensionConfig Registry (`IntoDataInput`, `RegistryBuilder`) | ✅ Done |
+| 10 | TypedExtensionConfig Registry (`DataInputFactory`, `RegistryBuilder`) | ✅ Done |
 | 11 | Test audit (removed 18 ineffective tests → 216 total) | ✅ Done |
 | 12 | Proto Alignment: buf codegen, `rumi-proto`, `AnyResolver`, xDS Matcher loading | ✅ Done |
 | 13 | Config/Registry across all implementations | ✅ Done |
@@ -226,7 +226,7 @@ Envoy source: `~/oss/reference/envoy/source/common/matcher/`
 
 ```rust
 // MatchingData — the erased data type (Envoy's MatchingDataType)
-pub enum MatchingData { None, String(String), Int(i64), Bool(bool), Bytes(Vec<u8>) }
+pub enum MatchingData { Absent, String(String), Int(i64), Bool(bool), Bytes(Vec<u8>) }
 
 // DataInput — domain-specific, generic over context, returns erased type
 pub trait DataInput<Ctx>: Send + Sync + Debug {
@@ -275,7 +275,7 @@ From 13-agent architecture review:
 | **Type Registry Immutability** | Vector, Lamport | Lock after initialization. No runtime registration. |
 | **Send + Sync** | Lamport, Lotfi | All core types must be thread-safe (FFI requirement). |
 | **Iterative Evaluation** | Taleb, Dijkstra | No recursive `evaluate()` — use explicit stack (deferred to v0.2). |
-| **DataInput None → false** | Dijkstra | `None` from `DataInput::get()` → predicate evaluates to `false`. |
+| **DataInput Absent → false** | Dijkstra | `Absent` from `DataInput::get()` → predicate evaluates to `false`. |
 | **No unsafe impl** | Wolf | Let compiler derive Send/Sync — don't add restrictive bounds. |
 | **Validate extension points at construction** | Phase 11 review | Extension hooks (e.g., `data_type()`, `supported_types()`) that exist but are never enforced create silent failure modes. Validate compatibility at construction/load time, not evaluation time. |
 
@@ -332,8 +332,8 @@ rumi/
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs              # Module tree for generated types
-│       ├── any_resolver.rs     # google.protobuf.Any → TypedConfig bridge
-│       ├── convert.rs          # Proto Matcher → MatcherConfig conversion
+│       ├── any_resolver.rs     # google.protobuf.Any → TypedExtensionConfig bridge
+│       ├── convert.rs          # Proto Matcher → MatcherIr conversion
 │       └── gen/                # buf-generated prost + prost-serde code
 ├── ext/
 │   ├── kv/             # rumi-kv (string-map matching) ▲
@@ -376,9 +376,9 @@ Principles distilled from 13 elite Rust codebases. Each prevents a form of self-
 | Principle | What You're Fooling Yourself About | Test |
 |-----------|-----------------------------------|------|
 | **Measure Before Optimizing** | "This will be faster" — but you haven't profiled | Is there benchmark evidence? |
-| **Config Format Is Frozen** | "We can iterate" — but 5 implementations consume it | Does this change `MatcherConfig` serialization? |
+| **Config Format Is Frozen** | "We can iterate" — but every user's config and three runtimes consume it | Does this change what `from_config` accepts? |
 | **Foundation Crates Migrate Last** | "It's just a version bump" — but it cascades everywhere | Does this change a dep in `rumi/core/Cargo.toml`? |
-| **Protocol Obligations Over Convenience** | "This shortcut is safe" — but it violates an invariant | Does this skip validate, reorder eval, or bypass None→false? |
+| **Protocol Obligations Over Convenience** | "This shortcut is safe" — but it violates an invariant | Does this skip validate, reorder eval, or bypass Absent→false? |
 | **Hold Position Until Evidence** | "Let's add this now" — but no second integration demands it | Is there concrete evidence, or is this speculative? |
 | **Reversions Encode Wisdom** | "I'll push through" — but the architecture is pushing back | Did you try, discover it doesn't fit, and document why? |
 | **Boring Code Wins** | "This is clever" — but clever breaks under maintenance | Would `Arc<Mutex<Vec>>` work here instead? |
@@ -388,7 +388,7 @@ Principles distilled from 13 elite Rust codebases. Each prevents a form of self-
 | Don't | Why | Source |
 |-------|-----|--------|
 | Add `thiserror` or utility crate deps | "17K lines replaced by 150" — hand-write what you need | ripgrep, hyper |
-| Expand `MatcherConfig` format after shipping | Format is frozen across 5 implementations | rust-analyzer |
+| Expand the protojson schema after shipping | Schema, type URLs and FFI shape freeze at publish (D-053); `MatcherIr` is internal and does not | rust-analyzer |
 | Optimize without benchmarking | Bottleneck is rarely where you think | ripgrep, all 13 |
 | Add `&mut self` to core traits | Breaks `Arc<T>` wrapper algebra, breaks FFI | hyper, tower |
 | Test at the abstraction level | Mock the boundary (registry, FFI), not the abstraction | aya |

@@ -1,7 +1,7 @@
-//! Config-driven test matcher exposed to Python.
+//! The key-value matcher exposed to Python.
 //!
-//! Takes a JSON config string, compiles it via Rust registry, and evaluates
-//! against simple key-value contexts. Used for conformance testing.
+//! Compiles a protojson document over `xuma.kv.v1` inputs and evaluates
+//! key-value contexts: the domain the conformance suite runs in.
 
 use std::collections::HashMap;
 
@@ -10,21 +10,21 @@ use pyo3::prelude::*;
 use rumi::prelude::*;
 use rumi_kv::KvContext;
 
-/// An opaque compiled test matcher.
+/// An opaque compiled key-value matcher.
 ///
-/// Created via `TestMatcher.from_config()`, immutable after construction.
+/// Created via `KvMatcher.from_config()`, immutable after construction.
 /// Evaluates key-value contexts against compiled matcher trees.
 ///
 /// # Thread Safety
 ///
-/// `TestMatcher` is immutable and safe to share across threads.
+/// `KvMatcher` is immutable and safe to share across threads.
 #[pyclass(frozen)]
-pub struct TestMatcher {
+pub struct KvMatcher {
     inner: Matcher<KvContext, String>,
 }
 
 #[pymethods]
-impl TestMatcher {
+impl KvMatcher {
     /// Load a matcher from a canonical protojson config string.
     ///
     /// protojson is the format all x.uma implementations use — protobuf's own
@@ -105,7 +105,7 @@ impl TestMatcher {
 
     #[allow(clippy::unused_self)]
     fn __repr__(&self) -> String {
-        "TestMatcher(<compiled>)".to_string()
+        "KvMatcher(<compiled>)".to_string()
     }
 }
 
