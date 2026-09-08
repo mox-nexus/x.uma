@@ -13,11 +13,15 @@
 > accurate about *defects* and stale about *structure*; the packages table in
 > §2 is current.
 >
-> **Session cursor: `scratch/HANDOFF-2026-09-08.md`** — branch state, the
-> decisions awaiting their `DECISIONS.md` entries, the sequence that follows
-> (decisions batch → rename pass → FFI shaping → publish 0.1.0 → engine as
-> 0.1.x), and the traps this repo has already paid for. Untracked, so it is a
-> cursor and not a record; the records are here and in `DECISIONS.md`.
+> **The sequence to first publish is decided: `DECISIONS.md` D-053** (retire,
+> decisions batch, rename pass, boundary shaping, publish 0.1.0, engine as
+> 0.1.x), with the fifteen decisions around it as D-052 to D-067. Everything
+> publishing freezes is decided there; the engine work is 0.1.x.
+>
+> **Session cursor: `scratch/HANDOFF-2026-09-08.md`** — branch state, which
+> step is in progress, and the traps this repo has already paid for.
+> Untracked, so it is a cursor and not a record; the records are here and in
+> `DECISIONS.md`.
 
 ## Where this stands (2026-08-18)
 
