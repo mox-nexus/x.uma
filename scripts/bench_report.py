@@ -16,8 +16,8 @@ from pathlib import Path
 
 FLOORS = ["floor_u32", "floor_option_string", "floor_flat_map"]
 PATHS = {
-    "python": ["crusty_evaluate_exact_hit", "crusty_evaluate_exact_miss", "config_evaluate_simple"],
-    "typescript": ["crusty_exact_hit", "crusty_exact_miss", "config_evaluate_simple"],
+    "python": ["crusty_evaluate_exact_hit", "crusty_evaluate_exact_miss", "crusty_config_evaluate_simple", "crusty_http_config_evaluate"],
+    "typescript": ["crusty_exact_hit", "crusty_exact_miss", "crusty_config_evaluate_simple", "crusty_http_config_evaluate"],
 }
 
 
