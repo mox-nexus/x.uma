@@ -186,11 +186,21 @@ pub struct TreeLookupTrace<A> {
     /// simply found no entry is the whole point of recording it: otherwise
     /// three different config faults collapse into one silent miss.
     pub key: Option<String>,
-    /// The entry key that won, if any. For a prefix tree this is the matched
-    /// prefix rather than the lookup key, which is the non-obvious step.
-    pub matched_key: Option<String>,
-    /// What the winning entry did.
-    pub on_match: Option<OnMatchTrace<A>>,
+    /// Every entry the key selected, in the order tried, with what each did.
+    ///
+    /// Empty when the key selected nothing. Evaluation stops at the first
+    /// entry that produces an action, so the last attempt is the winner unless
+    /// every attempt missed; for a prefix tree, an earlier attempt is a longer
+    /// prefix whose nested matcher produced nothing (D-055).
+    pub attempts: Vec<TreeAttempt<A>>,
+}
+
+impl<A> TreeLookupTrace<A> {
+    /// The attempt that produced the result, if one did.
+    #[must_use]
+    pub fn winner(&self) -> Option<&TreeAttempt<A>> {
+        self.attempts.last().filter(|a| a.on_match.produced())
+    }
 }
 
 impl<A: fmt::Debug> fmt::Debug for TreeLookupTrace<A> {
@@ -199,6 +209,23 @@ impl<A: fmt::Debug> fmt::Debug for TreeLookupTrace<A> {
             .field("kind", &self.kind)
             .field("input", &self.input)
             .field("key", &self.key)
+            .field("attempts", &self.attempts)
+            .finish()
+    }
+}
+
+/// One entry a tree lookup selected, and what it did.
+pub struct TreeAttempt<A> {
+    /// The entry key. For a prefix tree this is the matched prefix rather than
+    /// the lookup key, which is the non-obvious step.
+    pub matched_key: String,
+    /// What the entry did.
+    pub on_match: OnMatchTrace<A>,
+}
+
+impl<A: fmt::Debug> fmt::Debug for TreeAttempt<A> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TreeAttempt")
             .field("matched_key", &self.matched_key)
             .field("on_match", &self.on_match)
             .finish()
@@ -244,6 +271,17 @@ pub enum OnMatchTrace<A> {
     Action(A),
     /// Delegated to a nested matcher (recursive trace).
     Nested(Box<EvalTrace<A>>),
+}
+
+impl<A> OnMatchTrace<A> {
+    /// Whether this resolution produced an action.
+    #[must_use]
+    pub fn produced(&self) -> bool {
+        match self {
+            Self::Action(_) => true,
+            Self::Nested(trace) => trace.result.is_some(),
+        }
+    }
 }
 
 impl<A: fmt::Debug> fmt::Debug for OnMatchTrace<A> {

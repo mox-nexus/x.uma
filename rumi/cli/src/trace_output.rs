@@ -6,7 +6,7 @@
 
 use std::fmt::Display;
 
-use rumi::{EvalSteps, EvalTrace, PredicateTrace, TreeKind, TreeLookupTrace};
+use rumi::{EvalSteps, EvalTrace, OnMatchTrace, PredicateTrace, TreeKind, TreeLookupTrace};
 
 /// Render a trace to stdout.
 pub fn print<A: Display>(trace: &EvalTrace<A>) {
@@ -46,11 +46,24 @@ fn print_tree_lookup<A: Display>(t: &TreeLookupTrace<A>) {
     };
     println!("[TREE ] {rule} lookup on {}", t.input);
 
-    match (&t.key, &t.matched_key) {
-        (None, _) => println!("  key: (input produced no string — nothing to look up)"),
-        (Some(key), None) => println!("  key: {key:?} — no entry"),
-        (Some(key), Some(hit)) if key == hit => println!("  key: {key:?} — matched"),
-        (Some(key), Some(hit)) => println!("  key: {key:?} — matched entry {hit:?}"),
+    match &t.key {
+        None => println!("  key: (input produced no string — nothing to look up)"),
+        Some(key) if t.attempts.is_empty() => println!("  key: {key:?} — no entry"),
+        Some(key) => println!("  key: {key:?}"),
+    }
+    for attempt in &t.attempts {
+        let entry = &attempt.matched_key;
+        match &attempt.on_match {
+            OnMatchTrace::Action(_) => println!("  entry {entry:?} — matched"),
+            OnMatchTrace::Nested(nested) if nested.result.is_some() => {
+                println!("  entry {entry:?} — matched, nested matcher decided");
+            }
+            OnMatchTrace::Nested(_) => {
+                println!(
+                    "  entry {entry:?} — nested matcher missed, trying the next shorter prefix"
+                );
+            }
+        }
     }
 }
 

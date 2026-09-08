@@ -60,7 +60,7 @@ Dispatches on a key extracted from the context.
 |-------|------|----------|-------------|
 | `input` | `TypedExtensionConfig` | Yes | Produces the lookup key. Must be a string input |
 | `exactMatchMap` | `MatchMap` | One of | O(1) exact key lookup |
-| `prefixMatchMap` | `MatchMap` | One of | Longest matching prefix wins |
+| `prefixMatchMap` | `MatchMap` | One of | Longest matching prefix first; a nested miss tries the next shorter prefix |
 | `customMatch` | `TypedExtensionConfig` | One of | **Not supported** — rejected by name at load |
 
 A `MatchMap` is `{"map": {"<key>": OnMatch}}`. Entry values are `OnMatch`, so

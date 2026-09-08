@@ -232,7 +232,8 @@ pub(crate) struct TraceStepSerde {
 /// it maps to a single step whose `predicate` field describes the lookup. It
 /// does **not** synthesize a predicate trace: the trace would then assert a
 /// `SinglePredicate` that is not in the config, making it a second and wrong
-/// source of truth. `index` is 0 because there is exactly one.
+/// source of truth. One step per entry tried, in the order tried (D-055); a
+/// lookup that selected no entry is one unmatched step.
 pub(crate) fn trace_steps<A: std::fmt::Debug>(steps: &rumi::EvalSteps<A>) -> Vec<TraceStepSerde> {
     match steps {
         rumi::EvalSteps::List(list) => list
@@ -243,10 +244,20 @@ pub(crate) fn trace_steps<A: std::fmt::Debug>(steps: &rumi::EvalSteps<A>) -> Vec
                 predicate: format!("{:?}", step.predicate_trace),
             })
             .collect(),
-        rumi::EvalSteps::Tree(lookup) => vec![TraceStepSerde {
+        rumi::EvalSteps::Tree(lookup) if lookup.attempts.is_empty() => vec![TraceStepSerde {
             index: 0,
-            matched: lookup.matched_key.is_some(),
+            matched: false,
             predicate: format!("{lookup:?}"),
         }],
+        rumi::EvalSteps::Tree(lookup) => lookup
+            .attempts
+            .iter()
+            .enumerate()
+            .map(|(index, attempt)| TraceStepSerde {
+                index,
+                matched: true,
+                predicate: format!("{attempt:?}"),
+            })
+            .collect(),
     }
 }

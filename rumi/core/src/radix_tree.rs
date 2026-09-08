@@ -113,14 +113,17 @@ impl<V> RadixTree<V> {
         self.root.find_longest_prefix(key)
     }
 
-    /// Find all values whose keys are prefixes of the input, longest last.
+    /// Every entry whose key is a prefix of the input, longest first, each
+    /// with the key that matched.
     ///
-    /// Useful when you need to try shorter prefixes if the longest fails.
+    /// This is the lookup a prefix tree evaluates over: the longest entry is
+    /// tried first, and when its nested matcher produces nothing the next
+    /// shorter one is tried (D-055).
     #[must_use]
-    pub fn find_all_prefixes(&self, key: &str) -> Vec<&V> {
-        let mut results = Vec::new();
-        self.root.find_all_prefixes(key, &mut results);
-        results
+    pub fn find_all_prefix_entries<'a>(&'a self, key: &'a str) -> Vec<(&'a str, &'a V)> {
+        let mut entries = self.root.find_all_prefix_entries(key);
+        entries.reverse();
+        entries
     }
 }
 
@@ -283,16 +286,17 @@ impl<V> Node<V> {
         last.map(|(n, v)| (&key[..n], v))
     }
 
-    fn find_all_prefixes<'a>(&'a self, key: &str, results: &mut Vec<&'a V>) {
+    fn find_all_prefix_entries<'a>(&'a self, key: &'a str) -> Vec<(&'a str, &'a V)> {
         let mut current = self;
-        let mut remaining = key;
+        let mut consumed = 0usize;
+        let mut found = Vec::new();
 
-        // Check root value
         if let Some(ref v) = current.value {
-            results.push(v);
+            found.push((&key[..0], v));
         }
 
         loop {
+            let remaining = &key[consumed..];
             if remaining.is_empty() {
                 break;
             }
@@ -302,18 +306,18 @@ impl<V> Node<V> {
                 break;
             };
 
-            // Check if child prefix matches
             if remaining.len() >= child.prefix.len() && remaining.starts_with(&child.prefix) {
-                remaining = &remaining[child.prefix.len()..];
+                consumed += child.prefix.len();
                 current = child;
-
                 if let Some(ref v) = current.value {
-                    results.push(v);
+                    found.push((&key[..consumed], v));
                 }
             } else {
                 break;
             }
         }
+
+        found
     }
 }
 
@@ -373,17 +377,19 @@ mod tests {
     }
 
     #[test]
-    fn test_find_all_prefixes() {
+    fn all_prefix_entries_come_longest_first_with_their_keys() {
         let mut tree = RadixTree::new();
         tree.insert("/", 1);
         tree.insert("/api", 2);
         tree.insert("/api/v2", 3);
 
-        let prefixes = tree.find_all_prefixes("/api/v2/users");
-        assert_eq!(prefixes, vec![&1, &2, &3]);
+        let entries = tree.find_all_prefix_entries("/api/v2/users");
+        assert_eq!(entries, vec![("/api/v2", &3), ("/api", &2), ("/", &1)]);
 
-        let prefixes = tree.find_all_prefixes("/api/v1");
-        assert_eq!(prefixes, vec![&1, &2]);
+        let entries = tree.find_all_prefix_entries("/api/v1");
+        assert_eq!(entries, vec![("/api", &2), ("/", &1)]);
+
+        assert!(tree.find_all_prefix_entries("nope").is_empty());
     }
 
     #[test]

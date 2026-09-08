@@ -113,7 +113,8 @@ pub use registry::{
 };
 
 pub use trace::{
-    EvalStep, EvalSteps, EvalTrace, OnMatchTrace, PredicateTrace, TreeKind, TreeLookupTrace,
+    EvalStep, EvalSteps, EvalTrace, OnMatchTrace, PredicateTrace, TreeAttempt, TreeKind,
+    TreeLookupTrace,
 };
 
 pub use input_matcher::{

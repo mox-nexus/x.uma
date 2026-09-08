@@ -26,7 +26,8 @@ use std::fmt::Debug;
 /// # Variants
 ///
 /// - `ExactMatch` — O(1) hash map lookup
-/// - `PrefixMatch` — O(k) radix tree lookup, longest prefix wins
+/// - `PrefixMatch` — O(k) radix tree lookup, longest prefix first; a nested miss
+///   tries the next shorter prefix (D-055)
 pub enum MatcherTree<Ctx, A: Clone + Send + Sync + 'static> {
     /// O(1) exact string lookup.
     ExactMatch {
@@ -36,7 +37,7 @@ pub enum MatcherTree<Ctx, A: Clone + Send + Sync + 'static> {
         map: HashMap<String, OnMatch<Ctx, A>>,
     },
 
-    /// O(k) prefix lookup, longest matching prefix wins.
+    /// O(k) prefix lookup, longest matching prefix first.
     PrefixMatch {
         /// Extracts the lookup key from context.
         input: Box<dyn DataInput<Ctx>>,
@@ -72,7 +73,7 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
         Ok(Self::ExactMatch { input, map })
     }
 
-    /// Create a prefix-match tree. O(k) radix lookup, longest prefix wins.
+    /// Create a prefix-match tree. O(k) radix lookup, longest prefix first.
     ///
     /// # Errors
     ///
@@ -116,29 +117,36 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
         input.get(ctx)?.as_str().map(ToOwned::to_owned)
     }
 
-    /// The entry a key selects, and which key won.
+    /// The entries a key selects, in the order they are tried, each with the
+    /// key that won it.
     ///
-    /// Split out from [`evaluate`](Self::evaluate) so the traced path can reuse
-    /// the same decision rather than reimplement it — that is where the two
-    /// would otherwise drift apart.
-    fn lookup<'a>(&'a self, key: &'a str) -> Option<(&'a str, &'a OnMatch<Ctx, A>)> {
+    /// An exact map yields at most one. A prefix tree yields every matching
+    /// prefix, longest first, because a nested matcher that produces nothing
+    /// hands the lookup to the next shorter prefix (D-055). Split out from
+    /// [`evaluate`](Self::evaluate) so the traced path reuses the same
+    /// decision rather than reimplementing it.
+    fn candidates<'a>(&'a self, key: &'a str) -> Vec<(&'a str, &'a OnMatch<Ctx, A>)> {
         match self {
             Self::ExactMatch { map, .. } => map
                 .get_key_value(key)
-                .map(|(k, on_match)| (k.as_str(), on_match)),
-            Self::PrefixMatch { tree, .. } => tree.find_longest_prefix_entry(key),
+                .map(|(k, on_match)| (k.as_str(), on_match))
+                .into_iter()
+                .collect(),
+            Self::PrefixMatch { tree, .. } => tree.find_all_prefix_entries(key),
         }
     }
 
     /// Evaluate the tree against a context.
     ///
-    /// Returns `None` both when no key is available and when the key selects no
-    /// entry. The enclosing [`Matcher`](crate::Matcher) owns the fallback, so
-    /// there is exactly one place a miss can be handled.
+    /// Returns `None` when no key is available, when the key selects no entry,
+    /// and when every selected entry's nested matcher produced nothing. The
+    /// enclosing [`Matcher`](crate::Matcher) owns the fallback, so there is
+    /// exactly one place a miss can be handled.
     pub fn evaluate(&self, ctx: &Ctx) -> Option<A> {
         let key = self.key(ctx)?;
-        let (_, on_match) = self.lookup(&key)?;
-        on_match.evaluate(ctx)
+        self.candidates(&key)
+            .into_iter()
+            .find_map(|(_, on_match)| on_match.evaluate(ctx))
     }
 
     /// Which rule this tree applies, and what feeds it — for traces.
@@ -153,11 +161,11 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
         self.key(ctx)
     }
 
-    pub(crate) fn trace_lookup<'a>(
+    pub(crate) fn trace_candidates<'a>(
         &'a self,
         key: &'a str,
-    ) -> Option<(&'a str, &'a OnMatch<Ctx, A>)> {
-        self.lookup(key)
+    ) -> Vec<(&'a str, &'a OnMatch<Ctx, A>)> {
+        self.candidates(key)
     }
 
     /// Number of configured entries.

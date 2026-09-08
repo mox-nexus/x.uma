@@ -5,7 +5,7 @@
 
 use crate::{
     EvalStep, EvalSteps, EvalTrace, FieldMatcher, MatcherError, MatcherTree, OnMatch, OnMatchTrace,
-    Predicate, TreeLookupTrace, MAX_DEPTH,
+    Predicate, TreeAttempt, TreeLookupTrace, MAX_DEPTH,
 };
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -329,34 +329,31 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
                     kind,
                     input,
                     key: None,
-                    matched_key: None,
-                    on_match: None,
+                    attempts: Vec::new(),
                 },
             );
         };
 
-        let Some((matched_key, on_match)) = tree.trace_lookup(&key) else {
-            return (
-                None,
-                TreeLookupTrace {
-                    kind,
-                    input,
-                    key: Some(key),
-                    matched_key: None,
-                    on_match: None,
-                },
-            );
-        };
-        let matched_key = matched_key.to_owned();
-
-        let (result, on_match_trace) = match on_match {
-            OnMatch::Action(a) => (Some(a.clone()), OnMatchTrace::Action(a.clone())),
-            OnMatch::Matcher(nested) => {
-                let nested_trace = nested.evaluate_with_trace(ctx);
-                let r = nested_trace.result.clone();
-                (r, OnMatchTrace::Nested(Box::new(nested_trace)))
+        let mut result = None;
+        let mut attempts = Vec::new();
+        for (matched_key, on_match) in tree.trace_candidates(&key) {
+            let (r, on_match_trace) = match on_match {
+                OnMatch::Action(a) => (Some(a.clone()), OnMatchTrace::Action(a.clone())),
+                OnMatch::Matcher(nested) => {
+                    let nested_trace = nested.evaluate_with_trace(ctx);
+                    let r = nested_trace.result.clone();
+                    (r, OnMatchTrace::Nested(Box::new(nested_trace)))
+                }
+            };
+            attempts.push(TreeAttempt {
+                matched_key: matched_key.to_owned(),
+                on_match: on_match_trace,
+            });
+            if r.is_some() {
+                result = r;
+                break;
             }
-        };
+        }
 
         (
             result,
@@ -364,8 +361,7 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
                 kind,
                 input,
                 key: Some(key),
-                matched_key: Some(matched_key),
-                on_match: Some(on_match_trace),
+                attempts,
             },
         )
     }
@@ -1045,7 +1041,10 @@ mod tests {
         assert_eq!(lookup.kind, crate::TreeKind::Prefix);
         assert_eq!(lookup.key.as_deref(), Some("/api/v2/users"));
         // The winning prefix, not the lookup key — the non-obvious step.
-        assert_eq!(lookup.matched_key.as_deref(), Some("/api/v2"));
+        assert_eq!(
+            lookup.winner().map(|a| a.matched_key.as_str()),
+            Some("/api/v2")
+        );
     }
 
     #[test]
@@ -1088,10 +1087,53 @@ mod tests {
         match &no_entry.evaluate_with_trace(&ctx).steps {
             EvalSteps::Tree(t) => {
                 assert_eq!(t.key.as_deref(), Some("z"));
-                assert!(t.matched_key.is_none());
+                assert!(t.attempts.is_empty());
             }
             EvalSteps::List(_) => panic!("expected a tree trace"),
         }
+    }
+
+    #[test]
+    fn a_prefix_tree_falls_through_to_the_next_shorter_prefix_and_traces_every_attempt() {
+        let nested = Matcher::list(
+            vec![FieldMatcher::new(
+                Predicate::Single(SinglePredicate::new(
+                    Box::new(ValueInput),
+                    Box::new(ExactMatcher::new("never")),
+                )),
+                OnMatch::Action("api_admin".to_string()),
+            )],
+            None,
+        );
+        let tree = crate::MatcherTree::prefix(
+            Box::new(ValueInput),
+            [
+                ("/", OnMatch::Action("root".to_string())),
+                ("/api", OnMatch::Matcher(Box::new(nested))),
+            ],
+        )
+        .expect("valid tree");
+        let matcher = Matcher::tree(tree, Some(OnMatch::Action("fallback".to_string())));
+        let ctx = TestCtx {
+            value: "/api/users".into(),
+        };
+
+        assert_eq!(matcher.evaluate(&ctx), Some("root".to_string()));
+
+        let trace = matcher.evaluate_with_trace(&ctx);
+        assert_eq!(trace.result, matcher.evaluate(&ctx));
+        assert!(!trace.used_fallback);
+        let EvalSteps::Tree(lookup) = &trace.steps else {
+            panic!("expected a tree trace");
+        };
+        let tried: Vec<&str> = lookup
+            .attempts
+            .iter()
+            .map(|a| a.matched_key.as_str())
+            .collect();
+        assert_eq!(tried, ["/api", "/"]);
+        assert!(!lookup.attempts[0].on_match.produced());
+        assert_eq!(lookup.winner().map(|a| a.matched_key.as_str()), Some("/"));
     }
 
     #[test]
