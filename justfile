@@ -26,6 +26,10 @@ crust-wasm-check:
     # --features fixtures for the TEST build only; the npm package ships without.
     cd rumi/crusts/wasm && wasm-pack build --target web -- --features fixtures
     cd rumi/crusts/wasm && bun install --frozen-lockfile && bun test
+    # The crust's Rust unit tests, natively: the resolver, registries and
+    # action table are built once per process, and this is where that is
+    # asserted (the python crust cannot link `cargo test`; it shares the file).
+    cargo test --manifest-path rumi/crusts/wasm/Cargo.toml --lib
 
 # Build the wasm crust in its published shape. The docs site runs on it: the
 # playground and every live example evaluate through this package, so a

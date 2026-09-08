@@ -17,32 +17,32 @@ use rumi_test::KvContext;
 /// One line of the report: fixture, case, passed, detail.
 pub type FixtureResult = (String, String, bool, String);
 
-// The resolver and action registry are shared with `from_config` — see
-// `crate::protojson`. Fixtures must exercise exactly the same door a real
-// caller uses, or a passing suite proves nothing about the FFI surface.
+// A fixture loads through the same resolver, registries and action table as
+// `from_config`, or a passing suite proves nothing about the FFI surface.
 
 fn build(fixture: &ProtoFixture) -> Result<rumi::Matcher<KvContext, String>, rumi::MatcherError> {
     let resolver = crate::protojson::resolver();
-    let registry = rumi_test::register(rumi::RegistryBuilder::new()).build();
-    let actions = crate::protojson::actions();
-
-    let proto = parse_matcher(&resolver, fixture.proto_matcher.clone())?;
-    load_proto_matcher(&registry, &actions, &resolver, &proto)
+    let proto = parse_matcher(resolver, fixture.proto_matcher.clone())?;
+    load_proto_matcher(
+        crate::kv_matcher::registry(),
+        crate::protojson::actions(),
+        resolver,
+        &proto,
+    )
 }
 
 /// The HTTP-domain matcher a fixture describes.
-///
-/// `register_simple`, matching what the crusts' own `HttpMatcher` uses, so a
-/// fixture exercises the same registry a caller gets.
 fn build_http(
     fixture: &ProtoFixture,
 ) -> Result<rumi::Matcher<rumi_http::HttpRequest, String>, rumi::MatcherError> {
     let resolver = crate::protojson::resolver();
-    let registry = rumi_http::register_simple(rumi::RegistryBuilder::new()).build();
-    let actions = crate::protojson::actions();
-
-    let proto = parse_matcher(&resolver, fixture.proto_matcher.clone())?;
-    load_proto_matcher(&registry, &actions, &resolver, &proto)
+    let proto = parse_matcher(resolver, fixture.proto_matcher.clone())?;
+    load_proto_matcher(
+        crate::http_matcher::registry(),
+        crate::protojson::actions(),
+        resolver,
+        &proto,
+    )
 }
 
 /// Load whichever domain the fixture names, discarding the matcher.

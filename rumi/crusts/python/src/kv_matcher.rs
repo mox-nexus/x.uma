@@ -3,6 +3,8 @@
 //! Compiles a protojson document over `xuma.kv.v1` inputs and evaluates
 //! key-value contexts: the domain the conformance suite runs in.
 
+use std::sync::OnceLock;
+
 use std::collections::HashMap;
 
 use pyo3::exceptions::PyValueError;
@@ -45,9 +47,8 @@ impl KvMatcher {
     fn from_config(json_config: &str) -> PyResult<Self> {
         let config = crate::protojson::load(json_config).map_err(PyValueError::new_err)?;
 
-        let registry = build_test_registry();
-        let matcher = registry
-            .load_typed_matcher(config, &crate::protojson::actions())
+        let matcher = registry()
+            .load_typed_matcher(config, crate::protojson::actions())
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
         matcher
@@ -109,9 +110,11 @@ impl KvMatcher {
     }
 }
 
-/// Build the test registry for `KvContext`.
-fn build_test_registry() -> rumi::Registry<KvContext> {
-    rumi_kv::register(rumi::RegistryBuilder::new()).build()
+/// The registry every `KvMatcher` loads through. Built on first use; every
+/// call after that returns the same instance.
+pub(crate) fn registry() -> &'static rumi::Registry<KvContext> {
+    static REGISTRY: OnceLock<rumi::Registry<KvContext>> = OnceLock::new();
+    REGISTRY.get_or_init(|| rumi_kv::register(rumi::RegistryBuilder::new()).build())
 }
 
 /// Build a `KvContext` from a Python dict.

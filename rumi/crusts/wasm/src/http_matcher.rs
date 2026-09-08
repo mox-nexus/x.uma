@@ -3,6 +3,8 @@
 //! Takes a JSON config string, compiles it via Rust registry, and evaluates
 //! against HTTP request contexts passed as plain JS objects.
 
+use std::sync::OnceLock;
+
 use rumi::prelude::*;
 use rumi_http::HttpRequest;
 use wasm_bindgen::prelude::*;
@@ -34,9 +36,8 @@ impl HttpMatcher {
     pub fn from_config(json_config: &str) -> Result<HttpMatcher, JsValue> {
         let config = crate::protojson::load(json_config).map_err(|e| JsValue::from_str(&e))?;
 
-        let registry = build_http_registry();
-        let matcher = registry
-            .load_typed_matcher(config, &crate::protojson::actions())
+        let matcher = registry()
+            .load_typed_matcher(config, crate::protojson::actions())
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
         matcher
@@ -81,9 +82,11 @@ impl HttpMatcher {
     }
 }
 
-/// Build the HTTP registry for `HttpRequest`.
-fn build_http_registry() -> rumi::Registry<HttpRequest> {
-    rumi_http::register_simple(rumi::RegistryBuilder::new()).build()
+/// The registry every `HttpMatcher` loads through. Built on first use; every
+/// call after that returns the same instance.
+pub(crate) fn registry() -> &'static rumi::Registry<HttpRequest> {
+    static REGISTRY: OnceLock<rumi::Registry<HttpRequest>> = OnceLock::new();
+    REGISTRY.get_or_init(|| rumi_http::register_simple(rumi::RegistryBuilder::new()).build())
 }
 
 /// Build an `HttpRequest` from a JS plain object.

@@ -4,6 +4,8 @@
 //! against HTTP request contexts. Same `MatcherIr<String>` format used
 //! by all implementations.
 
+use std::sync::OnceLock;
+
 use std::collections::HashMap;
 
 use pyo3::exceptions::PyValueError;
@@ -48,9 +50,8 @@ impl HttpMatcher {
     fn from_config(json_config: &str) -> PyResult<Self> {
         let config = crate::protojson::load(json_config).map_err(PyValueError::new_err)?;
 
-        let registry = build_http_registry();
-        let matcher = registry
-            .load_typed_matcher(config, &crate::protojson::actions())
+        let matcher = registry()
+            .load_typed_matcher(config, crate::protojson::actions())
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
         matcher
@@ -113,9 +114,11 @@ impl HttpMatcher {
     }
 }
 
-/// Build the HTTP registry for `HttpRequest`.
-fn build_http_registry() -> rumi::Registry<HttpRequest> {
-    rumi_http::register_simple(rumi::RegistryBuilder::new()).build()
+/// The registry every `HttpMatcher` loads through. Built on first use; every
+/// call after that returns the same instance.
+pub(crate) fn registry() -> &'static rumi::Registry<HttpRequest> {
+    static REGISTRY: OnceLock<rumi::Registry<HttpRequest>> = OnceLock::new();
+    REGISTRY.get_or_init(|| rumi_http::register_simple(rumi::RegistryBuilder::new()).build())
 }
 
 /// Build an `HttpRequest` from Python arguments.

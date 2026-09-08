@@ -256,6 +256,7 @@ jobs:
           wasm-pack build --target web -- --features fixtures
           bun install --frozen-lockfile
           bun test
+          cargo test --lib
 
       # The npm artifact is assembled by wasm-pack, whose generated `files`
       # array omitted both licence files — so a package declaring
