@@ -15,8 +15,10 @@
 import { bench, run, summary } from "mitata";
 
 import init, {
+	boundaryFloorCachedString,
 	boundaryFloorFlatMap,
 	boundaryFloorOptionString,
+	boundaryFloorPacked,
 	boundaryFloorU32,
 } from "../pkg/xuma_crust.js";
 await init();
@@ -32,10 +34,15 @@ const flat = {
 	command: "ls",
 };
 
+// The same six fields as one string, the way a host would pack them.
+const packed = Object.values(flat).join("\u001f");
+
 summary(() => {
 	bench("floor_u32", () => boundaryFloorU32());
 	bench("floor_option_string", () => boundaryFloorOptionString());
+	bench("floor_cached_string", () => boundaryFloorCachedString());
 	bench("floor_flat_map", () => boundaryFloorFlatMap(flat));
+	bench("floor_packed", () => boundaryFloorPacked(packed));
 });
 
 await run(process.env.BENCH_JSON ? { format: "json" } : {});

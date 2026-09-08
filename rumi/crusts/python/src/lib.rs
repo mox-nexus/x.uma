@@ -44,6 +44,8 @@ fn xuma_crust(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_function(wrap_pyfunction!(floor::boundary_floor_u32, m)?)?;
         m.add_function(wrap_pyfunction!(floor::boundary_floor_option_string, m)?)?;
         m.add_function(wrap_pyfunction!(floor::boundary_floor_flat_map, m)?)?;
+        m.add_function(wrap_pyfunction!(floor::boundary_floor_packed, m)?)?;
+        m.add_function(wrap_pyfunction!(floor::boundary_floor_cached_string, m)?)?;
     }
 
     Ok(())

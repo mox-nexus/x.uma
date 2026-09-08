@@ -8,6 +8,19 @@
 use std::collections::HashMap;
 
 use pyo3::prelude::*;
+use pyo3::sync::PyOnceLock;
+use pyo3::types::PyString;
+
+/// A string made once and handed back by reference: the shape `evaluate`
+/// returns after D-056. Its distance from the `u32` floor is the reference's
+/// own cost.
+#[pyfunction]
+pub fn boundary_floor_cached_string(py: Python<'_>) -> Py<PyString> {
+    static CACHED: PyOnceLock<Py<PyString>> = PyOnceLock::new();
+    CACHED
+        .get_or_init(py, || PyString::new(py, "matched").unbind())
+        .clone_ref(py)
+}
 
 /// A bare integer back across the boundary.
 #[pyfunction]
@@ -19,6 +32,15 @@ pub fn boundary_floor_u32() -> u32 {
 #[pyfunction]
 pub fn boundary_floor_option_string() -> Option<String> {
     Some("matched".to_string())
+}
+
+/// One packed string in across the boundary: fields separated by U+001F,
+/// split into owned Rust strings. The other candidate shape for the flat
+/// context port (D-057).
+#[pyfunction]
+pub fn boundary_floor_packed(packed: &str) -> u32 {
+    let fields: Vec<String> = packed.split('\u{1f}').map(str::to_owned).collect();
+    u32::try_from(fields.len()).unwrap_or(u32::MAX)
 }
 
 /// A flat string map in across the boundary, marshalled into Rust strings,

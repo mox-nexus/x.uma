@@ -9,6 +9,19 @@ use std::collections::HashMap;
 
 use wasm_bindgen::prelude::*;
 
+thread_local! {
+    static CACHED: JsValue = JsValue::from_str("matched");
+}
+
+/// A string made once and handed back by handle: the shape `evaluate`
+/// returns after D-056. Its distance from the `u32` floor is the handle's
+/// own cost.
+#[wasm_bindgen(js_name = "boundaryFloorCachedString")]
+#[must_use]
+pub fn boundary_floor_cached_string() -> JsValue {
+    CACHED.with(JsValue::clone)
+}
+
 /// A bare integer back across the boundary.
 #[wasm_bindgen(js_name = "boundaryFloorU32")]
 #[must_use]
@@ -21,6 +34,17 @@ pub fn boundary_floor_u32() -> u32 {
 #[must_use]
 pub fn boundary_floor_option_string() -> Option<String> {
     Some("matched".to_string())
+}
+
+/// One packed string in across the boundary: fields separated by U+001F,
+/// split into owned Rust strings. The other candidate shape for the flat
+/// context port (D-057): one transcode for the whole context instead of one
+/// per field.
+#[wasm_bindgen(js_name = "boundaryFloorPacked")]
+#[must_use]
+pub fn boundary_floor_packed(packed: &str) -> u32 {
+    let fields: Vec<String> = packed.split('\u{1f}').map(str::to_owned).collect();
+    u32::try_from(fields.len()).unwrap_or(u32::MAX)
 }
 
 /// A flat string map in across the boundary, marshalled into Rust strings,

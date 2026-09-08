@@ -36,5 +36,16 @@ def test_bench_floor_option_string(benchmark):
     benchmark(native.boundary_floor_option_string)
 
 
+def test_bench_floor_cached_string(benchmark):
+    benchmark(native.boundary_floor_cached_string)
+
+
 def test_bench_floor_flat_map(benchmark):
     benchmark(native.boundary_floor_flat_map, FLAT)
+
+
+PACKED = "\x1f".join(FLAT.values())
+
+
+def test_bench_floor_packed(benchmark):
+    benchmark(native.boundary_floor_packed, PACKED)
