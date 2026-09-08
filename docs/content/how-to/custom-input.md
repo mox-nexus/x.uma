@@ -7,13 +7,14 @@ the engine.
 ## What an input is
 
 A `DataInput` extracts one value from your context and returns it as
-`MatchingData`, the erased type every matcher understands. That erasure is what
+`Option<MatchingData>`: the erased type every matcher understands, or `None`
+when the context has no such value. That erasure is what
 lets one `ExactMatcher` work across HTTP, Claude hooks, and your own domain
 without knowing anything about them.
 
 ```rust
 pub trait DataInput<Ctx>: Send + Sync + Debug {
-    fn get(&self, ctx: &Ctx) -> MatchingData;
+    fn get(&self, ctx: &Ctx) -> Option<MatchingData>;
 }
 ```
 
@@ -28,11 +29,8 @@ use rumi::prelude::*;
 struct RegionInput;
 
 impl DataInput<MyRequest> for RegionInput {
-    fn get(&self, ctx: &MyRequest) -> MatchingData {
-        match ctx.region() {
-            Some(r) => MatchingData::String(r.to_string()),
-            None => MatchingData::Absent,
-        }
+    fn get(&self, ctx: &MyRequest) -> Option<MatchingData> {
+        ctx.region().map(|r| MatchingData::String(r.to_string()))
     }
 
     fn data_type(&self) -> &'static str {
@@ -41,8 +39,8 @@ impl DataInput<MyRequest> for RegionInput {
 }
 ```
 
-Return `MatchingData::Absent` when the value is absent. The predicate will evaluate
-to `false`, which is what you want. Do not panic, and do not substitute a
+Return `None` when the value is absent. The predicate will evaluate to
+`false`, which is what you want. Do not panic, and do not substitute a
 sentinel like the empty string, because a rule matching `""` would then fire on
 missing data.
 

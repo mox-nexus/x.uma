@@ -522,8 +522,8 @@ mod tests {
     struct ValueInput;
 
     impl DataInput<TestCtx> for ValueInput {
-        fn get(&self, ctx: &TestCtx) -> MatchingData {
-            MatchingData::String(ctx.value.clone())
+        fn get(&self, ctx: &TestCtx) -> Option<MatchingData> {
+            Some(MatchingData::String(ctx.value.clone()))
         }
     }
 
@@ -1053,8 +1053,8 @@ mod tests {
         #[derive(Debug)]
         struct AbsentInput;
         impl DataInput<TestCtx> for AbsentInput {
-            fn get(&self, _ctx: &TestCtx) -> MatchingData {
-                MatchingData::Absent
+            fn get(&self, _ctx: &TestCtx) -> Option<MatchingData> {
+                None
             }
         }
 

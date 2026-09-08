@@ -20,8 +20,9 @@
 //! 2. **Non-generic `InputMatcher`**: The same `ExactMatcher` works for HTTP, Claude,
 //!    test contexts, etc. Matchers are domain-agnostic.
 //!
-//! 3. **`DataInput` Absent → false**: When a `DataInput` returns `MatchingData::Absent`,
-//!    the predicate evaluates to `false`. This is a critical invariant.
+//! 3. **`DataInput` None → false**: When a `DataInput` returns `None`, the
+//!    predicate evaluates to `false` and the matcher is never asked (INV-1).
+//!    The signature enforces it: absence is not a `MatchingData` value.
 //!
 //! # Example
 //!
@@ -37,8 +38,8 @@
 //! struct PathInput;
 //!
 //! impl DataInput<Request> for PathInput {
-//!     fn get(&self, ctx: &Request) -> MatchingData {
-//!         MatchingData::String(ctx.path.clone())
+//!     fn get(&self, ctx: &Request) -> Option<MatchingData> {
+//!         Some(MatchingData::String(ctx.path.clone()))
 //!     }
 //! }
 //!

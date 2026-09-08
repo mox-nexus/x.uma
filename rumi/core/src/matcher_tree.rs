@@ -113,7 +113,7 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
         let input = match self {
             Self::ExactMatch { input, .. } | Self::PrefixMatch { input, .. } => input,
         };
-        input.get(ctx).as_str().map(ToOwned::to_owned)
+        input.get(ctx)?.as_str().map(ToOwned::to_owned)
     }
 
     /// The entry a key selects, and which key won.
@@ -246,8 +246,8 @@ mod tests {
     struct PathInput;
 
     impl DataInput<TestContext> for PathInput {
-        fn get(&self, ctx: &TestContext) -> MatchingData {
-            MatchingData::String(ctx.path.clone())
+        fn get(&self, ctx: &TestContext) -> Option<MatchingData> {
+            Some(MatchingData::String(ctx.path.clone()))
         }
     }
 
@@ -345,8 +345,8 @@ mod tests {
         struct BoolInput;
 
         impl DataInput<TestContext> for BoolInput {
-            fn get(&self, _ctx: &TestContext) -> MatchingData {
-                MatchingData::Bool(true)
+            fn get(&self, _ctx: &TestContext) -> Option<MatchingData> {
+                Some(MatchingData::Bool(true))
             }
             fn data_type(&self) -> &'static str {
                 "bool"
@@ -379,8 +379,8 @@ mod tests {
         struct UndeclaredIntInput;
 
         impl DataInput<TestContext> for UndeclaredIntInput {
-            fn get(&self, _ctx: &TestContext) -> MatchingData {
-                MatchingData::Int(42)
+            fn get(&self, _ctx: &TestContext) -> Option<MatchingData> {
+                Some(MatchingData::Int(42))
             }
         }
 

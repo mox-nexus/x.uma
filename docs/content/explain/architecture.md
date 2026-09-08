@@ -13,7 +13,7 @@ Context (your data)
     ↓
 DataInput.get()          ← knows your type, returns erased data
     ↓
-MatchingData             ← string | int | bool | bytes | null
+Option<MatchingData>     ← string | int | bool | bytes, or absent
     ↓
 InputMatcher.matches()   ← doesn't know your type, doesn't need to
     ↓
@@ -79,7 +79,7 @@ The core engine (`rumi` in Rust, `xuma` in Python/TypeScript) provides:
 - **Matcher** — first-match-wins evaluation over a list of field matchers
 - **Predicate** — Boolean tree (Single, And, Or, Not) with short-circuit evaluation
 - **SinglePredicate** — pairs a `DataInput` with an `InputMatcher`
-- **MatchingData** — the type-erased bridge (`string | int | bool | bytes | null`)
+- **MatchingData** — the type-erased bridge (`string | int | bool | bytes`); absence is `None`, never a value
 - **InputMatcher** — five string matchers plus `BoolMatcher`
 - **OnMatch** — action XOR nested matcher (illegal states unrepresentable)
 - **Depth/width limits** — MAX_DEPTH=32, MAX_FIELD_MATCHERS=256

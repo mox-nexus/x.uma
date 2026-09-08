@@ -21,7 +21,7 @@ You audit the x.uma codebase for compliance with the 9 arch-guild constraints.
 | 3 | Type Registry Immutable | Registry methods use `&self`, not `&mut self` |
 | 4 | Send + Sync + Debug | All public types have marker tests |
 | 5 | Iterative Evaluation | No recursive `evaluate()` calls |
-| 6 | DataInput Absent → false | Conformance tests verify |
+| 6 | DataInput None → false | Conformance tests verify |
 | 7 | OnMatch is Exclusive | `OnMatch` is enum, not struct |
 | 8 | Action: 'static | Trait bounds include `'static` |
 | 9 | Action: Clone + Send + Sync | Matcher has these bounds |

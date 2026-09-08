@@ -25,7 +25,7 @@ Erase the type at the **data level**. Extract the value first, then match the er
 ```rust,ignore
 // DataInput is generic — knows about the context
 trait DataInput<Ctx> {
-    fn get(&self, ctx: &Ctx) -> MatchingData;
+    fn get(&self, ctx: &Ctx) -> Option<MatchingData>;
 }
 
 // InputMatcher is NOT generic — knows only about MatchingData
@@ -100,7 +100,7 @@ one implementation, every language.
 
 ## The None Convention
 
-When a `DataInput` returns `MatchingData::Absent` (data not present), the predicate evaluates to `false` without calling the matcher.
+`DataInput::get` returns `Option<MatchingData>`. When it returns `None`, the predicate evaluates to `false` without calling the matcher.
 
 ```rust
 use rumi::prelude::*;
@@ -116,7 +116,7 @@ let request = HttpRequest::builder().method("GET").path("/").build();
 assert!(!predicate.evaluate(&request));
 ```
 
-The matcher never sees `Absent`. Missing data is handled upstream. This is a security guarantee: missing data never accidentally matches, in the engine and therefore in every binding.
+The matcher never sees an absent value, because there is no `MatchingData` that means absent. Missing data is handled upstream, by the type. This is a security guarantee: missing data never accidentally matches, in the engine and therefore in every binding.
 
 ## Next
 

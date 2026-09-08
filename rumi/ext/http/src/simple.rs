@@ -122,8 +122,8 @@ impl HttpRequestBuilder {
 pub struct SimpleMethodInput;
 
 impl DataInput<HttpRequest> for SimpleMethodInput {
-    fn get(&self, ctx: &HttpRequest) -> MatchingData {
-        MatchingData::String(ctx.method.clone())
+    fn get(&self, ctx: &HttpRequest) -> Option<MatchingData> {
+        Some(MatchingData::String(ctx.method.clone()))
     }
 }
 
@@ -132,8 +132,8 @@ impl DataInput<HttpRequest> for SimpleMethodInput {
 pub struct SimplePathInput;
 
 impl DataInput<HttpRequest> for SimplePathInput {
-    fn get(&self, ctx: &HttpRequest) -> MatchingData {
-        MatchingData::String(ctx.path().to_string())
+    fn get(&self, ctx: &HttpRequest) -> Option<MatchingData> {
+        Some(MatchingData::String(ctx.path().to_string()))
     }
 }
 
@@ -149,10 +149,9 @@ impl DataInput<HttpRequest> for SimplePathInput {
 pub struct SimpleAuthorityInput;
 
 impl DataInput<HttpRequest> for SimpleAuthorityInput {
-    fn get(&self, ctx: &HttpRequest) -> MatchingData {
-        ctx.header(":authority").map_or(MatchingData::Absent, |a| {
-            MatchingData::String(a.to_string())
-        })
+    fn get(&self, ctx: &HttpRequest) -> Option<MatchingData> {
+        ctx.header(":authority")
+            .map(|a| MatchingData::String(a.to_string()))
     }
 }
 
@@ -161,10 +160,9 @@ impl DataInput<HttpRequest> for SimpleAuthorityInput {
 pub struct SimpleSchemeInput;
 
 impl DataInput<HttpRequest> for SimpleSchemeInput {
-    fn get(&self, ctx: &HttpRequest) -> MatchingData {
-        ctx.header(":scheme").map_or(MatchingData::Absent, |s| {
-            MatchingData::String(s.to_string())
-        })
+    fn get(&self, ctx: &HttpRequest) -> Option<MatchingData> {
+        ctx.header(":scheme")
+            .map(|s| MatchingData::String(s.to_string()))
     }
 }
 
@@ -184,10 +182,9 @@ impl SimpleHeaderInput {
 }
 
 impl DataInput<HttpRequest> for SimpleHeaderInput {
-    fn get(&self, ctx: &HttpRequest) -> MatchingData {
-        ctx.header(&self.name).map_or(MatchingData::Absent, |s| {
-            MatchingData::String(s.to_string())
-        })
+    fn get(&self, ctx: &HttpRequest) -> Option<MatchingData> {
+        ctx.header(&self.name)
+            .map(|s| MatchingData::String(s.to_string()))
     }
 }
 
@@ -205,11 +202,9 @@ impl SimpleQueryParamInput {
 }
 
 impl DataInput<HttpRequest> for SimpleQueryParamInput {
-    fn get(&self, ctx: &HttpRequest) -> MatchingData {
+    fn get(&self, ctx: &HttpRequest) -> Option<MatchingData> {
         ctx.query_param(&self.name)
-            .map_or(MatchingData::Absent, |s| {
-                MatchingData::String(s.to_string())
-            })
+            .map(|s| MatchingData::String(s.to_string()))
     }
 }
 

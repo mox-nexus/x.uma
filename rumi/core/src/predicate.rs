@@ -3,7 +3,7 @@
 //! Predicates combine [`DataInput`] and [`InputMatcher`] to create boolean
 //! conditions that can be composed with AND/OR/NOT.
 
-use crate::{DataInput, InputMatcher, MatchingData, PredicateTrace};
+use crate::{DataInput, InputMatcher, PredicateTrace};
 use std::fmt::Debug;
 
 /// A single predicate: combines a [`DataInput`] with an [`InputMatcher`].
@@ -12,9 +12,9 @@ use std::fmt::Debug;
 /// The `SinglePredicate` extracts data from the context using the input, then
 /// passes it to the matcher for evaluation.
 ///
-/// # INV-1: Absent → false
+/// # INV-1: absent → false
 ///
-/// If the `DataInput` returns [`MatchingData::Absent`], the predicate evaluates to `false`.
+/// If the `DataInput` returns `None`, the predicate evaluates to `false`.
 /// This is a critical invariant that simplifies reasoning about matcher behavior.
 ///
 /// # Example
@@ -55,14 +55,12 @@ impl<Ctx> SinglePredicate<Ctx> {
     /// # Returns
     ///
     /// - `true` if the input produces data and the matcher matches
-    /// - `false` if the input returns `Absent` (INV-1)
+    /// - `false` if the input returns `None` (INV-1)
     /// - `false` if the matcher doesn't match
     pub fn evaluate(&self, ctx: &Ctx) -> bool {
-        let data = self.input.get(ctx);
-        match data {
-            MatchingData::Absent => false, // INV-1
-            _ => self.matcher.matches(&data),
-        }
+        self.input
+            .get(ctx)
+            .is_some_and(|data| self.matcher.matches(&data))
     }
 
     /// Evaluate with full trace for debugging.
@@ -72,14 +70,11 @@ impl<Ctx> SinglePredicate<Ctx> {
     #[must_use]
     pub fn evaluate_with_trace(&self, ctx: &Ctx) -> PredicateTrace {
         let data = self.input.get(ctx);
-        let matched = match &data {
-            MatchingData::Absent => false,
-            _ => self.matcher.matches(&data),
-        };
+        let matched = data.as_ref().is_some_and(|d| self.matcher.matches(d));
         PredicateTrace::Single {
             matched,
             input: format!("{:?}", self.input),
-            data: format!("{data:?}"),
+            data: data.map_or_else(|| "absent".to_string(), |d| format!("{d:?}")),
             matcher: format!("{:?}", self.matcher),
         }
     }
@@ -311,6 +306,7 @@ impl<Ctx> Debug for Predicate<Ctx> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::MatchingData;
     use crate::{ContainsMatcher, ExactMatcher};
 
     #[derive(Debug, Clone)]
@@ -322,8 +318,8 @@ mod tests {
     struct ValueInput;
 
     impl DataInput<TestContext> for ValueInput {
-        fn get(&self, ctx: &TestContext) -> MatchingData {
-            MatchingData::String(ctx.value.clone())
+        fn get(&self, ctx: &TestContext) -> Option<MatchingData> {
+            Some(MatchingData::String(ctx.value.clone()))
         }
     }
 
@@ -331,8 +327,8 @@ mod tests {
     struct NoneInput;
 
     impl DataInput<TestContext> for NoneInput {
-        fn get(&self, _ctx: &TestContext) -> MatchingData {
-            MatchingData::Absent
+        fn get(&self, _ctx: &TestContext) -> Option<MatchingData> {
+            None
         }
     }
 
@@ -566,7 +562,7 @@ mod tests {
 
         assert!(!trace.matched());
         if let PredicateTrace::Single { data, .. } = &trace {
-            assert!(data.contains("Absent"));
+            assert_eq!(data, "absent");
         } else {
             panic!("expected Single trace");
         }

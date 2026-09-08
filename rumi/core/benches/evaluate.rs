@@ -22,8 +22,8 @@ struct Ctx {
 struct ValueInput;
 
 impl DataInput<Ctx> for ValueInput {
-    fn get(&self, ctx: &Ctx) -> MatchingData {
-        MatchingData::String(ctx.value.clone())
+    fn get(&self, ctx: &Ctx) -> Option<MatchingData> {
+        Some(MatchingData::String(ctx.value.clone()))
     }
 }
 

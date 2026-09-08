@@ -33,10 +33,8 @@ use std::fmt::Debug;
 /// struct HeaderInput { name: String }
 ///
 /// impl DataInput<HttpRequest> for HeaderInput {
-///     fn get(&self, ctx: &HttpRequest) -> MatchingData {
-///         ctx.headers.get(&self.name)
-///             .map(|v| MatchingData::String(v.clone()))
-///             .unwrap_or(MatchingData::Absent)
+///     fn get(&self, ctx: &HttpRequest) -> Option<MatchingData> {
+///         ctx.headers.get(&self.name).map(|v| MatchingData::String(v.clone()))
 ///     }
 /// }
 /// ```
@@ -49,9 +47,17 @@ use std::fmt::Debug;
 pub trait DataInput<Ctx>: Send + Sync + Debug {
     /// Extract data from the given context.
     ///
-    /// Returns [`MatchingData::Absent`] if the requested data is not present.
-    /// Absent makes the predicate `false` (INV-1).
-    fn get(&self, ctx: &Ctx) -> MatchingData;
+    /// `None` means the context has no such value. The predicate is then
+    /// `false` and the matcher is never consulted (INV-1); that is enforced by
+    /// this signature, not by every implementation remembering it.
+    ///
+    /// # Purity
+    ///
+    /// Same context, same result, and no effect observable by another call.
+    /// The engine may call `get` more or fewer times than there are rules, in
+    /// any order, and may share one call between rules that read the same
+    /// input (D-062).
+    fn get(&self, ctx: &Ctx) -> Option<MatchingData>;
 
     /// Returns a static string describing the type of data this input produces.
     ///
@@ -64,7 +70,7 @@ pub trait DataInput<Ctx>: Send + Sync + Debug {
 
 #[diagnostic::do_not_recommend]
 impl<Ctx> DataInput<Ctx> for Box<dyn DataInput<Ctx>> {
-    fn get(&self, ctx: &Ctx) -> MatchingData {
+    fn get(&self, ctx: &Ctx) -> Option<MatchingData> {
         (**self).get(ctx)
     }
 
@@ -86,8 +92,8 @@ mod tests {
     struct ValueInput;
 
     impl DataInput<TestContext> for ValueInput {
-        fn get(&self, ctx: &TestContext) -> MatchingData {
-            MatchingData::String(ctx.value.clone())
+        fn get(&self, ctx: &TestContext) -> Option<MatchingData> {
+            Some(MatchingData::String(ctx.value.clone()))
         }
     }
 
@@ -97,7 +103,7 @@ mod tests {
             value: "hello".to_string(),
         };
         let input = ValueInput;
-        let data = input.get(&ctx);
+        let data = input.get(&ctx).expect("value is set");
         assert_eq!(data.as_str(), Some("hello"));
     }
 }

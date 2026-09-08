@@ -720,12 +720,8 @@ mod tests {
     }
 
     impl DataInput<TestCtx> for ValueInput {
-        fn get(&self, ctx: &TestCtx) -> MatchingData {
-            if self.key == "value" {
-                MatchingData::String(ctx.value.clone())
-            } else {
-                MatchingData::Absent
-            }
+        fn get(&self, ctx: &TestCtx) -> Option<MatchingData> {
+            (self.key == "value").then(|| MatchingData::String(ctx.value.clone()))
         }
     }
 
@@ -857,8 +853,8 @@ mod tests {
         #[derive(Debug)]
         struct BoolInput;
         impl DataInput<TestCtx> for BoolInput {
-            fn get(&self, ctx: &TestCtx) -> MatchingData {
-                MatchingData::Bool(ctx.value == "yes")
+            fn get(&self, ctx: &TestCtx) -> Option<MatchingData> {
+                Some(MatchingData::Bool(ctx.value == "yes"))
             }
             fn data_type(&self) -> &'static str {
                 "bool"

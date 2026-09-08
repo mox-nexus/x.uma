@@ -8,8 +8,8 @@ use crate::prelude::*;
 pub struct EventTypeInput;
 
 impl DataInput<HookContext> for EventTypeInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        MatchingData::String(ctx.event().as_str().to_string())
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
+        Some(MatchingData::String(ctx.event().as_str().to_string()))
     }
 }
 
@@ -18,8 +18,8 @@ impl DataInput<HookContext> for EventTypeInput {
 pub struct ToolNameInput;
 
 impl DataInput<HookContext> for ToolNameInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        MatchingData::String(ctx.tool_name().to_string())
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
+        Some(MatchingData::String(ctx.tool_name().to_string()))
     }
 }
 
@@ -50,10 +50,9 @@ impl ToolArgInput {
 }
 
 impl DataInput<HookContext> for ToolArgInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        ctx.argument(&self.name).map_or(MatchingData::Absent, |s| {
-            MatchingData::String(s.to_string())
-        })
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
+        ctx.argument(&self.name)
+            .map(|s| MatchingData::String(s.to_string()))
     }
 }
 
@@ -62,8 +61,8 @@ impl DataInput<HookContext> for ToolArgInput {
 pub struct SessionIdInput;
 
 impl DataInput<HookContext> for SessionIdInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        MatchingData::String(ctx.session_id().to_string())
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
+        Some(MatchingData::String(ctx.session_id().to_string()))
     }
 }
 
@@ -72,8 +71,8 @@ impl DataInput<HookContext> for SessionIdInput {
 pub struct CwdInput;
 
 impl DataInput<HookContext> for CwdInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        MatchingData::String(ctx.cwd().to_string())
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
+        Some(MatchingData::String(ctx.cwd().to_string()))
     }
 }
 
@@ -82,10 +81,9 @@ impl DataInput<HookContext> for CwdInput {
 pub struct GitBranchInput;
 
 impl DataInput<HookContext> for GitBranchInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        ctx.git_branch().map_or(MatchingData::Absent, |s| {
-            MatchingData::String(s.to_string())
-        })
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
+        ctx.git_branch()
+            .map(|s| MatchingData::String(s.to_string()))
     }
 }
 
@@ -186,7 +184,7 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash");
         assert_eq!(
             EventTypeInput.get(&ctx),
-            MatchingData::String("PreToolUse".into())
+            Some(MatchingData::String("PreToolUse".into()))
         );
     }
 
@@ -205,7 +203,7 @@ mod tests {
         ] {
             assert_eq!(
                 EventTypeInput.get(&ctx),
-                MatchingData::String(event_name.into()),
+                Some(MatchingData::String(event_name.into())),
                 "EventTypeInput failed for {event_name}"
             );
         }
@@ -216,14 +214,17 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Write");
         assert_eq!(
             ToolNameInput.get(&ctx),
-            MatchingData::String("Write".into())
+            Some(MatchingData::String("Write".into()))
         );
     }
 
     #[test]
     fn tool_name_input_empty_for_non_tool_events() {
         let ctx = HookContext::stop();
-        assert_eq!(ToolNameInput.get(&ctx), MatchingData::String(String::new()));
+        assert_eq!(
+            ToolNameInput.get(&ctx),
+            Some(MatchingData::String(String::new()))
+        );
     }
 
     #[test]
@@ -231,17 +232,14 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "ls");
         assert_eq!(
             ToolArgInput::new("command").unwrap().get(&ctx),
-            MatchingData::String("ls".into())
+            Some(MatchingData::String("ls".into()))
         );
     }
 
     #[test]
     fn argument_input_returns_none_for_missing() {
         let ctx = HookContext::pre_tool_use("Bash");
-        assert_eq!(
-            ToolArgInput::new("command").unwrap().get(&ctx),
-            MatchingData::Absent
-        );
+        assert_eq!(ToolArgInput::new("command").unwrap().get(&ctx), None);
     }
 
     #[test]
@@ -249,7 +247,7 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash").with_session_id("abc-123");
         assert_eq!(
             SessionIdInput.get(&ctx),
-            MatchingData::String("abc-123".into())
+            Some(MatchingData::String("abc-123".into()))
         );
     }
 
@@ -258,7 +256,7 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash").with_cwd("/home/user/project");
         assert_eq!(
             CwdInput.get(&ctx),
-            MatchingData::String("/home/user/project".into())
+            Some(MatchingData::String("/home/user/project".into()))
         );
     }
 
@@ -267,13 +265,13 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash").with_git_branch("main");
         assert_eq!(
             GitBranchInput.get(&ctx),
-            MatchingData::String("main".into())
+            Some(MatchingData::String("main".into()))
         );
     }
 
     #[test]
     fn git_branch_input_absent() {
         let ctx = HookContext::pre_tool_use("Bash");
-        assert_eq!(GitBranchInput.get(&ctx), MatchingData::Absent);
+        assert_eq!(GitBranchInput.get(&ctx), None);
     }
 }

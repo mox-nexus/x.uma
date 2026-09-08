@@ -76,8 +76,8 @@ mod tests {
     struct ValueInput;
 
     impl DataInput<TestCtx> for ValueInput {
-        fn get(&self, ctx: &TestCtx) -> MatchingData {
-            MatchingData::String(ctx.value.clone())
+        fn get(&self, ctx: &TestCtx) -> Option<MatchingData> {
+            Some(MatchingData::String(ctx.value.clone()))
         }
     }
 

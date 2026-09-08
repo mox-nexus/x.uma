@@ -520,7 +520,6 @@ mod tests {
         assert!(matcher.matches(&"hello".into()));
         assert!(!matcher.matches(&"Hello".into()));
         assert!(!matcher.matches(&"hello world".into()));
-        assert!(!matcher.matches(&MatchingData::Absent));
         assert!(!matcher.matches(&MatchingData::Int(42)));
     }
 
@@ -530,7 +529,6 @@ mod tests {
         assert!(matcher.matches(&"/api/users".into()));
         assert!(matcher.matches(&"/api/".into()));
         assert!(!matcher.matches(&"/users".into()));
-        assert!(!matcher.matches(&MatchingData::Absent));
     }
 
     #[test]

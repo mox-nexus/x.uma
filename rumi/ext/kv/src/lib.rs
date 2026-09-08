@@ -27,7 +27,7 @@
 //!     .with("role", "admin");
 //!
 //! let input = StringInput::new("role").unwrap();
-//! assert_eq!(input.get(&ctx), MatchingData::String("admin".into()));
+//! assert_eq!(input.get(&ctx), Some(MatchingData::String("admin".into())));
 //! ```
 
 use rumi::prelude::*;
@@ -87,10 +87,9 @@ impl StringInput {
 }
 
 impl DataInput<KvContext> for StringInput {
-    fn get(&self, ctx: &KvContext) -> MatchingData {
-        ctx.get(&self.key).map_or(MatchingData::Absent, |s| {
-            MatchingData::String(s.to_string())
-        })
+    fn get(&self, ctx: &KvContext) -> Option<MatchingData> {
+        ctx.get(&self.key)
+            .map(|s| MatchingData::String(s.to_string()))
     }
 }
 
@@ -157,7 +156,7 @@ mod tests {
         let ctx = KvContext::new().with("name", "alice");
         let input = StringInput::new("name").unwrap();
 
-        assert_eq!(input.get(&ctx), MatchingData::String("alice".into()));
+        assert_eq!(input.get(&ctx), Some(MatchingData::String("alice".into())));
     }
 
     #[test]
@@ -165,7 +164,7 @@ mod tests {
         let ctx = KvContext::new();
         let input = StringInput::new("missing").unwrap();
 
-        assert_eq!(input.get(&ctx), MatchingData::Absent);
+        assert_eq!(input.get(&ctx), None);
     }
 
     #[test]

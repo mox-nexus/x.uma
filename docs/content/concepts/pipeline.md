@@ -9,7 +9,7 @@ Context (your data)
     ↓
 DataInput.get()          ← extract a value from the context
     ↓
-MatchingData             ← type-erased: string | int | bool | bytes | null
+Option<MatchingData>     ← type-erased: string | int | bool | bytes, or absent
     ↓
 InputMatcher.matches()   ← compare the value
     ↓
@@ -78,8 +78,8 @@ struct CloudEvent {
 struct EventTypeInput;
 
 impl DataInput<CloudEvent> for EventTypeInput {
-    fn get(&self, ctx: &CloudEvent) -> MatchingData {
-        MatchingData::from(ctx.kind.as_str())
+    fn get(&self, ctx: &CloudEvent) -> Option<MatchingData> {
+        Some(MatchingData::from(ctx.kind.as_str()))
     }
 }
 
@@ -108,7 +108,7 @@ assert_eq!(matcher.evaluate(&event), Some("handle_event"));
 |-------|------|----------|----------|
 | **Context** | Your domain data | Yes (`Ctx`) | `HttpRequest`, `HookContext`, your type |
 | **DataInput** | Extract a value | Yes (`Ctx`) | `PathInput`, `ToolNameInput`, your input |
-| **MatchingData** | Type-erased value | No | `string`, `int`, `bool`, `bytes`, `null` |
+| **MatchingData** | Type-erased value | No | `string`, `int`, `bool`, `bytes`; absent is `None` |
 | **InputMatcher** | Match the value | No | `ExactMatcher`, `PrefixMatcher`, `RegexMatcher` |
 | **Predicate** | Boolean logic | Yes (`Ctx`) | `SinglePredicate`, `And`, `Or`, `Not` |
 | **Matcher** | First-match-wins | Yes (`Ctx`, `A`) | Routes to actions |

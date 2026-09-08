@@ -70,7 +70,7 @@ rumi is the foundation crate. Every dependency change (regex version bump, serde
 13/13 codebases confirm: never skip a protocol step for convenience.
 
 x.uma's protocol obligations:
-- `DataInput::get` returns `Absent` → predicate evaluates to `false`
+- `DataInput::get` returns `None` → predicate evaluates to `false`
 - `OnMatch` is exclusive: action XOR nested matcher, never both
 - First-match-wins in `Matcher::evaluate`
 - `validate()` before evaluation (depth limit)
@@ -136,7 +136,7 @@ All 13 mined codebases have deliberate reversions that encode hard-won lessons. 
 | axum | Handler bounds proven at registration, not request time |
 | tokio | Runtime must be entered before spawning |
 | leptos | Reactive graph must be tracked (`FnMut`, not `Fn`) |
-| **x.uma** | **Absent → false; OnMatch exclusive; first-match-wins; validate before evaluate; registry immutable after build** |
+| **x.uma** | **None → false; OnMatch exclusive; first-match-wins; validate before evaluate; registry immutable after build** |
 
 ## Sources
 

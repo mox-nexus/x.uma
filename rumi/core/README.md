@@ -25,8 +25,8 @@ use rumi::prelude::*;
 struct MethodInput;
 
 impl DataInput<&'static str> for MethodInput {
-    fn get(&self, ctx: &&'static str) -> MatchingData {
-        MatchingData::String((*ctx).to_string())
+    fn get(&self, ctx: &&'static str) -> Option<MatchingData> {
+        Some(MatchingData::String((*ctx).to_string()))
     }
 }
 

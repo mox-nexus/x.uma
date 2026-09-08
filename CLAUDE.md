@@ -226,11 +226,11 @@ Envoy source: `~/oss/reference/envoy/source/common/matcher/`
 
 ```rust
 // MatchingData — the erased data type (Envoy's MatchingDataType)
-pub enum MatchingData { Absent, String(String), Int(i64), Bool(bool), Bytes(Vec<u8>) }
+pub enum MatchingData { String(String), Int(i64), Bool(bool), Bytes(Vec<u8>), Custom(..) }
 
 // DataInput — domain-specific, generic over context, returns erased type
 pub trait DataInput<Ctx>: Send + Sync + Debug {
-    fn get(&self, ctx: &Ctx) -> MatchingData;
+    fn get(&self, ctx: &Ctx) -> Option<MatchingData>;
 }
 
 // InputMatcher — domain-agnostic, NON-GENERIC, shareable across contexts!
@@ -275,7 +275,7 @@ From 13-agent architecture review:
 | **Type Registry Immutability** | Vector, Lamport | Lock after initialization. No runtime registration. |
 | **Send + Sync** | Lamport, Lotfi | All core types must be thread-safe (FFI requirement). |
 | **Iterative Evaluation** | Taleb, Dijkstra | No recursive `evaluate()` — use explicit stack (deferred to v0.2). |
-| **DataInput Absent → false** | Dijkstra | `Absent` from `DataInput::get()` → predicate evaluates to `false`. |
+| **DataInput None → false** | Dijkstra | `DataInput::get()` returns `Option`; `None` → predicate evaluates to `false`, enforced by the signature (D-061). |
 | **No unsafe impl** | Wolf | Let compiler derive Send/Sync — don't add restrictive bounds. |
 | **Validate extension points at construction** | Phase 11 review | Extension hooks (e.g., `data_type()`, `supported_types()`) that exist but are never enforced create silent failure modes. Validate compatibility at construction/load time, not evaluation time. |
 
@@ -378,7 +378,7 @@ Principles distilled from 13 elite Rust codebases. Each prevents a form of self-
 | **Measure Before Optimizing** | "This will be faster" — but you haven't profiled | Is there benchmark evidence? |
 | **Config Format Is Frozen** | "We can iterate" — but every user's config and three runtimes consume it | Does this change what `from_config` accepts? |
 | **Foundation Crates Migrate Last** | "It's just a version bump" — but it cascades everywhere | Does this change a dep in `rumi/core/Cargo.toml`? |
-| **Protocol Obligations Over Convenience** | "This shortcut is safe" — but it violates an invariant | Does this skip validate, reorder eval, or bypass Absent→false? |
+| **Protocol Obligations Over Convenience** | "This shortcut is safe" — but it violates an invariant | Does this skip validate, reorder eval, or bypass None→false? |
 | **Hold Position Until Evidence** | "Let's add this now" — but no second integration demands it | Is there concrete evidence, or is this speculative? |
 | **Reversions Encode Wisdom** | "I'll push through" — but the architecture is pushing back | Did you try, discover it doesn't fit, and document why? |
 | **Boring Code Wins** | "This is clever" — but clever breaks under maintenance | Would `Arc<Mutex<Vec>>` work here instead? |

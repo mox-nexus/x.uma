@@ -80,7 +80,6 @@ pub trait CustomMatchData: Send + Sync + Debug {
 ///
 /// # Variants
 ///
-/// - `Absent` — No data available (extractor returned nothing)
 /// - `String` — String data (most common: headers, paths, query params)
 /// - `Int` — Integer data
 /// - `Bool` — Boolean data
@@ -100,15 +99,15 @@ pub trait CustomMatchData: Send + Sync + Debug {
 ///
 /// let data = MatchingData::String("hello".to_string());
 /// assert_eq!(data.as_str(), Some("hello"));
-/// assert!(!data.is_absent());
 /// ```
-#[derive(Debug, Clone, Default)]
+///
+/// Absence is not a variant: `DataInput::get` returns `Option<MatchingData>`,
+/// and a matcher is never asked about a value that does not exist (INV-1).
+///
+/// Non-exhaustive so a variant can be added without a major version (D-064).
+#[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum MatchingData {
-    /// No data available (extractor returned nothing).
-    /// When a predicate receives this, it evaluates to `false` (INV-1).
-    #[default]
-    Absent,
-
     /// String data — the most common case for HTTP headers, paths, etc.
     String(String),
 
@@ -144,7 +143,6 @@ pub enum MatchingData {
 impl PartialEq for MatchingData {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Absent, Self::Absent) => true,
             (Self::String(a), Self::String(b)) => a == b,
             (Self::Int(a), Self::Int(b)) => a == b,
             (Self::Bool(a), Self::Bool(b)) => a == b,
@@ -156,22 +154,6 @@ impl PartialEq for MatchingData {
 }
 
 impl MatchingData {
-    /// Returns `true` if this is the `Absent` variant.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rumi::MatchingData;
-    ///
-    /// assert!(MatchingData::Absent.is_absent());
-    /// assert!(!MatchingData::String("x".to_string()).is_absent());
-    /// ```
-    #[inline]
-    #[must_use]
-    pub fn is_absent(&self) -> bool {
-        matches!(self, Self::Absent)
-    }
-
     /// Returns `true` if this is the `String` variant.
     #[inline]
     #[must_use]
@@ -303,7 +285,6 @@ impl MatchingData {
     #[must_use]
     pub fn type_name(&self) -> &'static str {
         match self {
-            Self::Absent => "none",
             Self::String(_) => "string",
             Self::Int(_) => "int",
             Self::Bool(_) => "bool",
@@ -343,18 +324,6 @@ impl From<Vec<u8>> for MatchingData {
     }
 }
 
-impl<T> From<Option<T>> for MatchingData
-where
-    T: Into<MatchingData>,
-{
-    fn from(opt: Option<T>) -> Self {
-        match opt {
-            Some(v) => v.into(),
-            Option::None => Self::Absent,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -372,13 +341,6 @@ mod tests {
         fn as_any(&self) -> &dyn Any {
             self
         }
-    }
-
-    #[test]
-    fn test_is_none() {
-        assert!(MatchingData::Absent.is_absent());
-        assert!(!MatchingData::String("x".to_string()).is_absent());
-        assert!(!MatchingData::Int(42).is_absent());
     }
 
     #[test]
@@ -400,17 +362,10 @@ mod tests {
 
         let data: MatchingData = true.into();
         assert!(matches!(data, MatchingData::Bool(true)));
-
-        let data: MatchingData = Option::<String>::None.into();
-        assert!(data.is_absent());
-
-        let data: MatchingData = Some("hello".to_string()).into();
-        assert_eq!(data.as_str(), Some("hello"));
     }
 
     #[test]
     fn test_type_name() {
-        assert_eq!(MatchingData::Absent.type_name(), "none");
         assert_eq!(MatchingData::String("x".into()).type_name(), "string");
         assert_eq!(MatchingData::Int(1).type_name(), "int");
         assert_eq!(MatchingData::Bool(true).type_name(), "bool");
@@ -421,7 +376,6 @@ mod tests {
     fn test_custom_is_custom() {
         let custom = MatchingData::Custom(Arc::new(TestCustomData { value: 42 }));
         assert!(custom.is_custom());
-        assert!(!custom.is_absent());
         assert!(!custom.is_string());
 
         assert!(!MatchingData::String("x".into()).is_custom());
@@ -529,8 +483,8 @@ mod tests {
         struct LocationInput;
 
         impl DataInput<GeoRequest> for LocationInput {
-            fn get(&self, ctx: &GeoRequest) -> MatchingData {
-                MatchingData::Custom(Arc::new(ctx.user_location.clone()))
+            fn get(&self, ctx: &GeoRequest) -> Option<MatchingData> {
+                Some(MatchingData::Custom(Arc::new(ctx.user_location.clone())))
             }
 
             fn data_type(&self) -> &'static str {
