@@ -1,12 +1,11 @@
 <script lang="ts">
-  import type { ModeKind } from "$lib/playground/types.js";
   import { configToGraph } from "$lib/playground/graph/config-to-graph.js";
   import { layoutGraph } from "$lib/playground/graph/layout.js";
   import { draw } from "$lib/playground/graph/draw.js";
   import { toExcalidraw } from "$lib/playground/graph/excalidraw.js";
   import type { PlacedGraph } from "$lib/playground/graph/types.js";
 
-  let { configJson, mode }: { configJson: string; mode: ModeKind } = $props();
+  let { configJson }: { configJson: string } = $props();
 
   let svgEl = $state<SVGSVGElement | undefined>(undefined);
   let placed = $state.raw<PlacedGraph | null>(null);
@@ -23,11 +22,10 @@
 
   $effect(() => {
     const json = configJson;
-    const kind = mode;
 
     clearTimeout(layoutTimer);
     layoutTimer = setTimeout(async () => {
-      const graph = await layoutGraph(configToGraph(json, kind));
+      const graph = await layoutGraph(configToGraph(json));
       placed = graph.nodes.length > 0 ? graph : null;
       if (placed) resetView();
     }, 200);

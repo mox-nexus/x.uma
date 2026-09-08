@@ -18,7 +18,7 @@ const single = (key: string, valueMatch: Record<string, string>) => ({
 export const tieredRouting: Preset = {
   id: "tiered-routing",
   name: "Tiered Routing",
-  mode: "config",
+  mode: "kv",
   description:
     "Nested matcher: premium users route by region, free users get default",
   config: JSON.stringify(

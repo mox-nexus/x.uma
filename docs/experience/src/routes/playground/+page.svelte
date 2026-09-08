@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { EvalResult, ModeKind, Preset } from "$lib/playground/types.js";
-  import { evaluateConfig, evaluateHttp } from "$lib/playground/engine.js";
+  import { evaluateKv, evaluateHttp, ready } from "$lib/playground/engine.js";
   import { presets } from "$lib/playground/examples/index.js";
   import Editor from "$lib/playground/components/Editor.svelte";
   import ContextPanel from "$lib/playground/components/ContextPanel.svelte";
@@ -11,7 +11,7 @@
   import MatcherGraph from "$lib/playground/components/graph/MatcherGraph.svelte";
 
   // State
-  let mode: ModeKind = $state("config");
+  let mode: ModeKind = $state("kv");
   let activePresetId = $state(presets[0]!.id);
   let configJson = $state(presets[0]!.config);
   let context: Record<string, string> = $state(
@@ -39,20 +39,22 @@
       httpHeaders = {};
     }
     result = null;
-    evaluate();
+    void evaluate();
   }
 
-  function evaluate() {
-    if (mode === "config") {
-      result = evaluateConfig(configJson, context);
-    } else {
-      result = evaluateHttp(configJson, httpMethod, httpPath, httpHeaders);
-    }
+  // The engine is WebAssembly and instantiates once, asynchronously. Every
+  // evaluation waits on that first load; after it, the wait is already over.
+  async function evaluate() {
+    await ready();
+    result =
+      mode === "kv"
+        ? evaluateKv(configJson, context)
+        : evaluateHttp(configJson, httpMethod, httpPath, httpHeaders);
   }
 
   function debouncedEvaluate() {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(evaluate, 300);
+    debounceTimer = setTimeout(() => void evaluate(), 300);
   }
 
   function onModeChange(newMode: ModeKind) {
@@ -65,7 +67,7 @@
 
   // Evaluate on mount
   $effect(() => {
-    evaluate();
+    void evaluate();
   });
 </script>
 
@@ -105,9 +107,7 @@
 
       {#if leftView !== "graph"}
         <div class="editor-section">
-          <div class="label">
-            {mode === "config" ? "Matcher Config" : "Route Config"}
-          </div>
+          <div class="label">Matcher Config</div>
           <Editor bind:value={configJson} oninput={debouncedEvaluate} />
         </div>
       {/if}
@@ -115,15 +115,15 @@
       {#if leftView !== "code"}
         <div class="graph-section">
           <div class="label">Matcher Tree</div>
-          <MatcherGraph {configJson} {mode} />
+          <MatcherGraph {configJson} />
         </div>
       {/if}
 
-      <button class="eval-btn" onclick={evaluate}>Evaluate</button>
+      <button class="eval-btn" onclick={() => void evaluate()}>Evaluate</button>
     </div>
 
     <div class="right-col">
-      {#if mode === "config"}
+      {#if mode === "kv"}
         <ContextPanel
           bind:context
           onchange={debouncedEvaluate}
@@ -143,8 +143,8 @@
 
   <footer class="footer">
     <span class="muted">
-      Powered by <a href="https://github.com/mox-nexus/x.uma" target="_blank" rel="noopener">xuma</a>
-      &mdash; pure TypeScript, no WASM, no server.
+      Powered by <a href="https://github.com/mox-nexus/x.uma" target="_blank" rel="noopener">rumi</a>,
+      the Rust engine, compiled to WebAssembly. No server.
     </span>
   </footer>
 </div>

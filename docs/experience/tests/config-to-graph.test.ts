@@ -33,7 +33,7 @@ const rule = (key: string, value: string, act: string) => ({
 	onMatch: action(act),
 });
 
-const graph = (cfg: unknown) => configToGraph(JSON.stringify(cfg), "config");
+const graph = (cfg: unknown) => configToGraph(JSON.stringify(cfg));
 const actions = (g: ReturnType<typeof graph>) =>
 	(g.nodes ?? [])
 		.filter((n) => n.type === "action" || n.type === "fallback")
@@ -109,5 +109,69 @@ describe("the diagram counts what the config holds", () => {
 		const m = (g.nodes ?? []).find((n) => n.type === "matcher");
 		expect((m?.data as { count?: number }).count).toBe(2);
 		expect((m?.data as { label?: string }).label).toContain("tree");
+	});
+});
+
+describe("the diagram reads the document the user wrote", () => {
+	test("an HTTP input with no key is labelled by its name", () => {
+		const g = graph({
+			matcherList: {
+				matchers: [
+					{
+						predicate: {
+							singlePredicate: {
+								input: {
+									name: "path",
+									typedConfig: { "@type": "type.googleapis.com/xuma.http.v1.PathInput" },
+								},
+								valueMatch: { prefix: "/api/" },
+							},
+						},
+						onMatch: action("api"),
+					},
+				],
+			},
+		});
+		const pred = (g.nodes ?? []).find((n) => n.type === "predicate");
+		expect(pred?.data).toMatchObject({ kind: "single", key: "path", match: 'prefix "/api/"' });
+	});
+
+	test("a regex reads as a regex", () => {
+		const g = graph({
+			matcherList: {
+				matchers: [
+					{
+						predicate: {
+							singlePredicate: {
+								input: mapInput("authorization"),
+								valueMatch: { safeRegex: { regex: "^Bearer .+$" } },
+							},
+						},
+						onMatch: action("ok"),
+					},
+				],
+			},
+		});
+		const pred = (g.nodes ?? []).find((n) => n.type === "predicate");
+		expect((pred?.data as { match?: string }).match).toBe('regex "^Bearer .+$"');
+	});
+
+	test("snake_case field names draw the same graph as lowerCamelCase", () => {
+		const camel = graph({
+			matcherList: { matchers: [rule("k", "hit", "A")] },
+			onNoMatch: action("B"),
+		});
+		const snake = graph({
+			matcher_list: {
+				matchers: [
+					{
+						predicate: { single_predicate: { input: mapInput("k"), value_match: { exact: "hit" } } },
+						on_match: action("A"),
+					},
+				],
+			},
+			on_no_match: action("B"),
+		});
+		expect(snake).toEqual(camel);
 	});
 });

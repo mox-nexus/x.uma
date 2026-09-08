@@ -1,45 +1,79 @@
 import type { Preset } from "../types.js";
 
+const named = (name: string) => ({
+  name,
+  typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.NamedAction", name },
+});
+
+const input = (name: string, message: string, config: Record<string, string> = {}) => ({
+  name,
+  typedConfig: { "@type": `type.googleapis.com/xuma.http.v1.${message}`, ...config },
+});
+
 export const authGateway: Preset = {
   id: "auth-gateway",
   name: "Auth Gateway",
   mode: "http",
   description:
-    "Require Bearer token and JSON content-type on /api paths",
+    "Require a Bearer token and a JSON content-type on POST /api/; everything else under /api/ is unauthorized",
   config: JSON.stringify(
-    [
-      {
-        match: {
-          method: "POST",
-          path: { type: "PathPrefix", value: "/api/" },
-          headers: [
-            {
-              type: "RegularExpression",
-              name: "authorization",
-              value: "^Bearer .+$",
+    {
+      matcherList: {
+        matchers: [
+          {
+            predicate: {
+              andMatcher: {
+                predicate: [
+                  {
+                    singlePredicate: {
+                      input: input("method", "MethodInput"),
+                      valueMatch: { exact: "POST" },
+                    },
+                  },
+                  {
+                    singlePredicate: {
+                      input: input("path", "PathInput"),
+                      valueMatch: { prefix: "/api/" },
+                    },
+                  },
+                  {
+                    singlePredicate: {
+                      input: input("authorization", "HeaderInput", { name: "authorization" }),
+                      valueMatch: { safeRegex: { regex: "^Bearer .+$" } },
+                    },
+                  },
+                  {
+                    singlePredicate: {
+                      input: input("content-type", "HeaderInput", { name: "content-type" }),
+                      valueMatch: { exact: "application/json" },
+                    },
+                  },
+                ],
+              },
             },
-            {
-              type: "Exact",
-              name: "content-type",
-              value: "application/json",
+            onMatch: { action: named("authorized") },
+          },
+          {
+            predicate: {
+              singlePredicate: {
+                input: input("path", "PathInput"),
+                valueMatch: { prefix: "/api/" },
+              },
             },
-          ],
-        },
-        action: "authorized",
+            onMatch: { action: named("unauthorized") },
+          },
+          {
+            predicate: {
+              singlePredicate: {
+                input: input("path", "PathInput"),
+                valueMatch: { exact: "/health" },
+              },
+            },
+            onMatch: { action: named("healthcheck") },
+          },
+        ],
       },
-      {
-        match: {
-          path: { type: "PathPrefix", value: "/api/" },
-        },
-        action: "unauthorized",
-      },
-      {
-        match: {
-          path: { type: "Exact", value: "/health" },
-        },
-        action: "healthcheck",
-      },
-    ],
+    },
     null,
     2,
   ),

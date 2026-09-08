@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
-	import { RegistryBuilder, parseProtojson } from 'xuma';
-	import { register as registerTest } from 'xuma/testing';
+	import { onMount, untrack } from 'svelte';
+	import { evaluateKv, ready } from '$lib/playground/engine.js';
+	import type { EvalResult } from '$lib/playground/types.js';
 
 	/**
 	 * A live matcher, embedded in prose.
@@ -16,27 +16,28 @@
 	 */
 	let { config = '', context = '{}' }: { config?: string; context?: string } = $props();
 
-	// Built once. The registry is immutable after build (INV-5).
-	const registry = registerTest(new RegistryBuilder()).build();
-
 	// Seeded once, deliberately. The props come from a static tag in Markdown and
 	// never change; after mount the textareas own this state. untrack() says that
 	// rather than leaving Svelte to warn about it.
 	let configText = $state(untrack(() => config.trim()));
 	let contextText = $state(untrack(() => context.trim()));
 
-	type Outcome =
-		| { kind: 'match'; action: string }
-		| { kind: 'no-match' }
-		| { kind: 'error'; message: string };
+	// The engine is WebAssembly: absent during prerender, instantiated once in
+	// the browser. Until then the result reads as loading rather than as wrong.
+	let engineReady = $state(false);
+	onMount(() => {
+		void ready().then(() => {
+			engineReady = true;
+		});
+	});
+
+	type Outcome = EvalResult | { kind: 'loading' };
 
 	const outcome = $derived.by((): Outcome => {
+		if (!engineReady) return { kind: 'loading' };
 		try {
-			const parsed = parseProtojson(JSON.parse(configText));
-			const matcher = registry.loadMatcher(parsed);
 			const ctx = JSON.parse(contextText) as Record<string, string>;
-			const result = matcher.evaluate(ctx);
-			return result !== null ? { kind: 'match', action: result } : { kind: 'no-match' };
+			return evaluateKv(configText, ctx);
 		} catch (e) {
 			return { kind: 'error', message: e instanceof Error ? e.message : String(e) };
 		}
@@ -60,6 +61,8 @@
 			<span class="tag">match</span><code>{outcome.action}</code>
 		{:else if outcome.kind === 'no-match'}
 			<span class="tag">no match</span><code>on_no_match, or no decision</code>
+		{:else if outcome.kind === 'loading'}
+			<span class="tag">loading</span><code>instantiating the engine</code>
 		{:else}
 			<span class="tag">error</span><code>{outcome.message}</code>
 		{/if}
@@ -145,7 +148,8 @@
 	.result[data-kind='error'] .tag {
 		color: var(--ci-red);
 	}
-	.result[data-kind='no-match'] .tag {
+	.result[data-kind='no-match'] .tag,
+	.result[data-kind='loading'] .tag {
 		color: var(--dao-muted);
 	}
 

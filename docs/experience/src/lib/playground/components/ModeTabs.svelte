@@ -2,7 +2,7 @@
   import type { ModeKind } from "../types.js";
 
   let {
-    mode = $bindable("config"),
+    mode = $bindable("kv"),
     onchange,
   }: {
     mode: ModeKind;
@@ -18,10 +18,10 @@
 <div class="mode-tabs">
   <button
     class="tab"
-    class:active={mode === "config"}
-    onclick={() => select("config")}
+    class:active={mode === "kv"}
+    onclick={() => select("kv")}
   >
-    Config
+    Key-value
   </button>
   <button
     class="tab"

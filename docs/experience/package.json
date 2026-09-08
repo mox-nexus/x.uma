@@ -24,7 +24,7 @@
     "roughjs": "^4.6.6",
     "shiki": "^3.22.0",
     "svelte-exmarkdown": "^5.0.2",
-    "xuma": "../../bumi"
+    "xuma-crust": "../../rumi/crusts/wasm/pkg"
   },
   "devDependencies": {
     "@sveltejs/kit": "^2.50.1",

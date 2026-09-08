@@ -57,17 +57,17 @@
 	const RUNTIMES = [
 		{
 			lang: 'Rust',
-			code: `let matcher = registry.load_matcher(config)?;
+			code: `let matcher = registry.load_typed_matcher(config, &actions)?;
 matcher.evaluate(&ctx)   // Some("read-handler")`
 		},
 		{
 			lang: 'Python',
-			code: `matcher = registry.load_matcher(config)
+			code: `matcher = TestMatcher.from_config(config)
 matcher.evaluate(ctx)    # "read-handler"`
 		},
 		{
 			lang: 'TypeScript',
-			code: `const matcher = registry.loadMatcher(config);
+			code: `const matcher = TestMatcher.fromConfig(config);
 matcher.evaluate(ctx);   // "read-handler"`
 		}
 	];
@@ -84,15 +84,15 @@ matcher.evaluate(ctx);   // "read-handler"`
 <section class="hero">
 	<h1>Write the rules once.<br /><em>Get the same answer everywhere.</em></h1>
 	<p>
-		x.uma is a matcher engine implementing the xDS Unified Matcher API. One config, five
-		implementations across three languages, one conformance suite proving they agree.
+		x.uma is a matcher engine implementing the xDS Unified Matcher API. One config, one Rust
+		engine, three languages, one conformance suite proving they agree.
 	</p>
 </section>
 
 <section class="demo">
 	<h2>It runs here</h2>
 	<p class="lede">
-		This is the real engine. The pure TypeScript implementation, running in your browser, loading
+		This is the real engine: rumi, compiled to WebAssembly and running in your browser, loading
 		the config beside it. Change the method to <code>POST</code>, or to something else entirely,
 		and watch the decision change.
 	</p>
@@ -106,8 +106,8 @@ matcher.evaluate(ctx);   // "read-handler"`
 <section class="runtimes">
 	<h2>The same config, three runtimes</h2>
 	<p class="lede">
-		The config above is data, not code. Every implementation loads it through a registry and
-		evaluates it identically.
+		The config above is data, not code. Every runtime hands it to the same engine and gets the
+		same answer.
 	</p>
 	<div class="grid">
 		{#each RUNTIMES as r (r.lang)}
@@ -120,10 +120,10 @@ matcher.evaluate(ctx);   // "read-handler"`
 </section>
 
 <section class="impls">
-	<h2>Five implementations</h2>
+	<h2>One engine, three runtimes</h2>
 	<p class="lede">
-		Pick by runtime and by how much speed you need. The pure implementations have no native
-		dependency beyond RE2. The crusts are the Rust engine, bound.
+		Pick by runtime. Every package is the same Rust engine; the bindings add a host-language
+		surface, not a second implementation.
 	</p>
 	<table>
 		<thead>
@@ -131,15 +131,13 @@ matcher.evaluate(ctx);   // "read-handler"`
 		</thead>
 		<tbody>
 			<tr><td><code>rumi-core</code></td><td>Rust</td><td>The engine. Reference implementation.</td></tr>
-			<tr><td><code>xuma</code></td><td>Python 3.12+</td><td>Pure Python, RE2 for regex.</td></tr>
-			<tr><td><code>xuma</code></td><td>TypeScript</td><td>Pure TypeScript, RE2 for regex.</td></tr>
-			<tr><td><code>xuma-crust</code></td><td>Python</td><td>Rust via PyO3.</td></tr>
-			<tr><td><code>xuma-crust</code></td><td>TypeScript</td><td>Rust via WebAssembly.</td></tr>
+			<tr><td><code>xuma-crust</code></td><td>Python 3.12+</td><td>The engine, bound through PyO3.</td></tr>
+			<tr><td><code>xuma-crust</code></td><td>TypeScript</td><td>The engine, compiled to WebAssembly.</td></tr>
 		</tbody>
 	</table>
 	<p class="aside">
-		All five run the same conformance fixtures from <code>spec/tests/</code>. An implementation
-		that disagrees fails its own build.
+		All three run the same conformance fixtures from <code>spec/tests/</code>. A binding that
+		disagrees with the engine fails its own build.
 	</p>
 </section>
 

@@ -27,6 +27,12 @@ crust-wasm-check:
     cd rumi/crusts/wasm && wasm-pack build --target web -- --features fixtures
     cd rumi/crusts/wasm && bun install --frozen-lockfile && bun test
 
+# Build the wasm crust in its published shape. The docs site runs on it: the
+# playground and every live example evaluate through this package, so a
+# docs build is a build of the engine first.
+crust-wasm-build:
+    cd rumi/crusts/wasm && wasm-pack build --target web
+
 # Both crusts. Not in `just ci`: wasm-pack builds take ~1 minute and the two
 # have separate toolchains, so CI runs them as their own jobs.
 crust-check: crust-py-check crust-wasm-check
@@ -164,12 +170,18 @@ doc:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Run the docs site with hot reload (localhost:6200)
-docs-dev: bumi-build
+docs-dev: docs-install
     cd docs/experience && bun run dev
 
 # Build the docs site (includes Pagefind search index)
-docs-build: bumi-build
+docs-build: docs-install
     cd docs/experience && bun run build
+
+# The engine is a `file:` dependency of the docs app, so the package has to
+# exist before the app installs. bun links it, so a rebuild is picked up
+# without reinstalling.
+docs-install: crust-wasm-build
+    cd docs/experience && bun install --frozen-lockfile
 
 # Preview the production docs build
 docs-preview:
@@ -202,7 +214,7 @@ docs-links:
 docs-samples:
     node scripts/check-doc-samples.mjs --require-all
 
-docs-check:
+docs-check: docs-install
     cd docs/experience && bun run check
 
 # The playground's diagram must describe the config it was given.
