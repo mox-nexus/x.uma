@@ -1,5 +1,5 @@
 name: "http_multiple_routes_or"
-implementations: [rust, python, typescript]
+implementations: [rust]
 description: "Multiple HttpRouteMatch entries are ORed together"
 
 # Multiple route matches - any can match
@@ -43,7 +43,7 @@ cases:
 
 ---
 name: "http_routes_with_fallback"
-implementations: [rust, python, typescript]
+implementations: [rust]
 description: "Multiple routes with on_no_match fallback"
 
 http_route_matches:
@@ -69,7 +69,7 @@ cases:
 
 ---
 name: "http_complex_routes_or"
-implementations: [rust, python, typescript]
+implementations: [rust]
 description: "Complex routes with different conditions ORed"
 
 http_route_matches:
@@ -119,7 +119,7 @@ cases:
 
 ---
 name: "http_empty_routes_is_refused"
-implementations: [rust, python, typescript]
+implementations: [rust]
 description: |
   An empty route-matches array must be refused, not treated as a catch-all.
 

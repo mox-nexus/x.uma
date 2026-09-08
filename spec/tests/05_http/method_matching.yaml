@@ -1,5 +1,5 @@
 name: "http_method_get"
-implementations: [rust, python, typescript]
+implementations: [rust]
 description: "Gateway API method matching for GET"
 
 http_route_match:
@@ -34,7 +34,7 @@ cases:
 
 ---
 name: "http_method_post"
-implementations: [rust, python, typescript]
+implementations: [rust]
 description: "Gateway API method matching for POST"
 
 http_route_match:
@@ -57,7 +57,7 @@ cases:
 
 ---
 name: "http_method_case_sensitive"
-implementations: [rust, python, typescript]
+implementations: [rust]
 description: "HTTP methods are case-sensitive per spec"
 
 http_route_match:

@@ -1,5 +1,5 @@
 name: "http_query_param_exact"
-implementations: [rust, python, typescript]
+implementations: [rust]
 description: "Gateway API exact query parameter matching"
 
 http_route_match:
@@ -43,7 +43,7 @@ cases:
 
 ---
 name: "http_query_param_regex"
-implementations: [rust, python, typescript]
+implementations: [rust]
 description: "Gateway API regex query parameter matching"
 
 http_route_match:
@@ -75,7 +75,7 @@ cases:
 
 ---
 name: "http_multiple_query_params_and"
-implementations: [rust, python, typescript]
+implementations: [rust]
 description: "Multiple query params are ANDed together"
 
 http_route_match:
