@@ -120,4 +120,4 @@ summary(() => {
 	bench("crusty_http_config_evaluate", () => httpMatcher.evaluate(ctx));
 });
 
-await run();
+await run(process.env.BENCH_JSON ? { format: "json" } : {});

@@ -135,4 +135,4 @@ summary(() => {
 	);
 });
 
-await run();
+await run(process.env.BENCH_JSON ? { format: "json" } : {});

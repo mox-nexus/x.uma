@@ -13,6 +13,8 @@ mod config;
 mod convert;
 #[cfg(feature = "fixtures")]
 mod fixtures;
+#[cfg(feature = "bench")]
+mod floor;
 mod http_matcher;
 mod kv_matcher;
 pub(crate) mod matcher;
@@ -35,6 +37,13 @@ fn xuma_crust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Trace types (shared across all matchers)
     m.add_class::<matcher::PyTraceResult>()?;
     m.add_class::<matcher::PyTraceStep>()?;
+
+    #[cfg(feature = "bench")]
+    {
+        m.add_function(wrap_pyfunction!(floor::boundary_floor_u32, m)?)?;
+        m.add_function(wrap_pyfunction!(floor::boundary_floor_option_string, m)?)?;
+        m.add_function(wrap_pyfunction!(floor::boundary_floor_flat_map, m)?)?;
+    }
 
     Ok(())
 }

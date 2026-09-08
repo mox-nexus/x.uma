@@ -13,6 +13,8 @@ mod config;
 mod convert;
 #[cfg(feature = "fixtures")]
 mod fixtures;
+#[cfg(feature = "bench")]
+mod floor;
 mod http_matcher;
 mod kv_matcher;
 pub(crate) mod matcher;

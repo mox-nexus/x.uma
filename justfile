@@ -19,7 +19,8 @@ crust-py-check:
     # without it, so no YAML fixture loader ships to PyPI (PLAN.md E3).
     cd rumi/crusts/python && maturin develop --uv --features fixtures
     cd rumi/crusts/python && uv run pytest tests/ -q \
-        --ignore=tests/test_bench_config.py --ignore=tests/test_bench_crusty.py
+        --ignore=tests/test_bench_config.py --ignore=tests/test_bench_crusty.py \
+        --ignore=tests/test_bench_floor.py
 
 # Build the wasm-bindgen crust and run its tests. 80 more, same story.
 crust-wasm-check:
@@ -56,8 +57,8 @@ crust-pack:
     node scripts/pack-wasm-crust.mjs
 
 crust-compiles:
-    cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures
-    cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures
+    cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures,bench
+    cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures,bench
 
 # Check every tool this repo needs is installed. First command in CONTRIBUTING.
 doctor:
@@ -269,17 +270,32 @@ bench-rust:
 # extension, and every verdict drawn from a debug crust is inverted. This
 # recipe omitted the flag until 2026-09-05.
 bench-xuma-crust-py:
-    cd rumi/crusts/python && maturin develop --release && uv run pytest tests/test_bench_crusty.py tests/test_bench_config.py --benchmark-only --benchmark-disable-gc
+    cd rumi/crusts/python && maturin develop --release --features bench && uv run pytest tests/test_bench_crusty.py tests/test_bench_config.py tests/test_bench_floor.py --benchmark-only --benchmark-disable-gc
 
 # The WASM boundary, under mitata.
 bench-xuma-crust-wasm:
-    cd rumi/crusts/wasm && wasm-pack build --target web && bun run bench/crusty.bench.ts && bun run bench/config.bench.ts
+    cd rumi/crusts/wasm && wasm-pack build --target web -- --features bench && bun run bench/crusty.bench.ts && bun run bench/config.bench.ts && bun run bench/floor.bench.ts
 
 # Run all benchmarks
 bench-all: bench-rust bench-xuma-crust-py bench-xuma-crust-wasm
 
 # Alias for bench-all
 bench: bench-all
+
+# One cold launch of both crust benchmark suites, as JSON rows in bench/raw/.
+# Builds the bench-feature crusts first unless NO_BUILD=1.
+bench-collect:
+    python3 scripts/bench_collect.py
+
+# The protocol behind every published number (D-066): LAUNCHES cold launches
+# on a clean tree at one commit, median per launch, CV over the medians, gate
+# G = max(1.20, 1 + 3·CV), written to bench/artifacts/<date>-<sha>.json.
+bench-artifact LAUNCHES="10":
+    python3 scripts/bench_artifact.py --launches {{LAUNCHES}}
+
+# Render an artifact as bench/RESULTS.md.
+bench-report ARTIFACT:
+    python3 scripts/bench_report.py {{ARTIFACT}} --output bench/RESULTS.md
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Conformance Testing

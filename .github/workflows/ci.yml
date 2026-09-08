@@ -70,8 +70,8 @@ jobs:
       # it needs none of that toolchain and takes ~3s.
       - name: Crusts still compile
         run: |
-          cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures
-          cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures
+          cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures,bench
+          cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures,bench
 
       # Not regression detection — no baseline, no threshold, so a benchmark
       # that got 10x slower passes. It catches a benchmark that has stopped
