@@ -1,0 +1,726 @@
+{
+ "protocol": "D-066",
+ "date": "2026-09-08",
+ "sha": "4827a08831f7fb0835b2c42a3c635f8a571ad64b",
+ "dirty": false,
+ "launches": 10,
+ "profile": "release",
+ "hardware": {
+  "os": "Darwin 25.5.0",
+  "arch": "arm64",
+  "cpu": "Apple M1 Max",
+  "cores": 10
+ },
+ "toolchains": {
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "wasm-pack": "wasm-pack 0.15.0",
+  "maturin": "maturin 1.13.1",
+  "bun": "1.3.12",
+  "python": "Python 3.12.12"
+ },
+ "cv_ceiling": 0.15,
+ "worst_cv": 0.1678,
+ "gates_nothing": true,
+ "benchmarks": [
+  {
+   "runtime": "python",
+   "name": "crusty_compile_complex",
+   "launches": 10,
+   "medians_ns": [
+    13583.0,
+    13542.0,
+    14000.0,
+    13583.0,
+    13458.0,
+    13542.0,
+    13875.0,
+    14542.0,
+    15750.0,
+    13542.0
+   ],
+   "median_ns": 13583.0,
+   "cv": 0.0513,
+   "gate": 1.2
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_compile_simple",
+   "launches": 10,
+   "medians_ns": [
+    758.3,
+    733.4,
+    737.5,
+    750.0,
+    754.1,
+    762.5,
+    766.6,
+    883.3,
+    866.7,
+    741.7
+   ],
+   "median_ns": 756.2,
+   "cv": 0.0692,
+   "gate": 1.208
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_config_evaluate_simple",
+   "launches": 10,
+   "medians_ns": [
+    245.8,
+    246.7,
+    244.2,
+    244.6,
+    243.3,
+    245.0,
+    249.6,
+    291.7,
+    245.4,
+    245.4
+   ],
+   "median_ns": 245.4,
+   "cv": 0.0587,
+   "gate": 1.2
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_config_load_compound",
+   "launches": 10,
+   "medians_ns": [
+    7375.0,
+    7333.0,
+    7500.0,
+    7375.0,
+    7250.0,
+    7333.0,
+    7458.0,
+    8542.0,
+    7292.0,
+    7292.0
+   ],
+   "median_ns": 7354.0,
+   "cv": 0.0512,
+   "gate": 1.2
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_config_load_simple",
+   "launches": 10,
+   "medians_ns": [
+    6167.0,
+    6208.0,
+    6416.0,
+    6208.0,
+    6167.0,
+    6166.0,
+    6250.0,
+    8666.0,
+    6166.0,
+    6125.0
+   ],
+   "median_ns": 6187.5,
+   "cv": 0.1211,
+   "gate": 1.363
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_evaluate_complex_hit",
+   "launches": 10,
+   "medians_ns": [
+    492.4,
+    488.6,
+    492.5,
+    484.9,
+    488.6,
+    492.5,
+    496.2,
+    572.0,
+    488.6,
+    488.6
+   ],
+   "median_ns": 490.5,
+   "cv": 0.0522,
+   "gate": 1.2
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_evaluate_complex_miss",
+   "launches": 10,
+   "medians_ns": [
+    372.3,
+    366.7,
+    375.0,
+    366.7,
+    369.5,
+    369.5,
+    377.7,
+    524.3,
+    372.2,
+    369.5
+   ],
+   "median_ns": 370.8,
+   "cv": 0.1258,
+   "gate": 1.377
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_evaluate_exact_hit",
+   "launches": 10,
+   "medians_ns": [
+    140.0,
+    136.3,
+    140.0,
+    136.3,
+    136.3,
+    135.8,
+    139.2,
+    159.2,
+    174.2,
+    136.7
+   ],
+   "median_ns": 137.9,
+   "cv": 0.0898,
+   "gate": 1.269
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_evaluate_exact_miss",
+   "launches": 10,
+   "medians_ns": [
+    135.4,
+    134.6,
+    136.7,
+    134.6,
+    135.0,
+    134.2,
+    137.9,
+    171.7,
+    190.0,
+    134.6
+   ],
+   "median_ns": 135.2,
+   "cv": 0.1363,
+   "gate": 1.409
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_evaluate_regex_hit",
+   "launches": 10,
+   "medians_ns": [
+    188.7,
+    189.2,
+    188.3,
+    187.5,
+    187.5,
+    187.9,
+    192.1,
+    270.0,
+    270.4,
+    188.3
+   ],
+   "median_ns": 188.5,
+   "cv": 0.1678,
+   "gate": 1.503
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_evaluate_regex_miss",
+   "launches": 10,
+   "medians_ns": [
+    170.0,
+    168.8,
+    169.6,
+    168.7,
+    169.2,
+    168.8,
+    173.7,
+    215.4,
+    169.6,
+    169.2
+   ],
+   "median_ns": 169.4,
+   "cv": 0.0833,
+   "gate": 1.25
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_http_config_evaluate",
+   "launches": 10,
+   "medians_ns": [
+    155.8,
+    132.9,
+    132.9,
+    132.9,
+    132.5,
+    132.9,
+    133.8,
+    155.4,
+    133.3,
+    132.9
+   ],
+   "median_ns": 132.9,
+   "cv": 0.0693,
+   "gate": 1.208
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_http_config_load",
+   "launches": 10,
+   "medians_ns": [
+    6792.0,
+    5834.0,
+    5917.0,
+    5875.0,
+    5792.0,
+    5833.0,
+    5958.0,
+    6125.0,
+    5834.0,
+    5792.0
+   ],
+   "median_ns": 5854.5,
+   "cv": 0.0508,
+   "gate": 1.2
+  },
+  {
+   "runtime": "python",
+   "name": "crusty_trace",
+   "launches": 10,
+   "medians_ns": [
+    2687.5,
+    2687.5,
+    2729.0,
+    2687.5,
+    2687.5,
+    2687.5,
+    2750.0,
+    3125.0,
+    2687.5,
+    2666.5
+   ],
+   "median_ns": 2687.5,
+   "cv": 0.0502,
+   "gate": 1.2
+  },
+  {
+   "runtime": "python",
+   "name": "floor_flat_map",
+   "launches": 10,
+   "medians_ns": [
+    570.8,
+    575.0,
+    570.8,
+    570.9,
+    566.7,
+    570.8,
+    666.7,
+    787.5,
+    575.0,
+    570.8
+   ],
+   "median_ns": 570.9,
+   "cv": 0.1189,
+   "gate": 1.357
+  },
+  {
+   "runtime": "python",
+   "name": "floor_option_string",
+   "launches": 10,
+   "medians_ns": [
+    64.6,
+    65.0,
+    64.6,
+    64.2,
+    64.6,
+    64.6,
+    69.6,
+    82.9,
+    64.6,
+    67.1
+   ],
+   "median_ns": 64.6,
+   "cv": 0.0861,
+   "gate": 1.258
+  },
+  {
+   "runtime": "python",
+   "name": "floor_u32",
+   "launches": 10,
+   "medians_ns": [
+    32.1,
+    32.1,
+    31.8,
+    32.1,
+    31.8,
+    32.1,
+    32.9,
+    37.4,
+    32.5,
+    32.1
+   ],
+   "median_ns": 32.1,
+   "cv": 0.0514,
+   "gate": 1.2
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_compile_complex",
+   "launches": 10,
+   "medians_ns": [
+    23125,
+    23459,
+    23208,
+    23041,
+    23209,
+    22750,
+    31292,
+    23000,
+    23083,
+    22875
+   ],
+   "median_ns": 23104.0,
+   "cv": 0.1089,
+   "gate": 1.327
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_compile_simple",
+   "launches": 10,
+   "medians_ns": [
+    3251.7,
+    3409.8,
+    3260.7,
+    3194.4,
+    3131.3,
+    3128.3,
+    3596.3,
+    3282.3,
+    3127.9,
+    3113.4
+   ],
+   "median_ns": 3223.1,
+   "cv": 0.0472,
+   "gate": 1.2
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_complex_hit",
+   "launches": 10,
+   "medians_ns": [
+    1369.4,
+    1444.6,
+    1342.9,
+    1329.5,
+    1360.8,
+    1318.5,
+    1551.9,
+    1546.7,
+    1322.3,
+    1325.7
+   ],
+   "median_ns": 1351.8,
+   "cv": 0.0655,
+   "gate": 1.2
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_complex_miss",
+   "launches": 10,
+   "medians_ns": [
+    1239.0,
+    1289.6,
+    1235.5,
+    1218.5,
+    1243.7,
+    1213.4,
+    1406.3,
+    1411.3,
+    1218.2,
+    1202.0
+   ],
+   "median_ns": 1237.2,
+   "cv": 0.0616,
+   "gate": 1.2
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_config_evaluate_simple",
+   "launches": 10,
+   "medians_ns": [
+    649.2,
+    641.8,
+    652.1,
+    638.8,
+    639.1,
+    643.9,
+    750.7,
+    752.3,
+    644.5,
+    655.2
+   ],
+   "median_ns": 646.8,
+   "cv": 0.0675,
+   "gate": 1.202
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_config_load_compound",
+   "launches": 10,
+   "medians_ns": [
+    11356.4,
+    11828.1,
+    11407.3,
+    11348.9,
+    11294.1,
+    11458.6,
+    11653.5,
+    12887.9,
+    11827.8,
+    11323.9
+   ],
+   "median_ns": 11432.9,
+   "cv": 0.0415,
+   "gate": 1.2
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_config_load_simple",
+   "launches": 10,
+   "medians_ns": [
+    7542,
+    7583,
+    7583,
+    7541,
+    7541,
+    7584,
+    10792,
+    8750,
+    7500,
+    7625
+   ],
+   "median_ns": 7583.0,
+   "cv": 0.131,
+   "gate": 1.393
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_evaluate",
+   "launches": 10,
+   "medians_ns": [
+    1362.8,
+    1398.5,
+    1341.9,
+    1332.8,
+    1363.7,
+    1322.0,
+    1871.6,
+    1688.2,
+    1346.5,
+    1323.5
+   ],
+   "median_ns": 1354.6,
+   "cv": 0.1311,
+   "gate": 1.393
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_exact_hit",
+   "launches": 10,
+   "medians_ns": [
+    706.5,
+    750,
+    720.8,
+    710.5,
+    730.3,
+    706.8,
+    935.9,
+    710.7,
+    713.3,
+    701.6
+   ],
+   "median_ns": 712.0,
+   "cv": 0.0958,
+   "gate": 1.287
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_exact_miss",
+   "launches": 10,
+   "medians_ns": [
+    674.9,
+    697.1,
+    683.1,
+    672.8,
+    707.3,
+    682.4,
+    1022.4,
+    677.2,
+    690.7,
+    675.6
+   ],
+   "median_ns": 682.8,
+   "cv": 0.1495,
+   "gate": 1.449
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_http_config_evaluate",
+   "launches": 10,
+   "medians_ns": [
+    1136.3,
+    1138.6,
+    1157.9,
+    1166.9,
+    1137.8,
+    1135.1,
+    1520.3,
+    1330.9,
+    1148.9,
+    1152.4
+   ],
+   "median_ns": 1150.6,
+   "cv": 0.1049,
+   "gate": 1.315
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_http_config_load",
+   "launches": 10,
+   "medians_ns": [
+    10081.6,
+    10013.9,
+    10143.2,
+    9937.8,
+    9982.4,
+    9788.0,
+    11050.4,
+    11344.1,
+    10080.9,
+    10101.8
+   ],
+   "median_ns": 10081.3,
+   "cv": 0.05,
+   "gate": 1.2
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_regex_hit",
+   "launches": 10,
+   "medians_ns": [
+    792,
+    833,
+    875,
+    833,
+    834,
+    792,
+    1166,
+    959,
+    792,
+    834
+   ],
+   "median_ns": 833.5,
+   "cv": 0.1321,
+   "gate": 1.396
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_regex_miss",
+   "launches": 10,
+   "medians_ns": [
+    723.9,
+    739.7,
+    728.4,
+    716.5,
+    728.9,
+    712.1,
+    758.5,
+    840.6,
+    721.0,
+    717.7
+   ],
+   "median_ns": 726.2,
+   "cv": 0.0518,
+   "gate": 1.2
+  },
+  {
+   "runtime": "typescript",
+   "name": "crusty_trace",
+   "launches": 10,
+   "medians_ns": [
+    4208,
+    4458,
+    4333,
+    4167,
+    4250,
+    4083,
+    5417,
+    4750,
+    4083,
+    4125
+   ],
+   "median_ns": 4229.0,
+   "cv": 0.0947,
+   "gate": 1.284
+  },
+  {
+   "runtime": "typescript",
+   "name": "floor_flat_map",
+   "launches": 10,
+   "medians_ns": [
+    2292,
+    2240.3,
+    2250.7,
+    2292,
+    2214.3,
+    2292,
+    3250,
+    2587.9,
+    2309.5,
+    2291
+   ],
+   "median_ns": 2292.0,
+   "cv": 0.1313,
+   "gate": 1.394
+  },
+  {
+   "runtime": "typescript",
+   "name": "floor_option_string",
+   "launches": 10,
+   "medians_ns": [
+    156.6,
+    150.4,
+    152.4,
+    153.8,
+    151.6,
+    154.2,
+    218.5,
+    174.1,
+    155.6,
+    150.8
+   ],
+   "median_ns": 154.0,
+   "cv": 0.1303,
+   "gate": 1.391
+  },
+  {
+   "runtime": "typescript",
+   "name": "floor_u32",
+   "launches": 10,
+   "medians_ns": [
+    2.2,
+    2.2,
+    2.2,
+    2.1,
+    2.2,
+    2.2,
+    2.8,
+    2.2,
+    2.2,
+    2.2
+   ],
+   "median_ns": 2.2,
+   "cv": 0.0851,
+   "gate": 1.255
+  }
+ ]
+}
