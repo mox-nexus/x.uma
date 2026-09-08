@@ -57,7 +57,7 @@ ripgrep measures everything on real workloads. Conventional wisdom is wrong (mma
 **Trigger:** Any optimization without benchmark evidence.
 
 ### Config Format Is Frozen
-`MatcherConfig<A>` serialization format is now used by all 5 implementations. Any change to it is a breaking change across rumi, puma, and bumi. rust-analyzer lesson: "By the time you have first users, it is already de-facto stable."
+The config format is protojson, read by the engine and both bindings. Any change to what it accepts is a breaking change for every runtime at once. rust-analyzer lesson: "By the time you have first users, it is already de-facto stable."
 
 **Trigger:** Any change to `MatcherConfig`, `PredicateConfig`, or `SinglePredicateConfig` serialization shape.
 

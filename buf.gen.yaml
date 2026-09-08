@@ -28,10 +28,6 @@ plugins:
   - remote: buf.build/community/neoeinstein-prost-serde:v0.3.0
     out: rumi/proto/src/gen
 
-  # Python and TypeScript have no generated types. Measured 2026-08-18: neither
-  # betterproto's `from_dict` nor ts-proto's `fromJSON` rejects an unknown
-  # field — both return the message with defaults — so neither can satisfy the
-  # conformance fixture that says a typo'd field is a load error. Generated
-  # code that is lenient is worse than a hand-written reader, because nobody
-  # audits a file headed "DO NOT EDIT". puma and bumi read protojson directly.
-  # See DECISIONS.md D-038.
+  # Python and TypeScript have no generated types: the bindings read protojson
+  # through the engine, so this is the only tree. See DECISIONS.md D-038 and
+  # D-051.

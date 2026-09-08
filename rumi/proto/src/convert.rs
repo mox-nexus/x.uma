@@ -254,8 +254,7 @@ fn convert_single_predicate(
         .as_ref()
         .ok_or_else(|| MatcherError::InvalidConfig {
             // Names the fields, so the error says what to write rather than
-            // what is absent — and so it agrees with puma's wording, which is
-            // a conformance property the fixtures pin.
+            // what is absent. The fixtures pin this wording.
             source: "singlePredicate: one of 'valueMatch' or 'customMatch' is required".into(),
         })?;
 

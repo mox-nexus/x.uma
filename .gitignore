@@ -1,9 +1,8 @@
 # Rust
 target/
-# Cargo.lock IS committed. D-016 left this open and the repo contradicted
-# itself: this line ignored it while bumi/bun.lock, puma/uv.lock and two others
-# were tracked. A workspace that ships a binary commits its lockfile, and
-# reproducible CI wants all of them. See DECISIONS.md D-031.
+# Cargo.lock IS committed, as is every other lockfile: a workspace that ships a
+# binary commits its lockfile, and reproducible CI wants all of them. See
+# DECISIONS.md D-031.
 **/*.rs.bk
 
 # Python
@@ -88,4 +87,3 @@ pagefind/
 .playwright-mcp/
 *.png
 
-# Bun workspace

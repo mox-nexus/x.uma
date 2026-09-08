@@ -13,11 +13,11 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Implementation {
-    /// rumi, the Rust reference implementation.
+    /// rumi, the engine.
     Rust,
-    /// puma, the pure Python implementation.
+    /// The Python binding, `xuma-crust` on PyPI.
     Python,
-    /// bumi, the pure TypeScript implementation.
+    /// The TypeScript binding, `xuma-crust` on npm.
     Typescript,
 }
 

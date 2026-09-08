@@ -1,6 +1,6 @@
 # TypeScript Quick Start
 
-Build an HTTP route matcher with `xuma` (pure TypeScript) or `xuma-crust` (WASM-backed).
+Build an HTTP route matcher with `xuma-crust`: the Rust engine, compiled to WebAssembly.
 
 ## Install
 
@@ -9,14 +9,10 @@ Build an HTTP route matcher with `xuma` (pure TypeScript) or `xuma-crust` (WASM-
 > See the [README](https://github.com/mox-nexus/x.uma#install).
 
 ```bash
-# Pure TypeScript
-bun add xuma
-
-# WASM-backed (faster, same API surface)
 bun add xuma-crust
 ```
 
-Requires Bun runtime. `xuma` uses `re2js` for linear-time regex.
+Requires the Bun runtime.
 
 ## Write a Config
 
@@ -92,35 +88,10 @@ $ rumi run http routes.yaml --method DELETE --path /other
 not_found
 ```
 
-## Load in Your App (xuma)
+## Load in Your App
 
-The pure TypeScript implementation loads the same config:
-
-```typescript
-import { strict as assert } from "node:assert";
-import { parseProtojson, RegistryBuilder } from "xuma";
-import { HttpRequest, register } from "xuma/http";
-import yaml from "js-yaml";
-
-// Build registry with HTTP inputs
-const builder = new RegistryBuilder();
-register(builder);
-const registry = builder.build();
-
-// Load config: canonical protojson in, runtime Matcher out
-const config = parseProtojson(yaml.load(await Bun.file("routes.yaml").text()));
-const matcher = registry.loadMatcher(config);
-
-// Evaluate
-const request = new HttpRequest("GET", "/api/users");
-assert.equal(matcher.evaluate(request), "api_read");
-```
-
-`xuma` reads protojson, not YAML — bring your own parser (`bun add js-yaml`).
-
-## Load in Your App (xuma-crust)
-
-The WASM-backed bindings use the same config format:
+`fromConfig` takes the same document the CLI read. The package reads protojson,
+not YAML: bring your own parser (`bun add js-yaml`).
 
 ```typescript
 import { strict as assert } from "node:assert";
@@ -139,71 +110,40 @@ assert.equal(matcher.evaluate({ method: "GET", path: "/api/users" }), "api_read"
 assert.equal(matcher.evaluate({ method: "DELETE", path: "/other" }), "not_found");
 ```
 
-`xuma-crust` is 3-10x faster than pure TypeScript for evaluation.
-
-## Compiler Shorthand
-
-For type-safe HTTP matching without config files:
-
-```typescript
-import { strict as assert } from "node:assert";
-import { compileRouteMatches, HttpRequest } from "xuma/http";
-import type { HttpRouteMatch } from "xuma/http";
-
-const routes: HttpRouteMatch[] = [
-  {
-    path: { type: "PathPrefix", value: "/api" },
-    method: "GET",
-  },
-  {
-    path: { type: "PathPrefix", value: "/admin" },
-    method: "POST",
-  },
-];
-
-const matcher = compileRouteMatches(routes, "allowed", "denied");
-
-assert.equal(matcher.evaluate(new HttpRequest("GET", "/api/users")), "allowed");
-assert.equal(matcher.evaluate(new HttpRequest("DELETE", "/api/users")), "denied");
-```
-
-Within a single `HttpRouteMatch`, all conditions are ANDed. Multiple routes are ORed. First match wins.
-
 ## Integration: Bun HTTP Server
 
 <!-- doc-sample: compile -->
 ```typescript
-import { compileRouteMatches, HttpRequest } from "xuma/http";
+import init, { HttpMatcher } from "xuma-crust";
+import yaml from "js-yaml";
 
-const matcher = compileRouteMatches(
-  [{ path: { type: "PathPrefix", value: "/api" }, method: "GET" }],
-  "allowed",
-  "denied",
-);
+await init();
+const config = yaml.load(await Bun.file("routes.yaml").text());
+const matcher = HttpMatcher.fromConfig(JSON.stringify(config));
 
 Bun.serve({
   port: 3000,
   fetch(req) {
     const url = new URL(req.url);
-    const request = new HttpRequest(
-      req.method,
-      url.pathname + url.search,
-      Object.fromEntries(req.headers),
-    );
-    if (matcher.evaluate(request) === "denied") {
+    const action = matcher.evaluate({
+      method: req.method,
+      path: url.pathname + url.search,
+      headers: Object.fromEntries(req.headers),
+    });
+    if (action === "not_found") {
       return new Response("Not found", { status: 404 });
     }
-    return new Response("OK");
+    return new Response(action ?? "no decision");
   },
 });
 ```
 
 ## Safety
 
-- **ReDoS protection** -- `re2js` guarantees linear-time regex matching.
-- **Immutable** -- all types use `readonly` fields.
-- **Depth limits** -- nested matchers capped at 32 levels.
-- **Fail-closed** -- missing data from `DataInput` returns `null`, which makes the predicate evaluate to `false`.
+- **ReDoS protection** -- regex runs in Rust's `regex` crate: linear time, no backtracking.
+- **Immutable** -- a compiled matcher cannot be changed after `fromConfig`.
+- **Bounded** -- nesting depth, rule count and pattern length are limited at load, not at evaluation.
+- **Fail-closed** -- a missing header or query parameter makes its predicate `false`; nothing matches by accident.
 
 ## Next Steps
 

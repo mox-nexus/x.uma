@@ -91,15 +91,16 @@ impl TestMatcher {
     /// Load and run conformance fixtures from a YAML file.
     ///
     /// Returns a list of `(fixture_name, case_name, passed, detail)` tuples.
-    /// Runs `spec/tests/07_protojson/` — canonical protojson, the same fixtures
-    /// and the same reader rumi, puma and bumi use.
-    ///
-    /// The crusts are implementations four and five. Reading a different config
-    /// format from the other three would turn "all five agree" into a claim
-    /// about five different questions.
+    /// Runs `spec/tests/07_protojson/` — canonical protojson, through the same
+    /// reader the engine uses, so a passing suite is a claim about this
+    /// binding's door and not about a second parser.
     #[staticmethod]
     fn run_fixtures(yaml_content: &str) -> PyResult<Vec<(String, String, bool, String)>> {
-        crate::fixtures::run_protojson(yaml_content).map_err(PyValueError::new_err)
+        crate::fixtures::run_protojson(
+            yaml_content,
+            rumi_test::implementations::Implementation::Python,
+        )
+        .map_err(PyValueError::new_err)
     }
 
     #[allow(clippy::unused_self)]

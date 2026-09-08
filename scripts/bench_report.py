@@ -31,24 +31,6 @@ def fmt_ns(ns: float) -> str:
     return f"{ns / 1_000_000_000:.2f}s"
 
 
-def fmt_comparison(pure_ns: float, crusty_ns: float, crusty_label: str) -> str:
-    """Format a pure-vs-binding comparison as a direction plus a magnitude.
-
-    This used to be `fmt_speedup(slow, fast) -> f"{slow/fast:.1f}x"`, called as
-    `fmt_speedup(pure_ns, crusty_ns)` under a column headed "Speedup". When the
-    binding is slower — which is the measured case for the WASM crust, by roughly
-    two orders of magnitude — that renders "0.0x", which reads as *no speedup
-    measured* rather than *far slower*. A generated report is only worth having if
-    it cannot restate the very inversion it was built to prevent, so the direction
-    is computed and named rather than implied by a column title.
-    """
-    if pure_ns <= 0 or crusty_ns <= 0:
-        return "N/A"
-    if crusty_ns < pure_ns:
-        return f"{crusty_label} {pure_ns / crusty_ns:.2f}x faster"
-    return f"pure {crusty_ns / pure_ns:.2f}x faster"
-
-
 @click.command()
 @click.option("--db", default=DB_DEFAULT, help="DuckDB database path")
 @click.option("--output", default=OUTPUT_DEFAULT, help="Output markdown file")
@@ -117,38 +99,6 @@ def main(db: str, output: str) -> None:
                 f"| {iters or 'N/A'} |"
             )
         lines.append("")
-
-    # FFI overhead analysis
-    lines.append("## FFI Overhead Analysis\n")
-
-    ffi_pairs = [("puma", "xuma-crust-python"), ("bumi", "xuma-crust-wasm")]
-    for pure, crusty in ffi_pairs:
-        ffi_results = con.execute(
-            """SELECT
-                pure.scenario, pure.phase,
-                pure.mean_ns AS pure_ns,
-                crusty.mean_ns AS crusty_ns
-            FROM bench_results pure
-            JOIN bench_results crusty
-              ON pure.scenario = crusty.scenario
-             AND pure.phase = crusty.phase
-             AND pure.run_id = crusty.run_id
-            WHERE pure.variant = ? AND crusty.variant = ?
-              AND pure.run_id = ?
-            ORDER BY pure.scenario, pure.phase""",
-            [pure, crusty, run_id],
-        ).fetchall()
-
-        if ffi_results:
-            lines.append(f"### {pure} vs {crusty}\n")
-            lines.append(f"| Scenario | Phase | {pure} | {crusty} | Result |")
-            lines.append("|----------|-------|------|--------|--------|")
-            for scenario, phase, pure_ns, crusty_ns in ffi_results:
-                lines.append(
-                    f"| {scenario} | {phase} | {fmt_ns(pure_ns)} "
-                    f"| {fmt_ns(crusty_ns)} | {fmt_comparison(pure_ns, crusty_ns, crusty)} |"
-                )
-            lines.append("")
 
     # Footer
     lines.append("---")

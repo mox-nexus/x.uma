@@ -22,8 +22,6 @@ The goal: sustainable excellence — no rewrites needed. Growth happens at edges
 | Package | Language | Role |
 |---------|----------|------|
 | **rumi** | Rust | Core engine (reference implementation) |
-| **puma** | Python | Pure Python implementation |
-| **bumi** | TypeScript | Pure TypeScript implementation |
 | **xuma-crust** | Python+Rust | PyO3 bindings (rumi/crusts/python/) |
 | **xuma-crust** | TS+WASM | wasm-bindgen bindings (rumi/crusts/wasm/) |
 
@@ -38,8 +36,6 @@ x.uma/
 │       └── claude/v1/
 ├── spec/tests/                 # conformance fixtures (YAML)
 ├── rumi/                      # Rust workspace member
-├── puma/                      # Pure Python implementation
-├── bumi/                      # Pure TypeScript implementation
 └── justfile                    # task orchestration
 ```
 
@@ -78,7 +74,7 @@ Type URLs: `type.googleapis.com/xuma.http.v1.HeaderInput`
 | Matcher evaluation logic | `rumi/core/src/` | Core, domain-agnostic |
 | New input/action type | `proto/xuma/<domain>/v1/` | Extension, domain-specific |
 | DataInput impl | `rumi/ext/<domain>.rs` | Adapter behind port |
-| Python-specific wrapper | `puma/python/` | Binding ergonomics |
+| Binding surface (PyO3, wasm) | `rumi/crusts/<runtime>/src/` | The door the host language sees |
 | Conformance test case | `spec/tests/<matcher-type>/` | Source of truth |
 
 **The filter:** Does it know about a specific domain (HTTP, Claude, etc.)? → Adapter (rumi/ext), not core.
@@ -116,7 +112,7 @@ Methods follow Envoy's naming (`get()`, `matches()`, `evaluate()`).
 ### Build Order
 
 ```
-rumi (core) → puma (pure Python) / bumi (pure TypeScript) / crusts (FFI bindings)
+rumi (core) → crusts (PyO3, wasm-bindgen)
 ```
 
 ### Development Workflow
@@ -129,8 +125,8 @@ just build-rust              # or: cargo build -p r-umi
 just gen                     # regenerate all bindings
 
 # Python development
-cd puma && maturin develop --uv   # build + install in venv
-uv run pytest                       # test
+cd rumi/crusts/python && uv run maturin develop --uv --features fixtures
+uv run pytest tests/ -q
 
 # Run all conformance tests
 just test-all

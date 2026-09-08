@@ -227,6 +227,38 @@ describe("Conformance Fixtures", () => {
       }
     });
   }
+
+  // The ledger holds in both directions: a fixture this binding is not listed
+  // for, but can load, is a stale exception and fails.
+  test("a fixture that omits this binding must not load here", () => {
+    const omitsTypescript = `
+name: omits_typescript
+implementations: [rust]
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          singlePredicate:
+            input:
+              name: k
+              typedConfig: {"@type": "type.googleapis.com/xuma.kv.v1.MapInput", key: k}
+            valueMatch: {exact: v}
+        onMatch:
+          action:
+            name: hit
+            typedConfig: {"@type": "type.googleapis.com/xuma.core.v1.NamedAction", name: hit}
+cases: []
+`;
+    const results = TestMatcher.runFixtures(omitsTypescript);
+    expect(results).toEqual([
+      {
+        fixture: "omits_typescript",
+        caseName: "ledger",
+        passed: false,
+        detail: "not listed in `implementations`, but it loads here — add this binding to the ledger",
+      },
+    ]);
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

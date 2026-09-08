@@ -250,8 +250,7 @@ class TestNesting:
 class TestConformance:
     """Run the conformance fixtures from spec/tests/07_protojson/.
 
-    Same fixtures, same reader as rumi, puma and bumi — see
-    `crusts/*/src/fixtures.rs`.
+    Same fixtures, same reader as rumi — see `crusts/*/src/fixtures.rs`.
     """
 
     @pytest.fixture(params=sorted(FIXTURES_DIR.glob("*.yaml")), ids=lambda p: p.stem)
@@ -264,6 +263,33 @@ class TestConformance:
         results = CrustTestMatcher.run_fixtures(yaml_content)
         failures = [(name, case, detail) for name, case, passed, detail in results if not passed]
         assert not failures, f"Failed cases: {failures}"
+
+    def test_a_fixture_that_omits_this_binding_must_not_load_here(self):
+        """The ledger holds in both directions: a fixture this binding is not
+        listed for, but can load, is a stale exception and fails."""
+        keyless_but_loadable = """
+name: omits_python
+implementations: [rust]
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          singlePredicate:
+            input:
+              name: k
+              typedConfig: {"@type": "type.googleapis.com/xuma.kv.v1.MapInput", key: k}
+            valueMatch: {exact: v}
+        onMatch:
+          action:
+            name: hit
+            typedConfig: {"@type": "type.googleapis.com/xuma.core.v1.NamedAction", name: hit}
+cases: []
+"""
+        results = CrustTestMatcher.run_fixtures(keyless_but_loadable)
+        assert results == [
+            ("omits_python", "ledger", False,
+             "not listed in `implementations`, but it loads here — add this binding to the ledger"),
+        ]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

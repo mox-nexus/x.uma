@@ -34,29 +34,6 @@ Two things to notice:
 
 Route `GET /api/users` to the API backend:
 
-**Python:**
-```python
-from xuma import SinglePredicate, PrefixMatcher, Matcher, FieldMatcher, Action
-from xuma.http import HttpRequest, PathInput
-
-# DataInput: extract the path from the request
-# InputMatcher: check if the path starts with /api
-predicate = SinglePredicate(
-    input=PathInput(),            # domain-specific
-    matcher=PrefixMatcher("/api") # domain-agnostic
-)
-
-matcher = Matcher(
-    matcher_list=(
-        FieldMatcher(predicate=predicate, on_match=Action("api_backend")),
-    ),
-)
-
-request = HttpRequest(method="GET", raw_path="/api/users")
-assert matcher.evaluate(request) == "api_backend"
-```
-
-**Rust:**
 ```rust,no_run
 use rumi::prelude::*;
 use rumi_http::*;
@@ -75,64 +52,55 @@ let request = HttpRequest::builder().method("GET").path("/api/users").build();
 assert_eq!(matcher.evaluate(&request), Some("api_backend"));
 ```
 
-**TypeScript:**
-```typescript
-import { strict as assert } from "node:assert";
-import { SinglePredicate, PrefixMatcher, Matcher, FieldMatcher, Action } from "xuma";
-import { HttpRequest, PathInput } from "xuma/http";
-
-const predicate = new SinglePredicate(
-  new PathInput(),             // domain-specific
-  new PrefixMatcher("/api"),   // domain-agnostic
-);
-
-const matcher = new Matcher(
-  [new FieldMatcher(predicate, new Action("api_backend"))],
-);
-
-const request = new HttpRequest("GET", "/api/users");
-assert.equal(matcher.evaluate(request), "api_backend");
-```
-
-Same structure in all three languages. Same result.
+The Python and TypeScript packages do not expose these types. A binding takes
+the same rule as a config document, hands it to this engine, and hands the
+decision back; the pipeline runs in Rust wherever it runs. See the
+[config format](../reference/config.md) for the document, and the
+[Python](../getting-started/python.md) and
+[TypeScript](../getting-started/typescript.md) quick starts for the door.
 
 ## The Same Pipeline, Different Domain
 
-The power of this split: the same `PrefixMatcher` works for HTTP paths and custom event types.
+The power of this split: the same `PrefixMatcher` works for HTTP paths and
+custom event types.
 
-```python
-from dataclasses import dataclass
-from xuma import SinglePredicate, PrefixMatcher, Matcher, FieldMatcher, Action, MatchingData
+```rust
+use rumi::prelude::*;
 
-# Custom context
-@dataclass(frozen=True)
-class CloudEvent:
-    type: str
-    source: str
+// Your context.
+struct CloudEvent {
+    kind: String,
+}
 
-# Custom DataInput — extract the event type
-@dataclass(frozen=True)
-class EventTypeInput:
-    def get(self, ctx: CloudEvent) -> MatchingData:
-        return ctx.type
+// Your DataInput: extract the event type. This is the only domain-specific
+// piece, and it is the whole port.
+#[derive(Debug)]
+struct EventTypeInput;
 
-# Use the SAME PrefixMatcher — it doesn't know about CloudEvent
-predicate = SinglePredicate(
-    input=EventTypeInput(),
-    matcher=PrefixMatcher("com.example."),
-)
+impl DataInput<CloudEvent> for EventTypeInput {
+    fn get(&self, ctx: &CloudEvent) -> MatchingData {
+        MatchingData::from(ctx.kind.as_str())
+    }
+}
 
-matcher = Matcher(
-    matcher_list=(
-        FieldMatcher(predicate=predicate, on_match=Action("handle_event")),
-    ),
-)
+// The SAME PrefixMatcher. It knows nothing about CloudEvent.
+let predicate = Predicate::Single(SinglePredicate::new(
+    Box::new(EventTypeInput),
+    Box::new(PrefixMatcher::new("com.example.")),
+));
 
-event = CloudEvent(type="com.example.user.created", source="api")
-assert matcher.evaluate(event) == "handle_event"
+let matcher: Matcher<CloudEvent, &str> = Matcher::list(
+    vec![FieldMatcher::new(predicate, OnMatch::Action("handle_event"))],
+    None,
+);
+
+let event = CloudEvent { kind: "com.example.user.created".into() };
+assert_eq!(matcher.evaluate(&event), Some("handle_event"));
 ```
 
-`PrefixMatcher` operates on `MatchingData` (the erased string), not on `CloudEvent` or `HttpRequest`. Domain adapters (`PathInput`, `EventTypeInput`) are context-specific. Matchers are universal.
+`PrefixMatcher` operates on `MatchingData` (the erased string), not on
+`CloudEvent` or `HttpRequest`. Domain adapters (`SimplePathInput`,
+`EventTypeInput`) are context-specific. Matchers are universal.
 
 ## Pipeline Stages
 

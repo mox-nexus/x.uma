@@ -99,7 +99,7 @@ Each domain provides:
 
 The compiler is the user-facing API. Instead of manually constructing predicate trees, you write:
 
-```rust
+```rust,ignore
 // HTTP: Gateway API config → matcher
 let matcher = compile_route_matches(&routes, "allowed", Some("denied"))?;
 
@@ -125,11 +125,19 @@ Matchers can be built two ways:
 
 **Compiler path** — domain-specific DSL produces matchers directly. Ergonomic, type-safe, no serialization overhead.
 
-```python
-from xuma.http import HttpPathMatch, HttpRouteMatch, compile_route_matches
+```rust
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use rumi_http::{compile_route_matches, HttpPathMatch, HttpRouteMatch};
 
-routes = [HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/api"), method="GET")]
-matcher = compile_route_matches(routes, "api", "not_found")
+let routes = vec![HttpRouteMatch {
+    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+    method: Some("GET".into()),
+    ..Default::default()
+}];
+let matcher = compile_route_matches(&routes, "api", Some("not_found"))?;
+# let _ = matcher;
+# Ok(())
+# }
 ```
 
 **Config path** — JSON/YAML config loaded through the registry. Portable across languages, storable, versionable.
@@ -157,17 +165,20 @@ matcher = compile_route_matches(routes, "api", "not_found")
 
 Both paths produce the same `Matcher`. The compiler path is for programmatic construction. The config path is for declarative, cross-language use.
 
-## Five Implementations, One Spec
+## One Engine, Two Bindings
 
-| Implementation | Language | Type |
-|----------------|----------|------|
-| **rumi** | Rust | Reference implementation |
-| **xuma** (Python) | Python | No protobuf runtime; `google-re2` ships platform wheels |
-| **xuma** (TypeScript) | TypeScript | Pure TypeScript — `re2js` is a JS port of RE2 |
-| **xuma-crust** | Python | Rust core via PyO3 |
-| **xuma-crust** | TypeScript | Rust core via WASM |
+| Package | Language | What it is |
+|---------|----------|------------|
+| **rumi** | Rust | The engine. Reference implementation. |
+| **xuma-crust** | Python | The engine, bound through PyO3 |
+| **xuma-crust** | TypeScript | The engine, compiled to WebAssembly |
 
-All five pass the same conformance suite for the config format — `spec/tests/07_protojson/`, the document every implementation reads. The three with a Gateway API compiler (rumi, puma, bumi) also pass `spec/tests/05_http/`. Same config, same evaluation semantics, same results. Choose based on your runtime and performance needs.
+All three read the same config document and pass the same conformance suite,
+`spec/tests/07_protojson/`. The bindings do not reimplement anything: a
+binding's job is to hand the document to the engine and hand the decision
+back, and the suite exists to prove that nothing changes on the way through.
+`spec/tests/05_http/`, the Gateway API compiler suite, runs in Rust, which is
+where the compiler lives.
 
 ## Next
 

@@ -9,9 +9,9 @@ description: >
   shape. This is the same domain through `parseProtojson` -> registry, which is
   what a user writes.
 
-  It also pins the six `xuma.http.v1.*` type URLs to their meanings in all three
-  implementations. `PathInput` in particular: it strips the query string, which
-  puma and bumi always did and Rust's simple context did not until F26.
+  It also pins the six `xuma.http.v1.*` type URLs to their meanings in the
+  engine and both bindings. `PathInput` in particular strips the query string,
+  which Rust's simple context did not until F26.
 
 domain: http
 

@@ -2,75 +2,30 @@
 
 ## What is x.uma?
 
-A matcher engine implementing the xDS Unified Matcher API across multiple languages and domains.
+A matcher engine implementing the xDS Unified Matcher API: one Rust engine,
+`rumi`, with bindings for Python and TypeScript, and domains that plug in at
+`TypedExtensionConfig`.
 
-### The intended architecture, and what is actually built
+### One engine, two bindings
 
-**Intent: one core, with thin DX layers per runtime.** `rumi` is the engine;
-Python and TypeScript get an extension layer over it, and domains plug in at
-`TypedExtensionConfig`. That is what the ACES diagram below describes, and it is
-the design this project is steered by.
+| Package | Language | What it is |
+|---------|----------|------------|
+| **rumi** | Rust | The engine. Reference implementation. |
+| **xuma-crust** | Python | The engine, bound through PyO3 (`rumi/crusts/python/`) |
+| **xuma-crust** | TypeScript | The engine, compiled to WebAssembly (`rumi/crusts/wasm/`) |
 
-**Reality: three complete engines.** `rumi`, `puma` and `bumi` each contain a
-full independent implementation — matcher, predicate, tree, string matchers,
-config loading. The bindings sit alongside them rather than being the only path
-to the core. So the diagram below is the target, not a description of the tree.
+Until 2026-09-08 the tree also held a pure-Python and a pure-TypeScript
+engine, each a complete reimplementation. They were retired under D-051: never decided into existence, they triplicated every spec
+change, and with nothing published their removal cost no user anything. The
+reasoning is in `DECISIONS.md`; the history is in `git log` before that date.
 
-| Package | Language | What it actually is |
-|---------|----------|---------------------|
-| **rumi** | Rust | The core engine (reference implementation) |
-| **puma** | Python | **A second engine**, reimplemented in Python (dir: `puma/`, package `xuma`) |
-| **bumi** | Bun/TypeScript | **A third engine**, reimplemented in TypeScript (dir: `bumi/`, package `xuma`) |
-| **xuma-crust** | Python | Binding to the core via PyO3 (from `rumi/crusts/python/`) |
-| **xuma-crust** | TypeScript | Binding to the core via wasm-bindgen (from `rumi/crusts/wasm/`) |
+**Write engine and domain code in `rumi` only.** A binding hands a config
+document to the engine and a decision back; it interprets neither.
 
-**How the gap opened.** `puma` was originally the PyO3 binding — `55df2d21`
-changed one roadmap table cell from "PyO3/maturin bindings" to "Pure Python
-implementation" and pushed the bindings to a new `p.uma[crusty]` slot, which
-`c9afb7e0` then built. No decision was recorded, because the change was made by
-editing a table rather than by deciding something. Everything downstream
-inherited the result as though it had always been the design. `a01790f0` later
-renamed `puma`→`xuma` and `puma-crusty`→`xuma-crust`, which is why the shipped
-names no longer show any of this.
-
-**What it costs, concretely.** Every spec change lands three times. The
-empty-route fail-open (D-050) existed in all three compilers at once; the width
-limits from #32 were applied to Rust only. Three engines do not cross-check a
-shared misreading of the spec — they triplicate it.
-
-**What it earns.** `puma` and `bumi` carry no protobuf runtime and read
-protojson directly (D-039), and they install with no native extension. As of
-2026-09-06 they are also *faster* than the bindings on most workloads, which is
-the opposite of what the docs claimed for six months — see `bench/RESULTS.md`
-and the boundary work in `rumi/crusts/wasm/src/matcher.rs`.
-
-**Decided 2026-09-06 (D-051): the duplicate engines are retired.** `rumi` is the
-engine; Python and TypeScript get a binding plus a DX layer, not a
-reimplementation. Nothing is published yet — all nine names returned 404 on
-2026-09-06 — so this costs no user anything today and would cost a deprecation
-cycle after a release.
-
-Two consequences worth knowing before you touch anything here:
-
-- **The boundary work is now blocking, not opportunistic.** After `d006b241`,
-  pure TypeScript still beats the WASM binding 68x on `exact_hit`; only
-  `regex_hit` goes the other way. `xuma` on npm cannot ship slower than the code
-  it replaces. Remaining known work: typed `extern` accessors with `final`
-  instead of `Reflect::get`, `OnceCell` for the two registries `fromConfig`
-  rebuilds per call, and the returned-`String` transcode. Python is not in this
-  position — the PyO3 binding already wins everywhere except `compile_complex`.
-- **Write new domain and engine code in `rumi` only.** Do not add a feature to
-  `puma/src` or `bumi/src` that `rumi` does not have. They are being retired;
-  adding to them deepens the debt this decision exists to pay off.
-
-Sequencing — retirement order, whether `bumi/` is frozen as a conformance oracle
-rather than deleted, and what `xuma` ships in the interval — is open and lives in
-`PLAN.md`.
-
-All five implementations pass `spec/tests/07_protojson/`, the canonical config
-suite. `spec/tests/05_http/` (Gateway API route matches through the domain
-compiler) runs in rumi, puma and bumi — the three that have a compiler; neither
-crust exposes that surface. Both suites carry the `implementations:` ledger, and
+**Conformance.** The engine and both bindings run `spec/tests/07_protojson/`,
+the canonical config suite, through the same reader. `spec/tests/05_http/`
+(Gateway API route matches through the domain compiler) runs in rumi, where the
+compiler lives. Every fixture carries a required `implementations:` ledger, and
 every runner enforces it in **both** directions: a fixture that omits you must
 also fail for you, so a stale exception cannot hide a finished migration.
 
@@ -82,10 +37,8 @@ x.uma follows ACES principles using hexagonal architecture (ports & adapters) to
 
 ### Architecture
 
-**This is the target.** One CORE with ports and adapters around it. `puma` and
-`bumi` are not adapters onto this core today — each contains its own copy of it.
-See "The intended architecture, and what is actually built" above before
-reasoning about where code should live.
+One CORE with ports and adapters around it. The bindings are adapters onto
+this core, not copies of it.
 
 ```
                     ┌─────────────────────────────────┐
@@ -156,16 +109,14 @@ x.uma/
 ├── spec/
 │   └── tests/                  # conformance test fixtures (YAML)
 ├── rumi/                       # Rust workspace (core + extensions + crusts + proto)
+│   ├── crusts/python/          # xuma-crust for PyPI (PyO3)
+│   ├── crusts/wasm/            # xuma-crust for npm (wasm-bindgen)
 │   └── proto/src/gen/          # buf-generated Rust types (prost + prost-serde)
-├── puma/                       # Python implementation (package: xuma)
-│   └── proto/src/gen/          # buf-generated Python types (betterproto)
-├── bumi/                       # Pure TypeScript implementation (package: xuma)
-│   └── proto/src/gen/          # buf-generated TypeScript types (ts-proto)
-├── buf.gen.yaml                # Polyglot codegen config (all 3 languages)
+├── buf.gen.yaml                # codegen config (Rust only)
 ├── docs/
 │   ├── content/                # plain Markdown, framework-free
-│   └── experience/             # SvelteKit docs site (adapter-static)
-└── justfile                    # polyglot task orchestration
+│   └── experience/             # SvelteKit docs site, runs on the wasm crust
+└── justfile                    # task orchestration
 ```
 
 ## Roadmap
@@ -178,22 +129,18 @@ x.uma/
 | 2.5 | Extensible MatchingData (`Custom` variant) | ✅ Done |
 | 3 | StringMatcher, MatcherTree, RadixTree | ✅ Done |
 | 4 | HTTP Domain (ext_proc model) | ✅ Done |
-| 5 | puma (Python + HTTP) | ✅ Done |
-| 5.1 | puma arch-guild hardening | ✅ Done |
-| 6 | bumi (Bun/TypeScript + HTTP) | ✅ Done |
-| 6.1 | bumi arch-guild hardening | ✅ Done |
+| 5, 6 | Pure Python and pure TypeScript engines | Retired 2026-09-08 (D-051) |
 | 7 | xuma-crust: PyO3 Python bindings | ✅ Done |
 | 7.5 | Claude domain: trace + HookMatch compiler (a **feature of `rumi-core`**, not a crate) | ✅ Done |
 | 8 | xuma-crust: wasm-bindgen TypeScript bindings | ✅ Done |
-| 9 | Cross-language benchmarks (all 5 variants) | ⚠️ Runs, not guarded |
+| 9 | Benchmarks: engine and both bindings | ⚠️ Runs, not guarded |
 | 10 | TypedExtensionConfig Registry (`IntoDataInput`, `RegistryBuilder`) | ✅ Done |
 | 11 | Test audit (removed 18 ineffective tests → 216 total) | ✅ Done |
 | 12 | Proto Alignment: buf codegen, `rumi-proto`, `AnyResolver`, xDS Matcher loading | ✅ Done |
 | 13 | Config/Registry across all implementations | ✅ Done |
-| 14 | Config-path benchmarks (all 5 variants) | ⚠️ Runs, not guarded |
+| 14 | Config-path benchmarks: engine and both bindings | ⚠️ Runs, not guarded |
 | 15 | Crate restructure + publish prep (0.0.2) | ⚠️ Unverified |
 | — | Semantic matching (cosine similarity via `CustomMatchData`) | Planned |
-| — | RE2 migration: `google-re2` for puma, `re2js` for bumi | ✅ Done |
 
 **Status legend.** ✅ Done means **CI executes something that would fail if it
 regressed**. ⚠️ Unverified means the work exists but nothing checks it, so the
@@ -232,10 +179,11 @@ until 2026-08-31, and `release.yml` published the same three — omitting two th
 `cargo metadata` and fails if the workflow disagrees, so the two cannot drift
 again.
 
-Outside Cargo: `xuma` on PyPI and npm, `xuma-crust` on PyPI and npm. Checked
-2026-08-31 — all four are **unclaimed (404)**. The crates.io names could *not* be
-checked: the registry answered 403, which is a rejected request, not an absent
-crate.
+Outside Cargo: `xuma-crust` on PyPI and npm. Checked 2026-08-31 — both are
+**unclaimed (404)**, as is `xuma` on both registries. `xuma` has had no
+publisher since D-051; it returns as the host-language package over the binding.
+The crates.io names could *not* be checked: the registry answered 403, which is
+a rejected request, not an absent crate.
 
 Both release workflows are `workflow_dispatch` and have never been run.
 `release-crust.yml` published only the PyPI wheel until 2026-09-01, while two
@@ -366,16 +314,6 @@ Types to build (parallel to rumi-http's gateway):
 - `HookMatchExt` — extension trait for compile convenience
 - `compile_hook_matches()` — transforms `HookMatch` configs into `Matcher<HookContext, A>`
 - `evaluate_with_trace()` — returns the decision AND the path through the matcher tree
-
-### Cross-Language Type Mapping
-
-| Concept | Rust (rumi) | Python (puma) | TypeScript (bumi) |
-|---------|-------------|---------------|-------------------|
-| Erased data | `MatchingData` | `MatchingData` | `MatchingData` |
-| Context type | `Ctx` (generic) | `Ctx` (TypeVar) | `Ctx` (generic) |
-| Action type | `A` (generic) | `A` (TypeVar) | `A` (generic) |
-
-`MatchingData` is the same name across all three implementations. In Rust it's an enum, in Python a type alias (`str | int | bool | bytes | None`), in TypeScript a type alias (`string | number | boolean | Uint8Array | null`). One concept, one name.
 
 ## rumi Crate Structure
 
@@ -510,12 +448,13 @@ a *contract the suite enforced* and each implementation was conformant by
 failing open (D-050). When a fixture and a security property disagree, the
 fixture is the thing that is wrong.
 
-Coverage is deliberate rather than accidental: `07_protojson/` runs in all five;
-`05_http/` runs in the three implementations that have a Gateway API compiler.
-Both carry the `implementations:` ledger and every runner enforces it in both
-directions. Until 2026-08-31 `05_http/` had neither a ledger nor a rumi runner,
-which is how the fixture above got to require a fail-open of everyone while the
-reference implementation was not reading the file that said so.
+Coverage is deliberate rather than accidental: `07_protojson/` runs in the
+engine and both bindings; `05_http/` runs in rumi, which has the Gateway API
+compiler. Every fixture carries a required `implementations:` ledger and every
+runner enforces it in both directions. Until 2026-08-31 `05_http/` had neither
+a ledger nor a rumi runner, which is how the fixture above got to require a
+fail-open of everyone while the reference implementation was not reading the
+file that said so.
 
 ### Session Start
 

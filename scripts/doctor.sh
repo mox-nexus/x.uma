@@ -42,8 +42,8 @@ echo
 check cargo      cargo      --version  "Rust workspace"                       yes
 check rustc      rustc      --version  "Rust compiler"                        yes
 check just       just       --version  "task runner"                          yes
-check uv         uv         --version  "Python env + puma"                    yes
-check bun        bun        --version  "bumi, docs site"                      yes
+check uv         uv         --version  "PyO3 crust env"                       yes
+check bun        bun        --version  "wasm crust tests, docs site"          yes
 check node       node       --version  "doc and agreement check scripts"      yes
 check buf        buf        --version  "proto codegen (just gen)"             yes
 check maturin    maturin    --version  "PyO3 crust wheel"                     no

@@ -1,9 +1,8 @@
 # Config Format
 
 The config format is canonical protojson — protobuf's own JSON mapping of
-`xds.type.matcher.v3.Matcher`. All five implementations (rumi, puma, bumi, and
-both `xuma-crust` bindings) read the same document and agree on the same
-answers; see [`DECISIONS.md` D-026](https://github.com/mox-nexus/x.uma/blob/main/DECISIONS.md)
+`xds.type.matcher.v3.Matcher`. The engine and both `xuma-crust` bindings read
+the same document and agree on the same answers; see [`DECISIONS.md` D-026](https://github.com/mox-nexus/x.uma/blob/main/DECISIONS.md)
 for why this format and not a bespoke one.
 
 **Field names accept `lowerCamelCase` (canonical) or the proto's own

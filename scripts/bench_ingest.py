@@ -125,16 +125,10 @@ KNOWN_PHASES = {"compile", "evaluate", "trace", "load"}
 def split_name(raw: str, variants: dict[str, str]) -> tuple[str, str, str]:
     """Split a benchmark name into (variant, scenario, phase).
 
-    A single benchmark FILE holds both sides of a comparison —
-    `test_bench_puma_evaluate_exact_hit` and `test_bench_crusty_evaluate_exact_hit`
-    live in `test_bench_crusty.py` together. Labelling every row in that file with
-    one variant, which is what this module did until 2026-09-05, files the pure
-    implementation's measurements under the binding's name. A generated report then
-    states the opposite of what was measured, with a provenance line attached.
-
-    The leading token names the variant. The rest is kept intact as the scenario,
-    so the two sides of a pair join on equality; stripping a `crusty_`/`puma_`
-    prefix into the scenario is what made the report's FFI section return no rows.
+    The leading token names the variant and the rest is kept intact as the
+    scenario, so rows from different variants join on scenario equality.
+    Stripping the variant prefix into the scenario is what once made the
+    report's comparison section return no rows.
     """
     clean = raw.removeprefix("test_bench_")
     head, _, rest = clean.partition("_")
@@ -206,21 +200,10 @@ def parse_mitata_json(
 
 
 # filename -> ({leading name token: variant}, parser).
-#
-# The crust files carry BOTH sides of each comparison, which is why the map is
-# per-token rather than per-file. See split_name.
 FILE_PARSERS: dict[str, tuple[dict[str, str], Any]] = {
     "rust.json": ({"rumi": "rumi"}, parse_divan_json),
-    "python.json": ({"puma": "puma"}, parse_pytest_benchmark_json),
-    "typescript.json": ({"bumi": "bumi"}, parse_mitata_json),
-    "xuma-crust-python.json": (
-        {"crusty": "xuma-crust-python", "puma": "puma"},
-        parse_pytest_benchmark_json,
-    ),
-    "xuma-crust-wasm.json": (
-        {"crusty": "xuma-crust-wasm", "bumi": "bumi"},
-        parse_mitata_json,
-    ),
+    "xuma-crust-python.json": ({"crusty": "xuma-crust-python"}, parse_pytest_benchmark_json),
+    "xuma-crust-wasm.json": ({"crusty": "xuma-crust-wasm"}, parse_mitata_json),
 }
 
 

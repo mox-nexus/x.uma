@@ -85,7 +85,7 @@ publishable:
 proto-field-types:
     node scripts/check-proto-field-types.mjs
 
-# Generate proto code (all three languages) and the xDS dependency types.
+# Generate proto code and the xDS dependency types.
 #
 # Two passes are required. `buf generate` only walks the local module graph, and
 # no xuma proto imports xDS, so the xds.* types convert.rs depends on are absent
@@ -148,7 +148,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-full test-protojson test-http-conformance test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links docs-samples readme-agreement puma-check bumi-check docs-check docs-test docs-build audit
+ci: fmt-check lint-strict test test-full test-protojson test-http-conformance test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links docs-samples readme-agreement docs-check docs-test docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -259,88 +259,23 @@ bench-rust:
     cargo bench --manifest-path rumi/Cargo.toml
     cargo bench --manifest-path rumi/Cargo.toml --bench config --features registry
 
-# Run Python benchmarks (pytest-benchmark)
-bench-puma:
-    cd puma && uv run pytest tests/bench/ --benchmark-only --benchmark-disable-gc
-
-# Run TypeScript benchmarks (mitata)
-bench-bumi:
-    cd bumi && bun run bench
-    cd bumi && bun run bench/config.bench.ts
-
-# Run xuma-crust (Python) vs puma comparison benchmarks
+# The PyO3 boundary, under pytest-benchmark.
 #
 # --release is load-bearing, not tidiness. Without it maturin installs a debug
-# extension, and the debug crust measures SLOWER than pure Python in 10 of 11
-# pairs — the exact opposite verdict. This recipe omitted the flag until
-# 2026-09-05, so anyone who re-checked the documented performance claims by
-# running the documented command got a confidently wrong answer.
+# extension, and every verdict drawn from a debug crust is inverted. This
+# recipe omitted the flag until 2026-09-05.
 bench-xuma-crust-py:
     cd rumi/crusts/python && maturin develop --release && uv run pytest tests/test_bench_crusty.py tests/test_bench_config.py --benchmark-only --benchmark-disable-gc
 
-# Run xuma-crust (WASM) vs bumi comparison benchmarks
+# The WASM boundary, under mitata.
 bench-xuma-crust-wasm:
     cd rumi/crusts/wasm && wasm-pack build --target web && bun run bench/crusty.bench.ts && bun run bench/config.bench.ts
 
 # Run all benchmarks
-bench-all: bench-rust bench-puma bench-bumi bench-xuma-crust-py bench-xuma-crust-wasm
+bench-all: bench-rust bench-xuma-crust-py bench-xuma-crust-wasm
 
 # Alias for bench-all
 bench: bench-all
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Python (puma)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Run puma tests
-puma-test:
-    cd puma && uv run pytest
-
-# Lint puma
-puma-lint:
-    cd puma && uv run ruff check .
-
-# Type-check puma
-puma-typecheck:
-    cd puma && uv run mypy src/xuma
-
-# Run all puma checks
-puma-check: puma-lint puma-typecheck puma-test
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# TypeScript (bumi)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Install bumi dependencies
-bumi-install:
-    cd bumi && bun install
-
-# Build bumi to dist/ (published artifact — .js + .d.ts)
-bumi-build:
-    cd bumi && bun run build
-
-# Run bumi tests
-bumi-test:
-    cd bumi && bun test
-
-# Type-check bumi
-bumi-typecheck:
-    cd bumi && bun run typecheck
-
-# Lint bumi
-bumi-lint:
-    cd bumi && bun run lint
-
-# Format bumi
-bumi-fmt:
-    cd bumi && bun run fmt
-
-# Check bumi formatting
-bumi-fmt-check:
-    cd bumi && bun run fmt:check
-
-# Run all bumi checks
-bumi-check: bumi-lint bumi-fmt-check bumi-typecheck bumi-test
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Conformance Testing
@@ -355,19 +290,16 @@ test-protojson:
 
 # spec/tests/05_http through rumi's Gateway API compiler.
 #
-# This suite had runners in puma and bumi and none in the reference
-# implementation, so "all implementations pass all fixtures" was true of
-# 07_protojson and merely assumed here — while one of its fixtures was
-# requiring a fail-open of everyone (D-050). PLAN.md CONF1.
+# Until 2026-08-31 this suite had no runner in the reference implementation,
+# while one of its fixtures was requiring a fail-open of everyone (D-050).
 test-http-conformance:
     cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test http_conformance --features rumi-test/http,rumi-test/fixtures
 
 # Does the fixture corpus span the schema?
 #
-# The price of not generating types for puma and bumi: their dependency on
-# proto/xuma is a human's memory rather than an arrow the build can see, so the
-# fixture corpus has to carry it. Messages with no fixture are listed with a
-# reason, and that list is checked for staleness in both directions.
+# The corpus is the contract the bindings are held to, so every config message
+# has to appear in it. Messages with no fixture are listed with a reason, and
+# that list is checked for staleness in both directions.
 test-fixture-coverage:
     cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test fixture_coverage --features rumi-test/registry,rumi-test/fixtures
 

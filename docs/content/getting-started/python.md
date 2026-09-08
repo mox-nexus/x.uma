@@ -1,6 +1,6 @@
 # Python Quick Start
 
-Build an HTTP route matcher with `xuma` (no build step) or `xuma-crust` (Rust-backed).
+Build an HTTP route matcher with `xuma-crust`: the Rust engine, bound through PyO3.
 
 ## Install
 
@@ -9,14 +9,10 @@ Build an HTTP route matcher with `xuma` (no build step) or `xuma-crust` (Rust-ba
 > See the [README](https://github.com/mox-nexus/x.uma#install).
 
 ```bash
-# No build step — google-re2 ships wheels
-uv add xuma
-
-# Rust-backed (faster, same API surface)
 uv add xuma-crust
 ```
 
-Requires Python 3.12+. `xuma` uses `google-re2` for linear-time regex.
+Requires Python 3.12+.
 
 ## Write a Config
 
@@ -92,34 +88,9 @@ $ rumi run http routes.yaml --method DELETE --path /other
 not_found
 ```
 
-## Load in Your App (xuma)
+## Load in Your App
 
-The `xuma` implementation loads the same config:
-
-```python
-import yaml
-from xuma import RegistryBuilder
-from xuma._protojson import parse_protojson
-from xuma.http import HttpRequest, register
-
-# Build registry with HTTP inputs
-builder = RegistryBuilder()
-register(builder)
-registry = builder.build()
-
-# Load config: canonical protojson in, runtime Matcher out
-with open("routes.yaml") as f:
-    config = parse_protojson(yaml.safe_load(f))
-matcher = registry.load_matcher(config)
-
-# Evaluate
-request = HttpRequest(method="GET", raw_path="/api/users")
-assert matcher.evaluate(request) == "api_read"
-```
-
-## Load in Your App (xuma-crust)
-
-The Rust-backed bindings use the same config format:
+`from_config` takes the same document the CLI read:
 
 ```python
 import json
@@ -136,49 +107,12 @@ assert matcher.evaluate("GET", "/api/users") == "api_read"
 assert matcher.evaluate("DELETE", "/other") == "not_found"
 ```
 
-`xuma-crust` is 10-100x faster than `xuma` for evaluation.
-
-## Compiler Shorthand
-
-For type-safe HTTP matching without config files:
-
-```python
-from xuma.http import (
-    HttpRouteMatch,
-    HttpPathMatch,
-    HttpRequest,
-    compile_route_matches,
-)
-
-routes = [
-    HttpRouteMatch(
-        path=HttpPathMatch(type="PathPrefix", value="/api"),
-        method="GET",
-    ),
-    HttpRouteMatch(
-        path=HttpPathMatch(type="PathPrefix", value="/admin"),
-        method="POST",
-    ),
-]
-
-matcher = compile_route_matches(
-    matches=routes,
-    action="allowed",
-    on_no_match="denied",
-)
-
-assert matcher.evaluate(HttpRequest(method="GET", raw_path="/api/users")) == "allowed"
-assert matcher.evaluate(HttpRequest(method="DELETE", raw_path="/api/users")) == "denied"
-```
-
-Within a single `HttpRouteMatch`, all conditions are ANDed. Multiple routes are ORed. First match wins.
-
 ## Safety
 
-- **ReDoS protection** -- `google-re2` guarantees linear-time regex matching.
-- **Immutable** -- all types are `frozen=True` dataclasses.
-- **Depth limits** -- nested matchers capped at 32 levels.
-- **Fail-closed** -- missing headers or query params return `None` from `DataInput`, which makes the predicate evaluate to `False`.
+- **ReDoS protection** -- regex runs in Rust's `regex` crate: linear time, no backtracking.
+- **Immutable** -- a compiled matcher cannot be changed after `from_config`.
+- **Bounded** -- nesting depth, rule count and pattern length are limited at load, not at evaluation.
+- **Fail-closed** -- a missing header or query parameter makes its predicate `False`; nothing matches by accident.
 
 ## Next Steps
 

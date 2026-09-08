@@ -78,23 +78,24 @@ impl TestMatcher {
     ///
     /// Returns an array of `{ fixture, caseName, passed, detail }` objects.
     ///
-    /// Runs `spec/tests/07_protojson/` — canonical protojson, the same fixtures
-    /// and the same reader rumi, puma and bumi use. The crusts are
-    /// implementations four and five; reading a different config format from
-    /// the other three would turn "all five agree" into a claim about five
-    /// different questions.
+    /// Runs `spec/tests/07_protojson/` — canonical protojson, through the same
+    /// reader the engine uses, so a passing suite is a claim about this
+    /// binding's door and not about a second parser.
     #[wasm_bindgen(js_name = "runFixtures")]
     pub fn run_fixtures(yaml_content: &str) -> Result<JsValue, JsValue> {
-        let results: Vec<FixtureResultSerde> = crate::fixtures::run_protojson(yaml_content)
-            .map_err(|e| JsValue::from_str(&e))?
-            .into_iter()
-            .map(|(fixture, case_name, passed, detail)| FixtureResultSerde {
-                fixture,
-                case_name,
-                passed,
-                detail,
-            })
-            .collect();
+        let results: Vec<FixtureResultSerde> = crate::fixtures::run_protojson(
+            yaml_content,
+            rumi_test::implementations::Implementation::Typescript,
+        )
+        .map_err(|e| JsValue::from_str(&e))?
+        .into_iter()
+        .map(|(fixture, case_name, passed, detail)| FixtureResultSerde {
+            fixture,
+            case_name,
+            passed,
+            detail,
+        })
+        .collect();
         serde_wasm_bindgen::to_value(&results).map_err(|e| JsValue::from_str(&e.to_string()))
     }
 }

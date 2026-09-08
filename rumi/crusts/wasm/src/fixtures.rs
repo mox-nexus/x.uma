@@ -1,9 +1,8 @@
 //! Running the protojson conformance suite from inside a crust.
 //!
-//! The crusts are implementations four and five, so they run the same fixtures
-//! through the same reader as rumi — `parse_matcher` and `load_proto_matcher`.
-//! Reading a different config format from the other three would turn "all five
-//! implementations agree" into a claim about five different questions.
+//! A binding runs the same fixtures through the same reader as the engine —
+//! `parse_matcher` and `load_proto_matcher` — because what the suite checks is
+//! that the binding's door reaches the engine unchanged.
 //!
 //! Byte-identical between the two crusts, deliberately: this file is the same
 //! in `crusts/python` and `crusts/wasm` so a divergence between the wheel and
@@ -11,6 +10,7 @@
 
 use rumi_proto::convert::load_proto_matcher;
 use rumi_proto::protojson::parse_matcher;
+use rumi_test::implementations::Implementation;
 use rumi_test::proto_fixture::{Domain, ProtoFixture};
 use rumi_test::KvContext;
 
@@ -110,19 +110,34 @@ fn run_cases(fixture: &ProtoFixture, results: &mut Vec<FixtureResult>) {
     }
 }
 
-/// Run every fixture in a protojson YAML file.
+/// Run every fixture in a protojson YAML file, as the binding `me`.
 ///
 /// # Errors
 ///
 /// If the file is not a set of `ProtoFixture` documents. A fixture that fails
 /// is reported in the results rather than raised, so one bad case does not hide
 /// the rest.
-pub fn run_protojson(yaml: &str) -> Result<Vec<FixtureResult>, String> {
+pub fn run_protojson(yaml: &str, me: Implementation) -> Result<Vec<FixtureResult>, String> {
     let fixtures = ProtoFixture::from_yaml_multi(yaml).map_err(|e| format!("invalid YAML: {e}"))?;
 
     let mut results = Vec::new();
 
     for fixture in &fixtures {
+        // Not listed: this binding must not be able to run it. A skip that
+        // quietly starts working is as much a defect in the ledger as one that
+        // quietly starts failing.
+        if !fixture.expects(me) {
+            let passed = try_load(fixture).is_err();
+            let detail = if passed {
+                "not listed in `implementations`, and correctly does not load here".into()
+            } else {
+                "not listed in `implementations`, but it loads here — add this binding to the ledger"
+                    .into()
+            };
+            results.push((fixture.name.clone(), "ledger".into(), passed, detail));
+            continue;
+        }
+
         if fixture.expect_error {
             let outcome = try_load(fixture);
             let passed = outcome.is_err();

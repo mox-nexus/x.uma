@@ -1,10 +1,9 @@
 //! Reader for `spec/tests/05_http/` — Gateway API route matches through the
 //! domain compiler.
 //!
-//! Added 2026-08-31. Until then this suite was loaded only by
-//! `puma/tests/conftest.py` and `bumi/tests/helpers/fixture-loader.ts`, so the
-//! project's claim that every implementation passes every fixture was true of
-//! `07_protojson/` and not of this directory. That gap is not academic: the
+//! Added 2026-08-31. Until then this suite had no runner in the reference
+//! implementation, so the project's claim that every implementation passes
+//! every fixture was true of `07_protojson/` and not of this directory. That gap is not academic: the
 //! fixture `http_empty_routes_matches_all` required an empty route list to
 //! match everything, which made a fail-open a contract the suite enforced
 //! (D-050) — and rumi, the reference implementation, was not even running it.

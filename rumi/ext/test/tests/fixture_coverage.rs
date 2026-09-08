@@ -1,15 +1,10 @@
 //! Does the fixture corpus span the schema?
 //!
-//! This is the price of not generating types for puma and bumi
-//! (`DECISIONS.md` D-038). With generated types, the dependency on
-//! `proto/xuma/**` is an arrow the build can see: change a field, the compile
-//! breaks. Reading protojson by hand makes that arrow a human's memory. The
-//! arrow has to come back some other way, and this is it — the fixture corpus
-//! becomes the thing that says what the schema is, and the conformance
-//! ledger propagates it to every implementation.
-//!
-//! Without this, "all three implementations agree" means only "all three agree
-//! about whatever somebody remembered to fixture".
+//! The corpus is the contract the bindings are held to: every config message
+//! in `proto/xuma/**` reaches the wheel and the npm package only through a
+//! fixture that exercises it. Without this check, "the engine and its bindings
+//! agree" means only "they agree about whatever somebody remembered to
+//! fixture".
 //!
 //! # What is checked
 //!
@@ -25,9 +20,7 @@
 //! `protojson_rejects_an_unknown_field` proves the mechanism once, and the
 //! mechanism is schema-wide — every generated deserializer ends its field
 //! visitor with `unknown_field`. Per-field versions would be fifteen copies of
-//! one proof. If a hand-written reader in puma or bumi ever replaces that
-//! mechanism with something per-field, this stops being true and the per-field
-//! version becomes necessary.
+//! one proof.
 
 #![cfg(all(feature = "fixtures", feature = "registry"))]
 
@@ -43,39 +36,39 @@ const KNOWN_GAPS: &[(&str, &str)] = &[
     ),
     (
         "xuma.claude.v1.EventTypeInput",
-        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
-         would not be a cross-language claim. Fixture it when puma and bumi grow the \
-         domain — see CLAUDE.md, which states the asymmetry",
+        "the protojson runner builds kv and http contexts only, so a Claude-domain \
+         fixture has nothing to evaluate against. Fixture it when the runner grows a \
+         HookContext",
     ),
     (
         "xuma.claude.v1.ToolNameInput",
-        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
-         would not be a cross-language claim. Fixture it when puma and bumi grow the \
-         domain — see CLAUDE.md, which states the asymmetry",
+        "the protojson runner builds kv and http contexts only, so a Claude-domain \
+         fixture has nothing to evaluate against. Fixture it when the runner grows a \
+         HookContext",
     ),
     (
         "xuma.claude.v1.ToolArgInput",
-        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
-         would not be a cross-language claim. Fixture it when puma and bumi grow the \
-         domain — see CLAUDE.md, which states the asymmetry",
+        "the protojson runner builds kv and http contexts only, so a Claude-domain \
+         fixture has nothing to evaluate against. Fixture it when the runner grows a \
+         HookContext",
     ),
     (
         "xuma.claude.v1.SessionIdInput",
-        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
-         would not be a cross-language claim. Fixture it when puma and bumi grow the \
-         domain — see CLAUDE.md, which states the asymmetry",
+        "the protojson runner builds kv and http contexts only, so a Claude-domain \
+         fixture has nothing to evaluate against. Fixture it when the runner grows a \
+         HookContext",
     ),
     (
         "xuma.claude.v1.CwdInput",
-        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
-         would not be a cross-language claim. Fixture it when puma and bumi grow the \
-         domain — see CLAUDE.md, which states the asymmetry",
+        "the protojson runner builds kv and http contexts only, so a Claude-domain \
+         fixture has nothing to evaluate against. Fixture it when the runner grows a \
+         HookContext",
     ),
     (
         "xuma.claude.v1.GitBranchInput",
-        "the Claude domain is Rust-only, so a fixture could only ever list [rust] and \
-         would not be a cross-language claim. Fixture it when puma and bumi grow the \
-         domain — see CLAUDE.md, which states the asymmetry",
+        "the protojson runner builds kv and http contexts only, so a Claude-domain \
+         fixture has nothing to evaluate against. Fixture it when the runner grows a \
+         HookContext",
     ),
 ];
 
