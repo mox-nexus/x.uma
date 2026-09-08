@@ -457,3 +457,39 @@ describe("Session Semantics", () => {
     expect(matcher.evaluate({ event: "PreToolUse" })).toBeUndefined();
   });
 });
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// The decision object on the compile door (D-056)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("Compiled decision", () => {
+  test("action is index zero and fallback index one", () => {
+    const matcher = HookMatcher.compile([{ event: "PreToolUse" }], "blocked", "allowed");
+    expect(matcher.actions()).toEqual(["blocked", "allowed"]);
+    expect(matcher.decide({ event: "PreToolUse" })).toEqual({
+      matched: true,
+      action: "blocked",
+      index: 0,
+      fallback: false,
+    });
+    expect(matcher.decide({ event: "Stop" })).toEqual({
+      matched: true,
+      action: "allowed",
+      index: 1,
+      fallback: true,
+    });
+  });
+
+  test("without a fallback a miss is no decision", () => {
+    const matcher = HookMatcher.compile([{ event: "PreToolUse" }], "blocked");
+    expect(matcher.actions()).toEqual(["blocked"]);
+    expect(matcher.decide({ event: "Stop" })).toEqual({
+      matched: false,
+      action: undefined,
+      index: undefined,
+      fallback: false,
+    });
+    expect(matcher.actionMetadata(0)).toEqual({});
+  });
+});

@@ -37,6 +37,7 @@ fn xuma_crust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Trace types (shared across all matchers)
     m.add_class::<matcher::PyTraceResult>()?;
     m.add_class::<matcher::PyTraceStep>()?;
+    m.add_class::<matcher::PyDecision>()?;
 
     #[cfg(feature = "bench")]
     {

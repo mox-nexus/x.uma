@@ -7,6 +7,10 @@ use std::collections::HashMap;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyString;
+use rumi_proto::index::ActionIndex;
+
+use crate::protojson::{ActionEntry, Loaded};
 use rumi::claude::{compile_hook_matches, HookContext, HookEvent};
 use rumi::prelude::*;
 
@@ -23,7 +27,8 @@ use crate::convert;
 /// `HookMatcher` is immutable and safe to share across threads.
 #[pyclass(frozen)]
 pub struct HookMatcher {
-    inner: Matcher<HookContext, String>,
+    inner: Matcher<HookContext, ActionIndex>,
+    actions: Actions,
 }
 
 #[pymethods]
@@ -47,6 +52,7 @@ impl HookMatcher {
     #[pyo3(signature = (rules, action, fallback = None))]
     #[allow(clippy::needless_pass_by_value)] // PyO3 requires owned Vec across FFI
     fn compile(
+        py: Python<'_>,
         rules: Vec<PyHookMatch>,
         action: String,
         fallback: Option<String>,
@@ -66,16 +72,21 @@ impl HookMatcher {
             .map(convert::convert_hook_match)
             .collect::<PyResult<_>>()?;
 
-        // Compile via rumi::claude compiler
-        let matcher = compile_hook_matches(&rust_rules, action, fallback)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let matcher = compile_hook_matches(
+            &rust_rules,
+            ActionIndex(0),
+            fallback.as_ref().map(|_| ActionIndex(1)),
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        // Validate depth (Vector: non-negotiable)
         matcher
             .validate()
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        Ok(Self { inner: matcher })
+        Ok(Self {
+            inner: matcher,
+            actions: Actions::compiled(py, action, fallback),
+        })
     }
 
     /// Evaluate a hook context against compiled rules.
@@ -100,17 +111,55 @@ impl HookMatcher {
         session_id = None,
         git_branch = None,
     ))]
+    // The six hook fields are the API; `py` is PyO3's.
+    #[allow(clippy::too_many_arguments)]
     fn evaluate(
         &self,
+        py: Python<'_>,
         event: &str,
         tool_name: &str,
         arguments: Option<HashMap<String, String>>,
         cwd: Option<&str>,
         session_id: Option<&str>,
         git_branch: Option<&str>,
-    ) -> PyResult<Option<String>> {
+    ) -> PyResult<Option<Py<PyString>>> {
         let ctx = build_context(event, tool_name, arguments, cwd, session_id, git_branch)?;
-        Ok(self.inner.evaluate(&ctx))
+        Ok(self.actions.action(py, self.inner.evaluate(&ctx)))
+    }
+
+    /// The decision as an object: `matched`, `action`, `index`, `fallback`.
+    #[pyo3(signature = (
+        event,
+        tool_name = "",
+        arguments = None,
+        cwd = None,
+        session_id = None,
+        git_branch = None,
+    ))]
+    // The six hook fields are the API; `py` is PyO3's.
+    #[allow(clippy::too_many_arguments)]
+    fn decide(
+        &self,
+        py: Python<'_>,
+        event: &str,
+        tool_name: &str,
+        arguments: Option<HashMap<String, String>>,
+        cwd: Option<&str>,
+        session_id: Option<&str>,
+        git_branch: Option<&str>,
+    ) -> PyResult<PyDecision> {
+        let ctx = build_context(event, tool_name, arguments, cwd, session_id, git_branch)?;
+        Ok(self.actions.decide(py, self.inner.evaluate(&ctx)))
+    }
+
+    /// Every action this matcher can return, in index order.
+    fn actions(&self) -> Vec<String> {
+        self.actions.names()
+    }
+
+    /// The metadata carried by the action at `index`.
+    fn action_metadata(&self, index: u32) -> PyResult<HashMap<String, String>> {
+        self.actions.metadata(index)
     }
 
     /// Trace evaluation for debugging (opt-in, per Vector recommendation).
@@ -125,8 +174,11 @@ impl HookMatcher {
         session_id = None,
         git_branch = None,
     ))]
+    // The six hook fields are the API; `py` is PyO3's.
+    #[allow(clippy::too_many_arguments)]
     fn trace(
         &self,
+        py: Python<'_>,
         event: &str,
         tool_name: &str,
         arguments: Option<HashMap<String, String>>,
@@ -136,14 +188,7 @@ impl HookMatcher {
     ) -> PyResult<PyTraceResult> {
         let ctx = build_context(event, tool_name, arguments, cwd, session_id, git_branch)?;
         let trace = self.inner.evaluate_with_trace(&ctx);
-
-        let steps = trace_steps(&trace.steps);
-
-        Ok(PyTraceResult {
-            result: trace.result,
-            steps,
-            used_fallback: trace.used_fallback,
-        })
+        Ok(self.actions.trace(py, &trace))
     }
 
     #[allow(clippy::unused_self)] // Required by Python __repr__ protocol
@@ -211,13 +256,135 @@ fn build_context(
     Ok(ctx)
 }
 
+/// The actions a compiled matcher decides between, held host-side (D-056).
+///
+/// The engine returns an [`ActionIndex`]; the Python string it stands for is
+/// made once here, at load, and handed back by reference on every evaluate.
+/// Nothing about an action is converted per call.
+pub(crate) struct Actions {
+    names: Vec<Py<PyString>>,
+    entries: Vec<ActionEntry>,
+    fallback_start: Option<ActionIndex>,
+}
+
+impl Actions {
+    fn new(py: Python<'_>, entries: Vec<ActionEntry>, fallback_start: Option<ActionIndex>) -> Self {
+        let names = entries
+            .iter()
+            .map(|e| PyString::new(py, &e.name).unbind())
+            .collect();
+        Self {
+            names,
+            entries,
+            fallback_start,
+        }
+    }
+
+    /// The compile door: index 0 is the action, index 1 the fallback.
+    pub(crate) fn compiled(py: Python<'_>, action: String, fallback: Option<String>) -> Self {
+        let mut entries = vec![ActionEntry::named(action)];
+        let fallback_start = fallback.map(|f| {
+            entries.push(ActionEntry::named(f));
+            ActionIndex(1)
+        });
+        Self::new(py, entries, fallback_start)
+    }
+
+    /// The config door: what `load_indexed` numbered.
+    pub(crate) fn split<Ctx>(
+        py: Python<'_>,
+        loaded: Loaded<Ctx>,
+    ) -> (Matcher<Ctx, ActionIndex>, Self) {
+        let actions = Self::new(py, loaded.actions, loaded.fallback_start);
+        (loaded.matcher, actions)
+    }
+
+    pub(crate) fn action(
+        &self,
+        py: Python<'_>,
+        index: Option<ActionIndex>,
+    ) -> Option<Py<PyString>> {
+        index.map(|i| self.names[i.0 as usize].clone_ref(py))
+    }
+
+    fn is_fallback(&self, index: ActionIndex) -> bool {
+        self.fallback_start.is_some_and(|start| index >= start)
+    }
+
+    pub(crate) fn decide(&self, py: Python<'_>, index: Option<ActionIndex>) -> PyDecision {
+        PyDecision {
+            matched: index.is_some(),
+            action: self.action(py, index),
+            index: index.map(|i| i.0),
+            fallback: index.is_some_and(|i| self.is_fallback(i)),
+        }
+    }
+
+    pub(crate) fn names(&self) -> Vec<String> {
+        self.entries.iter().map(|e| e.name.clone()).collect()
+    }
+
+    pub(crate) fn metadata(&self, index: u32) -> PyResult<HashMap<String, String>> {
+        self.entries
+            .get(index as usize)
+            .map(|e| e.metadata.clone())
+            .ok_or_else(|| {
+                PyValueError::new_err(format!(
+                    "no action at index {index}; this matcher has {}",
+                    self.entries.len()
+                ))
+            })
+    }
+
+    pub(crate) fn trace(
+        &self,
+        py: Python<'_>,
+        trace: &rumi::EvalTrace<ActionIndex>,
+    ) -> PyTraceResult {
+        PyTraceResult {
+            result: self.action(py, trace.result),
+            index: trace.result.map(|i| i.0),
+            steps: trace_steps(&trace.steps),
+            used_fallback: trace.used_fallback,
+        }
+    }
+}
+
+/// One decision: whether anything matched, the action, its index, and whether
+/// it came from the root fallback.
+#[pyclass(frozen, name = "Decision")]
+#[derive(Debug)]
+pub struct PyDecision {
+    #[pyo3(get)]
+    pub matched: bool,
+    #[pyo3(get)]
+    pub action: Option<Py<PyString>>,
+    #[pyo3(get)]
+    pub index: Option<u32>,
+    #[pyo3(get)]
+    pub fallback: bool,
+}
+
+#[pymethods]
+impl PyDecision {
+    fn __repr__(&self) -> String {
+        format!(
+            "Decision(matched={}, action={:?}, index={:?}, fallback={})",
+            self.matched, self.action, self.index, self.fallback
+        )
+    }
+}
+
 /// Trace result returned from `HookMatcher.trace()`.
 #[pyclass(frozen)]
 #[derive(Debug)]
 pub struct PyTraceResult {
     /// The action result (same as `evaluate()`).
     #[pyo3(get)]
-    pub result: Option<String>,
+    pub result: Option<Py<PyString>>,
+    /// The action's index, if one was returned.
+    #[pyo3(get)]
+    pub index: Option<u32>,
     /// Trace steps for each field matcher evaluated.
     #[pyo3(get)]
     pub steps: Vec<PyTraceStep>,
@@ -230,8 +397,9 @@ pub struct PyTraceResult {
 impl PyTraceResult {
     fn __repr__(&self) -> String {
         format!(
-            "TraceResult(result={:?}, steps={}, used_fallback={})",
+            "TraceResult(result={:?}, index={:?}, steps={}, used_fallback={})",
             self.result,
+            self.index,
             self.steps.len(),
             self.used_fallback
         )

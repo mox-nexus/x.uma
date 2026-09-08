@@ -5,7 +5,10 @@
 
 use rumi::claude::{compile_hook_matches, HookContext, HookEvent};
 use rumi::prelude::*;
+use rumi_proto::index::ActionIndex;
 use wasm_bindgen::prelude::*;
+
+use crate::protojson::{ActionEntry, Loaded};
 
 use crate::convert;
 
@@ -15,7 +18,8 @@ use crate::convert;
 /// Evaluates Claude Code hook contexts against compiled rules.
 #[wasm_bindgen]
 pub struct HookMatcher {
-    inner: Matcher<HookContext, String>,
+    inner: Matcher<HookContext, ActionIndex>,
+    actions: Actions,
 }
 
 #[wasm_bindgen]
@@ -64,16 +68,21 @@ impl HookMatcher {
             rust_rules.push(convert::convert_hook_match_from_js(&rule)?);
         }
 
-        // Compile via rumi::claude compiler
-        let matcher = compile_hook_matches(&rust_rules, action, fallback)
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let matcher = compile_hook_matches(
+            &rust_rules,
+            ActionIndex(0),
+            fallback.as_ref().map(|_| ActionIndex(1)),
+        )
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
-        // Validate depth (Vector: non-negotiable)
         matcher
             .validate()
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
-        Ok(Self { inner: matcher })
+        Ok(Self {
+            inner: matcher,
+            actions: Actions::compiled(action, fallback),
+        })
     }
 
     /// Evaluate a hook context against compiled rules.
@@ -91,9 +100,28 @@ impl HookMatcher {
     /// ```
     ///
     /// Returns the action string if rules matched, or `undefined`.
-    pub fn evaluate(&self, context: JsValue) -> Result<Option<String>, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "string | undefined")]
+    pub fn evaluate(&self, context: JsValue) -> Result<JsValue, JsValue> {
         let ctx = build_context_from_js(&context)?;
-        Ok(self.inner.evaluate(&ctx))
+        Ok(self.actions.action(self.inner.evaluate(&ctx)))
+    }
+
+    /// The decision as an object: `{ matched, action, index, fallback }`.
+    pub fn decide(&self, context: JsValue) -> Result<JsValue, JsValue> {
+        let ctx = build_context_from_js(&context)?;
+        Ok(self.actions.decide(self.inner.evaluate(&ctx)))
+    }
+
+    /// Every action this matcher can return, in index order.
+    #[must_use]
+    pub fn actions(&self) -> Vec<String> {
+        self.actions.names()
+    }
+
+    /// The metadata carried by the action at `index`.
+    #[wasm_bindgen(js_name = "actionMetadata")]
+    pub fn action_metadata(&self, index: u32) -> Result<JsValue, JsValue> {
+        self.actions.metadata(index)
     }
 
     /// Trace evaluation for debugging (opt-in, per Vector recommendation).
@@ -103,15 +131,108 @@ impl HookMatcher {
     pub fn trace(&self, context: JsValue) -> Result<JsValue, JsValue> {
         let ctx = build_context_from_js(&context)?;
         let trace = self.inner.evaluate_with_trace(&ctx);
+        self.actions.trace(&trace)
+    }
+}
 
-        let steps = trace_steps(&trace.steps);
+/// The actions a compiled matcher decides between, held host-side (D-056).
+///
+/// The engine returns an [`ActionIndex`]; the JS string it stands for is made
+/// once here, at load, and handed back by handle on every evaluate. Nothing
+/// about an action is transcoded per call.
+pub(crate) struct Actions {
+    names: Vec<JsValue>,
+    entries: Vec<ActionEntry>,
+    fallback_start: Option<ActionIndex>,
+}
 
+thread_local! {
+    static KEY_MATCHED: JsValue = JsValue::from_str("matched");
+    static KEY_ACTION: JsValue = JsValue::from_str("action");
+    static KEY_INDEX: JsValue = JsValue::from_str("index");
+    static KEY_FALLBACK: JsValue = JsValue::from_str("fallback");
+}
+
+impl Actions {
+    fn new(entries: Vec<ActionEntry>, fallback_start: Option<ActionIndex>) -> Self {
+        let names = entries.iter().map(|e| JsValue::from_str(&e.name)).collect();
+        Self {
+            names,
+            entries,
+            fallback_start,
+        }
+    }
+
+    /// The compile door: index 0 is the action, index 1 the fallback.
+    pub(crate) fn compiled(action: String, fallback: Option<String>) -> Self {
+        let mut entries = vec![ActionEntry::named(action)];
+        let fallback_start = fallback.map(|f| {
+            entries.push(ActionEntry::named(f));
+            ActionIndex(1)
+        });
+        Self::new(entries, fallback_start)
+    }
+
+    /// The config door: what `load_indexed` numbered.
+    pub(crate) fn split<Ctx>(loaded: Loaded<Ctx>) -> (Matcher<Ctx, ActionIndex>, Self) {
+        let actions = Self::new(loaded.actions, loaded.fallback_start);
+        (loaded.matcher, actions)
+    }
+
+    pub(crate) fn action(&self, index: Option<ActionIndex>) -> JsValue {
+        index.map_or(JsValue::UNDEFINED, |i| self.names[i.0 as usize].clone())
+    }
+
+    fn is_fallback(&self, index: ActionIndex) -> bool {
+        self.fallback_start.is_some_and(|start| index >= start)
+    }
+
+    pub(crate) fn decide(&self, index: Option<ActionIndex>) -> JsValue {
+        let obj = js_sys::Object::new();
+        let set = |key: &'static std::thread::LocalKey<JsValue>, value: JsValue| {
+            key.with(|k| {
+                js_sys::Reflect::set(&obj, k, &value).expect("a fresh object accepts a property");
+            });
+        };
+        set(&KEY_MATCHED, JsValue::from_bool(index.is_some()));
+        set(&KEY_ACTION, self.action(index));
+        set(
+            &KEY_INDEX,
+            index.map_or(JsValue::UNDEFINED, |i| JsValue::from_f64(f64::from(i.0))),
+        );
+        set(
+            &KEY_FALLBACK,
+            JsValue::from_bool(index.is_some_and(|i| self.is_fallback(i))),
+        );
+        obj.into()
+    }
+
+    pub(crate) fn names(&self) -> Vec<String> {
+        self.entries.iter().map(|e| e.name.clone()).collect()
+    }
+
+    pub(crate) fn metadata(&self, index: u32) -> Result<JsValue, JsValue> {
+        let entry = self.entries.get(index as usize).ok_or_else(|| {
+            JsValue::from_str(&format!(
+                "no action at index {index}; this matcher has {}",
+                self.entries.len()
+            ))
+        })?;
+        // A plain object, not a `Map`: metadata is read like any other record.
+        let plain = serde_wasm_bindgen::Serializer::json_compatible();
+        serde::Serialize::serialize(&entry.metadata, &plain)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
+    }
+
+    pub(crate) fn trace(&self, trace: &rumi::EvalTrace<ActionIndex>) -> Result<JsValue, JsValue> {
         let result = TraceResultSerde {
-            result: trace.result,
-            steps,
+            result: trace
+                .result
+                .map(|i| self.entries[i.0 as usize].name.clone()),
+            index: trace.result.map(|i| i.0),
+            steps: trace_steps(&trace.steps),
             used_fallback: trace.used_fallback,
         };
-
         serde_wasm_bindgen::to_value(&result).map_err(|e| JsValue::from_str(&e.to_string()))
     }
 }
@@ -214,6 +335,7 @@ fn build_context_from_js(val: &JsValue) -> Result<HookContext, JsValue> {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TraceResultSerde {
     pub(crate) result: Option<String>,
+    pub(crate) index: Option<u32>,
     pub(crate) steps: Vec<TraceStepSerde>,
     pub(crate) used_fallback: bool,
 }

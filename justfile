@@ -297,6 +297,10 @@ bench-artifact LAUNCHES="10":
 bench-report ARTIFACT:
     python3 scripts/bench_report.py {{ARTIFACT}} --output bench/RESULTS.md
 
+# Two artifacts, benchmark by benchmark: old/new against the larger gate.
+bench-compare OLD NEW:
+    python3 scripts/bench_compare.py {{OLD}} {{NEW}}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Conformance Testing
 # ═══════════════════════════════════════════════════════════════════════════════

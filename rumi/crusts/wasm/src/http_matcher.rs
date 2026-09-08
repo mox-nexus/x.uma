@@ -9,7 +9,9 @@ use rumi::prelude::*;
 use rumi_http::HttpRequest;
 use wasm_bindgen::prelude::*;
 
-use crate::matcher::TraceResultSerde;
+use rumi_proto::index::ActionIndex;
+
+use crate::matcher::Actions;
 
 /// An opaque compiled HTTP matcher.
 ///
@@ -17,7 +19,8 @@ use crate::matcher::TraceResultSerde;
 /// Evaluates HTTP requests against compiled matcher trees.
 #[wasm_bindgen]
 pub struct HttpMatcher {
-    inner: Matcher<HttpRequest, String>,
+    inner: Matcher<HttpRequest, ActionIndex>,
+    actions: Actions,
 }
 
 #[wasm_bindgen]
@@ -36,15 +39,11 @@ impl HttpMatcher {
     pub fn from_config(json_config: &str) -> Result<HttpMatcher, JsValue> {
         let config = crate::protojson::load(json_config).map_err(|e| JsValue::from_str(&e))?;
 
-        let matcher = registry()
-            .load_typed_matcher(config, crate::protojson::actions())
+        let loaded = crate::protojson::load_indexed(registry(), config)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let (inner, actions) = Actions::split(loaded);
 
-        matcher
-            .validate()
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
-
-        Ok(Self { inner: matcher })
+        Ok(Self { inner, actions })
     }
 
     /// Evaluate an HTTP request against compiled matcher rules.
@@ -60,25 +59,35 @@ impl HttpMatcher {
     /// ```
     ///
     /// Returns the action string if the request matched, or `undefined`.
-    pub fn evaluate(&self, context: JsValue) -> Result<Option<String>, JsValue> {
+    #[wasm_bindgen(unchecked_return_type = "string | undefined")]
+    pub fn evaluate(&self, context: JsValue) -> Result<JsValue, JsValue> {
         let req = build_request_from_js(&context)?;
-        Ok(self.inner.evaluate(&req))
+        Ok(self.actions.action(self.inner.evaluate(&req)))
+    }
+
+    /// The decision as an object: `{ matched, action, index, fallback }`.
+    pub fn decide(&self, context: JsValue) -> Result<JsValue, JsValue> {
+        let req = build_request_from_js(&context)?;
+        Ok(self.actions.decide(self.inner.evaluate(&req)))
+    }
+
+    /// Every action this matcher can return, in index order.
+    #[must_use]
+    pub fn actions(&self) -> Vec<String> {
+        self.actions.names()
+    }
+
+    /// The metadata carried by the action at `index`.
+    #[wasm_bindgen(js_name = "actionMetadata")]
+    pub fn action_metadata(&self, index: u32) -> Result<JsValue, JsValue> {
+        self.actions.metadata(index)
     }
 
     /// Trace evaluation for debugging.
     pub fn trace(&self, context: JsValue) -> Result<JsValue, JsValue> {
         let req = build_request_from_js(&context)?;
         let trace = self.inner.evaluate_with_trace(&req);
-
-        let steps = super::matcher::trace_steps(&trace.steps);
-
-        let result = TraceResultSerde {
-            result: trace.result,
-            steps,
-            used_fallback: trace.used_fallback,
-        };
-
-        serde_wasm_bindgen::to_value(&result).map_err(|e| JsValue::from_str(&e.to_string()))
+        self.actions.trace(&trace)
     }
 }
 

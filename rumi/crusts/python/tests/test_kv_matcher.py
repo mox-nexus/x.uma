@@ -409,3 +409,86 @@ class TestDeveloperExperience:
         }))
         matcher = CrustTestMatcher.from_config(config)
         assert "KvMatcher" in repr(matcher)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# The decision object, the action table, and metadata (D-056)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _named(name, **metadata):
+    action = {"@type": "type.googleapis.com/xuma.core.v1.NamedAction", "name": name}
+    if metadata:
+        action["metadata"] = metadata
+    return {"action": {"name": name, "typedConfig": action}}
+
+
+def _rule(key, value, on_match):
+    return {
+        "predicate": {
+            "singlePredicate": {
+                "input": {
+                    "name": key,
+                    "typedConfig": {"@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": key},
+                },
+                "valueMatch": {"exact": value},
+            }
+        },
+        "onMatch": on_match,
+    }
+
+
+TWO_RULES_AND_A_FALLBACK = json.dumps({
+    "matcherList": {"matchers": [
+        _rule("role", "admin", _named("allow", processor="audit")),
+        _rule("role", "viewer", _named("read_only")),
+    ]},
+    "onNoMatch": _named("deny"),
+})
+
+
+class TestDecision:
+    def test_a_hit_is_a_decision_with_its_index(self):
+        matcher = CrustTestMatcher.from_config(TWO_RULES_AND_A_FALLBACK)
+        d = matcher.decide({"role": "viewer"})
+        assert (d.matched, d.action, d.index, d.fallback) == (True, "read_only", 1, False)
+
+    def test_the_fallback_says_so(self):
+        matcher = CrustTestMatcher.from_config(TWO_RULES_AND_A_FALLBACK)
+        d = matcher.decide({"role": "auditor"})
+        assert (d.matched, d.action, d.index, d.fallback) == (True, "deny", 2, True)
+
+    def test_no_decision_at_all(self):
+        matcher = CrustTestMatcher.from_config(json.dumps({
+            "matcherList": {"matchers": [_rule("role", "admin", _named("allow"))]},
+        }))
+        d = matcher.decide({"role": "nobody"})
+        assert (d.matched, d.action, d.index, d.fallback) == (False, None, None, False)
+
+    def test_evaluate_and_decide_agree(self):
+        matcher = CrustTestMatcher.from_config(TWO_RULES_AND_A_FALLBACK)
+        for ctx in ({"role": "admin"}, {"role": "viewer"}, {"role": "x"}, {}):
+            assert matcher.decide(ctx).action == matcher.evaluate(ctx)
+
+
+class TestActionTable:
+    def test_actions_are_listed_in_document_order_with_the_fallback_last(self):
+        matcher = CrustTestMatcher.from_config(TWO_RULES_AND_A_FALLBACK)
+        assert matcher.actions() == ["allow", "read_only", "deny"]
+
+    def test_metadata_is_carried_not_dropped(self):
+        matcher = CrustTestMatcher.from_config(TWO_RULES_AND_A_FALLBACK)
+        assert matcher.action_metadata(0) == {"processor": "audit"}
+        assert matcher.action_metadata(1) == {}
+
+    def test_metadata_out_of_range_is_an_error(self):
+        matcher = CrustTestMatcher.from_config(TWO_RULES_AND_A_FALLBACK)
+        with pytest.raises(ValueError, match="no action at index 3"):
+            matcher.action_metadata(3)
+
+    def test_the_trace_carries_the_index(self):
+        matcher = CrustTestMatcher.from_config(TWO_RULES_AND_A_FALLBACK)
+        trace = matcher.trace({"role": "admin"})
+        assert trace.index == 0
+        assert matcher.actions()[trace.index] == trace.result
+        assert matcher.trace({"role": "nope"}).index == 2

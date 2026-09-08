@@ -358,3 +358,106 @@ describe("Trace", () => {
     expect(trace.usedFallback).toBe(true);
   });
 });
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// The decision object, the action table, and metadata (D-056)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function named(name: string, metadata?: Record<string, string>) {
+  const action: Record<string, unknown> = {
+    "@type": "type.googleapis.com/xuma.core.v1.NamedAction",
+    name,
+  };
+  if (metadata) action.metadata = metadata;
+  return { action: { name, typedConfig: action } };
+}
+
+function rule(key: string, value: string, onMatch: unknown) {
+  return {
+    predicate: {
+      singlePredicate: {
+        input: { name: key, typedConfig: { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key } },
+        valueMatch: { exact: value },
+      },
+    },
+    onMatch,
+  };
+}
+
+const TWO_RULES_AND_A_FALLBACK = JSON.stringify({
+  matcherList: {
+    matchers: [
+      rule("role", "admin", named("allow", { processor: "audit" })),
+      rule("role", "viewer", named("read_only")),
+    ],
+  },
+  onNoMatch: named("deny"),
+});
+
+describe("Decision", () => {
+  test("a hit is a decision with its index", () => {
+    const matcher = KvMatcher.fromConfig(TWO_RULES_AND_A_FALLBACK);
+    expect(matcher.decide({ role: "viewer" })).toEqual({
+      matched: true,
+      action: "read_only",
+      index: 1,
+      fallback: false,
+    });
+  });
+
+  test("the fallback says so", () => {
+    const matcher = KvMatcher.fromConfig(TWO_RULES_AND_A_FALLBACK);
+    expect(matcher.decide({ role: "auditor" })).toEqual({
+      matched: true,
+      action: "deny",
+      index: 2,
+      fallback: true,
+    });
+  });
+
+  test("no decision at all", () => {
+    const matcher = KvMatcher.fromConfig(
+      JSON.stringify({ matcherList: { matchers: [rule("role", "admin", named("allow"))] } }),
+    );
+    expect(matcher.decide({ role: "nobody" })).toEqual({
+      matched: false,
+      action: undefined,
+      index: undefined,
+      fallback: false,
+    });
+  });
+
+  test("evaluate and decide agree", () => {
+    const matcher = KvMatcher.fromConfig(TWO_RULES_AND_A_FALLBACK);
+    for (const ctx of [{ role: "admin" }, { role: "viewer" }, { role: "x" }, {}]) {
+      expect(matcher.decide(ctx).action).toBe(matcher.evaluate(ctx));
+    }
+  });
+});
+
+describe("Action table", () => {
+  test("actions are listed in document order with the fallback last", () => {
+    const matcher = KvMatcher.fromConfig(TWO_RULES_AND_A_FALLBACK);
+    expect(matcher.actions()).toEqual(["allow", "read_only", "deny"]);
+  });
+
+  test("metadata is carried, not dropped", () => {
+    const matcher = KvMatcher.fromConfig(TWO_RULES_AND_A_FALLBACK);
+    expect(matcher.actionMetadata(0)).toEqual({ processor: "audit" });
+    expect(matcher.actionMetadata(1)).toEqual({});
+  });
+
+  test("metadata out of range is an error", () => {
+    const matcher = KvMatcher.fromConfig(TWO_RULES_AND_A_FALLBACK);
+    expect(() => matcher.actionMetadata(3)).toThrow("no action at index 3");
+  });
+
+  test("the trace carries the index", () => {
+    const matcher = KvMatcher.fromConfig(TWO_RULES_AND_A_FALLBACK);
+    const trace = matcher.trace({ role: "admin" });
+    expect(trace.index).toBe(0);
+    expect(matcher.actions()[trace.index]).toBe(trace.result);
+    expect(matcher.trace({ role: "nope" }).index).toBe(2);
+  });
+});

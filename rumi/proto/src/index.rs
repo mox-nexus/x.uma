@@ -25,26 +25,53 @@ impl std::fmt::Display for ActionIndex {
     }
 }
 
+/// A document with its action sites numbered.
+#[derive(Debug, Clone)]
+pub struct Indexed {
+    /// The IR with every action replaced by its index.
+    pub ir: MatcherIr<ActionIndex>,
+    /// The actions, in index order: `table[i.0]` is what `ActionIndex(i)`
+    /// stands for. One entry per site, so the mapping is a bijection over the
+    /// document and identical for every load of it.
+    pub table: Vec<TypedExtensionConfig>,
+    /// The first index under the root matcher's `on_no_match`, if it has one.
+    /// The root fallback is walked last, so every index from here on is a
+    /// fallback decision (D-056's `fallback` flag).
+    pub fallback_start: Option<ActionIndex>,
+}
+
 /// Replace every action in the IR with its index, returning the actions in
 /// index order.
-///
-/// `table[i.0]` is the action `ActionIndex(i)` stands for. The table has one
-/// entry per action site, so the mapping is a bijection over the document,
-/// and it is identical for every load of the same document.
 #[must_use]
-pub fn index_actions(
-    ir: MatcherIr<TypedExtensionConfig>,
-) -> (MatcherIr<ActionIndex>, Vec<TypedExtensionConfig>) {
+pub fn index_actions(ir: MatcherIr<TypedExtensionConfig>) -> Indexed {
     let mut table = Vec::new();
-    let indexed = walk_matcher(ir, &mut table);
-    (indexed, table)
+    let kind = walk_kind(ir.kind, &mut table);
+    let fallback_start = ir
+        .on_no_match
+        .as_ref()
+        .map(|_| ActionIndex(u32::try_from(table.len()).expect("fewer than 2^32 action sites")));
+    let on_no_match = ir.on_no_match.map(|om| walk_on_match(om, &mut table));
+    Indexed {
+        ir: MatcherIr { kind, on_no_match },
+        table,
+        fallback_start,
+    }
 }
 
 fn walk_matcher(
     ir: MatcherIr<TypedExtensionConfig>,
     table: &mut Vec<TypedExtensionConfig>,
 ) -> MatcherIr<ActionIndex> {
-    let kind = match ir.kind {
+    let kind = walk_kind(ir.kind, table);
+    let on_no_match = ir.on_no_match.map(|om| walk_on_match(om, table));
+    MatcherIr { kind, on_no_match }
+}
+
+fn walk_kind(
+    kind: MatcherKindIr<TypedExtensionConfig>,
+    table: &mut Vec<TypedExtensionConfig>,
+) -> MatcherKindIr<ActionIndex> {
+    match kind {
         MatcherKindIr::List(matchers) => MatcherKindIr::List(
             matchers
                 .into_iter()
@@ -65,9 +92,7 @@ fn walk_matcher(
                 }
             },
         }),
-    };
-    let on_no_match = ir.on_no_match.map(|om| walk_on_match(om, table));
-    MatcherIr { kind, on_no_match }
+    }
 }
 
 fn walk_entries(
@@ -176,10 +201,15 @@ mod tests {
         ])
         .with_fallback(Some(action("fallback")));
 
-        let (indexed, table) = index_actions(ir);
+        let Indexed {
+            ir,
+            table,
+            fallback_start,
+        } = index_actions(ir);
 
         assert_eq!(names(&table), ["first", "second", "fallback"]);
-        assert_eq!(actions_of(&indexed), [0, 1, 2]);
+        assert_eq!(actions_of(&ir), [0, 1, 2]);
+        assert_eq!(fallback_start, Some(ActionIndex(2)));
     }
 
     #[test]
@@ -197,11 +227,15 @@ mod tests {
             rule("c", action("after")),
         ]);
 
-        let (_, table) = index_actions(ir);
+        let indexed = index_actions(ir);
 
         assert_eq!(
-            names(&table),
+            names(&indexed.table),
             ["before", "inner", "inner_fallback", "after"]
+        );
+        assert_eq!(
+            indexed.fallback_start, None,
+            "a nested fallback is not the root's"
         );
     }
 
@@ -223,8 +257,8 @@ mod tests {
             on_no_match: Some(action("deny")),
         };
 
-        let (_, one) = index_actions(tree(vec![("viewer", "read"), ("admin", "allow")]));
-        let (_, two) = index_actions(tree(vec![("admin", "allow"), ("viewer", "read")]));
+        let one = index_actions(tree(vec![("viewer", "read"), ("admin", "allow")])).table;
+        let two = index_actions(tree(vec![("admin", "allow"), ("viewer", "read")])).table;
 
         assert_eq!(names(&one), ["allow", "read", "deny"]);
         assert_eq!(names(&one), names(&two));
@@ -234,9 +268,9 @@ mod tests {
     fn every_index_names_exactly_one_site() {
         let ir = MatcherIr::list(vec![rule("a", action("same")), rule("b", action("same"))]);
 
-        let (indexed, table) = index_actions(ir);
+        let indexed = index_actions(ir);
 
-        assert_eq!(table.len(), 2, "two sites, even with one name");
-        assert_eq!(actions_of(&indexed), [0, 1]);
+        assert_eq!(indexed.table.len(), 2, "two sites, even with one name");
+        assert_eq!(actions_of(&indexed.ir), [0, 1]);
     }
 }

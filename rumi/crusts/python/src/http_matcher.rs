@@ -10,6 +10,10 @@ use std::collections::HashMap;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyString;
+use rumi_proto::index::ActionIndex;
+
+use crate::matcher::{Actions, PyDecision};
 use rumi::prelude::*;
 use rumi_http::HttpRequest;
 
@@ -23,7 +27,8 @@ use rumi_http::HttpRequest;
 /// `HttpMatcher` is immutable and safe to share across threads.
 #[pyclass(frozen)]
 pub struct HttpMatcher {
-    inner: Matcher<HttpRequest, String>,
+    inner: Matcher<HttpRequest, ActionIndex>,
+    actions: Actions,
 }
 
 #[pymethods]
@@ -47,18 +52,14 @@ impl HttpMatcher {
     /// - Invalid regex pattern
     /// - Depth/width limits exceeded
     #[staticmethod]
-    fn from_config(json_config: &str) -> PyResult<Self> {
+    fn from_config(py: Python<'_>, json_config: &str) -> PyResult<Self> {
         let config = crate::protojson::load(json_config).map_err(PyValueError::new_err)?;
 
-        let matcher = registry()
-            .load_typed_matcher(config, crate::protojson::actions())
+        let loaded = crate::protojson::load_indexed(registry(), config)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let (inner, actions) = Actions::split(py, loaded);
 
-        matcher
-            .validate()
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-
-        Ok(Self { inner: matcher })
+        Ok(Self { inner, actions })
     }
 
     /// Evaluate an HTTP request against compiled matcher rules.
@@ -76,13 +77,38 @@ impl HttpMatcher {
     #[pyo3(signature = (method, path, headers = None, query_params = None))]
     fn evaluate(
         &self,
+        py: Python<'_>,
         method: &str,
         path: &str,
         headers: Option<HashMap<String, String>>,
         query_params: Option<HashMap<String, String>>,
-    ) -> Option<String> {
+    ) -> Option<Py<PyString>> {
         let req = build_request(method, path, headers, query_params);
-        self.inner.evaluate(&req)
+        self.actions.action(py, self.inner.evaluate(&req))
+    }
+
+    /// The decision as an object: `matched`, `action`, `index`, `fallback`.
+    #[pyo3(signature = (method, path, headers = None, query_params = None))]
+    fn decide(
+        &self,
+        py: Python<'_>,
+        method: &str,
+        path: &str,
+        headers: Option<HashMap<String, String>>,
+        query_params: Option<HashMap<String, String>>,
+    ) -> PyDecision {
+        let req = build_request(method, path, headers, query_params);
+        self.actions.decide(py, self.inner.evaluate(&req))
+    }
+
+    /// Every action this matcher can return, in index order.
+    fn actions(&self) -> Vec<String> {
+        self.actions.names()
+    }
+
+    /// The metadata carried by the action at `index`.
+    fn action_metadata(&self, index: u32) -> PyResult<HashMap<String, String>> {
+        self.actions.metadata(index)
     }
 
     /// Trace evaluation for debugging.
@@ -91,6 +117,7 @@ impl HttpMatcher {
     #[pyo3(signature = (method, path, headers = None, query_params = None))]
     fn trace(
         &self,
+        py: Python<'_>,
         method: &str,
         path: &str,
         headers: Option<HashMap<String, String>>,
@@ -98,14 +125,7 @@ impl HttpMatcher {
     ) -> super::matcher::PyTraceResult {
         let req = build_request(method, path, headers, query_params);
         let trace = self.inner.evaluate_with_trace(&req);
-
-        let steps = super::matcher::trace_steps(&trace.steps);
-
-        super::matcher::PyTraceResult {
-            result: trace.result,
-            steps,
-            used_fallback: trace.used_fallback,
-        }
+        self.actions.trace(py, &trace)
     }
 
     #[allow(clippy::unused_self)]

@@ -8,7 +8,7 @@
 //! in `crusts/python` and `crusts/wasm` so a divergence between the wheel and
 //! the npm package cannot start here.
 
-use rumi_proto::convert::load_proto_matcher;
+use rumi_proto::convert::convert_matcher;
 use rumi_proto::protojson::parse_matcher;
 use rumi_test::implementations::Implementation;
 use rumi_test::proto_fixture::{Domain, ProtoFixture};
@@ -17,32 +17,27 @@ use rumi_test::KvContext;
 /// One line of the report: fixture, case, passed, detail.
 pub type FixtureResult = (String, String, bool, String);
 
-// A fixture loads through the same resolver, registries and action table as
-// `from_config`, or a passing suite proves nothing about the FFI surface.
+// A fixture loads through the same resolver, registries, action table and
+// indexing as `from_config`, or a passing suite proves nothing about the FFI
+// surface.
 
-fn build(fixture: &ProtoFixture) -> Result<rumi::Matcher<KvContext, String>, rumi::MatcherError> {
+use crate::protojson::Loaded;
+
+fn build(fixture: &ProtoFixture) -> Result<Loaded<KvContext>, rumi::MatcherError> {
     let resolver = crate::protojson::resolver();
     let proto = parse_matcher(resolver, fixture.proto_matcher.clone())?;
-    load_proto_matcher(
-        crate::kv_matcher::registry(),
-        crate::protojson::actions(),
-        resolver,
-        &proto,
-    )
+    let ir = convert_matcher(&proto, resolver)?;
+    crate::protojson::load_indexed(crate::kv_matcher::registry(), ir)
 }
 
 /// The HTTP-domain matcher a fixture describes.
 fn build_http(
     fixture: &ProtoFixture,
-) -> Result<rumi::Matcher<rumi_http::HttpRequest, String>, rumi::MatcherError> {
+) -> Result<Loaded<rumi_http::HttpRequest>, rumi::MatcherError> {
     let resolver = crate::protojson::resolver();
     let proto = parse_matcher(resolver, fixture.proto_matcher.clone())?;
-    load_proto_matcher(
-        crate::http_matcher::registry(),
-        crate::protojson::actions(),
-        resolver,
-        &proto,
-    )
+    let ir = convert_matcher(&proto, resolver)?;
+    crate::protojson::load_indexed(crate::http_matcher::registry(), ir)
 }
 
 /// Load whichever domain the fixture names, discarding the matcher.
@@ -56,9 +51,12 @@ fn try_load(fixture: &ProtoFixture) -> Result<(), rumi::MatcherError> {
 /// Evaluate every case, reporting one line each.
 fn run_cases(fixture: &ProtoFixture, results: &mut Vec<FixtureResult>) {
     macro_rules! evaluate {
-        ($matcher:expr, $context:expr) => {
+        ($loaded:expr, $context:expr) => {
             for case in &fixture.cases {
-                let result = $matcher.evaluate(&$context(case));
+                let result = $loaded
+                    .matcher
+                    .evaluate(&$context(case))
+                    .map(|i| $loaded.actions[i.0 as usize].name.clone());
                 let passed = result == case.expect;
                 let detail = if passed {
                     format!("got {result:?}")

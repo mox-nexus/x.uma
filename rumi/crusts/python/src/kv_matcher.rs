@@ -9,6 +9,10 @@ use std::collections::HashMap;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyString;
+use rumi_proto::index::ActionIndex;
+
+use crate::matcher::{Actions, PyDecision};
 use rumi::prelude::*;
 use rumi_kv::KvContext;
 
@@ -22,7 +26,8 @@ use rumi_kv::KvContext;
 /// `KvMatcher` is immutable and safe to share across threads.
 #[pyclass(frozen)]
 pub struct KvMatcher {
-    inner: Matcher<KvContext, String>,
+    inner: Matcher<KvContext, ActionIndex>,
+    actions: Actions,
 }
 
 #[pymethods]
@@ -44,18 +49,14 @@ impl KvMatcher {
     /// - Invalid regex pattern
     /// - Depth/width limits exceeded
     #[staticmethod]
-    fn from_config(json_config: &str) -> PyResult<Self> {
+    fn from_config(py: Python<'_>, json_config: &str) -> PyResult<Self> {
         let config = crate::protojson::load(json_config).map_err(PyValueError::new_err)?;
 
-        let matcher = registry()
-            .load_typed_matcher(config, crate::protojson::actions())
+        let loaded = crate::protojson::load_indexed(registry(), config)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let (inner, actions) = Actions::split(py, loaded);
 
-        matcher
-            .validate()
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-
-        Ok(Self { inner: matcher })
+        Ok(Self { inner, actions })
     }
 
     /// Evaluate a key-value context against compiled matcher rules.
@@ -67,25 +68,38 @@ impl KvMatcher {
     /// # Returns
     ///
     /// The action string if the context matched, or `None`.
-    fn evaluate(&self, context: HashMap<String, String>) -> Option<String> {
+    fn evaluate(&self, py: Python<'_>, context: HashMap<String, String>) -> Option<Py<PyString>> {
         let ctx = build_context(context);
-        self.inner.evaluate(&ctx)
+        self.actions.action(py, self.inner.evaluate(&ctx))
+    }
+
+    /// The decision as an object: `matched`, `action`, `index`, `fallback`.
+    fn decide(&self, py: Python<'_>, context: HashMap<String, String>) -> PyDecision {
+        let ctx = build_context(context);
+        self.actions.decide(py, self.inner.evaluate(&ctx))
+    }
+
+    /// Every action this matcher can return, in index order.
+    fn actions(&self) -> Vec<String> {
+        self.actions.names()
+    }
+
+    /// The metadata carried by the action at `index`.
+    fn action_metadata(&self, index: u32) -> PyResult<HashMap<String, String>> {
+        self.actions.metadata(index)
     }
 
     /// Trace evaluation for debugging.
     ///
     /// Returns the same result as `evaluate()` plus a detailed trace.
-    fn trace(&self, context: HashMap<String, String>) -> super::matcher::PyTraceResult {
+    fn trace(
+        &self,
+        py: Python<'_>,
+        context: HashMap<String, String>,
+    ) -> super::matcher::PyTraceResult {
         let ctx = build_context(context);
         let trace = self.inner.evaluate_with_trace(&ctx);
-
-        let steps = super::matcher::trace_steps(&trace.steps);
-
-        super::matcher::PyTraceResult {
-            result: trace.result,
-            steps,
-            used_fallback: trace.used_fallback,
-        }
+        self.actions.trace(py, &trace)
     }
 
     #[cfg(feature = "fixtures")]
