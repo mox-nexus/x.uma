@@ -188,6 +188,30 @@ pub const MAX_PATTERN_LENGTH: usize = 8192;
 /// faster than literal matching.
 pub const MAX_REGEX_PATTERN_LENGTH: usize = 4096;
 
+/// Leaf predicates in one document, counted across every nested matcher.
+///
+/// Every leaf is a per-request cost, and the per-list bound does not add up
+/// across nesting: three nested lists of a hundred are each under
+/// [`MAX_FIELD_MATCHERS`] and together are not. The registry counts leaves
+/// as it loads and refuses at the one that crosses; `Matcher::validate`
+/// counts the finished tree for every other constructor (D-054).
+pub const MAX_LEAF_PREDICATES: usize = 256;
+
+/// Compiled regexes in one document.
+///
+/// Each regex holds up to [`REGEX_SIZE_LIMIT`] of program and
+/// [`REGEX_DFA_SIZE_LIMIT`] of lazy DFA cache per thread, so the count is
+/// what bounds the document's regex memory: 64 × 2 MiB. Counted by the
+/// registry during load; the domain compilers are bounded by their own rule
+/// counts (D-054).
+pub const MAX_REGEXES: usize = 64;
+
+/// Compiled program size per regex, in bytes.
+pub const REGEX_SIZE_LIMIT: usize = 1 << 20;
+
+/// Lazy DFA cache per regex per thread, in bytes.
+pub const REGEX_DFA_SIZE_LIMIT: usize = 1 << 20;
+
 /// Errors from matcher construction and validation.
 ///
 /// These errors are caught at config load time, not evaluation time.
@@ -228,6 +252,27 @@ pub enum MatcherError {
         input_type: String,
         /// The data types accepted by the matcher.
         matcher_types: Vec<String>,
+    },
+    /// More leaf predicates in the document than [`MAX_LEAF_PREDICATES`].
+    TooManyLeafPredicates {
+        /// The leaf that crossed the budget, or the total for a finished tree.
+        count: usize,
+        /// Maximum allowed.
+        max: usize,
+    },
+    /// More regexes in the document than [`MAX_REGEXES`].
+    TooManyRegexes {
+        /// The regex that crossed the budget.
+        count: usize,
+        /// Maximum allowed.
+        max: usize,
+    },
+    /// A config document larger than a reader accepts.
+    DocumentTooLarge {
+        /// The document's size.
+        bytes: usize,
+        /// Maximum accepted.
+        max: usize,
     },
     /// Too many field matchers in a single `Matcher`.
     TooManyFieldMatchers {
@@ -326,6 +371,24 @@ impl std::fmt::Display for MatcherError {
                 write!(
                     f,
                     "compound predicate has {count} children, but maximum allowed is {max}"
+                )
+            }
+            Self::TooManyLeafPredicates { count, max } => {
+                write!(
+                    f,
+                    "matcher has {count} leaf predicates, but maximum allowed is {max}"
+                )
+            }
+            Self::TooManyRegexes { count, max } => {
+                write!(
+                    f,
+                    "matcher compiles {count} regexes, but maximum allowed is {max}"
+                )
+            }
+            Self::DocumentTooLarge { bytes, max } => {
+                write!(
+                    f,
+                    "config document is {bytes} bytes, but maximum accepted is {max}"
                 )
             }
             Self::DuplicateTreeKey { key } => {

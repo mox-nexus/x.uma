@@ -44,7 +44,10 @@ an 8 MB pattern against an 8 KB limit.
 | `MAX_PREDICATES_PER_COMPOUND` | 256 | children of one `and`/`or` | `Predicate::validate()` |
 | `MAX_PATTERN_LENGTH` | 8192 | a literal match pattern | `StringMatchSpec` constructor |
 | `MAX_REGEX_PATTERN_LENGTH` | 4096 | a regex pattern's source | `StringMatchSpec` constructor |
-| repetition product (TypeScript) | 1000 | nested `{n}` counts, matching RE2's own `kMaxRepeat` | the regex budget |
+| `MAX_LEAF_PREDICATES` | 256 | single predicates in one document, across nesting | the registry as it loads; `Matcher::validate()` for every other constructor |
+| `MAX_REGEXES` | 64 | compiled regexes in one document | the registry as it loads |
+| `REGEX_SIZE_LIMIT`, `REGEX_DFA_SIZE_LIMIT` | 1 MiB each | one regex's program and its per-thread DFA cache | `RegexBuilder`, so regex memory is count × 2 MiB |
+| `MAX_DOCUMENT_BYTES` | 1 MiB | a config document, before parsing | every reader: the CLI and both bindings |
 | config nesting | 128 | JSON/YAML object depth before a matcher exists | both parsers, and the protojson walk |
 
 The two width limits used to be enforced in the config loader alone, which meant

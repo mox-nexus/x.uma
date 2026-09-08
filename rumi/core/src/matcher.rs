@@ -450,7 +450,38 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
                 max: MAX_DEPTH,
             });
         }
-        self.validate_widths()
+        self.validate_widths()?;
+        let leaves = self.leaf_count();
+        if leaves > crate::MAX_LEAF_PREDICATES {
+            return Err(MatcherError::TooManyLeafPredicates {
+                count: leaves,
+                max: crate::MAX_LEAF_PREDICATES,
+            });
+        }
+        Ok(())
+    }
+
+    /// The number of single predicates in the whole tree, nested matchers and
+    /// fallback included: the per-request cost of evaluating everything.
+    #[must_use]
+    pub fn leaf_count(&self) -> usize {
+        let own = match &self.kind {
+            MatcherKind::List(list) => list
+                .iter()
+                .map(|fm| {
+                    fm.predicate.leaf_count()
+                        + match &fm.on_match {
+                            OnMatch::Action(_) => 0,
+                            OnMatch::Matcher(m) => m.leaf_count(),
+                        }
+                })
+                .sum(),
+            MatcherKind::Tree(tree) => tree.leaf_count(),
+        };
+        own + self.on_no_match.as_ref().map_or(0, |om| match om {
+            OnMatch::Action(_) => 0,
+            OnMatch::Matcher(m) => m.leaf_count(),
+        })
     }
 
     /// The width half of [`validate`](Self::validate), recursing through nested
@@ -1091,6 +1122,40 @@ mod tests {
             }
             EvalSteps::List(_) => panic!("expected a tree trace"),
         }
+    }
+
+    #[test]
+    fn validate_counts_leaf_predicates_across_nesting() {
+        let leaf = || {
+            FieldMatcher::new(
+                Predicate::Single(SinglePredicate::new(
+                    Box::new(ValueInput),
+                    Box::new(ExactMatcher::new("x")),
+                )),
+                OnMatch::Action("leaf".to_string()),
+            )
+        };
+        let nested = |n: usize| Matcher::list((0..n).map(|_| leaf()).collect(), None);
+        let rule = |n: usize| {
+            FieldMatcher::new(
+                Predicate::Single(SinglePredicate::new(
+                    Box::new(ValueInput),
+                    Box::new(ExactMatcher::new("t")),
+                )),
+                OnMatch::Matcher(Box::new(nested(n))),
+            )
+        };
+
+        let under = Matcher::list(vec![rule(100), rule(100)], None);
+        assert_eq!(under.leaf_count(), 202);
+        assert!(under.validate().is_ok());
+
+        let over = Matcher::list(vec![rule(100), rule(100), rule(100)], None);
+        assert_eq!(over.leaf_count(), 303);
+        assert!(matches!(
+            over.validate(),
+            Err(MatcherError::TooManyLeafPredicates { count: 303, max }) if max == crate::MAX_LEAF_PREDICATES
+        ));
     }
 
     #[test]

@@ -45,7 +45,7 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     ir::{FieldMatcherIr, MatcherIr, OnMatchIr, PredicateIr, SinglePredicateIr, ValueMatchIr},
-    DataInput, FieldMatcher, InputMatcher, Matcher, MatcherError, OnMatch, Predicate,
+    DataInput, FieldMatcher, InputMatcher, Matcher, MatcherError, MatcherKind, OnMatch, Predicate,
     SinglePredicate, MAX_FIELD_MATCHERS, MAX_PREDICATES_PER_COMPOUND,
 };
 
@@ -359,6 +359,40 @@ impl<A: Clone + Send + Sync + 'static> ActionRegistry<A> {
 ///
 /// Constructed via [`RegistryBuilder`]. Use [`load_matcher()`](Self::load_matcher)
 /// to compile config into a runtime `Matcher`.
+/// What one load has spent against the document-wide budgets (D-054).
+///
+/// Counted as the walk goes, so a document is refused at the leaf or regex
+/// that crosses a budget rather than after everything past it has been built.
+#[derive(Default)]
+struct LoadBudget {
+    leaves: usize,
+    regexes: usize,
+}
+
+impl LoadBudget {
+    fn leaf(&mut self) -> Result<(), MatcherError> {
+        self.leaves += 1;
+        if self.leaves > crate::MAX_LEAF_PREDICATES {
+            return Err(MatcherError::TooManyLeafPredicates {
+                count: self.leaves,
+                max: crate::MAX_LEAF_PREDICATES,
+            });
+        }
+        Ok(())
+    }
+
+    fn regex(&mut self) -> Result<(), MatcherError> {
+        self.regexes += 1;
+        if self.regexes > crate::MAX_REGEXES {
+            return Err(MatcherError::TooManyRegexes {
+                count: self.regexes,
+                max: crate::MAX_REGEXES,
+            });
+        }
+        Ok(())
+    }
+}
+
 pub struct Registry<Ctx> {
     input_factories: HashMap<String, BoxedInputFactory<Ctx>>,
     matcher_factories: HashMap<String, BoxedMatcherFactory>,
@@ -383,12 +417,21 @@ impl<Ctx: 'static> Registry<Ctx> {
     where
         A: Clone + Send + Sync + 'static,
     {
-        let on_no_match = config
-            .on_no_match
-            .map(|om| self.load_on_match(om))
-            .transpose()?;
+        let mut budget = LoadBudget::default();
+        let matcher = self.load_matcher_in(config, &mut budget)?;
+        matcher.validate()?;
+        Ok(matcher)
+    }
 
-        let matcher = match config.kind {
+    fn load_matcher_in<A>(
+        &self,
+        config: MatcherIr<A>,
+        budget: &mut LoadBudget,
+    ) -> Result<Matcher<Ctx, A>, MatcherError>
+    where
+        A: Clone + Send + Sync + 'static,
+    {
+        let kind = match config.kind {
             crate::ir::MatcherKindIr::List(matchers) => {
                 if matchers.len() > MAX_FIELD_MATCHERS {
                     return Err(MatcherError::TooManyFieldMatchers {
@@ -398,18 +441,24 @@ impl<Ctx: 'static> Registry<Ctx> {
                 }
                 let matchers = matchers
                     .into_iter()
-                    .map(|fm| self.load_field_matcher(fm))
+                    .map(|fm| self.load_field_matcher(fm, budget))
                     .collect::<Result<Vec<_>, _>>()?;
-                Matcher::list(matchers, on_no_match)
+                MatcherKind::List(matchers)
             }
             crate::ir::MatcherKindIr::Tree(tree) => {
-                let tree = self.load_tree(tree, |om| self.load_on_match(om))?;
-                Matcher::tree(tree, on_no_match)
+                MatcherKind::Tree(
+                    self.load_tree(tree, budget, |this, om, b| this.load_on_match(om, b))?,
+                )
             }
         };
-
-        matcher.validate()?;
-        Ok(matcher)
+        let on_no_match = config
+            .on_no_match
+            .map(|om| self.load_on_match(om, budget))
+            .transpose()?;
+        Ok(match kind {
+            MatcherKind::List(matchers) => Matcher::list(matchers, on_no_match),
+            MatcherKind::Tree(tree) => Matcher::tree(tree, on_no_match),
+        })
     }
 
     /// Load a `Matcher` from configuration with typed action resolution.
@@ -437,12 +486,22 @@ impl<Ctx: 'static> Registry<Ctx> {
     where
         A: Clone + Send + Sync + 'static,
     {
-        let on_no_match = config
-            .on_no_match
-            .map(|om| self.load_typed_on_match(om, actions))
-            .transpose()?;
+        let mut budget = LoadBudget::default();
+        let matcher = self.load_typed_matcher_in(config, actions, &mut budget)?;
+        matcher.validate()?;
+        Ok(matcher)
+    }
 
-        let matcher = match config.kind {
+    fn load_typed_matcher_in<A>(
+        &self,
+        config: MatcherIr<crate::ir::TypedExtensionConfig>,
+        actions: &ActionRegistry<A>,
+        budget: &mut LoadBudget,
+    ) -> Result<Matcher<Ctx, A>, MatcherError>
+    where
+        A: Clone + Send + Sync + 'static,
+    {
+        let kind = match config.kind {
             crate::ir::MatcherKindIr::List(matchers) => {
                 if matchers.len() > MAX_FIELD_MATCHERS {
                     return Err(MatcherError::TooManyFieldMatchers {
@@ -452,18 +511,24 @@ impl<Ctx: 'static> Registry<Ctx> {
                 }
                 let matchers = matchers
                     .into_iter()
-                    .map(|fm| self.load_typed_field_matcher(fm, actions))
+                    .map(|fm| self.load_typed_field_matcher(fm, actions, budget))
                     .collect::<Result<Vec<_>, _>>()?;
-                Matcher::list(matchers, on_no_match)
+                MatcherKind::List(matchers)
             }
             crate::ir::MatcherKindIr::Tree(tree) => {
-                let tree = self.load_tree(tree, |om| self.load_typed_on_match(om, actions))?;
-                Matcher::tree(tree, on_no_match)
+                MatcherKind::Tree(self.load_tree(tree, budget, |this, om, b| {
+                    this.load_typed_on_match(om, actions, b)
+                })?)
             }
         };
-
-        matcher.validate()?;
-        Ok(matcher)
+        let on_no_match = config
+            .on_no_match
+            .map(|om| self.load_typed_on_match(om, actions, budget))
+            .transpose()?;
+        Ok(match kind {
+            MatcherKind::List(matchers) => Matcher::list(matchers, on_no_match),
+            MatcherKind::Tree(tree) => Matcher::tree(tree, on_no_match),
+        })
     }
 
     /// Returns the number of registered input types.
@@ -480,11 +545,16 @@ impl<Ctx: 'static> Registry<Ctx> {
     fn load_tree<A, C, F>(
         &self,
         config: crate::ir::MatcherTreeIr<C>,
-        load_on_match: F,
+        budget: &mut LoadBudget,
+        mut load_on_match: F,
     ) -> Result<crate::MatcherTree<Ctx, A>, MatcherError>
     where
         A: Clone + Send + Sync + 'static,
-        F: Fn(crate::ir::OnMatchIr<C>) -> Result<crate::OnMatch<Ctx, A>, MatcherError>,
+        F: FnMut(
+            &Self,
+            crate::ir::OnMatchIr<C>,
+            &mut LoadBudget,
+        ) -> Result<crate::OnMatch<Ctx, A>, MatcherError>,
     {
         use crate::ir::TreeTypeIr;
 
@@ -514,7 +584,7 @@ impl<Ctx: 'static> Registry<Ctx> {
 
         let loaded = entries
             .into_iter()
-            .map(|(key, om)| load_on_match(om).map(|om| (key, om)))
+            .map(|(key, om)| load_on_match(self, om, budget).map(|om| (key, om)))
             .collect::<Result<Vec<_>, _>>()?;
 
         if is_prefix {
@@ -567,19 +637,24 @@ impl<Ctx: 'static> Registry<Ctx> {
     fn load_field_matcher<A>(
         &self,
         config: FieldMatcherIr<A>,
+        budget: &mut LoadBudget,
     ) -> Result<FieldMatcher<Ctx, A>, MatcherError>
     where
         A: Clone + Send + Sync + 'static,
     {
-        let predicate = self.load_predicate(config.predicate)?;
-        let on_match = self.load_on_match(config.on_match)?;
+        let predicate = self.load_predicate(config.predicate, budget)?;
+        let on_match = self.load_on_match(config.on_match, budget)?;
         Ok(FieldMatcher::new(predicate, on_match))
     }
 
-    fn load_predicate(&self, config: PredicateIr) -> Result<Predicate<Ctx>, MatcherError> {
+    fn load_predicate(
+        &self,
+        config: PredicateIr,
+        budget: &mut LoadBudget,
+    ) -> Result<Predicate<Ctx>, MatcherError> {
         match config {
             PredicateIr::Single(single) => {
-                let sp = self.load_single(single)?;
+                let sp = self.load_single(single, budget)?;
                 Ok(Predicate::Single(sp))
             }
             PredicateIr::And { predicates } => {
@@ -591,7 +666,7 @@ impl<Ctx: 'static> Registry<Ctx> {
                 }
                 let ps = predicates
                     .into_iter()
-                    .map(|p| self.load_predicate(p))
+                    .map(|p| self.load_predicate(p, budget))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Predicate::And(ps))
             }
@@ -604,19 +679,31 @@ impl<Ctx: 'static> Registry<Ctx> {
                 }
                 let ps = predicates
                     .into_iter()
-                    .map(|p| self.load_predicate(p))
+                    .map(|p| self.load_predicate(p, budget))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Predicate::Or(ps))
             }
             PredicateIr::Not { predicate } => {
-                let inner = self.load_predicate(*predicate)?;
+                let inner = self.load_predicate(*predicate, budget)?;
                 Ok(Predicate::Not(Box::new(inner)))
             }
         }
     }
 
     #[allow(clippy::needless_pass_by_value)] // Consistent with other load_ methods
-    fn load_single(&self, config: SinglePredicateIr) -> Result<SinglePredicate<Ctx>, MatcherError> {
+    fn load_single(
+        &self,
+        config: SinglePredicateIr,
+        budget: &mut LoadBudget,
+    ) -> Result<SinglePredicate<Ctx>, MatcherError> {
+        budget.leaf()?;
+        if let ValueMatchIr::BuiltIn {
+            spec: crate::StringMatchSpec::Regex(_),
+            ..
+        } = &config.matcher
+        {
+            budget.regex()?;
+        }
         let input_factory = self
             .input_factories
             .get(&config.input.type_url)
@@ -661,14 +748,18 @@ impl<Ctx: 'static> Registry<Ctx> {
         Ok(SinglePredicate::new(input, matcher))
     }
 
-    fn load_on_match<A>(&self, config: OnMatchIr<A>) -> Result<OnMatch<Ctx, A>, MatcherError>
+    fn load_on_match<A>(
+        &self,
+        config: OnMatchIr<A>,
+        budget: &mut LoadBudget,
+    ) -> Result<OnMatch<Ctx, A>, MatcherError>
     where
         A: Clone + Send + Sync + 'static,
     {
         match config {
             OnMatchIr::Action { action } => Ok(OnMatch::Action(action)),
             OnMatchIr::Matcher { matcher } => {
-                let m = self.load_matcher(*matcher)?;
+                let m = self.load_matcher_in(*matcher, budget)?;
                 Ok(OnMatch::Matcher(Box::new(m)))
             }
         }
@@ -678,12 +769,13 @@ impl<Ctx: 'static> Registry<Ctx> {
         &self,
         config: FieldMatcherIr<crate::ir::TypedExtensionConfig>,
         actions: &ActionRegistry<A>,
+        budget: &mut LoadBudget,
     ) -> Result<FieldMatcher<Ctx, A>, MatcherError>
     where
         A: Clone + Send + Sync + 'static,
     {
-        let predicate = self.load_predicate(config.predicate)?;
-        let on_match = self.load_typed_on_match(config.on_match, actions)?;
+        let predicate = self.load_predicate(config.predicate, budget)?;
+        let on_match = self.load_typed_on_match(config.on_match, actions, budget)?;
         Ok(FieldMatcher::new(predicate, on_match))
     }
 
@@ -691,6 +783,7 @@ impl<Ctx: 'static> Registry<Ctx> {
         &self,
         config: OnMatchIr<crate::ir::TypedExtensionConfig>,
         actions: &ActionRegistry<A>,
+        budget: &mut LoadBudget,
     ) -> Result<OnMatch<Ctx, A>, MatcherError>
     where
         A: Clone + Send + Sync + 'static,
@@ -701,7 +794,7 @@ impl<Ctx: 'static> Registry<Ctx> {
                 Ok(OnMatch::Action(resolved))
             }
             OnMatchIr::Matcher { matcher } => {
-                let m = self.load_typed_matcher(*matcher, actions)?;
+                let m = self.load_typed_matcher_in(*matcher, actions, budget)?;
                 Ok(OnMatch::Matcher(Box::new(m)))
             }
         }

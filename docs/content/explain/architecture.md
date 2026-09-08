@@ -82,7 +82,7 @@ The core engine, `rumi`, provides:
 - **MatchingData** — the type-erased bridge (`string | int | bool | bytes`); absence is `None`, never a value
 - **InputMatcher** — five string matchers plus `BoolMatcher`
 - **OnMatch** — action XOR nested matcher (illegal states unrepresentable)
-- **Depth/width limits** — MAX_DEPTH=32, MAX_FIELD_MATCHERS=256
+- **Depth, width and budget limits** — MAX_DEPTH=32, MAX_FIELD_MATCHERS=256 per list, MAX_LEAF_PREDICATES=256 and MAX_REGEXES=64 per document
 - **Registry** — immutable type registry for config-driven construction
 - **Trace** — step-by-step evaluation debugging
 

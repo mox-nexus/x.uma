@@ -204,6 +204,15 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
             .unwrap_or(0)
     }
 
+    pub(crate) fn leaf_count(&self) -> usize {
+        self.outcomes()
+            .map(|om| match om {
+                OnMatch::Action(_) => 0,
+                OnMatch::Matcher(m) => m.leaf_count(),
+            })
+            .sum()
+    }
+
     /// Check this tree's width, and recurse into nested matchers.
     pub(crate) fn validate_widths(&self) -> Result<(), MatcherError> {
         if self.len() > crate::MAX_TREE_ENTRIES {

@@ -461,3 +461,12 @@ describe("Action table", () => {
     expect(matcher.trace({ role: "nope" }).index).toBe(2);
   });
 });
+
+
+describe("Document budget", () => {
+  test("a document over a mebibyte is refused by its size", () => {
+    const padding = "x".repeat(1 << 20);
+    const document = JSON.stringify({ matcherList: { matchers: [] }, pad: padding });
+    expect(() => KvMatcher.fromConfig(document)).toThrow("bytes");
+  });
+});

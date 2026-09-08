@@ -166,7 +166,7 @@ INV-7 is scoped to the predicate tree deliberately. `Matcher::evaluate_with_trac
 | Constraint | Enforcement |
 |------------|-------------|
 | ReDoS Protection | `regex` crate only (linear time). Never `fancy-regex`. |
-| Resource limits (5) | `MAX_DEPTH=32`, `MAX_FIELD_MATCHERS=256`, `MAX_PREDICATES_PER_COMPOUND=256`, `MAX_PATTERN_LENGTH=8192`, `MAX_REGEX_PATTERN_LENGTH=4096` (`lib.rs:183-205`). Only `MAX_DEPTH` is checked in `validate()`; the other four are enforced solely inside `Registry::load_*`, so a hand-built or compiler-built matcher bypasses them. The crusts **re-declare** the two pattern limits locally (`crusts/python/src/convert.rs:12`, `crusts/wasm/src/convert.rs:10`) instead of importing them — three copies with no compile-time link. |
+| Resource limits | Per list: `MAX_DEPTH=32`, `MAX_FIELD_MATCHERS=256`, `MAX_PREDICATES_PER_COMPOUND=256`, `MAX_PATTERN_LENGTH=8192`, `MAX_REGEX_PATTERN_LENGTH=4096`. Per document (D-054): `MAX_LEAF_PREDICATES=256`, `MAX_REGEXES=64` with `REGEX_SIZE_LIMIT` and `REGEX_DFA_SIZE_LIMIT` of 1 MiB each, `MAX_DOCUMENT_BYTES=1 MiB` in `rumi_proto::protojson`. Depth, widths and the leaf total are checked by `validate()`; the regex count and the byte budget only on the reader path, so a hand-built matcher is bounded by its author. The crusts still **re-declare** the two pattern limits locally (`crusts/python/src/convert.rs`, `crusts/wasm/src/convert.rs`). |
 | Max 32 Depth | `MatcherError::DepthExceeded` at `validate()` time |
 | Registry Immutable | `&self` methods only after `build()` |
 | Send + Sync + Debug | All public types — FFI requirement (PyO3, WASM) |

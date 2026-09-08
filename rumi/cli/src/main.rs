@@ -617,6 +617,7 @@ fn build_actions() -> rumi::ActionRegistry<String> {
 /// anything interprets it, so the two syntaxes cannot mean different things.
 #[cfg(test)]
 fn load_config_str(yaml: &str) -> Result<MatcherIr<TypedExtensionConfig>, String> {
+    rumi_proto::protojson::check_document_size(yaml).map_err(|e| e.to_string())?;
     let document: serde_json::Value =
         serde_yaml::from_str(yaml).map_err(|e| format!("YAML parse error: {e}"))?;
     let resolver = build_resolver();
@@ -627,6 +628,7 @@ fn load_config_str(yaml: &str) -> Result<MatcherIr<TypedExtensionConfig>, String
 fn load_config(path: &str) -> Result<MatcherIr<TypedExtensionConfig>, String> {
     let content =
         std::fs::read_to_string(path).map_err(|e| format!("failed to read \"{path}\": {e}"))?;
+    rumi_proto::protojson::check_document_size(&content).map_err(|e| e.to_string())?;
 
     let is_json = std::path::Path::new(path)
         .extension()

@@ -492,3 +492,11 @@ class TestActionTable:
         assert trace.index == 0
         assert matcher.actions()[trace.index] == trace.result
         assert matcher.trace({"role": "nope"}).index == 2
+
+
+class TestDocumentBudget:
+    def test_a_document_over_a_mebibyte_is_refused_by_its_size(self):
+        padding = "x" * (1 << 20)
+        document = json.dumps({"matcherList": {"matchers": []}, "pad": padding})
+        with pytest.raises(ValueError, match="bytes"):
+            CrustTestMatcher.from_config(document)

@@ -100,6 +100,7 @@ pub fn actions() -> &'static rumi::ActionRegistry<ActionEntry> {
 ///
 /// If the JSON does not parse, or is not a valid `xds.type.matcher.v3.Matcher`.
 pub fn load(json_config: &str) -> Result<rumi::MatcherIr<rumi::TypedExtensionConfig>, String> {
+    rumi_proto::protojson::check_document_size(json_config).map_err(|e| e.to_string())?;
     let document: serde_json::Value =
         serde_json::from_str(json_config).map_err(|e| format!("invalid config JSON: {e}"))?;
     let resolver = resolver();

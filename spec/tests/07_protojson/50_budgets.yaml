@@ -1,0 +1,726 @@
+name: budget_aggregate_leaves
+description: >
+  Every leaf predicate is a per-request cost, and the per-list bound of 256
+  does not add up across nesting: three nested lists of a hundred are each
+  under it and together are not. The budget is the total over the root
+  matcher (D-054), and it is checked while the document is being loaded, so
+  the refusal names the leaf that crossed it, not the size of what was
+  materialised afterwards.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: tenant
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: tenant
+          valueMatch:
+            exact: t0
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+              - &leaf
+                predicate:
+                  singlePredicate:
+                    input:
+                      name: role
+                      typedConfig:
+                        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                        key: role
+                    valueMatch:
+                      exact: admin
+                onMatch:
+                  action:
+                    name: allow
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+                      name: allow
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+    - predicate:
+        singlePredicate:
+          input:
+            name: tenant
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: tenant
+          valueMatch:
+            exact: t1
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+    - predicate:
+        singlePredicate:
+          input:
+            name: tenant
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: tenant
+          valueMatch:
+            exact: t2
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+expect_error: true
+error_contains: 257 leaf predicates
+
+---
+name: budget_regex_memory
+description: >
+  A compiled regex holds memory the engine bounds per pattern; the count of
+  them is bounded per document (D-054). Two nested lists of a hundred and
+  fifty regex rules are each under the per-list bound and together over the
+  regex budget. The refusal names the regex that crossed the budget, one
+  past it, which is the proof that the check runs during the walk rather
+  than after every pattern has been compiled.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: tenant
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: tenant
+          valueMatch:
+            exact: t0
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+              - &rx
+                predicate:
+                  singlePredicate:
+                    input:
+                      name: path
+                      typedConfig:
+                        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                        key: path
+                    valueMatch:
+                      safeRegex:
+                        regex: ^/api/v[0-9]+/users/[0-9]+$
+                onMatch:
+                  action:
+                    name: api
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+                      name: api
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+    - predicate:
+        singlePredicate:
+          input:
+            name: tenant
+            typedConfig:
+              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              key: tenant
+          valueMatch:
+            exact: t1
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+expect_error: true
+error_contains: 65 regexes

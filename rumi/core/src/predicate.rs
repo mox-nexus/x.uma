@@ -256,6 +256,17 @@ impl<Ctx> Predicate<Ctx> {
         }
     }
 
+    /// The number of single predicates under this one: the per-request cost
+    /// of evaluating it in full.
+    #[must_use]
+    pub fn leaf_count(&self) -> usize {
+        match self {
+            Predicate::Single(_) => 1,
+            Predicate::And(ps) | Predicate::Or(ps) => ps.iter().map(Predicate::leaf_count).sum(),
+            Predicate::Not(p) => p.leaf_count(),
+        }
+    }
+
     /// Check that no compound in this tree holds more than
     /// [`MAX_PREDICATES_PER_COMPOUND`](crate::MAX_PREDICATES_PER_COMPOUND)
     /// children.

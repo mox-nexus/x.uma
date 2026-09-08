@@ -359,7 +359,7 @@ impl StringMatcher {
     ///
     /// Returns `Err` if the regex pattern is invalid.
     pub fn regex(pattern: &str) -> Result<Self, regex::Error> {
-        regex::Regex::new(pattern).map(Self::Regex)
+        bounded_regex(pattern).map(Self::Regex)
     }
 
     /// Create a case-insensitive regex match.
@@ -370,8 +370,17 @@ impl StringMatcher {
     ///
     /// Returns `Err` if the regex pattern is invalid.
     pub fn regex_ignore_case(pattern: &str) -> Result<Self, regex::Error> {
-        regex::Regex::new(&format!("(?i){pattern}")).map(Self::Regex)
+        bounded_regex(&format!("(?i){pattern}")).map(Self::Regex)
     }
+}
+
+/// Compile with the per-regex memory limits, so a document's regex memory is
+/// its regex count times a known constant (D-054).
+fn bounded_regex(pattern: &str) -> Result<regex::Regex, regex::Error> {
+    regex::RegexBuilder::new(pattern)
+        .size_limit(crate::REGEX_SIZE_LIMIT)
+        .dfa_size_limit(crate::REGEX_DFA_SIZE_LIMIT)
+        .build()
 }
 
 impl InputMatcher for StringMatcher {
@@ -598,5 +607,11 @@ mod tests {
 
         let m = StringMatcher::regex_ignore_case(r"^user-\d+$").unwrap();
         assert!(m.matches(&"USER-123".into()));
+    }
+
+    #[test]
+    fn a_regex_whose_program_exceeds_the_size_limit_is_refused() {
+        let err = StringMatcher::regex("(?:[a-z]{1000}){1000}").unwrap_err();
+        assert!(err.to_string().contains("size limit"), "{err}");
     }
 }
