@@ -28,6 +28,7 @@
 
 pub mod any_resolver;
 pub mod convert;
+pub mod index;
 pub mod protojson;
 
 // ═══════════════════════════════════════════════════════════════════════════════

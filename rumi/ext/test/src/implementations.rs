@@ -15,7 +15,7 @@ use serde::Deserialize;
 pub enum Implementation {
     /// rumi, the engine.
     Rust,
-    /// The Python binding, `xuma-crust` on PyPI.
+    /// The Python binding, `xuma-crust` on the Python package index.
     Python,
     /// The TypeScript binding, `xuma-crust` on npm.
     Typescript,

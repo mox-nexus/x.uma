@@ -336,7 +336,13 @@ impl<A: Clone + Send + Sync + 'static> ActionRegistry<A> {
         urls
     }
 
-    fn resolve(&self, config: &crate::ir::TypedExtensionConfig) -> Result<A, MatcherError> {
+    /// Resolve one action's config into an `A` through its registered factory.
+    ///
+    /// # Errors
+    ///
+    /// [`MatcherError::UnknownTypeUrl`] if no factory is registered for the
+    /// config's type URL, or whatever the factory returns.
+    pub fn resolve(&self, config: &crate::ir::TypedExtensionConfig) -> Result<A, MatcherError> {
         let factory =
             self.factories
                 .get(&config.type_url)
