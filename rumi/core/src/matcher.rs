@@ -423,15 +423,13 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
     /// Checks, over the whole tree including nested matchers and `on_no_match`
     /// chains:
     /// - nesting depth against [`MAX_DEPTH`]
-    /// - rules per matcher against [`MAX_FIELD_MATCHERS`](crate::MAX_FIELD_MATCHERS)
-    /// - children per `and`/`or` against
-    ///   [`MAX_PREDICATES_PER_COMPOUND`](crate::MAX_PREDICATES_PER_COMPOUND)
+    /// - entries per tree against [`MAX_TREE_ENTRIES`](crate::MAX_TREE_ENTRIES)
+    /// - the worst path's cost, [`path_cost`](Self::path_cost), against
+    ///   [`MAX_PREDICATES_PER_EVALUATION`](crate::MAX_PREDICATES_PER_EVALUATION)
     ///
-    /// The width limits used to live in the registry, which meant a matcher
-    /// built by a domain compiler or across the FFI carried none of them. They
-    /// belong here, on the type that holds the rules, so that whatever builds a
-    /// matcher — in any language, through any adapter — inherits the same
-    /// guarantees rather than reimplementing them.
+    /// The limits live here, on the type that holds the rules, so that
+    /// whatever builds a matcher (the registry, a domain compiler, a binding,
+    /// a hand) inherits the same guarantees rather than reimplementing them.
     ///
     /// Pattern-length limits are not here: a compiled pattern is held by
     /// [`StringMatchSpec`](crate::StringMatchSpec), which enforces its own in
@@ -440,8 +438,9 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
     /// # Errors
     ///
     /// - [`MatcherError::DepthExceeded`] if nesting is too deep
-    /// - [`MatcherError::TooManyFieldMatchers`] if one matcher holds too many rules
-    /// - [`MatcherError::TooManyPredicates`] if one compound holds too many children
+    /// - [`MatcherError::TooManyTreeEntries`] if one tree holds too many entries
+    /// - [`MatcherError::TooManyPredicatesPerEvaluation`] if one evaluation can
+    ///   reach too many predicates
     pub fn validate(&self) -> Result<(), MatcherError> {
         let depth = self.depth();
         if depth > MAX_DEPTH {
@@ -451,61 +450,46 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
             });
         }
         self.validate_widths()?;
-        let leaves = self.leaf_count();
-        if leaves > crate::MAX_LEAF_PREDICATES {
-            return Err(MatcherError::TooManyLeafPredicates {
-                count: leaves,
-                max: crate::MAX_LEAF_PREDICATES,
+        let cost = self.path_cost();
+        if cost > crate::MAX_PREDICATES_PER_EVALUATION {
+            return Err(MatcherError::TooManyPredicatesPerEvaluation {
+                count: cost,
+                max: crate::MAX_PREDICATES_PER_EVALUATION,
             });
         }
         Ok(())
     }
 
-    /// The number of single predicates in the whole tree, nested matchers and
-    /// fallback included: the per-request cost of evaluating everything.
+    /// The most predicates one evaluation can reach.
+    ///
+    /// A list costs every rule's predicate and nested matcher, since a nested
+    /// miss moves on to the next rule; a tree costs its dearest entry, or for a
+    /// prefix tree its dearest chain of prefixes (D-055); the fallback adds its
+    /// own. An upper bound: it assumes every predicate can hold.
     #[must_use]
-    pub fn leaf_count(&self) -> usize {
+    pub fn path_cost(&self) -> usize {
         let own = match &self.kind {
             MatcherKind::List(list) => list
                 .iter()
-                .map(|fm| {
-                    fm.predicate.leaf_count()
-                        + match &fm.on_match {
-                            OnMatch::Action(_) => 0,
-                            OnMatch::Matcher(m) => m.leaf_count(),
-                        }
-                })
+                .map(|fm| fm.predicate.leaf_count() + fm.on_match.path_cost())
                 .sum(),
-            MatcherKind::Tree(tree) => tree.leaf_count(),
+            MatcherKind::Tree(tree) => tree.path_cost(),
         };
-        own + self.on_no_match.as_ref().map_or(0, |om| match om {
-            OnMatch::Action(_) => 0,
-            OnMatch::Matcher(m) => m.leaf_count(),
-        })
+        own + self.on_no_match.as_ref().map_or(0, OnMatch::path_cost)
     }
 
-    /// The width half of [`validate`](Self::validate), recursing through nested
-    /// matchers. Depth is checked once at the root because `depth()` is already
-    /// a whole-tree measure.
+    /// The tree-width half of [`validate`](Self::validate), recursing through
+    /// nested matchers. Depth is checked once at the root because `depth()` is
+    /// already a whole-tree measure.
     pub(crate) fn validate_widths(&self) -> Result<(), MatcherError> {
         match &self.kind {
             MatcherKind::List(list) => {
-                if list.len() > crate::MAX_FIELD_MATCHERS {
-                    return Err(MatcherError::TooManyFieldMatchers {
-                        count: list.len(),
-                        max: crate::MAX_FIELD_MATCHERS,
-                    });
-                }
-
                 for fm in list {
-                    fm.predicate.validate()?;
                     if let OnMatch::Matcher(nested) = &fm.on_match {
                         nested.validate_widths()?;
                     }
                 }
             }
-            // Bounded separately, and for a different reason — see
-            // `MAX_TREE_ENTRIES`.
             MatcherKind::Tree(tree) => tree.validate_widths()?,
         }
 
@@ -1125,7 +1109,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_counts_leaf_predicates_across_nesting() {
+    fn path_cost_adds_a_lists_rules_and_takes_a_trees_dearest_entry() {
         let leaf = || {
             FieldMatcher::new(
                 Predicate::Single(SinglePredicate::new(
@@ -1136,26 +1120,60 @@ mod tests {
             )
         };
         let nested = |n: usize| Matcher::list((0..n).map(|_| leaf()).collect(), None);
+        let under = |n: usize| OnMatch::Matcher(Box::new(nested(n)));
         let rule = |n: usize| {
             FieldMatcher::new(
                 Predicate::Single(SinglePredicate::new(
                     Box::new(ValueInput),
                     Box::new(ExactMatcher::new("t")),
                 )),
-                OnMatch::Matcher(Box::new(nested(n))),
+                under(n),
             )
         };
 
-        let under = Matcher::list(vec![rule(100), rule(100)], None);
-        assert_eq!(under.leaf_count(), 202);
-        assert!(under.validate().is_ok());
-
-        let over = Matcher::list(vec![rule(100), rule(100), rule(100)], None);
-        assert_eq!(over.leaf_count(), 303);
+        let list = Matcher::list(vec![rule(100), rule(100), rule(100)], None);
+        assert_eq!(list.path_cost(), 303);
         assert!(matches!(
-            over.validate(),
-            Err(MatcherError::TooManyLeafPredicates { count: 303, max }) if max == crate::MAX_LEAF_PREDICATES
+            list.validate(),
+            Err(MatcherError::TooManyPredicatesPerEvaluation { count: 303, max })
+                if max == crate::MAX_PREDICATES_PER_EVALUATION
         ));
+
+        let exact = Matcher::tree(
+            MatcherTree::exact(
+                Box::new(ValueInput),
+                [("a", under(100)), ("b", under(200)), ("c", under(100))],
+            )
+            .unwrap(),
+            Some(under(50)),
+        );
+        assert_eq!(exact.path_cost(), 250, "dearest entry plus the fallback");
+        assert!(exact.validate().is_ok());
+
+        let siblings = Matcher::tree(
+            MatcherTree::prefix(
+                Box::new(ValueInput),
+                [("/x", under(200)), ("/y", under(200)), ("/z", under(200))],
+            )
+            .unwrap(),
+            None,
+        );
+        assert_eq!(siblings.path_cost(), 200);
+
+        let chain = Matcher::tree(
+            MatcherTree::prefix(
+                Box::new(ValueInput),
+                [
+                    ("/", under(100)),
+                    ("/a", under(100)),
+                    ("/a/b", under(100)),
+                    ("/z", under(200)),
+                ],
+            )
+            .unwrap(),
+            None,
+        );
+        assert_eq!(chain.path_cost(), 300, "/a/b falls through to /a and /");
     }
 
     #[test]

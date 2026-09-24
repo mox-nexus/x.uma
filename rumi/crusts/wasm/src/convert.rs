@@ -17,8 +17,10 @@ use rumi::MAX_PATTERN_LENGTH;
 /// Maximum number of argument matchers per rule.
 const MAX_ARGUMENTS: usize = 64;
 
-/// Maximum number of rules per `compile()` call.
-pub const MAX_RULES: u32 = 256;
+/// Rules per `compile()` call, refused before conversion: every rule costs at
+/// least one predicate on the one path the compiler emits (D-068).
+#[allow(clippy::cast_possible_truncation)] // 256 fits in u32
+pub const MAX_RULES: u32 = rumi::MAX_PREDICATES_PER_EVALUATION as u32;
 
 /// Maximum regex pattern length. Re-exported from core — see above.
 use rumi::MAX_REGEX_PATTERN_LENGTH;

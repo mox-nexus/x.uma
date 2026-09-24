@@ -142,8 +142,10 @@ Work down this list; it is ordered by how often each is the cause.
 
 ## Limits enforced at load
 
-Nesting depth 32, at most 256 field matchers per matcher, 256 predicates per
-compound, pattern length 8192, regex pattern length 4096. Exceeding one is a
+Nesting depth 32, at most 256 predicates reachable in one evaluation (every
+rule of a list, one tree entry, or one chain of prefixes), 64 regexes per
+document, pattern length 8192, regex pattern length 4096. Past 256 rules, key
+them on a field with a matcher tree. Exceeding one is a
 load error, never an evaluation failure. Evaluation itself cannot fail.
 
 ## References

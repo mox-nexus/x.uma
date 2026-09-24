@@ -46,7 +46,7 @@ use serde::de::DeserializeOwned;
 use crate::{
     ir::{FieldMatcherIr, MatcherIr, OnMatchIr, PredicateIr, SinglePredicateIr, ValueMatchIr},
     DataInput, FieldMatcher, InputMatcher, Matcher, MatcherError, MatcherKind, OnMatch, Predicate,
-    SinglePredicate, MAX_FIELD_MATCHERS, MAX_PREDICATES_PER_COMPOUND,
+    SinglePredicate,
 };
 
 /// Trait for `DataInput` types that can be constructed from configuration.
@@ -355,27 +355,24 @@ impl<A: Clone + Send + Sync + 'static> ActionRegistry<A> {
     }
 }
 
-/// Immutable registry of `DataInput` and `InputMatcher` factories.
+/// What one load has spent against the document-wide budgets (D-054, D-068).
 ///
-/// Constructed via [`RegistryBuilder`]. Use [`load_matcher()`](Self::load_matcher)
-/// to compile config into a runtime `Matcher`.
-/// What one load has spent against the document-wide budgets (D-054).
-///
-/// Counted as the walk goes, so a document is refused at the leaf or regex
-/// that crosses a budget rather than after everything past it has been built.
+/// Counted as the walk goes, so a document is refused at the predicate or
+/// regex that crosses a budget rather than after everything past it has been
+/// built.
 #[derive(Default)]
 struct LoadBudget {
-    leaves: usize,
+    predicates: usize,
     regexes: usize,
 }
 
 impl LoadBudget {
-    fn leaf(&mut self) -> Result<(), MatcherError> {
-        self.leaves += 1;
-        if self.leaves > crate::MAX_LEAF_PREDICATES {
-            return Err(MatcherError::TooManyLeafPredicates {
-                count: self.leaves,
-                max: crate::MAX_LEAF_PREDICATES,
+    fn predicate(&mut self) -> Result<(), MatcherError> {
+        self.predicates += 1;
+        if self.predicates > crate::MAX_DOCUMENT_PREDICATES {
+            return Err(MatcherError::TooManyDocumentPredicates {
+                count: self.predicates,
+                max: crate::MAX_DOCUMENT_PREDICATES,
             });
         }
         Ok(())
@@ -393,6 +390,10 @@ impl LoadBudget {
     }
 }
 
+/// Immutable registry of `DataInput` and `InputMatcher` factories.
+///
+/// Constructed via [`RegistryBuilder`]. Use [`load_matcher()`](Self::load_matcher)
+/// to compile config into a runtime `Matcher`.
 pub struct Registry<Ctx> {
     input_factories: HashMap<String, BoxedInputFactory<Ctx>>,
     matcher_factories: HashMap<String, BoxedMatcherFactory>,
@@ -433,12 +434,6 @@ impl<Ctx: 'static> Registry<Ctx> {
     {
         let kind = match config.kind {
             crate::ir::MatcherKindIr::List(matchers) => {
-                if matchers.len() > MAX_FIELD_MATCHERS {
-                    return Err(MatcherError::TooManyFieldMatchers {
-                        count: matchers.len(),
-                        max: MAX_FIELD_MATCHERS,
-                    });
-                }
                 let matchers = matchers
                     .into_iter()
                     .map(|fm| self.load_field_matcher(fm, budget))
@@ -503,12 +498,6 @@ impl<Ctx: 'static> Registry<Ctx> {
     {
         let kind = match config.kind {
             crate::ir::MatcherKindIr::List(matchers) => {
-                if matchers.len() > MAX_FIELD_MATCHERS {
-                    return Err(MatcherError::TooManyFieldMatchers {
-                        count: matchers.len(),
-                        max: MAX_FIELD_MATCHERS,
-                    });
-                }
                 let matchers = matchers
                     .into_iter()
                     .map(|fm| self.load_typed_field_matcher(fm, actions, budget))
@@ -658,12 +647,6 @@ impl<Ctx: 'static> Registry<Ctx> {
                 Ok(Predicate::Single(sp))
             }
             PredicateIr::And { predicates } => {
-                if predicates.len() > MAX_PREDICATES_PER_COMPOUND {
-                    return Err(MatcherError::TooManyPredicates {
-                        count: predicates.len(),
-                        max: MAX_PREDICATES_PER_COMPOUND,
-                    });
-                }
                 let ps = predicates
                     .into_iter()
                     .map(|p| self.load_predicate(p, budget))
@@ -671,12 +654,6 @@ impl<Ctx: 'static> Registry<Ctx> {
                 Ok(Predicate::And(ps))
             }
             PredicateIr::Or { predicates } => {
-                if predicates.len() > MAX_PREDICATES_PER_COMPOUND {
-                    return Err(MatcherError::TooManyPredicates {
-                        count: predicates.len(),
-                        max: MAX_PREDICATES_PER_COMPOUND,
-                    });
-                }
                 let ps = predicates
                     .into_iter()
                     .map(|p| self.load_predicate(p, budget))
@@ -696,7 +673,7 @@ impl<Ctx: 'static> Registry<Ctx> {
         config: SinglePredicateIr,
         budget: &mut LoadBudget,
     ) -> Result<SinglePredicate<Ctx>, MatcherError> {
-        budget.leaf()?;
+        budget.predicate()?;
         if let ValueMatchIr::BuiltIn {
             spec: crate::StringMatchSpec::Regex(_),
             ..
@@ -1358,63 +1335,112 @@ mod tests {
         assert!(!urls.contains(&"xuma.core.v1.StringMatcher"));
     }
 
-    #[test]
-    fn too_many_field_matchers() {
-        let registry = RegistryBuilder::<TestCtx>::new()
-            .input::<ValueInput>("test.ValueInput")
-            .build();
+    fn exact_x() -> PredicateIr {
+        built_in(value_input(), StringMatchSpec::Exact("x".into()))
+    }
 
-        let fm = || {
-            field(
-                built_in(value_input(), StringMatchSpec::Exact("x".into())),
-                act("x"),
-            )
-        };
-        let matchers: Vec<_> = (0..=crate::MAX_FIELD_MATCHERS).map(|_| fm()).collect();
-        let config = MatcherIr::list(matchers);
-        let err = registry.load_matcher(config).unwrap_err();
+    fn per_evaluation(err: &MatcherError) -> Option<usize> {
         match err {
-            MatcherError::TooManyFieldMatchers { count, max } => {
-                assert_eq!(count, crate::MAX_FIELD_MATCHERS + 1);
-                assert_eq!(max, crate::MAX_FIELD_MATCHERS);
+            MatcherError::TooManyPredicatesPerEvaluation { count, max } => {
+                assert_eq!(*max, crate::MAX_PREDICATES_PER_EVALUATION);
+                Some(*count)
             }
-            _ => panic!("expected TooManyFieldMatchers, got {err:?}"),
+            _ => None,
         }
     }
 
     #[test]
-    fn too_many_predicates_and() {
+    fn a_list_past_the_evaluation_budget_is_refused() {
         let registry = RegistryBuilder::<TestCtx>::new()
             .input::<ValueInput>("test.ValueInput")
             .build();
+        let over = crate::MAX_PREDICATES_PER_EVALUATION + 1;
 
-        let predicates: Vec<_> = (0..=crate::MAX_PREDICATES_PER_COMPOUND)
-            .map(|_| built_in(value_input(), StringMatchSpec::Exact("x".into())))
-            .collect();
+        let matchers = (0..over).map(|_| field(exact_x(), act("x"))).collect();
+        let err = registry
+            .load_matcher(MatcherIr::list(matchers))
+            .unwrap_err();
 
-        let config = one(PredicateIr::And { predicates }, act("x"));
+        assert_eq!(per_evaluation(&err), Some(over), "got {err:?}");
+    }
+
+    #[test]
+    fn a_compound_past_the_evaluation_budget_is_refused() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+        let over = crate::MAX_PREDICATES_PER_EVALUATION + 1;
+        let predicates = || (0..over).map(|_| exact_x()).collect::<Vec<_>>();
+
+        for compound in [
+            PredicateIr::And {
+                predicates: predicates(),
+            },
+            PredicateIr::Or {
+                predicates: predicates(),
+            },
+        ] {
+            let err = registry.load_matcher(one(compound, act("x"))).unwrap_err();
+            assert_eq!(per_evaluation(&err), Some(over), "got {err:?}");
+        }
+    }
+
+    #[test]
+    fn the_document_budget_refuses_at_the_predicate_that_crosses_it() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+        let full_path = || OnMatchIr::Matcher {
+            matcher: Box::new(MatcherIr::list(
+                (0..crate::MAX_PREDICATES_PER_EVALUATION)
+                    .map(|_| field(exact_x(), act("x")))
+                    .collect(),
+            )),
+        };
+        let entries = crate::MAX_DOCUMENT_PREDICATES / crate::MAX_PREDICATES_PER_EVALUATION + 1;
+        let config = MatcherIr {
+            kind: crate::ir::MatcherKindIr::Tree(crate::ir::MatcherTreeIr {
+                input: value_input(),
+                tree: crate::ir::TreeTypeIr::ExactMatchMap(
+                    (0..entries)
+                        .map(|i| (format!("k{i}"), full_path()))
+                        .collect(),
+                ),
+            }),
+            on_no_match: None,
+        };
+
         let err = registry.load_matcher(config).unwrap_err();
-        assert!(
-            matches!(err, MatcherError::TooManyPredicates { .. }),
-            "expected TooManyPredicates, got {err:?}"
+
+        assert_eq!(
+            err,
+            MatcherError::TooManyDocumentPredicates {
+                count: crate::MAX_DOCUMENT_PREDICATES + 1,
+                max: crate::MAX_DOCUMENT_PREDICATES,
+            }
         );
     }
 
     #[test]
-    fn too_many_predicates_or() {
+    fn the_regex_budget_refuses_at_the_regex_that_crosses_it() {
         let registry = RegistryBuilder::<TestCtx>::new()
             .input::<ValueInput>("test.ValueInput")
             .build();
-
-        let predicates: Vec<_> = (0..=crate::MAX_PREDICATES_PER_COMPOUND)
-            .map(|_| built_in(value_input(), StringMatchSpec::Exact("x".into())))
+        let regex = || built_in(value_input(), StringMatchSpec::Regex("^x+$".into()));
+        let matchers = (0..=crate::MAX_REGEXES)
+            .map(|_| field(regex(), act("x")))
             .collect();
 
-        let config = one(PredicateIr::Or { predicates }, act("x"));
-        let err = registry.load_matcher(config).unwrap_err();
-        assert!(
-            matches!(err, MatcherError::TooManyPredicates { .. }),
-            "expected TooManyPredicates, got {err:?}"
+        let err = registry
+            .load_matcher(MatcherIr::list(matchers))
+            .unwrap_err();
+
+        assert_eq!(
+            err,
+            MatcherError::TooManyRegexes {
+                count: crate::MAX_REGEXES + 1,
+                max: crate::MAX_REGEXES,
+            }
         );
     }
 
@@ -1475,7 +1501,7 @@ mod tests {
     }
 
     #[test]
-    fn field_matchers_at_limit_succeeds() {
+    fn a_list_at_the_evaluation_budget_loads() {
         let registry = RegistryBuilder::<TestCtx>::new()
             .input::<ValueInput>("test.ValueInput")
             .build();
@@ -1486,7 +1512,9 @@ mod tests {
                 act("x"),
             )
         };
-        let matchers: Vec<_> = (0..crate::MAX_FIELD_MATCHERS).map(|_| fm()).collect();
+        let matchers: Vec<_> = (0..crate::MAX_PREDICATES_PER_EVALUATION)
+            .map(|_| fm())
+            .collect();
         let config = MatcherIr::list(matchers);
         assert!(registry.load_matcher(config).is_ok());
     }

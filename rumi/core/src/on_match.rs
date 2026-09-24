@@ -72,6 +72,15 @@ impl<Ctx, A: Clone + Send + Sync + 'static> OnMatch<Ctx, A> {
         }
     }
 
+    /// The most predicates reaching this outcome can evaluate: none for an
+    /// action, the nested matcher's [`Matcher::path_cost`] otherwise.
+    pub fn path_cost(&self) -> usize {
+        match self {
+            Self::Action(_) => 0,
+            Self::Matcher(m) => m.path_cost(),
+        }
+    }
+
     /// Evaluate this `OnMatch` against a context.
     ///
     /// - If this is an `Action`, returns the cloned action.

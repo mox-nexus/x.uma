@@ -153,30 +153,24 @@ pub mod prelude {
 /// Validate at config load time via [`Matcher::validate`].
 pub const MAX_DEPTH: usize = 32;
 
-/// Maximum number of field matchers in a single [`Matcher`].
+/// Predicates one evaluation can reach, along the worst path through the matcher.
 ///
-/// Prevents width-based denial-of-service: a config with millions of field matchers at depth 1
-/// bypasses [`MAX_DEPTH`] but still causes excessive resource consumption.
-pub const MAX_FIELD_MATCHERS: usize = 256;
+/// Width is a denial-of-service axis that depth does not cover, and every
+/// predicate a request can reach is a per-request cost: all of a list's rules,
+/// since a nested miss moves on to the next; one entry of an exact tree; a
+/// chain of prefixes, since a miss falls through to the next shorter one
+/// (D-055). Entries a request never visits do not count, which is what lets a
+/// tree scale where a list cannot (D-068).
+pub const MAX_PREDICATES_PER_EVALUATION: usize = 256;
 
 /// Maximum entries in a single [`MatcherTree`](crate::MatcherTree).
 ///
-/// Deliberately **not** [`MAX_FIELD_MATCHERS`], and for a different reason.
-/// That limit is about evaluation: a list is O(n) per request, so its width is
-/// a per-request cost. A tree is O(1) hash or O(k) in the key's length, so its
-/// entry count costs nothing at evaluation time — and large routing tables are
-/// the entire reason to reach for a tree.
-///
-/// What a tree's width does cost is memory at config load. That is what this
-/// bounds, and why it is far larger than 256. Copying `MAX_FIELD_MATCHERS`
-/// here would have frozen a limit whose stated rationale does not apply.
+/// A tree is O(1) hash or O(k) in the key's length, so its entry count costs
+/// nothing at evaluation time, and large routing tables are the entire reason
+/// to reach for a tree. What its width does cost is memory at config load,
+/// which is what this bounds, and why it is far larger than
+/// [`MAX_PREDICATES_PER_EVALUATION`].
 pub const MAX_TREE_ENTRIES: usize = 65_536;
-
-/// Maximum number of predicates in a single `And` or `Or` compound predicate.
-///
-/// Same width-based denial-of-service protection as [`MAX_FIELD_MATCHERS`], applied to
-/// compound predicate children.
-pub const MAX_PREDICATES_PER_COMPOUND: usize = 256;
 
 /// Maximum length for non-regex string match patterns (exact, prefix, suffix, contains).
 pub const MAX_PATTERN_LENGTH: usize = 8192;
@@ -188,14 +182,15 @@ pub const MAX_PATTERN_LENGTH: usize = 8192;
 /// faster than literal matching.
 pub const MAX_REGEX_PATTERN_LENGTH: usize = 4096;
 
-/// Leaf predicates in one document, counted across every nested matcher.
+/// Predicates in one document, counted across every nested matcher and tree
+/// entry.
 ///
-/// Every leaf is a per-request cost, and the per-list bound does not add up
-/// across nesting: three nested lists of a hundred are each under
-/// [`MAX_FIELD_MATCHERS`] and together are not. The registry counts leaves
-/// as it loads and refuses at the one that crosses; `Matcher::validate`
-/// counts the finished tree for every other constructor (D-054).
-pub const MAX_LEAF_PREDICATES: usize = 256;
+/// A memory bound, not a per-request one: that is
+/// [`MAX_PREDICATES_PER_EVALUATION`]. The registry counts as it loads and
+/// refuses at the predicate that crosses, so a document whose size is not
+/// bounded in bytes (IR deserialised from YAML with aliases, say) is refused
+/// before it is materialised (D-068).
+pub const MAX_DOCUMENT_PREDICATES: usize = 65_536;
 
 /// Compiled regexes in one document.
 ///
@@ -253,9 +248,17 @@ pub enum MatcherError {
         /// The data types accepted by the matcher.
         matcher_types: Vec<String>,
     },
-    /// More leaf predicates in the document than [`MAX_LEAF_PREDICATES`].
-    TooManyLeafPredicates {
-        /// The leaf that crossed the budget, or the total for a finished tree.
+    /// More predicates on one evaluation's worst path than
+    /// [`MAX_PREDICATES_PER_EVALUATION`].
+    TooManyPredicatesPerEvaluation {
+        /// The worst path's predicate count.
+        count: usize,
+        /// Maximum allowed.
+        max: usize,
+    },
+    /// More predicates in the document than [`MAX_DOCUMENT_PREDICATES`].
+    TooManyDocumentPredicates {
+        /// The predicate that crossed the budget.
         count: usize,
         /// Maximum allowed.
         max: usize,
@@ -272,20 +275,6 @@ pub enum MatcherError {
         /// The document's size.
         bytes: usize,
         /// Maximum accepted.
-        max: usize,
-    },
-    /// Too many field matchers in a single `Matcher`.
-    TooManyFieldMatchers {
-        /// Actual count of field matchers.
-        count: usize,
-        /// Maximum allowed.
-        max: usize,
-    },
-    /// Too many predicates in a compound `And` or `Or`.
-    TooManyPredicates {
-        /// Actual count of predicates.
-        count: usize,
-        /// Maximum allowed.
         max: usize,
     },
     /// An identifier that names what to look up was empty.
@@ -361,22 +350,17 @@ impl std::fmt::Display for MatcherError {
                     "input produces \"{input_type}\" data but matcher supports {matcher_types:?}"
                 )
             }
-            Self::TooManyFieldMatchers { count, max } => {
+            Self::TooManyPredicatesPerEvaluation { count, max } => {
                 write!(
                     f,
-                    "matcher has {count} field matchers, but maximum allowed is {max}"
+                    "matcher can reach {count} predicates in one evaluation, but maximum \
+                     allowed is {max} — key large rule sets on a field with a matcher tree"
                 )
             }
-            Self::TooManyPredicates { count, max } => {
+            Self::TooManyDocumentPredicates { count, max } => {
                 write!(
                     f,
-                    "compound predicate has {count} children, but maximum allowed is {max}"
-                )
-            }
-            Self::TooManyLeafPredicates { count, max } => {
-                write!(
-                    f,
-                    "matcher has {count} leaf predicates, but maximum allowed is {max}"
+                    "document has {count} predicates, but maximum allowed is {max}"
                 )
             }
             Self::TooManyRegexes { count, max } => {

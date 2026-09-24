@@ -8,6 +8,54 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-09-24 · The budget measures a request, not a document
+
+### D-068 · Per-request cost is budgeted along the worst path; the per-list and per-compound bounds go
+
+**Decided.** Revises D-054. `MAX_PREDICATES_PER_EVALUATION = 256` bounds the
+predicates one evaluation can reach, computed once the matcher is built: a list
+costs every rule's predicate plus its nested matcher, since a nested miss moves
+on to the next rule; an exact tree costs its dearest entry; a prefix tree costs
+its dearest chain of prefixes, since a miss falls through to the next shorter
+one (D-055); a fallback adds its own cost. `MAX_DOCUMENT_PREDICATES = 65_536`
+bounds the document, counted during load as D-054's leaf budget was, so a
+hostile document is still refused before it is materialised. It is a memory
+bound, the same size as `MAX_TREE_ENTRIES`. `MAX_FIELD_MATCHERS` and
+`MAX_PREDICATES_PER_COMPOUND` are removed, with their errors.
+
+**Why.** D-054's leaf budget summed every leaf in the document, including those
+under tree entries a request never visits. With the value 256 it capped any
+document at 256 rules, so the trees D-054 names as the way to scale could not
+hold more than 256 single-rule entries (verified by execution 2026-09-24: 256
+entries load, 257 are refused, 300 plain-action entries load). It also made the
+per-list bound unreachable, since every rule holds at least one predicate. The
+2026-09-07 reviews bounded the right thing and the budget did not: Dijkstra,
+that lifting the width is a security decision and a dispatcher over a list that
+cannot exist is not an optimisation; Knuth, that per-request cost is linear in
+the rules visited (~21 ns per rule on a miss) and scale comes from dispatch.
+Both are statements about one request. The path budget is that statement, and
+it covers a wide list and a wide compound, which lie on one path. Two bounds on
+one quantity leave a reader to work out which fires; one does not.
+
+**What it entails.** The per-request security posture is unchanged: a list or a
+compound over 256 predicates is still refused, now by the path budget. What
+changes is that a tree's entries no longer add up. Fixtures first:
+`budget_tree_entries_do_not_add_up` and `budget_prefix_siblings_do_not_add_up`
+(entries summing past 256, each a hundred, load and evaluate);
+`budget_prefix_chain_adds_up` (a chain of prefixes summing to 300 is
+refused); `budget_list_rules_add_up`, formerly `budget_aggregate_leaves`,
+keeps its refusal under the new message. The document budget and the regex
+budget are asserted in registry unit tests at exactly budget + 1, on the IR
+path, which has no byte bound; through protojson `MAX_DOCUMENT_BYTES` binds
+first.
+
+**Revisit if.** The N-scaling benchmark (Knuth; Ixian's
+`rule_count_{last_match,miss}`) shows a workload that needs more than 256
+predicates on one path. Raising the number is then the security decision
+Dijkstra named, taken on those measurements.
+
+---
+
 ## 2026-09-08 · The freeze line: what is decided before first publish
 
 Sixteen decisions from one deliberation (2026-09-07, focus mode: Burner,
@@ -82,6 +130,9 @@ once step 4 lands, never as the pure engine in the interval.
 moves before publish, because it changes a public trait.
 
 ### D-054 · Rule sets at scale are trees; per-list width stays bounded; aggregate budgets are checked during load
+
+**Revised by D-068** (2026-09-24): the leaf budget summed branches a request
+never visits; per-request cost is now budgeted along the worst path.
 
 **Decided.** `MAX_FIELD_MATCHERS = 256` stays as the per-list bound. Large rule
 sets are compiled into `MatcherTree`s, with lists beneath the leaves; the

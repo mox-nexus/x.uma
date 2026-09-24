@@ -438,8 +438,10 @@ Configs are validated at load time:
 | Limit | Value | Error |
 |-------|-------|-------|
 | Max nesting depth | 32 levels | `DepthExceeded` |
-| Max field matchers per matcher | 256 | `TooManyFieldMatchers` |
-| Max predicates per AND/OR | 256 | `TooManyPredicates` |
+| Max predicates one evaluation can reach | 256 | `TooManyPredicatesPerEvaluation` |
+| Max entries per tree | 65,536 | `TooManyTreeEntries` |
+| Max predicates per document | 65,536 | `TooManyDocumentPredicates` |
+| Max regexes per document | 64 | `TooManyRegexes` |
 | Max pattern length | 8192 chars | `PatternTooLong` |
 | Max regex pattern length | 4096 chars | `PatternTooLong` |
 | Max document nesting (before a matcher exists) | 128 levels | rejected during `@type` expansion |

@@ -238,7 +238,7 @@ mod tests {
     /// CLAUDE.md calls the door handle — accepted a matcher of any width.
     #[test]
     fn compiler_rejects_more_routes_than_the_limit() {
-        let routes: Vec<HttpRouteMatch> = (0..=rumi::MAX_PREDICATES_PER_COMPOUND)
+        let routes: Vec<HttpRouteMatch> = (0..=rumi::MAX_PREDICATES_PER_EVALUATION)
             .map(|i| HttpRouteMatch {
                 path: Some(HttpPathMatch::Exact {
                     value: format!("/r{i}"),
@@ -249,7 +249,7 @@ mod tests {
 
         let err = compile_route_matches(&routes, "hit", None).unwrap_err();
         assert!(
-            matches!(err, MatcherError::TooManyPredicates { .. }),
+            matches!(err, MatcherError::TooManyPredicatesPerEvaluation { .. }),
             "{err:?}"
         );
     }

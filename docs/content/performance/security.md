@@ -34,18 +34,17 @@ No implementation uses a backtracking regex engine. Patterns that would cause ca
 
 **Threat:** Resource exhaustion from extremely wide matchers. A config with millions of field matchers at depth 1 bypasses depth limits but still causes excessive memory and CPU usage.
 
-**Mitigation:** Width limits per list, and budgets per document that nesting cannot add around, all checked before a matcher exists:
+**Mitigation:** A budget on what one evaluation can reach, and budgets per document that nesting cannot add around, all checked before a matcher exists:
 
 | Limit | Value | Protects |
 |-------|-------|----------|
-| `MAX_FIELD_MATCHERS` | 256 per `Matcher` | Memory from wide matcher lists |
-| `MAX_PREDICATES_PER_COMPOUND` | 256 per AND/OR | CPU from wide predicate trees |
+| `MAX_PREDICATES_PER_EVALUATION` | 256 on the worst path | CPU per request: every rule of a list, one tree entry, or one chain of prefixes |
 | `MAX_PATTERN_LENGTH` | 8,192 chars | Memory from large string patterns |
-| `MAX_LEAF_PREDICATES` | 256 per document | CPU per request, counted across nested matchers |
+| `MAX_DOCUMENT_PREDICATES` | 65,536 per document | Memory, counted across nested matchers and tree entries |
 | `MAX_REGEXES` | 64 per document, 1 MiB program and 1 MiB DFA cache each | Regex memory, bounded as count × size |
 | `MAX_DOCUMENT_BYTES` | 1 MiB | A document refused by its size before it is parsed |
 
-The per-document budgets are counted as the document is loaded, so a hostile config is refused at the leaf or regex that crosses the budget rather than after everything past it has been built.
+The per-document budgets are counted as the document is loaded, so a hostile config is refused at the predicate or regex that crosses the budget rather than after everything past it has been built.
 
 ## None-to-False
 

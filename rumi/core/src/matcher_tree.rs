@@ -204,13 +204,14 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
             .unwrap_or(0)
     }
 
-    pub(crate) fn leaf_count(&self) -> usize {
-        self.outcomes()
-            .map(|om| match om {
-                OnMatch::Action(_) => 0,
-                OnMatch::Matcher(m) => m.leaf_count(),
-            })
-            .sum()
+    /// The dearest entry one lookup can evaluate, or for a prefix tree the
+    /// dearest chain of prefixes, since a miss falls through to the next
+    /// shorter one (D-055).
+    pub(crate) fn path_cost(&self) -> usize {
+        match self {
+            Self::ExactMatch { map, .. } => map.values().map(OnMatch::path_cost).max().unwrap_or(0),
+            Self::PrefixMatch { tree, .. } => tree.max_chain_cost(&OnMatch::path_cost),
+        }
     }
 
     /// Check this tree's width, and recurse into nested matchers.

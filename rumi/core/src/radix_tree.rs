@@ -113,6 +113,21 @@ impl<V> RadixTree<V> {
         self.root.find_longest_prefix(key)
     }
 
+    /// The largest total `cost` over a chain of stored keys, each a prefix of
+    /// the next: what one lookup can visit when every miss falls through to
+    /// the next shorter prefix (D-055). Iterative, since a chain of keys like
+    /// `a`, `aa`, `aaa` makes the tree as deep as its longest key.
+    pub fn max_chain_cost(&self, cost: &impl Fn(&V) -> usize) -> usize {
+        let mut dearest = 0;
+        let mut stack = vec![(&self.root, 0)];
+        while let Some((node, above)) = stack.pop() {
+            let here = above + node.value.as_ref().map_or(0, cost);
+            dearest = dearest.max(here);
+            stack.extend(node.children.values().map(|child| (child, here)));
+        }
+        dearest
+    }
+
     /// Every entry whose key is a prefix of the input, longest first, each
     /// with the key that matched.
     ///
