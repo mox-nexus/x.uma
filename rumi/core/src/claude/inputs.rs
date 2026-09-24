@@ -2,6 +2,7 @@
 
 use super::context::HookContext;
 use crate::prelude::*;
+use std::borrow::Cow;
 
 /// Extracts the hook event type as a string.
 #[derive(Debug, Clone)]
@@ -10,6 +11,10 @@ pub struct EventTypeInput;
 impl DataInput<HookContext> for EventTypeInput {
     fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
         Some(MatchingData::String(ctx.event().as_str().to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.claude.v1.EventTypeInput"))
     }
 }
 
@@ -20,6 +25,10 @@ pub struct ToolNameInput;
 impl DataInput<HookContext> for ToolNameInput {
     fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
         Some(MatchingData::String(ctx.tool_name().to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.claude.v1.ToolNameInput"))
     }
 }
 
@@ -54,6 +63,13 @@ impl DataInput<HookContext> for ToolArgInput {
         ctx.argument(&self.name)
             .map(|s| MatchingData::String(s.to_string()))
     }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Owned(format!(
+            "xuma.claude.v1.ToolArgInput/{}",
+            self.name
+        )))
+    }
 }
 
 /// Extracts the session ID.
@@ -63,6 +79,10 @@ pub struct SessionIdInput;
 impl DataInput<HookContext> for SessionIdInput {
     fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
         Some(MatchingData::String(ctx.session_id().to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.claude.v1.SessionIdInput"))
     }
 }
 
@@ -74,6 +94,10 @@ impl DataInput<HookContext> for CwdInput {
     fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
         Some(MatchingData::String(ctx.cwd().to_string()))
     }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.claude.v1.CwdInput"))
+    }
 }
 
 /// Extracts the git branch, or `None` if not in a repository.
@@ -84,6 +108,10 @@ impl DataInput<HookContext> for GitBranchInput {
     fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
         ctx.git_branch()
             .map(|s| MatchingData::String(s.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.claude.v1.GitBranchInput"))
     }
 }
 

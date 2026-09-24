@@ -7,6 +7,7 @@
 //! enabling `InputMatchers` to be shared across different domains.
 
 use crate::MatchingData;
+use std::borrow::Cow;
 use std::fmt::Debug;
 
 /// Extracts data from a domain-specific context.
@@ -66,6 +67,16 @@ pub trait DataInput<Ctx>: Send + Sync + Debug {
     fn data_type(&self) -> &'static str {
         "string"
     }
+
+    /// What this input reads, as a name: two inputs with equal identities read
+    /// the same value from any context.
+    ///
+    /// `None`, the default, keeps the input out of any evaluation that shares
+    /// one extraction between rules. An input that is impure, or whose
+    /// sameness is not decidable from its configuration, returns `None` (D-062).
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        None
+    }
 }
 
 #[diagnostic::do_not_recommend]
@@ -76,6 +87,10 @@ impl<Ctx> DataInput<Ctx> for Box<dyn DataInput<Ctx>> {
 
     fn data_type(&self) -> &'static str {
         (**self).data_type()
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        (**self).identity()
     }
 }
 

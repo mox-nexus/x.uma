@@ -44,6 +44,21 @@ Return `None` when the value is absent. The predicate will evaluate to
 sentinel like the empty string, because a rule matching `""` would then fire on
 missing data.
 
+`get` must be pure: same context, same result, and nothing another call could
+observe. The engine may call it more or fewer times than there are rules, and
+in any order.
+
+If two instances of your input read the same value whenever their
+configuration is equal, say so with `identity`. It returns a name that is
+equal exactly when the value read is. The default, `None`, is always safe: it
+means the engine never shares one extraction between rules that use the input.
+
+```rust
+fn identity(&self) -> Option<std::borrow::Cow<'_, str>> {
+    Some("myapp.v1.RegionInput".into())
+}
+```
+
 ## Register it
 
 Inputs reach configs through the registry, keyed by type URL:

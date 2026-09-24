@@ -31,6 +31,7 @@
 //! ```
 
 use rumi::prelude::*;
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 /// A key-value context: a simple string-to-string map.
@@ -90,6 +91,10 @@ impl DataInput<KvContext> for StringInput {
     fn get(&self, ctx: &KvContext) -> Option<MatchingData> {
         ctx.get(&self.key)
             .map(|s| MatchingData::String(s.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Owned(format!("xuma.kv.v1.MapInput/{}", self.key)))
     }
 }
 

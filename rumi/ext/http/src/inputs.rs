@@ -5,6 +5,7 @@
 
 use crate::message::HttpMessage;
 use rumi::prelude::*;
+use std::borrow::Cow;
 
 /// Extracts the request path (without query string) from `HttpMessage`.
 ///
@@ -15,6 +16,10 @@ pub struct PathInput;
 impl DataInput<HttpMessage> for PathInput {
     fn get(&self, ctx: &HttpMessage) -> Option<MatchingData> {
         ctx.path().map(|p| MatchingData::String(p.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.http.v1.PathInput"))
     }
 }
 
@@ -27,6 +32,10 @@ pub struct MethodInput;
 impl DataInput<HttpMessage> for MethodInput {
     fn get(&self, ctx: &HttpMessage) -> Option<MatchingData> {
         ctx.method().map(|m| MatchingData::String(m.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.http.v1.MethodInput"))
     }
 }
 
@@ -65,6 +74,13 @@ impl DataInput<HttpMessage> for HeaderInput {
         ctx.header(&self.name)
             .map(|v| MatchingData::String(v.to_string()))
     }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Owned(format!(
+            "xuma.http.v1.HeaderInput/{}",
+            self.name.to_ascii_lowercase()
+        )))
+    }
 }
 
 /// Extracts a query parameter value from `HttpMessage`.
@@ -99,6 +115,13 @@ impl DataInput<HttpMessage> for QueryParamInput {
         ctx.query_param(&self.name)
             .map(|v| MatchingData::String(v.to_string()))
     }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Owned(format!(
+            "xuma.http.v1.QueryParamInput/{}",
+            self.name
+        )))
+    }
 }
 
 /// Extracts the :scheme pseudo-header from `HttpMessage`.
@@ -109,6 +132,10 @@ impl DataInput<HttpMessage> for SchemeInput {
     fn get(&self, ctx: &HttpMessage) -> Option<MatchingData> {
         ctx.scheme().map(|s| MatchingData::String(s.to_string()))
     }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.http.v1.SchemeInput"))
+    }
 }
 
 /// Extracts the :authority pseudo-header from `HttpMessage`.
@@ -118,6 +145,10 @@ pub struct AuthorityInput;
 impl DataInput<HttpMessage> for AuthorityInput {
     fn get(&self, ctx: &HttpMessage) -> Option<MatchingData> {
         ctx.authority().map(|a| MatchingData::String(a.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.http.v1.AuthorityInput"))
     }
 }
 
@@ -203,6 +234,27 @@ mod tests {
             matches!(err, rumi::MatcherError::EmptyIdentifier { .. }),
             "{err:?}"
         );
+    }
+
+    /// Header names are case-insensitive, so two spellings of one header are
+    /// one input; query parameter names are not (D-062).
+    #[test]
+    fn identity_is_equal_exactly_when_the_value_read_is() {
+        let id = |input: &dyn DataInput<HttpMessage>| input.identity().map(|c| c.into_owned());
+
+        assert_eq!(
+            id(&HeaderInput::new("X-Tenant").unwrap()),
+            id(&HeaderInput::new("x-tenant").unwrap())
+        );
+        assert_ne!(
+            id(&QueryParamInput::new("Page").unwrap()),
+            id(&QueryParamInput::new("page").unwrap())
+        );
+        assert_ne!(
+            id(&HeaderInput::new("path").unwrap()),
+            id(&QueryParamInput::new("path").unwrap())
+        );
+        assert_ne!(id(&PathInput), id(&MethodInput));
     }
 
     #[test]
