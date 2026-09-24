@@ -127,7 +127,7 @@ impl HookMatcher {
         Ok(self.actions.action(py, self.inner.evaluate(&ctx)))
     }
 
-    /// The decision as an object: `matched`, `action`, `index`, `fallback`.
+    /// The decision as an object: `matched`, `action`, `index`, `fallback`, `undecided`.
     #[pyo3(signature = (
         event,
         tool_name = "",
@@ -149,7 +149,7 @@ impl HookMatcher {
         git_branch: Option<&str>,
     ) -> PyResult<PyDecision> {
         let ctx = build_context(event, tool_name, arguments, cwd, session_id, git_branch)?;
-        Ok(self.actions.decide(py, self.inner.evaluate(&ctx)))
+        Ok(self.actions.decide(py, self.inner.outcome(&ctx)))
     }
 
     /// Every action this matcher can return, in index order.
@@ -311,12 +311,15 @@ impl Actions {
         self.fallback_start.is_some_and(|start| index >= start)
     }
 
-    pub(crate) fn decide(&self, py: Python<'_>, index: Option<ActionIndex>) -> PyDecision {
+    pub(crate) fn decide(&self, py: Python<'_>, outcome: rumi::Outcome<ActionIndex>) -> PyDecision {
+        let undecided = matches!(outcome, rumi::Outcome::Undecided);
+        let index = outcome.into_action();
         PyDecision {
             matched: index.is_some(),
             action: self.action(py, index),
             index: index.map(|i| i.0),
             fallback: index.is_some_and(|i| self.is_fallback(i)),
+            undecided,
         }
     }
 
@@ -346,12 +349,14 @@ impl Actions {
             index: trace.result.map(|i| i.0),
             steps: trace_steps(&trace.steps),
             used_fallback: trace.used_fallback,
+            undecided: trace.undecided,
         }
     }
 }
 
-/// One decision: whether anything matched, the action, its index, and whether
-/// it came from the root fallback.
+/// One decision: whether anything matched, the action, its index, whether it
+/// came from the root fallback, and whether a required value was absent so
+/// nothing was decided (D-069).
 #[pyclass(frozen, name = "Decision")]
 #[derive(Debug)]
 pub struct PyDecision {
@@ -363,14 +368,16 @@ pub struct PyDecision {
     pub index: Option<u32>,
     #[pyo3(get)]
     pub fallback: bool,
+    #[pyo3(get)]
+    pub undecided: bool,
 }
 
 #[pymethods]
 impl PyDecision {
     fn __repr__(&self) -> String {
         format!(
-            "Decision(matched={}, action={:?}, index={:?}, fallback={})",
-            self.matched, self.action, self.index, self.fallback
+            "Decision(matched={}, action={:?}, index={:?}, fallback={}, undecided={})",
+            self.matched, self.action, self.index, self.fallback, self.undecided
         )
     }
 }
@@ -391,17 +398,21 @@ pub struct PyTraceResult {
     /// Whether the fallback was used.
     #[pyo3(get)]
     pub used_fallback: bool,
+    /// Whether a required value was absent, so nothing was decided (D-069).
+    #[pyo3(get)]
+    pub undecided: bool,
 }
 
 #[pymethods]
 impl PyTraceResult {
     fn __repr__(&self) -> String {
         format!(
-            "TraceResult(result={:?}, index={:?}, steps={}, used_fallback={})",
+            "TraceResult(result={:?}, index={:?}, steps={}, used_fallback={}, undecided={})",
             self.result,
             self.index,
             self.steps.len(),
-            self.used_fallback
+            self.used_fallback,
+            self.undecided
         )
     }
 }

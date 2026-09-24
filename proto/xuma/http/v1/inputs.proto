@@ -10,25 +10,41 @@ option java_multiple_files = true;
 message HeaderInput {
   // Header name to extract (case-insensitive).
   string name = 1;
+  // Absent is undecided, not false: no action and no fallback (D-069).
+  bool required = 2;
 }
 
 // Extracts the HTTP request path.
-message PathInput {}
+message PathInput {
+  // Absent is undecided, not false: no action and no fallback (D-069).
+  bool required = 1;
+}
 
 // Extracts the HTTP request method.
-message MethodInput {}
+message MethodInput {
+  // Absent is undecided, not false: no action and no fallback (D-069).
+  bool required = 1;
+}
 
 // Extracts a query parameter value by name.
 message QueryParamInput {
   // Query parameter name.
   string name = 1;
+  // Absent is undecided, not false: no action and no fallback (D-069).
+  bool required = 2;
 }
 
 // Extracts the HTTP authority — the :authority pseudo-header, or Host in
 // HTTP/1. Named for what the code registers: this message was `HostInput`
 // while the registry advertised `xuma.http.v1.AuthorityInput`, so the schema
 // and the type URL named different things.
-message AuthorityInput {}
+message AuthorityInput {
+  // Absent is undecided, not false: no action and no fallback (D-069).
+  bool required = 1;
+}
 
 // Extracts the HTTP scheme (http/https).
-message SchemeInput {}
+message SchemeInput {
+  // Absent is undecided, not false: no action and no fallback (D-069).
+  bool required = 1;
+}

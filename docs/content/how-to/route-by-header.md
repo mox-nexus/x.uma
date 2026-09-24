@@ -22,7 +22,7 @@ one worth understanding: a missing input is not an error, it is a non-match.
       {
         "predicate": {
           "singlePredicate": {
-            "input": { "name": "tier", "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "tier" } },
+            "input": { "name": "tier", "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": "tier" } },
             "valueMatch": { "exact": "enterprise" }
           }
         },
@@ -31,7 +31,7 @@ one worth understanding: a missing input is not an error, it is a non-match.
       {
         "predicate": {
           "singlePredicate": {
-            "input": { "name": "tier", "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "tier" } },
+            "input": { "name": "tier", "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": "tier" } },
             "valueMatch": { "exact": "pro" }
           }
         },

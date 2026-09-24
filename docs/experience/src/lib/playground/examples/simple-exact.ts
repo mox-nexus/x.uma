@@ -9,7 +9,7 @@ const single = (key: string, valueMatch: Record<string, string>) => ({
   singlePredicate: {
     input: {
       name: key,
-      typedConfig: { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key },
+      typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.MapInput", key },
     },
     valueMatch,
   },
@@ -22,7 +22,7 @@ export const blockDangerousCommands: Preset = {
   // The rule *shape* a hook uses, in the domain the playground evaluates.
   // `rumi run claude` registers `xuma.claude.v1.*` inputs and rejects anything
   // else, so this exact config fails to load in the real hook runner; the
-  // playground's engine registers `xuma.kv.v1.MapInput`. The shape is the
+  // playground's engine registers `xuma.core.v1.MapInput`. The shape is the
   // transferable part: AND of three conditions, deny on match, allow on
   // no-match.
   description:

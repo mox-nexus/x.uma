@@ -24,7 +24,7 @@ await init();
 // ── Configs ──────────────────────────────────────────────────────────────────
 
 function mapInput(key: string) {
-	return { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key };
+	return { "@type": "type.googleapis.com/xuma.core.v1.MapInput", key };
 }
 
 function namedAction(name: string) {

@@ -208,6 +208,7 @@ mod tests {
         // Encode a HeaderInput proto to bytes
         let header_input = crate::xuma::http::v1::HeaderInput {
             name: "content-type".into(),
+            ..Default::default()
         };
         let bytes = header_input.encode_to_vec();
 
@@ -228,21 +229,24 @@ mod tests {
     #[test]
     fn resolve_short_type_url() {
         let resolver = AnyResolverBuilder::new()
-            .register::<crate::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+            .register::<crate::xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
             .build();
 
-        let input = crate::xuma::kv::v1::MapInput { key: "key".into() };
+        let input = crate::xuma::core::v1::MapInput {
+            key: "key".into(),
+            ..Default::default()
+        };
 
         let config = crate::xds::core::v3::TypedExtensionConfig {
             name: "test".into(),
             typed_config: Some(prost_types::Any {
-                type_url: "xuma.kv.v1.MapInput".into(),
+                type_url: "xuma.core.v1.MapInput".into(),
                 value: input.encode_to_vec().into(),
             }),
         };
 
         let typed = resolver.resolve(&config).unwrap();
-        assert_eq!(typed.type_url, "xuma.kv.v1.MapInput");
+        assert_eq!(typed.type_url, "xuma.core.v1.MapInput");
         assert_eq!(typed.config["key"], "key");
     }
 

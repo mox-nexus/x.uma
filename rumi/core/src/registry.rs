@@ -355,6 +355,18 @@ impl<A: Clone + Send + Sync + 'static> ActionRegistry<A> {
     }
 }
 
+/// Whether an input's declaration marks its value `required` (D-069).
+///
+/// Every input message whose value can be absent declares the field, so the
+/// registry reads it once here rather than every factory implementing
+/// absence; a factory whose message lacks the field refuses the key.
+fn declares_required(config: &serde_json::Value) -> bool {
+    config
+        .get("required")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
+}
+
 /// What one load has spent against the document-wide budgets (D-054, D-068).
 ///
 /// Counted as the walk goes, so a document is refused at the predicate or
@@ -556,6 +568,7 @@ impl<Ctx: 'static> Registry<Ctx> {
                 available: self.input_factories.keys().cloned().collect(),
             })?;
         let input = input_factory(&config.input.config)?;
+        let required = declares_required(&config.input.config);
 
         let (entries, is_prefix) = match config.tree {
             TreeTypeIr::ExactMatchMap(e) => (e, false),
@@ -576,11 +589,12 @@ impl<Ctx: 'static> Registry<Ctx> {
             .map(|(key, om)| load_on_match(self, om, budget).map(|om| (key, om)))
             .collect::<Result<Vec<_>, _>>()?;
 
-        if is_prefix {
+        let tree = if is_prefix {
             crate::MatcherTree::prefix(input, loaded)
         } else {
             crate::MatcherTree::exact(input, loaded)
-        }
+        };
+        tree.map(|t| t.with_required_input(required))
     }
 
     /// Returns the number of registered matcher types.
@@ -722,7 +736,8 @@ impl<Ctx: 'static> Registry<Ctx> {
             });
         }
 
-        Ok(SinglePredicate::new(input, matcher))
+        Ok(SinglePredicate::new(input, matcher)
+            .with_required(declares_required(&config.input.config)))
     }
 
     fn load_on_match<A>(

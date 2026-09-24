@@ -26,7 +26,7 @@ from xuma_crust import HttpMatcher, KvMatcher
 
 
 def _map_input(key: str) -> dict:
-    return {"@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": key}
+    return {"@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": key}
 
 
 def _named_action(name: str) -> dict:

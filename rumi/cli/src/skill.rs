@@ -65,7 +65,7 @@ matcherList:
           input:
             name: method
             typedConfig:
-              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              "@type": type.googleapis.com/xuma.core.v1.MapInput
               key: method
           valueMatch:
             exact: GET
@@ -185,7 +185,7 @@ fn section(s: &mut String, title: &str, urls: &[&str]) {
 /// doc comment claims these tables cannot drift. The generated half could not.
 /// This half could, and did.
 pub const CONFIG_KEYS: &[(&str, &str)] = &[
-    ("xuma.kv.v1.MapInput", "key"),
+    ("xuma.core.v1.MapInput", "key"),
     ("xuma.http.v1.HeaderInput", "name"),
     ("xuma.http.v1.QueryParamInput", "name"),
     ("xuma.claude.v1.ToolArgInput", "name"),
@@ -199,7 +199,7 @@ pub const CONFIG_KEYS: &[(&str, &str)] = &[
 /// extension appears immediately even before it is described here.
 fn description(type_url: &str) -> &'static str {
     match type_url {
-        "xuma.kv.v1.MapInput" => "reads the context map",
+        "xuma.core.v1.MapInput" => "reads the context map",
         "xuma.core.v1.StringMatcher" => "Exact / Prefix / Suffix / Contains / Regex",
         "xuma.core.v1.BoolMatcher" => "matches a boolean value",
         "xuma.http.v1.PathInput" => "request path, without query string",
@@ -317,7 +317,7 @@ everywhere else.
 input:
   name: role
   typedConfig:
-    "@type": type.googleapis.com/xuma.kv.v1.MapInput
+    "@type": type.googleapis.com/xuma.core.v1.MapInput
     key: role
 ```
 

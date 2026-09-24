@@ -5,14 +5,14 @@
 //! inlined beside an `@type` key:
 //!
 //! ```json
-//! { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "role" }
+//! { "@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": "role" }
 //! ```
 //!
 //! `pbjson-types` writes it **packed** instead — a type URL beside base64 of the
 //! binary encoding:
 //!
 //! ```json
-//! { "typeUrl": "type.googleapis.com/xuma.kv.v1.MapInput", "value": "CgRyb2xl" }
+//! { "typeUrl": "type.googleapis.com/xuma.core.v1.MapInput", "value": "CgRyb2xl" }
 //! ```
 //!
 //! The difference is not stylistic. Expanding an `Any` requires knowing the
@@ -270,7 +270,7 @@ mod tests {
 
     fn resolver() -> AnyResolver {
         AnyResolverBuilder::new()
-            .register::<crate::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+            .register::<crate::xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
             .register::<crate::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
             .build()
     }
@@ -306,7 +306,7 @@ mod tests {
                       "input": {
                         "name": "role",
                         "typedConfig": {
-                          "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                          "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                           "key": "role"
                         }
                       },
@@ -346,7 +346,7 @@ mod tests {
         let doc = serde_json::json!({
             "name": "role",
             "typedConfig": {
-                "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                 "key": "role"
             }
         });
@@ -355,7 +355,7 @@ mod tests {
             serde_json::from_value(r.pack(doc).unwrap()).unwrap();
         let typed = r.resolve(&tec).unwrap();
 
-        assert_eq!(typed.type_url, "xuma.kv.v1.MapInput");
+        assert_eq!(typed.type_url, "xuma.core.v1.MapInput");
         assert_eq!(typed.config["key"], "role");
     }
 
@@ -377,7 +377,7 @@ mod tests {
     #[test]
     fn unknown_field_inside_a_payload_is_an_error() {
         let doc = serde_json::json!({
-            "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+            "@type": "type.googleapis.com/xuma.core.v1.MapInput",
             "kye": "role"
         });
         let err = resolver().pack(doc).unwrap_err();
@@ -406,7 +406,7 @@ mod tests {
                 "input": {
                     "name": "role",
                     "typedConfig": {
-                        "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                        "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                         "key": "role"
                     }
                 },

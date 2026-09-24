@@ -160,7 +160,7 @@ allow
 |-----------|-----|
 | **No ReDoS** | One regex engine everywhere: Rust's `regex` crate, linear time, no backtracking |
 | **Bounded depth** | Max 32 nesting levels, validated at config load — not at evaluation time |
-| **Fail-closed** | Missing data from `DataInput` → predicate returns `false`. Never matches by accident. |
+| **Missing is not a match** | A predicate over a missing value is `false`. Under `not` that turns true, as in Envoy; mark the input `required` and a missing value leaves the evaluation undecided instead. |
 | **Thread-safe** | `Send + Sync` in Rust; a compiled matcher is immutable in every binding |
 
 The engine and both bindings run the same conformance fixtures in `spec/tests/`.

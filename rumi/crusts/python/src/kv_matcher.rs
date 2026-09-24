@@ -1,6 +1,6 @@
 //! The key-value matcher exposed to Python.
 //!
-//! Compiles a protojson document over `xuma.kv.v1` inputs and evaluates
+//! Compiles a protojson document over `xuma.core.v1.MapInput` and evaluates
 //! key-value contexts: the domain the conformance suite runs in.
 
 use std::sync::OnceLock;
@@ -39,7 +39,7 @@ impl KvMatcher {
     ///
     /// # Supported input type URLs
     ///
-    /// - `xuma.kv.v1.MapInput` — string lookup by key (`{"key": "..."}`)
+    /// - `xuma.core.v1.MapInput` — string lookup by key (`{"key": "..."}`)
     ///
     /// # Errors
     ///
@@ -73,10 +73,10 @@ impl KvMatcher {
         self.actions.action(py, self.inner.evaluate(&ctx))
     }
 
-    /// The decision as an object: `matched`, `action`, `index`, `fallback`.
+    /// The decision as an object: `matched`, `action`, `index`, `fallback`, `undecided`.
     fn decide(&self, py: Python<'_>, context: HashMap<String, String>) -> PyDecision {
         let ctx = build_context(context);
-        self.actions.decide(py, self.inner.evaluate(&ctx))
+        self.actions.decide(py, self.inner.outcome(&ctx))
     }
 
     /// Every action this matcher can return, in index order.

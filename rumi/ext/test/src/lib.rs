@@ -16,7 +16,7 @@ pub mod http_fixture;
 
 // The conformance suite refers to the domain by these names, so they are
 // re-exported rather than duplicated. `rumi-kv` is the single definition.
-pub use rumi_kv::{KvContext, StringInput};
+pub use rumi_kv::{KvContext, MapInput};
 
 #[cfg(feature = "registry")]
 pub use rumi_kv::register;

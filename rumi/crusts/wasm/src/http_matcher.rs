@@ -65,10 +65,10 @@ impl HttpMatcher {
         Ok(self.actions.action(self.inner.evaluate(&req)))
     }
 
-    /// The decision as an object: `{ matched, action, index, fallback }`.
+    /// The decision as an object: `{ matched, action, index, fallback, undecided }`.
     pub fn decide(&self, context: JsValue) -> Result<JsValue, JsValue> {
         let req = build_request_from_js(&context)?;
-        Ok(self.actions.decide(self.inner.evaluate(&req)))
+        Ok(self.actions.decide(self.inner.outcome(&req)))
     }
 
     /// Every action this matcher can return, in index order.

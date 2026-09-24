@@ -300,9 +300,10 @@ fn report<Ctx, A: std::fmt::Display + Clone + Send + Sync + 'static>(
     if trace {
         trace_output::print(&matcher.evaluate_with_trace(ctx));
     } else {
-        match matcher.evaluate(ctx) {
-            Some(action) => println!("{action}"),
-            None => println!("(no match)"),
+        match matcher.outcome(ctx) {
+            rumi::Outcome::Action(action) => println!("{action}"),
+            rumi::Outcome::NoMatch => println!("(no match)"),
+            rumi::Outcome::Undecided => println!("(undecided: a required value is absent)"),
         }
     }
 }
@@ -446,7 +447,13 @@ fn run_claude_hook(args: &[String]) -> ! {
         Err(e) => block("hook payload describes an event rumi does not know", &e),
     };
 
-    let decision = matcher.evaluate(&ctx);
+    let decision = match matcher.outcome(&ctx) {
+        rumi::Outcome::Undecided => block(
+            "a required value is absent from the hook payload",
+            "the matcher could not decide (D-069)",
+        ),
+        outcome => outcome.into_action(),
+    };
     let code = hook::exit_code_for(decision.as_deref(), &deny_actions);
 
     if code == hook::EXIT_BLOCK {
@@ -567,7 +574,7 @@ fn build_resolver() -> AnyResolver {
     use rumi_proto::xuma;
 
     AnyResolverBuilder::new()
-        .register::<xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+        .register::<xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
         .register::<xuma::http::v1::HeaderInput>("xuma.http.v1.HeaderInput")
         .register::<xuma::http::v1::PathInput>("xuma.http.v1.PathInput")
         .register::<xuma::http::v1::MethodInput>("xuma.http.v1.MethodInput")
@@ -889,7 +896,7 @@ mod tests {
     #[test]
     fn build_test_registry_has_expected_types() {
         let registry = build_test_registry();
-        assert!(registry.contains_input("xuma.kv.v1.MapInput"));
+        assert!(registry.contains_input("xuma.core.v1.MapInput"));
         assert!(registry.contains_matcher("xuma.core.v1.BoolMatcher"));
     }
 

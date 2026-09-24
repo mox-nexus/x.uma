@@ -16,7 +16,7 @@ matcherList:
           input:
             name: method
             typedConfig:
-              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              "@type": type.googleapis.com/xuma.core.v1.MapInput
               key: method
           valueMatch:
             exact: GET

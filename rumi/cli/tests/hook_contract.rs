@@ -112,6 +112,47 @@ fn a_matching_deny_rule_blocks() {
     );
 }
 
+/// "Deny anything but `ls`" written with `not`, the shape that fails open
+/// when the argument is missing: absent is false, and `not` makes it true. With
+/// the argument `required`, its absence is undecided (D-069), and a hook that
+/// cannot decide blocks, as it does for every other failure.
+const REQUIRED_CONFIG: &str = r#"
+matcherList:
+  matchers:
+    - predicate:
+        notMatcher:
+          singlePredicate:
+            input:
+              name: command
+              typedConfig:
+                "@type": type.googleapis.com/xuma.claude.v1.ToolArgInput
+                name: command
+                required: true
+            valueMatch:
+              exact: ls
+      onMatch:
+        action:
+          name: deny
+          typedConfig:
+            "@type": type.googleapis.com/xuma.core.v1.NamedAction
+            name: deny
+"#;
+
+#[test]
+fn an_absent_required_argument_blocks_rather_than_deciding() {
+    let cfg = write_config(REQUIRED_CONFIG);
+    let allowed = run_hook(
+        &cfg,
+        r#"{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"}}"#,
+    );
+    let absent = run_hook(
+        &cfg,
+        r#"{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{}}"#,
+    );
+    assert_eq!(allowed, ALLOW, "the allow path is reachable");
+    assert_eq!(absent, BLOCK, "no command means the hook could not decide");
+}
+
 #[test]
 fn a_non_matching_call_is_allowed() {
     let cfg = write_config(CONFIG);

@@ -18,6 +18,8 @@ message ToolNameInput {}
 message ToolArgInput {
   // Argument name to extract.
   string name = 1;
+  // Absent is undecided, not false: no action and no fallback (D-069).
+  bool required = 2;
 }
 
 // Extracts the session ID.
@@ -27,4 +29,7 @@ message SessionIdInput {}
 message CwdInput {}
 
 // Extracts the git branch name (if in a git repo).
-message GitBranchInput {}
+message GitBranchInput {
+  // Absent is undecided, not false: no action and no fallback (D-069).
+  bool required = 1;
+}

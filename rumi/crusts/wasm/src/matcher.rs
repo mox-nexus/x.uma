@@ -106,10 +106,10 @@ impl HookMatcher {
         Ok(self.actions.action(self.inner.evaluate(&ctx)))
     }
 
-    /// The decision as an object: `{ matched, action, index, fallback }`.
+    /// The decision as an object: `{ matched, action, index, fallback, undecided }`.
     pub fn decide(&self, context: JsValue) -> Result<JsValue, JsValue> {
         let ctx = build_context_from_js(&context)?;
-        Ok(self.actions.decide(self.inner.evaluate(&ctx)))
+        Ok(self.actions.decide(self.inner.outcome(&ctx)))
     }
 
     /// Every action this matcher can return, in index order.
@@ -151,6 +151,7 @@ thread_local! {
     static KEY_ACTION: JsValue = JsValue::from_str("action");
     static KEY_INDEX: JsValue = JsValue::from_str("index");
     static KEY_FALLBACK: JsValue = JsValue::from_str("fallback");
+    static KEY_UNDECIDED: JsValue = JsValue::from_str("undecided");
 }
 
 impl Actions {
@@ -187,7 +188,9 @@ impl Actions {
         self.fallback_start.is_some_and(|start| index >= start)
     }
 
-    pub(crate) fn decide(&self, index: Option<ActionIndex>) -> JsValue {
+    pub(crate) fn decide(&self, outcome: rumi::Outcome<ActionIndex>) -> JsValue {
+        let undecided = matches!(outcome, rumi::Outcome::Undecided);
+        let index = outcome.into_action();
         let obj = js_sys::Object::new();
         let set = |key: &'static std::thread::LocalKey<JsValue>, value: JsValue| {
             key.with(|k| {
@@ -204,6 +207,7 @@ impl Actions {
             &KEY_FALLBACK,
             JsValue::from_bool(index.is_some_and(|i| self.is_fallback(i))),
         );
+        set(&KEY_UNDECIDED, JsValue::from_bool(undecided));
         obj.into()
     }
 
@@ -232,6 +236,7 @@ impl Actions {
             index: trace.result.map(|i| i.0),
             steps: trace_steps(&trace.steps),
             used_fallback: trace.used_fallback,
+            undecided: trace.undecided,
         };
         serde_wasm_bindgen::to_value(&result).map_err(|e| JsValue::from_str(&e.to_string()))
     }
@@ -338,6 +343,7 @@ pub(crate) struct TraceResultSerde {
     pub(crate) index: Option<u32>,
     pub(crate) steps: Vec<TraceStepSerde>,
     pub(crate) used_fallback: bool,
+    pub(crate) undecided: bool,
 }
 
 /// One step in the evaluation trace.

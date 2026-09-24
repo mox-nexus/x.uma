@@ -8,7 +8,7 @@
 use rumi_proto::any_resolver::{AnyResolver, AnyResolverBuilder};
 use rumi_proto::convert::load_proto_matcher;
 use rumi_proto::protojson::parse_matcher;
-use rumi_test::proto_fixture::{Domain, Implementation, ProtoFixture};
+use rumi_test::proto_fixture::{observed, Domain, Implementation, ProtoFixture};
 use rumi_test::KvContext;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -26,7 +26,7 @@ fn fixtures_dir() -> PathBuf {
 
 fn resolver() -> AnyResolver {
     AnyResolverBuilder::new()
-        .register::<rumi_proto::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+        .register::<rumi_proto::xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
         .register::<rumi_proto::xuma::http::v1::HeaderInput>("xuma.http.v1.HeaderInput")
         .register::<rumi_proto::xuma::http::v1::PathInput>("xuma.http.v1.PathInput")
         .register::<rumi_proto::xuma::http::v1::MethodInput>("xuma.http.v1.MethodInput")
@@ -143,8 +143,8 @@ fn run(fixture: &ProtoFixture) {
                     .iter()
                     .fold(KvContext::new(), |c, (k, v)| c.with(k, v));
                 assert_eq!(
-                    matcher.evaluate(&ctx),
-                    case.expect,
+                    observed(matcher.outcome(&ctx), |a| a),
+                    case.expected(),
                     "fixture '{}' case '{}'",
                     fixture.name,
                     case.name
@@ -168,8 +168,8 @@ fn run(fixture: &ProtoFixture) {
                     |b, (k, v)| b.header(k, v),
                 );
                 assert_eq!(
-                    matcher.evaluate(&req.build()),
-                    case.expect,
+                    observed(matcher.outcome(&req.build()), |a| a),
+                    case.expected(),
                     "fixture '{}' case '{}'",
                     fixture.name,
                     case.name
@@ -226,7 +226,7 @@ matcherList:
           input:
             name: role
             typedConfig:
-              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              "@type": type.googleapis.com/xuma.core.v1.MapInput
               key: role
           valueMatch:
             exact: admin
@@ -252,7 +252,7 @@ onNoMatch:
               "input": {
                 "name": "role",
                 "typedConfig": {
-                  "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                  "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                   "key": "role"
                 }
               },

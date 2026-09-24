@@ -31,7 +31,7 @@ fn build_resolver() -> AnyResolver {
     use rumi_proto::xuma;
 
     AnyResolverBuilder::new()
-        .register::<xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+        .register::<xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
         .register::<xuma::http::v1::HeaderInput>("xuma.http.v1.HeaderInput")
         .register::<xuma::http::v1::PathInput>("xuma.http.v1.PathInput")
         .register::<xuma::http::v1::MethodInput>("xuma.http.v1.MethodInput")

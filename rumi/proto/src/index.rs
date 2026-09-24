@@ -149,7 +149,7 @@ mod tests {
         FieldMatcherIr {
             predicate: PredicateIr::Single(SinglePredicateIr {
                 input: TypedExtensionConfig {
-                    type_url: "xuma.kv.v1.MapInput".into(),
+                    type_url: "xuma.core.v1.MapInput".into(),
                     config: serde_json::json!({ "key": name }),
                 },
                 matcher: ValueMatchIr::BuiltIn {
@@ -244,7 +244,7 @@ mod tests {
         let tree = |entries: Vec<(&str, &str)>| MatcherIr {
             kind: MatcherKindIr::Tree(MatcherTreeIr {
                 input: TypedExtensionConfig {
-                    type_url: "xuma.kv.v1.MapInput".into(),
+                    type_url: "xuma.core.v1.MapInput".into(),
                     config: serde_json::json!({ "key": "role" }),
                 },
                 tree: TreeTypeIr::ExactMatchMap(

@@ -151,7 +151,7 @@ Non-negotiable. Every change must preserve these:
 
 | # | Invariant | What Breaks If Violated |
 |---|-----------|------------------------|
-| INV-1 | `DataInput::get()` returns `None` → predicate evaluates to `false` | Fail-open security — missing data could match |
+| INV-1 | `DataInput::get()` returns `None` → predicate evaluates to `false`; `required` → `Undecided`, which `not` passes through and which stops a list or tree without its fallback (D-069) | Fail-open security — missing data could match |
 | INV-2 | First-match-wins in `Matcher::evaluate()` | Semantic change — different action returned |
 | INV-3 | `EvalTrace.result` always equals `evaluate()` result | Debug output lies — trace shows wrong result |
 | INV-4 | `OnMatch` is exclusive — Action XOR Matcher, never both | Ambiguous semantics — which takes precedence? |

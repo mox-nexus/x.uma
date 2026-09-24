@@ -36,7 +36,7 @@ class TestBasicMatching:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.kv.v1.MapInput",
+                        "type_url": "xuma.core.v1.MapInput",
                         "config": {"key": "role"},
                     },
                     "value_match": {"Exact": "admin"},
@@ -56,7 +56,7 @@ class TestBasicMatching:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.kv.v1.MapInput",
+                        "type_url": "xuma.core.v1.MapInput",
                         "config": {"key": "email"},
                     },
                     "value_match": {"Suffix": "@acme.com"},
@@ -74,7 +74,7 @@ class TestBasicMatching:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.kv.v1.MapInput",
+                        "type_url": "xuma.core.v1.MapInput",
                         "config": {"key": "version"},
                     },
                     "value_match": {"Regex": r"^v\d+\.\d+"},
@@ -104,7 +104,7 @@ class TestCompoundPredicates:
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.kv.v1.MapInput",
+                                "type_url": "xuma.core.v1.MapInput",
                                 "config": {"key": "role"},
                             },
                             "value_match": {"Exact": "admin"},
@@ -112,7 +112,7 @@ class TestCompoundPredicates:
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.kv.v1.MapInput",
+                                "type_url": "xuma.core.v1.MapInput",
                                 "config": {"key": "org"},
                             },
                             "value_match": {"Prefix": "acme"},
@@ -136,7 +136,7 @@ class TestCompoundPredicates:
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.kv.v1.MapInput",
+                                "type_url": "xuma.core.v1.MapInput",
                                 "config": {"key": "role"},
                             },
                             "value_match": {"Exact": "admin"},
@@ -144,7 +144,7 @@ class TestCompoundPredicates:
                         {
                             "type": "single",
                             "input": {
-                                "type_url": "xuma.kv.v1.MapInput",
+                                "type_url": "xuma.core.v1.MapInput",
                                 "config": {"key": "role"},
                             },
                             "value_match": {"Exact": "superadmin"},
@@ -167,7 +167,7 @@ class TestCompoundPredicates:
                     "predicate": {
                         "type": "single",
                         "input": {
-                            "type_url": "xuma.kv.v1.MapInput",
+                            "type_url": "xuma.core.v1.MapInput",
                             "config": {"key": "env"},
                         },
                         "value_match": {"Exact": "prod"},
@@ -196,7 +196,7 @@ class TestNesting:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.kv.v1.MapInput",
+                        "type_url": "xuma.core.v1.MapInput",
                         "config": {"key": "tier"},
                     },
                     "value_match": {"Exact": "premium"},
@@ -209,7 +209,7 @@ class TestNesting:
                                 "predicate": {
                                     "type": "single",
                                     "input": {
-                                        "type_url": "xuma.kv.v1.MapInput",
+                                        "type_url": "xuma.core.v1.MapInput",
                                         "config": {"key": "region"},
                                     },
                                     "value_match": {"Exact": "us-east"},
@@ -220,7 +220,7 @@ class TestNesting:
                                 "predicate": {
                                     "type": "single",
                                     "input": {
-                                        "type_url": "xuma.kv.v1.MapInput",
+                                        "type_url": "xuma.core.v1.MapInput",
                                         "config": {"key": "region"},
                                     },
                                     "value_match": {"Exact": "eu-west"},
@@ -277,7 +277,7 @@ proto_matcher:
           singlePredicate:
             input:
               name: k
-              typedConfig: {"@type": "type.googleapis.com/xuma.kv.v1.MapInput", key: k}
+              typedConfig: {"@type": "type.googleapis.com/xuma.core.v1.MapInput", key: k}
             valueMatch: {exact: v}
         onMatch:
           action:
@@ -324,7 +324,7 @@ class TestErrors:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.kv.v1.MapInput",
+                        "type_url": "xuma.core.v1.MapInput",
                         "config": {"key": "name"},
                     },
                     "value_match": {"Regex": "[invalid"},
@@ -350,7 +350,7 @@ class TestTrace:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.kv.v1.MapInput",
+                        "type_url": "xuma.core.v1.MapInput",
                         "config": {"key": "role"},
                     },
                     "value_match": {"Exact": "admin"},
@@ -370,7 +370,7 @@ class TestTrace:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.kv.v1.MapInput",
+                        "type_url": "xuma.core.v1.MapInput",
                         "config": {"key": "role"},
                     },
                     "value_match": {"Exact": "admin"},
@@ -399,7 +399,7 @@ class TestDeveloperExperience:
                 "predicate": {
                     "type": "single",
                     "input": {
-                        "type_url": "xuma.kv.v1.MapInput",
+                        "type_url": "xuma.core.v1.MapInput",
                         "config": {"key": "x"},
                     },
                     "value_match": {"Exact": "y"},
@@ -429,7 +429,7 @@ def _rule(key, value, on_match):
             "singlePredicate": {
                 "input": {
                     "name": key,
-                    "typedConfig": {"@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": key},
+                    "typedConfig": {"@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": key},
                 },
                 "valueMatch": {"exact": value},
             }
@@ -464,6 +464,19 @@ class TestDecision:
         }))
         d = matcher.decide({"role": "nobody"})
         assert (d.matched, d.action, d.index, d.fallback) == (False, None, None, False)
+
+    def test_a_required_value_that_is_absent_is_undecided(self):
+        required = _rule("role", "guest", _named("allow"))
+        single = required["predicate"]["singlePredicate"]
+        single["input"]["typedConfig"]["required"] = True
+        required["predicate"] = {"notMatcher": {"singlePredicate": single}}
+        matcher = CrustTestMatcher.from_config(json.dumps({
+            "matcherList": {"matchers": [required]},
+            "onNoMatch": _named("deny"),
+        }))
+        d = matcher.decide({})
+        assert (d.matched, d.action, d.fallback, d.undecided) == (False, None, False, True)
+        assert matcher.trace({}).undecided
 
     def test_evaluate_and_decide_agree(self):
         matcher = CrustTestMatcher.from_config(TWO_RULES_AND_A_FALLBACK)

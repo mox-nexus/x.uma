@@ -180,7 +180,7 @@ All extension types use googleapis.com prefix:
 
 ```
 type.googleapis.com/xuma.http.v1.HeaderInput
-type.googleapis.com/xuma.kv.v1.MapInput
+type.googleapis.com/xuma.core.v1.MapInput
 type.googleapis.com/xds.type.matcher.v3.StringMatcher
 ```
 

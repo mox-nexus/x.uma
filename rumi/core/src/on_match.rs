@@ -86,9 +86,15 @@ impl<Ctx, A: Clone + Send + Sync + 'static> OnMatch<Ctx, A> {
     /// - If this is an `Action`, returns the cloned action.
     /// - If this is a `Matcher`, delegates to the nested matcher.
     pub fn evaluate(&self, ctx: &Ctx) -> Option<A> {
+        self.outcome(ctx).into_action()
+    }
+
+    /// Evaluate this `OnMatch`, keeping an undecided nested matcher apart from
+    /// one that matched nothing (D-069).
+    pub fn outcome(&self, ctx: &Ctx) -> crate::Outcome<A> {
         match self {
-            Self::Action(a) => Some(a.clone()),
-            Self::Matcher(m) => m.evaluate(ctx),
+            Self::Action(a) => crate::Outcome::Action(a.clone()),
+            Self::Matcher(m) => m.outcome(ctx),
         }
     }
 }

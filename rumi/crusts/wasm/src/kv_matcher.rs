@@ -1,6 +1,6 @@
 //! The key-value matcher exposed to TypeScript via wasm-bindgen.
 //!
-//! Compiles a protojson document over `xuma.kv.v1` inputs and evaluates
+//! Compiles a protojson document over `xuma.core.v1.MapInput` and evaluates
 //! key-value contexts: the domain the conformance suite runs in.
 
 use std::sync::OnceLock;
@@ -32,7 +32,7 @@ impl KvMatcher {
     ///
     /// # Supported input type URLs
     ///
-    /// - `xuma.kv.v1.MapInput` — string lookup by key (`{"key": "..."}`)
+    /// - `xuma.core.v1.MapInput` — string lookup by key (`{"key": "..."}`)
     #[wasm_bindgen(js_name = "fromConfig")]
     pub fn from_config(json_config: &str) -> Result<KvMatcher, JsValue> {
         let config = crate::protojson::load(json_config).map_err(|e| JsValue::from_str(&e))?;
@@ -58,10 +58,10 @@ impl KvMatcher {
         Ok(self.actions.action(self.inner.evaluate(&ctx)))
     }
 
-    /// The decision as an object: `{ matched, action, index, fallback }`.
+    /// The decision as an object: `{ matched, action, index, fallback, undecided }`.
     pub fn decide(&self, context: JsValue) -> Result<JsValue, JsValue> {
         let ctx = build_context_from_js(&context)?;
-        Ok(self.actions.decide(self.inner.evaluate(&ctx)))
+        Ok(self.actions.decide(self.inner.outcome(&ctx)))
     }
 
     /// Every action this matcher can return, in index order.

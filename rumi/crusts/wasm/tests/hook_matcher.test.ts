@@ -472,12 +472,14 @@ describe("Compiled decision", () => {
       action: "blocked",
       index: 0,
       fallback: false,
+      undecided: false,
     });
     expect(matcher.decide({ event: "Stop" })).toEqual({
       matched: true,
       action: "allowed",
       index: 1,
       fallback: true,
+      undecided: false,
     });
   });
 
@@ -489,6 +491,7 @@ describe("Compiled decision", () => {
       action: undefined,
       index: undefined,
       fallback: false,
+      undecided: false,
     });
     expect(matcher.actionMetadata(0)).toEqual({});
   });

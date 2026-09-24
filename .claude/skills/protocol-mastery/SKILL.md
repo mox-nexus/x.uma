@@ -233,7 +233,6 @@ Following established patterns:
 
 ```
 xuma.core.v1      # Base types, registry
-xuma.kv.v1      # Conformance testing
 xuma.http.v1      # HTTP matching
 xuma.claude.v1    # Claude Code hooks
 xuma.grpc.v1      # gRPC matching (future)
@@ -244,7 +243,7 @@ xuma.grpc.v1      # gRPC matching (future)
 ```
 type.googleapis.com/xuma.http.v1.HeaderInput
 type.googleapis.com/xuma.http.v1.QueryParameterInput
-type.googleapis.com/xuma.kv.v1.MapInput
+type.googleapis.com/xuma.core.v1.MapInput
 ```
 
 **Convention:** Always `type.googleapis.com/` prefix (de facto standard).

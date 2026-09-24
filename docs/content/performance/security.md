@@ -52,7 +52,20 @@ The per-document budgets are counted as the document is loaded, so a hostile con
 
 **Mitigation:** `DataInput::get` returns `Option<MatchingData>`. When it returns `None`, the predicate evaluates to `false` and the `InputMatcher` is never called. The signature enforces it in the engine, and therefore in every binding.
 
-This is a security invariant, not a convenience feature. It ensures fail-closed behavior: missing data means no match.
+This is a security invariant, not a convenience feature, and it covers exactly one thing: a predicate over a missing value does not match. It does not make every rule fail closed. `not` inverts that `false`, so "allow unless the role is `guest`" allows a request that carries no role at all. Envoy behaves the same way, and xDS configs rely on it.
+
+When a missing value must not be read as an answer, mark the input `required`:
+
+```yaml
+input:
+  name: role
+  typedConfig:
+    "@type": type.googleapis.com/xuma.core.v1.MapInput
+    key: role
+    required: true
+```
+
+A required value that is absent leaves the evaluation **undecided**, the way Envoy treats insufficient data. `not` passes it through unchanged. An `and` stops at the first child that is not a match, and an `or` still matches if another child does. A list or tree that meets it stops: no later rule fires, and neither does `on_no_match`. The result says `undecided: true`, and your host applies its own default. `rumi run claude` blocks, as it does for every other case where it cannot decide.
 
 ## Immutability
 

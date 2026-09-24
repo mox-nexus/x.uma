@@ -87,7 +87,7 @@ impl HttpMatcher {
         self.actions.action(py, self.inner.evaluate(&req))
     }
 
-    /// The decision as an object: `matched`, `action`, `index`, `fallback`.
+    /// The decision as an object: `matched`, `action`, `index`, `fallback`, `undecided`.
     #[pyo3(signature = (method, path, headers = None, query_params = None))]
     fn decide(
         &self,
@@ -98,7 +98,7 @@ impl HttpMatcher {
         query_params: Option<HashMap<String, String>>,
     ) -> PyDecision {
         let req = build_request(method, path, headers, query_params);
-        self.actions.decide(py, self.inner.evaluate(&req))
+        self.actions.decide(py, self.inner.outcome(&req))
     }
 
     /// Every action this matcher can return, in index order.

@@ -122,7 +122,7 @@ cases:
     expected: { matches: false }
 ```
 
-**Why:** Fail-closed security. Missing data should never match.
+**Why:** Missing data should never match a predicate. It does not make a rule fail closed: `not` inverts the `false`, as in Envoy. `required` inputs make absence undecided instead (D-069).
 
 ### 7. OnMatch is Exclusive
 

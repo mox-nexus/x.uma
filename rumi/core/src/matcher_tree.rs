@@ -33,6 +33,8 @@ pub enum MatcherTree<Ctx, A: Clone + Send + Sync + 'static> {
     ExactMatch {
         /// Extracts the lookup key from context.
         input: Box<dyn DataInput<Ctx>>,
+        /// Whether an absent key leaves the tree undecided (D-069).
+        required: bool,
         /// Map from exact key to outcome.
         map: HashMap<String, OnMatch<Ctx, A>>,
     },
@@ -41,6 +43,8 @@ pub enum MatcherTree<Ctx, A: Clone + Send + Sync + 'static> {
     PrefixMatch {
         /// Extracts the lookup key from context.
         input: Box<dyn DataInput<Ctx>>,
+        /// Whether an absent key leaves the tree undecided (D-069).
+        required: bool,
         /// Radix tree mapping prefixes to outcomes.
         tree: RadixTree<OnMatch<Ctx, A>>,
     },
@@ -70,7 +74,11 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
             }
         }
 
-        Ok(Self::ExactMatch { input, map })
+        Ok(Self::ExactMatch {
+            input,
+            required: false,
+            map,
+        })
     }
 
     /// Create a prefix-match tree. O(k) radix lookup, longest prefix first.
@@ -95,7 +103,29 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
             }
         }
 
-        Ok(Self::PrefixMatch { input, tree })
+        Ok(Self::PrefixMatch {
+            input,
+            required: false,
+            tree,
+        })
+    }
+
+    /// Mark the key as required: absent, the tree is undecided and its
+    /// matcher's `on_no_match` does not fire (D-069).
+    #[must_use]
+    pub fn with_required_input(mut self, required: bool) -> Self {
+        match &mut self {
+            Self::ExactMatch { required: r, .. } | Self::PrefixMatch { required: r, .. } => {
+                *r = required;
+            }
+        }
+        self
+    }
+
+    fn input_required(&self) -> bool {
+        match self {
+            Self::ExactMatch { required, .. } | Self::PrefixMatch { required, .. } => *required,
+        }
     }
 
     /// A tree looks its key up as a string, so a non-string input never matches.
@@ -143,10 +173,32 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
     /// enclosing [`Matcher`](crate::Matcher) owns the fallback, so there is
     /// exactly one place a miss can be handled.
     pub fn evaluate(&self, ctx: &Ctx) -> Option<A> {
-        let key = self.key(ctx)?;
-        self.candidates(&key)
-            .into_iter()
-            .find_map(|(_, on_match)| on_match.evaluate(ctx))
+        self.outcome(ctx).into_action()
+    }
+
+    /// Evaluate the tree, keeping an absent required key, or an undecided
+    /// entry, apart from a miss (D-069). An undecided entry stops the prefix
+    /// fall-through, as Envoy's does.
+    pub fn outcome(&self, ctx: &Ctx) -> crate::Outcome<A> {
+        let Some(key) = self.key(ctx) else {
+            return self.absent_key();
+        };
+        for (_, on_match) in self.candidates(&key) {
+            match on_match.outcome(ctx) {
+                crate::Outcome::NoMatch => {}
+                decided => return decided,
+            }
+        }
+        crate::Outcome::NoMatch
+    }
+
+    /// What an absent key decides: undecided if required, a miss otherwise.
+    pub(crate) fn absent_key(&self) -> crate::Outcome<A> {
+        if self.input_required() {
+            crate::Outcome::Undecided
+        } else {
+            crate::Outcome::NoMatch
+        }
     }
 
     /// Which rule this tree applies, and what feeds it — for traces.
@@ -236,12 +288,12 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
 impl<Ctx, A: Clone + Send + Sync + Debug + 'static> Debug for MatcherTree<Ctx, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ExactMatch { input, map } => f
+            Self::ExactMatch { input, map, .. } => f
                 .debug_struct("ExactMatch")
                 .field("input", input)
                 .field("entries", &map.len())
                 .finish(),
-            Self::PrefixMatch { input, tree } => f
+            Self::PrefixMatch { input, tree, .. } => f
                 .debug_struct("PrefixMatch")
                 .field("input", input)
                 .field("tree", tree)

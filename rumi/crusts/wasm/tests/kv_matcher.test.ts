@@ -27,7 +27,7 @@ describe("Basic Matching", () => {
       matchers: [{
         predicate: {
           type: "single",
-          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } },
+          input: { type_url: "xuma.core.v1.MapInput", config: { key: "role" } },
           value_match: { Exact: "admin" },
         },
         on_match: { type: "action", action: "admin_route" },
@@ -43,7 +43,7 @@ describe("Basic Matching", () => {
       matchers: [{
         predicate: {
           type: "single",
-          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "path" } },
+          input: { type_url: "xuma.core.v1.MapInput", config: { key: "path" } },
           value_match: { Prefix: "/api" },
         },
         on_match: { type: "action", action: "api_route" },
@@ -59,7 +59,7 @@ describe("Basic Matching", () => {
       matchers: [{
         predicate: {
           type: "single",
-          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } },
+          input: { type_url: "xuma.core.v1.MapInput", config: { key: "role" } },
           value_match: { Exact: "admin" },
         },
         on_match: { type: "action", action: "admin_route" },
@@ -83,12 +83,12 @@ describe("Compound Predicates", () => {
           predicates: [
             {
               type: "single",
-              input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } },
+              input: { type_url: "xuma.core.v1.MapInput", config: { key: "role" } },
               value_match: { Exact: "admin" },
             },
             {
               type: "single",
-              input: { type_url: "xuma.kv.v1.MapInput", config: { key: "org" } },
+              input: { type_url: "xuma.core.v1.MapInput", config: { key: "org" } },
               value_match: { Exact: "acme" },
             },
           ],
@@ -110,12 +110,12 @@ describe("Compound Predicates", () => {
           predicates: [
             {
               type: "single",
-              input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } },
+              input: { type_url: "xuma.core.v1.MapInput", config: { key: "role" } },
               value_match: { Exact: "admin" },
             },
             {
               type: "single",
-              input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } },
+              input: { type_url: "xuma.core.v1.MapInput", config: { key: "role" } },
               value_match: { Exact: "superadmin" },
             },
           ],
@@ -136,7 +136,7 @@ describe("Compound Predicates", () => {
           type: "not",
           predicate: {
             type: "single",
-            input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } },
+            input: { type_url: "xuma.core.v1.MapInput", config: { key: "role" } },
             value_match: { Exact: "guest" },
           },
         },
@@ -159,7 +159,7 @@ describe("Nesting & Fallback", () => {
       matchers: [{
         predicate: {
           type: "single",
-          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } },
+          input: { type_url: "xuma.core.v1.MapInput", config: { key: "role" } },
           value_match: { Exact: "admin" },
         },
         on_match: {
@@ -168,7 +168,7 @@ describe("Nesting & Fallback", () => {
             matchers: [{
               predicate: {
                 type: "single",
-                input: { type_url: "xuma.kv.v1.MapInput", config: { key: "org" } },
+                input: { type_url: "xuma.core.v1.MapInput", config: { key: "org" } },
                 value_match: { Exact: "acme" },
               },
               on_match: { type: "action", action: "acme_admin" },
@@ -188,7 +188,7 @@ describe("Nesting & Fallback", () => {
       matchers: [{
         predicate: {
           type: "single",
-          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } },
+          input: { type_url: "xuma.core.v1.MapInput", config: { key: "role" } },
           value_match: { Exact: "admin" },
         },
         on_match: { type: "action", action: "admin" },
@@ -241,7 +241,7 @@ proto_matcher:
           singlePredicate:
             input:
               name: k
-              typedConfig: {"@type": "type.googleapis.com/xuma.kv.v1.MapInput", key: k}
+              typedConfig: {"@type": "type.googleapis.com/xuma.core.v1.MapInput", key: k}
             valueMatch: {exact: v}
         onMatch:
           action:
@@ -289,7 +289,7 @@ describe("Errors", () => {
       matchers: [{
         predicate: {
           type: "single",
-          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "x" } },
+          input: { type_url: "xuma.core.v1.MapInput", config: { key: "x" } },
           value_match: { Regex: "[invalid" },
         },
         on_match: { type: "action", action: "test" },
@@ -309,7 +309,7 @@ describe("Trace", () => {
       matchers: [{
         predicate: {
           type: "single",
-          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } },
+          input: { type_url: "xuma.core.v1.MapInput", config: { key: "role" } },
           value_match: { Exact: "admin" },
         },
         on_match: { type: "action", action: "admin" },
@@ -326,7 +326,7 @@ describe("Trace", () => {
       matchers: [{
         predicate: {
           type: "single",
-          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } },
+          input: { type_url: "xuma.core.v1.MapInput", config: { key: "role" } },
           value_match: { Exact: "admin" },
         },
         on_match: { type: "action", action: "admin" },
@@ -345,7 +345,7 @@ describe("Trace", () => {
       matchers: [{
         predicate: {
           type: "single",
-          input: { type_url: "xuma.kv.v1.MapInput", config: { key: "role" } },
+          input: { type_url: "xuma.core.v1.MapInput", config: { key: "role" } },
           value_match: { Exact: "admin" },
         },
         on_match: { type: "action", action: "admin" },
@@ -377,7 +377,7 @@ function rule(key: string, value: string, onMatch: unknown) {
   return {
     predicate: {
       singlePredicate: {
-        input: { name: key, typedConfig: { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key } },
+        input: { name: key, typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.MapInput", key } },
         valueMatch: { exact: value },
       },
     },
@@ -403,6 +403,7 @@ describe("Decision", () => {
       action: "read_only",
       index: 1,
       fallback: false,
+      undecided: false,
     });
   });
 
@@ -413,6 +414,7 @@ describe("Decision", () => {
       action: "deny",
       index: 2,
       fallback: true,
+      undecided: false,
     });
   });
 
@@ -425,7 +427,36 @@ describe("Decision", () => {
       action: undefined,
       index: undefined,
       fallback: false,
+      undecided: false,
     });
+  });
+
+  test("a required value that is absent is undecided, and the fallback does not fire", () => {
+    const required = {
+      predicate: {
+        notMatcher: {
+          singlePredicate: {
+            input: {
+              name: "role",
+              typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.MapInput", key: "role", required: true },
+            },
+            valueMatch: { exact: "guest" },
+          },
+        },
+      },
+      onMatch: named("allow"),
+    };
+    const matcher = KvMatcher.fromConfig(
+      JSON.stringify({ matcherList: { matchers: [required] }, onNoMatch: named("deny") }),
+    );
+    expect(matcher.decide({})).toEqual({
+      matched: false,
+      action: undefined,
+      index: undefined,
+      fallback: false,
+      undecided: true,
+    });
+    expect(matcher.trace({}).undecided).toBe(true);
   });
 
   test("evaluate and decide agree", () => {

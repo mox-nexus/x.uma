@@ -146,7 +146,7 @@ Bun.serve({
 - **ReDoS protection** -- regex runs in Rust's `regex` crate: linear time, no backtracking.
 - **Immutable** -- a compiled matcher cannot be changed after `fromConfig`.
 - **Bounded** -- nesting depth, rule count and pattern length are limited at load, not at evaluation.
-- **Fail-closed** -- a missing header or query parameter makes its predicate `false`; nothing matches by accident.
+- **Missing is not a match** -- a missing header or query parameter makes its predicate `false`. Under `not` that becomes a match, so mark an input `required` when its absence must not decide anything: the result then says `undecided`.
 
 ## Next Steps
 

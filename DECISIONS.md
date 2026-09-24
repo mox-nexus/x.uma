@@ -8,7 +8,64 @@ in `scratch/` and gets summarized here.
 
 ---
 
-## 2026-09-24 · The budget measures a request, not a document
+## 2026-09-24 · Budgets and declared inputs, before publish
+
+### D-069 · D-057 before publish: `MapInput` in core, `required` as Envoy's insufficient data, typed evaluate stays
+
+**Decided.** Narrows D-057 to what publishing freezes, and says what its
+`required` flag does, which D-057 named and did not define.
+
+1. `xuma.kv.v1.MapInput{key}` becomes `xuma.core.v1.MapInput{key, type,
+   required}`; the kv message is deleted. `type` is `"string"` (the default),
+   `"int"` or `"bool"`, the vocabulary `DataInput::data_type` already speaks,
+   so a matcher that cannot read the declared type is refused at load. A value
+   that does not parse as its declared type is absent.
+2. Every input message declares `bool required`. The registry reads it, not
+   the factory, so no input implements absence twice. `required: false`, the
+   default, keeps today's xDS semantics: an absent value makes its predicate
+   false.
+3. An absent **required** value is Envoy's `InsufficientData`
+   (`source/common/matcher/field_matcher.h`, `list_matcher.h`): the predicate
+   is undecided; `not` passes undecided through; `and` returns the first child
+   that is not a match, undecided or no match, in order; `or` matches if any
+   child matches and is otherwise undecided if any child was; a list or tree
+   that meets undecided stops, and neither a later rule nor `on_no_match`
+   fires. The engine's `Matcher::outcome` returns `Outcome::Undecided`
+   (`evaluate` still returns `Option<A>`, `None` here); the bindings' result
+   object gains `undecided: bool` beside `{matched, action, index,
+   fallback}`, because a host that treats "no rule fired" as allow may treat
+   "could not decide" as deny, and the result object freezes at publish; the
+   trace marks the predicate `undecided`.
+4. The typed `evaluate` methods on the bindings stay. The flat map D-057
+   proposed measured at 2.25 µs against 600 to 900 ns for typed arguments in
+   wasm (artifact `2026-09-08-f6c3adb3`); the packed string that beats both is
+   additive and is 0.1.x.
+
+**Why.** An absent value is false for a plain predicate, but `not` turns it
+true: "allow unless role is guest" allows a request with no role (verified by
+execution, 2026-09-24). Envoy does the same for a value that is absent with
+all data available, so the engine is conformant, and the security page's
+"missing data means no match" overstated what the invariant covers. `required`
+is how a rule author says a value's absence is not an answer, and Envoy
+already has the semantics for that: the evaluation cannot decide, so it does
+not, rather than inventing a three-valued logic of our own. The host that
+receives no decision applies its own default, which is where the policy for a
+missing value belongs (the matcher is not a policy engine).
+
+**What it entails.** Fixtures first, in `60_declared_inputs.yaml`:
+`declared_input_type_mismatch` and `declared_input_unknown_type` (load
+errors); `map_input_typed` (a `bool` read, and an unparsable value absent);
+`required_input_absent_under_{not,and,or}`, `required_input_absent_stops_the_list`
+and `required_tree_key_absent` (each asserting `on_no_match` does not fire);
+`optional_input_absent_under_not` pinning the xDS default. D-057's
+`declared_input_unknown_url` already exists as `unknown_input_type_url`. A
+case asserts `expect_undecided`, and every other case now asserts it is
+decided. The `MapInput` type URL changes in every fixture. The registration
+seam and `just ext` follow in their own change.
+
+**Revisit if.** Streaming input (Envoy's `MoreDataMightBeAvailable`) is
+needed. `Undecided` is the state it would reuse; the difference is that the
+host would call again with more data.
 
 ### D-068 · Per-request cost is budgeted along the worst path; the per-list and per-compound bounds go
 
@@ -238,6 +295,9 @@ result needs the action's typed config per call, in which case the table
 crosses per call and the index is redundant.
 
 ### D-057 · Inputs are declared by the domain proto messages, resolved at load, and extracted natively from a flat context
+
+**Narrowed by D-069** (2026-09-24): what lands before publish, and what
+`required` does.
 
 **Decided.** The only way to declare an input is the domain's proto message:
 `xuma.http.v1.HeaderInput{name}`, `xuma.claude.v1.ToolArgInput`, and so on.

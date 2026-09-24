@@ -9,7 +9,7 @@ const single = (key: string, valueMatch: Record<string, string>) => ({
   singlePredicate: {
     input: {
       name: key,
-      typedConfig: { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key },
+      typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.MapInput", key },
     },
     valueMatch,
   },

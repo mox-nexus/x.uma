@@ -7,7 +7,7 @@
 //!
 //! - [`HookMatcher`] — Claude Code hook matching (typed Python config)
 //! - [`HttpMatcher`] — HTTP request matching (JSON config via registry)
-//! - [`KvMatcher`] — key-value matching over `xuma.kv.v1` inputs; the conformance domain
+//! - [`KvMatcher`] — key-value matching over `xuma.core.v1.MapInput`; the conformance domain
 
 mod config;
 mod convert;

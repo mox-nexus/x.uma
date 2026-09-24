@@ -93,11 +93,11 @@ mod registry;
 pub use data_input::DataInput;
 pub use field_matcher::FieldMatcher;
 pub use input_matcher::InputMatcher;
-pub use matcher::{Matcher, MatcherKind};
+pub use matcher::{Matcher, MatcherKind, Outcome};
 pub use matcher_tree::MatcherTree;
 pub use matching_data::{CustomMatchData, MatchingData};
 pub use on_match::OnMatch;
-pub use predicate::{Predicate, SinglePredicate};
+pub use predicate::{MatchResult, Predicate, SinglePredicate};
 pub use radix_tree::RadixTree;
 pub use string_match::StringMatchSpec;
 
@@ -129,9 +129,9 @@ pub use input_matcher::{
 pub mod prelude {
     pub use crate::{
         BoolMatcher, ContainsMatcher, CustomMatchData, DataInput, EvalStep, EvalTrace,
-        ExactMatcher, FieldMatcher, InputMatcher, Matcher, MatcherError, MatcherTree, MatchingData,
-        OnMatch, OnMatchTrace, Predicate, PredicateTrace, PrefixMatcher, RadixTree,
-        SinglePredicate, StringMatchSpec, StringMatcher, SuffixMatcher,
+        ExactMatcher, FieldMatcher, InputMatcher, MatchResult, Matcher, MatcherError, MatcherTree,
+        MatchingData, OnMatch, OnMatchTrace, Outcome, Predicate, PredicateTrace, PrefixMatcher,
+        RadixTree, SinglePredicate, StringMatchSpec, StringMatcher, SuffixMatcher,
     };
 
     /// Registry types, so `use rumi::prelude::*` is enough to load a config.

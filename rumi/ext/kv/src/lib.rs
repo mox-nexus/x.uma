@@ -11,7 +11,7 @@
 //!
 //! # Type URL
 //!
-//! This crate registers `xuma.kv.v1.MapInput`. It used to be
+//! This crate registers `xuma.core.v1.MapInput`. It used to be
 //! `xuma.test.v1.StringInput`, whose only proto field was named `value` while
 //! the code used it as a lookup key — so the schema and the config disagreed
 //! about what the field meant, and which one you got depended on a feature
@@ -26,7 +26,7 @@
 //!     .with("name", "alice")
 //!     .with("role", "admin");
 //!
-//! let input = StringInput::new("role").unwrap();
+//! let input = MapInput::new("role").unwrap();
 //! assert_eq!(input.get(&ctx), Some(MatchingData::String("admin".into())));
 //! ```
 
@@ -35,9 +35,6 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 /// A key-value context: a simple string-to-string map.
-///
-/// `KvContext` is kept as a deprecated alias, since the conformance suite and
-/// the crusts refer to it by that name.
 #[derive(Debug, Clone, Default)]
 pub struct KvContext {
     values: HashMap<String, String>,
@@ -64,14 +61,73 @@ impl KvContext {
     }
 }
 
-/// Extracts a string value from `KvContext` by key.
-#[derive(Debug, Clone)]
-pub struct StringInput {
-    key: String,
+/// The type a [`MapInput`] reads its value as (D-069).
+///
+/// The names are the ones [`DataInput::data_type`] speaks, so a matcher that
+/// cannot read the declared type is refused when the document loads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ValueType {
+    /// The text as it is.
+    #[default]
+    String,
+    /// A decimal `i64`.
+    Int,
+    /// `true` or `false`.
+    Bool,
 }
 
-impl StringInput {
-    /// Create a new string input extractor.
+impl ValueType {
+    /// Parse a declared type name; empty is `string`, proto3's default.
+    ///
+    /// # Errors
+    ///
+    /// [`MatcherError::InvalidConfig`](rumi::MatcherError::InvalidConfig) for
+    /// any other name.
+    pub fn from_name(name: &str) -> Result<Self, rumi::MatcherError> {
+        match name {
+            "" | "string" => Ok(Self::String),
+            "int" => Ok(Self::Int),
+            "bool" => Ok(Self::Bool),
+            other => Err(rumi::MatcherError::InvalidConfig {
+                source: format!("type \"{other}\" is not one of \"string\", \"int\", \"bool\""),
+            }),
+        }
+    }
+
+    /// The name [`DataInput::data_type`] reports.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::String => "string",
+            Self::Int => "int",
+            Self::Bool => "bool",
+        }
+    }
+
+    /// The value `text` reads as, or `None` if it does not parse, which makes
+    /// it absent.
+    fn read(self, text: &str) -> Option<MatchingData> {
+        match self {
+            Self::String => Some(MatchingData::String(text.to_owned())),
+            Self::Int => text.parse().ok().map(MatchingData::Int),
+            Self::Bool => match text {
+                "true" => Some(MatchingData::Bool(true)),
+                "false" => Some(MatchingData::Bool(false)),
+                _ => None,
+            },
+        }
+    }
+}
+
+/// Reads one entry of a [`KvContext`] as its declared [`ValueType`].
+#[derive(Debug, Clone)]
+pub struct MapInput {
+    key: String,
+    value_type: ValueType,
+}
+
+impl MapInput {
+    /// Read the entry under `key` as a string.
     ///
     /// # Errors
     ///
@@ -83,56 +139,73 @@ impl StringInput {
         if key.is_empty() {
             return Err(rumi::MatcherError::EmptyIdentifier { what: "map key" });
         }
-        Ok(Self { key })
+        Ok(Self {
+            key,
+            value_type: ValueType::String,
+        })
+    }
+
+    /// Read the entry as `value_type` instead.
+    #[must_use]
+    pub fn with_type(mut self, value_type: ValueType) -> Self {
+        self.value_type = value_type;
+        self
     }
 }
 
-impl DataInput<KvContext> for StringInput {
+impl DataInput<KvContext> for MapInput {
     fn get(&self, ctx: &KvContext) -> Option<MatchingData> {
         ctx.get(&self.key)
-            .map(|s| MatchingData::String(s.to_string()))
+            .and_then(|text| self.value_type.read(text))
+    }
+
+    fn data_type(&self) -> &'static str {
+        self.value_type.name()
     }
 
     fn identity(&self) -> Option<Cow<'_, str>> {
-        Some(Cow::Owned(format!("xuma.kv.v1.MapInput/{}", self.key)))
+        Some(Cow::Owned(format!(
+            "xuma.core.v1.MapInput/{}/{}",
+            self.value_type.name(),
+            self.key
+        )))
     }
 }
 
 /// Prelude for convenient imports.
 pub mod prelude {
-    pub use super::{KvContext, StringInput};
+    pub use super::{KvContext, MapInput, ValueType};
     pub use rumi::prelude::*;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Config loading (feature = "registry")
 //
-// The config type is the generated proto message, unconditionally. There used
-// to be a hand-written `StringInputConfig { key }` here selected by
-// `#[cfg(all(feature = "registry", not(feature = "proto")))]`, with the proto
-// type on the other side of the cfg — so the same crate read a different config
-// key depending on a feature. Features add; they do not replace.
+// The config type is the generated proto message, unconditionally: a
+// hand-written config selected by a feature once made the same crate read a
+// different key depending on the build. Features add; they do not replace.
+// `required` is read by the registry, not here (D-069).
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[cfg(feature = "registry")]
-impl rumi::DataInputFactory<KvContext> for StringInput {
-    type Config = rumi_proto::xuma::kv::v1::MapInput;
+impl rumi::DataInputFactory<KvContext> for MapInput {
+    type Config = rumi_proto::xuma::core::v1::MapInput;
 
     fn from_config(
         config: Self::Config,
     ) -> Result<Box<dyn rumi::DataInput<KvContext>>, rumi::MatcherError> {
-        Ok(Box::new(StringInput::new(config.key)?))
+        let value_type = ValueType::from_name(&config.r#type)?;
+        Ok(Box::new(MapInput::new(config.key)?.with_type(value_type)))
     }
 }
 
 /// Register the key-value domain with the given builder.
 ///
-/// Registers core matchers (`BoolMatcher`, `StringMatcher`) and test-domain inputs:
-/// - `xuma.kv.v1.MapInput` → [`StringInput`]
+/// Registers the core matchers and `xuma.core.v1.MapInput` → [`MapInput`].
 #[cfg(feature = "registry")]
 #[must_use]
 pub fn register(builder: rumi::RegistryBuilder<KvContext>) -> rumi::RegistryBuilder<KvContext> {
-    rumi::register_core_matchers(builder).input::<StringInput>("xuma.kv.v1.MapInput")
+    rumi::register_core_matchers(builder).input::<MapInput>("xuma.core.v1.MapInput")
 }
 
 #[cfg(test)]
@@ -140,7 +213,7 @@ mod tests {
     use super::*;
     #[test]
     fn an_empty_key_is_rejected() {
-        let err = StringInput::new("").unwrap_err();
+        let err = MapInput::new("").unwrap_err();
         assert!(
             matches!(err, rumi::MatcherError::EmptyIdentifier { .. }),
             "{err:?}"
@@ -159,15 +232,30 @@ mod tests {
     #[test]
     fn test_string_input() {
         let ctx = KvContext::new().with("name", "alice");
-        let input = StringInput::new("name").unwrap();
+        let input = MapInput::new("name").unwrap();
 
         assert_eq!(input.get(&ctx), Some(MatchingData::String("alice".into())));
     }
 
     #[test]
+    fn a_typed_value_that_does_not_parse_is_absent() {
+        let ctx = KvContext::new().with("port", "80").with("flag", "yes");
+        let port = MapInput::new("port").unwrap().with_type(ValueType::Int);
+        let flag = MapInput::new("flag").unwrap().with_type(ValueType::Bool);
+
+        assert_eq!(port.get(&ctx), Some(MatchingData::Int(80)));
+        assert_eq!(flag.get(&ctx), None);
+        assert_ne!(
+            port.identity(),
+            MapInput::new("port").unwrap().identity(),
+            "one key read as two types is two inputs"
+        );
+    }
+
+    #[test]
     fn test_string_input_missing_key() {
         let ctx = KvContext::new();
-        let input = StringInput::new("missing").unwrap();
+        let input = MapInput::new("missing").unwrap();
 
         assert_eq!(input.get(&ctx), None);
     }
@@ -179,7 +267,7 @@ mod tests {
         let matcher: Matcher<KvContext, &str> = Matcher::list(
             vec![FieldMatcher::new(
                 Predicate::Single(SinglePredicate::new(
-                    Box::new(StringInput::new("role").unwrap()),
+                    Box::new(MapInput::new("role").unwrap()),
                     Box::new(ExactMatcher::new("admin")),
                 )),
                 OnMatch::Action("allowed"),
@@ -212,7 +300,7 @@ mod config_tests {
     fn built_in(key: &str, spec: StringMatchSpec) -> PredicateIr {
         PredicateIr::Single(SinglePredicateIr {
             input: TypedExtensionConfig {
-                type_url: "xuma.kv.v1.MapInput".into(),
+                type_url: "xuma.core.v1.MapInput".into(),
                 config: serde_json::json!({ "key": key }),
             },
             matcher: ValueMatchIr::BuiltIn {
@@ -241,7 +329,7 @@ mod config_tests {
         let registry = register(rumi::RegistryBuilder::new()).build();
 
         // Core matchers + 1 test input
-        assert!(registry.contains_input("xuma.kv.v1.MapInput"));
+        assert!(registry.contains_input("xuma.core.v1.MapInput"));
         assert!(registry.contains_matcher("xuma.core.v1.BoolMatcher"));
     }
 

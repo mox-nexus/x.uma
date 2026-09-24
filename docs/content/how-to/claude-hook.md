@@ -166,5 +166,20 @@ For a deny rule that is usually what you want; for an allow rule in an
 allowlist, it means the call falls through to `on_no_match`.
 
 `rumi run claude ... --trace` shows this directly — a missing input renders as
-`= None`, which is the difference between a rule that fired and lost and a rule
+`= absent`, which is the difference between a rule that fired and lost and a rule
 that never fired at all.
+
+The false flips under `notMatcher`: "deny unless the command is `ls`" denies a
+call with no `command`, and "allow unless the command is `rm`" allows one. When
+a missing argument must not decide anything, declare it `required`:
+
+```yaml
+typedConfig:
+  "@type": type.googleapis.com/xuma.claude.v1.ToolArgInput
+  name: command
+  required: true
+```
+
+A required argument that is missing leaves the evaluation undecided: no rule
+fires and `onNoMatch` does not either. `rumi run claude` then blocks with
+exit 2, as it does whenever it cannot decide.

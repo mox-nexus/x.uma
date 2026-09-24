@@ -20,7 +20,7 @@
  */
 
 const PREFIX = "type.googleapis.com/";
-const INPUT_TYPE = `${PREFIX}xuma.kv.v1.MapInput`;
+const INPUT_TYPE = `${PREFIX}xuma.core.v1.MapInput`;
 const ACTION_TYPE = `${PREFIX}xuma.core.v1.NamedAction`;
 
 const VALUE_MATCH: Record<string, string> = {

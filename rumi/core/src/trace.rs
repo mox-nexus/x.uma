@@ -20,6 +20,7 @@
 //! }
 //! ```
 
+use crate::MatchResult;
 use std::fmt;
 
 /// Trace of a predicate evaluation.
@@ -31,8 +32,8 @@ use std::fmt;
 pub enum PredicateTrace {
     /// A single predicate evaluation.
     Single {
-        /// Whether this predicate matched.
-        matched: bool,
+        /// What this predicate decided.
+        result: MatchResult,
         /// Debug description of the `DataInput` (e.g., `"ToolNameInput"`).
         input: String,
         /// The `MatchingData` extracted from context (Debug format).
@@ -42,37 +43,43 @@ pub enum PredicateTrace {
     },
     /// AND: all children must match.
     And {
-        /// Whether all children matched.
-        matched: bool,
+        /// The first child that is not a match, or a match (D-069).
+        result: MatchResult,
         /// Trace of each child (all evaluated, no short-circuit).
         children: Vec<PredicateTrace>,
     },
     /// OR: any child must match.
     Or {
-        /// Whether any child matched.
-        matched: bool,
+        /// A match if any child matched, else undecided if any was (D-069).
+        result: MatchResult,
         /// Trace of each child (all evaluated, no short-circuit).
         children: Vec<PredicateTrace>,
     },
     /// NOT: inverts inner result.
     Not {
-        /// Whether the NOT predicate matched (i.e., inner did NOT match).
-        matched: bool,
+        /// The inner result negated; undecided stays undecided (D-069).
+        result: MatchResult,
         /// Trace of the inner predicate.
         inner: Box<PredicateTrace>,
     },
 }
 
 impl PredicateTrace {
-    /// Get the overall match result of this predicate.
+    /// What this predicate decided.
+    #[must_use]
+    pub fn result(&self) -> MatchResult {
+        match self {
+            Self::Single { result, .. }
+            | Self::And { result, .. }
+            | Self::Or { result, .. }
+            | Self::Not { result, .. } => *result,
+        }
+    }
+
+    /// Whether this predicate matched; an undecided predicate did not.
     #[must_use]
     pub fn matched(&self) -> bool {
-        match self {
-            Self::Single { matched, .. }
-            | Self::And { matched, .. }
-            | Self::Or { matched, .. }
-            | Self::Not { matched, .. } => *matched,
-        }
+        self.result() == MatchResult::Matched
     }
 }
 
@@ -80,30 +87,30 @@ impl fmt::Debug for PredicateTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Single {
-                matched,
+                result,
                 input,
                 data,
                 matcher,
             } => f
                 .debug_struct("Single")
-                .field("matched", matched)
+                .field("result", result)
                 .field("input", input)
                 .field("data", data)
                 .field("matcher", matcher)
                 .finish(),
-            Self::And { matched, children } => f
+            Self::And { result, children } => f
                 .debug_struct("And")
-                .field("matched", matched)
+                .field("result", result)
                 .field("children", children)
                 .finish(),
-            Self::Or { matched, children } => f
+            Self::Or { result, children } => f
                 .debug_struct("Or")
-                .field("matched", matched)
+                .field("result", result)
                 .field("children", children)
                 .finish(),
-            Self::Not { matched, inner } => f
+            Self::Not { result, inner } => f
                 .debug_struct("Not")
-                .field("matched", matched)
+                .field("result", result)
                 .field("inner", inner)
                 .finish(),
         }
@@ -127,6 +134,22 @@ pub struct EvalTrace<A> {
     pub steps: EvalSteps<A>,
     /// Whether the `on_no_match` fallback was used.
     pub used_fallback: bool,
+    /// Whether a required value was absent, so nothing was decided (D-069).
+    /// When set, `result` is `None`.
+    pub undecided: bool,
+}
+
+impl<A: Clone> EvalTrace<A> {
+    /// The outcome this trace records, identical to
+    /// [`Matcher::outcome`](crate::Matcher::outcome).
+    #[must_use]
+    pub fn outcome(&self) -> crate::Outcome<A> {
+        match (&self.result, self.undecided) {
+            (_, true) => crate::Outcome::Undecided,
+            (Some(a), false) => crate::Outcome::Action(a.clone()),
+            (None, false) => crate::Outcome::NoMatch,
+        }
+    }
 }
 
 /// The traced work, mirroring `MatcherKind`.
@@ -238,6 +261,7 @@ impl<A: fmt::Debug> fmt::Debug for EvalTrace<A> {
             .field("result", &self.result)
             .field("steps", &self.steps)
             .field("used_fallback", &self.used_fallback)
+            .field("undecided", &self.undecided)
             .finish()
     }
 }
@@ -300,7 +324,7 @@ mod tests {
     #[test]
     fn predicate_trace_matched_single() {
         let trace = PredicateTrace::Single {
-            matched: true,
+            result: MatchResult::Matched,
             input: "TestInput".into(),
             data: "String(\"hello\")".into(),
             matcher: "ExactMatcher(\"hello\")".into(),
@@ -311,7 +335,7 @@ mod tests {
     #[test]
     fn predicate_trace_matched_and() {
         let trace = PredicateTrace::And {
-            matched: false,
+            result: MatchResult::NoMatch,
             children: vec![],
         };
         assert!(!trace.matched());
@@ -320,7 +344,7 @@ mod tests {
     #[test]
     fn predicate_trace_matched_or() {
         let trace = PredicateTrace::Or {
-            matched: true,
+            result: MatchResult::Matched,
             children: vec![],
         };
         assert!(trace.matched());
@@ -329,9 +353,9 @@ mod tests {
     #[test]
     fn predicate_trace_matched_not() {
         let trace = PredicateTrace::Not {
-            matched: true,
+            result: MatchResult::Matched,
             inner: Box::new(PredicateTrace::Single {
-                matched: false,
+                result: MatchResult::NoMatch,
                 input: String::new(),
                 data: String::new(),
                 matcher: String::new(),
@@ -343,7 +367,7 @@ mod tests {
     #[test]
     fn predicate_trace_debug_format() {
         let trace = PredicateTrace::Single {
-            matched: true,
+            result: MatchResult::Matched,
             input: "PathInput".into(),
             data: "String(\"/api\")".into(),
             matcher: "ExactMatcher(\"/api\")".into(),
@@ -358,6 +382,7 @@ mod tests {
         let trace: EvalTrace<String> = EvalTrace {
             result: Some("matched".into()),
             steps: EvalSteps::List(vec![]),
+            undecided: false,
             used_fallback: false,
         };
         let debug = format!("{trace:?}");

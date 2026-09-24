@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import Any
 
 PREFIX = "type.googleapis.com/"
-INPUT_TYPE = PREFIX + "xuma.kv.v1.MapInput"
+INPUT_TYPE = PREFIX + "xuma.core.v1.MapInput"
 ACTION_TYPE = PREFIX + "xuma.core.v1.NamedAction"
 
 _VALUE_MATCH = {"Exact": "exact", "Prefix": "prefix", "Suffix": "suffix", "Contains": "contains"}

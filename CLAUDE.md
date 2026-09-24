@@ -88,14 +88,13 @@ All x.uma extensions use the `xuma` proto package namespace:
 
 ```
 xuma.core.v1      # Base types, registry
-xuma.kv.v1      # Conformance testing
 xuma.http.v1      # HTTP matching
 xuma.claude.v1    # Claude Code hooks
 xuma.grpc.v1      # gRPC matching
 ```
 
 Type URLs:
-- `type.googleapis.com/xuma.kv.v1.MapInput`
+- `type.googleapis.com/xuma.core.v1.MapInput`
 - `type.googleapis.com/xuma.http.v1.HeaderInput`
 - `type.googleapis.com/xuma.claude.v1.HookContext`
 
@@ -276,7 +275,7 @@ From 13-agent architecture review:
 | **Type Registry Immutability** | Vector, Lamport | Lock after initialization. No runtime registration. |
 | **Send + Sync** | Lamport, Lotfi | All core types must be thread-safe (FFI requirement). |
 | **Iterative Evaluation** | Taleb, Dijkstra | No recursive `evaluate()` — use explicit stack (deferred to v0.2). |
-| **DataInput None → false** | Dijkstra | `DataInput::get()` returns `Option`; `None` → predicate evaluates to `false`, enforced by the signature (D-061). |
+| **DataInput None → false** | Dijkstra | `DataInput::get()` returns `Option`; `None` → predicate evaluates to `false`, enforced by the signature (D-061); for a `required` input, `None` → `MatchResult::Undecided`, which stops the evaluation without its fallback (D-069). |
 | **No unsafe impl** | Wolf | Let compiler derive Send/Sync — don't add restrictive bounds. |
 | **Validate extension points at construction** | Phase 11 review | Extension hooks (e.g., `data_type()`, `supported_types()`) that exist but are never enforced create silent failure modes. Validate compatibility at construction/load time, not evaluation time. |
 

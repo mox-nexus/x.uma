@@ -13,14 +13,14 @@ proto_matcher:
           input:
             name: MapInput
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: x
           valueMatch:
             exact: a
           customMatch:
             name: custom
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: x
       onMatch:
         action:
@@ -73,7 +73,7 @@ proto_matcher:
           input:
             name: MapInput
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: x
           customMatch:
             name: custom
@@ -105,7 +105,7 @@ proto_matcher:
             input:
               name: MapInput
               typedConfig:
-                '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                '@type': type.googleapis.com/xuma.core.v1.MapInput
                 key: role
         onMatch:
           action:

@@ -13,7 +13,7 @@
           "singlePredicate": {
             "input": {
               "name": "method",
-              "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "method" }
+              "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": "method" }
             },
             "valueMatch": { "exact": "GET" }
           }
@@ -30,7 +30,7 @@
           "singlePredicate": {
             "input": {
               "name": "method",
-              "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "method" }
+              "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": "method" }
             },
             "valueMatch": { "exact": "POST" }
           }

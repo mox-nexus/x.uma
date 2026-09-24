@@ -18,7 +18,7 @@ import { configToGraph } from "../src/lib/playground/graph/config-to-graph.js";
 
 const mapInput = (key: string) => ({
 	name: key,
-	typedConfig: { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key },
+	typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.MapInput", key },
 });
 
 const action = (name: string) => ({

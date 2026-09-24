@@ -11,7 +11,7 @@
 use rumi_proto::convert::convert_matcher;
 use rumi_proto::protojson::parse_matcher;
 use rumi_test::implementations::Implementation;
-use rumi_test::proto_fixture::{Domain, ProtoFixture};
+use rumi_test::proto_fixture::{observed, Domain, ProtoFixture};
 use rumi_test::KvContext;
 
 /// One line of the report: fixture, case, passed, detail.
@@ -53,15 +53,14 @@ fn run_cases(fixture: &ProtoFixture, results: &mut Vec<FixtureResult>) {
     macro_rules! evaluate {
         ($loaded:expr, $context:expr) => {
             for case in &fixture.cases {
-                let result = $loaded
-                    .matcher
-                    .evaluate(&$context(case))
-                    .map(|i| $loaded.actions[i.0 as usize].name.clone());
-                let passed = result == case.expect;
+                let result = observed($loaded.matcher.outcome(&$context(case)), |i| {
+                    $loaded.actions[i.0 as usize].name.clone()
+                });
+                let passed = result == case.expected();
                 let detail = if passed {
                     format!("got {result:?}")
                 } else {
-                    format!("expected {:?}, got {:?}", case.expect, result)
+                    format!("expected {:?}, got {:?}", case.expected(), result)
                 };
                 results.push((fixture.name.clone(), case.name.clone(), passed, detail));
             }

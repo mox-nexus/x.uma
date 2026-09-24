@@ -26,7 +26,7 @@ let registry = register(RegistryBuilder::new()).build();
 let config = MatcherIr::list(vec![FieldMatcherIr {
         predicate: PredicateIr::Single(SinglePredicateIr {
             input: TypedExtensionConfig {
-                type_url: "xuma.kv.v1.MapInput".into(),
+                type_url: "xuma.core.v1.MapInput".into(),
                 config: serde_json::json!({ "key": "role" }),
             },
             matcher: ValueMatchIr::BuiltIn {
@@ -60,7 +60,7 @@ The concept was never "test". It is a general-purpose domain, a peer of
 
 | Type URL | Reads |
 |---|---|
-| `xuma.kv.v1.MapInput` | one key from the context map |
+| `xuma.core.v1.MapInput` | one key from the context map |
 
 The URL still says `test`. Type URLs are part of the config schema and freeze at
 first publish, so renaming them belongs with the schema migration rather than

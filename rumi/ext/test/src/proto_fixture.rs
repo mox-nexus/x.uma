@@ -105,6 +105,32 @@ pub struct ProtoTestCase {
     pub http_request: Option<HttpRequestSpec>,
     /// The expected action, or `None` for no match.
     pub expect: Option<String>,
+    /// Whether the evaluation is expected to be undecided: a required value
+    /// absent, so no action and no fallback (D-069). Every other case asserts
+    /// the evaluation was decided.
+    #[serde(default)]
+    pub expect_undecided: bool,
+}
+
+impl ProtoTestCase {
+    /// What this case expects, in the shape [`observed`] reports.
+    #[must_use]
+    pub fn expected(&self) -> (Option<String>, bool) {
+        (self.expect.clone(), self.expect_undecided)
+    }
+}
+
+/// An outcome as `(action, undecided)`, the pair a case states.
+#[must_use]
+pub fn observed<A>(
+    outcome: rumi::Outcome<A>,
+    name: impl Fn(A) -> String,
+) -> (Option<String>, bool) {
+    match outcome {
+        rumi::Outcome::Action(a) => (Some(name(a)), false),
+        rumi::Outcome::NoMatch => (None, false),
+        rumi::Outcome::Undecided => (None, true),
+    }
 }
 
 /// One HTTP request a fixture evaluates against.

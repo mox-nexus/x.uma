@@ -23,7 +23,7 @@ proto_matcher:
             input:
               name: role
               typedConfig:
-                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                "@type": type.googleapis.com/xuma.core.v1.MapInput
                 key: role
             valueMatch:
               exact: admin
