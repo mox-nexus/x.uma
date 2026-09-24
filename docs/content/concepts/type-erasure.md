@@ -13,7 +13,7 @@ trait InputMatcher<Ctx> {
 }
 
 // You'd need separate matchers for each domain
-let http_matcher = ExactMatcher::<HttpRequest>::new("/api");
+let http_matcher = ExactMatcher::<HttpMessage>::new("/api");
 let event_matcher = ExactMatcher::<CloudEvent>::new("com.example");
 // Can't put them in the same registry. No code reuse.
 ```
@@ -38,7 +38,7 @@ Now one `ExactMatcher` works everywhere:
 
 ```rust,ignore
 // HTTP path matching
-let path_pred = SinglePredicate::new(Box::new(SimplePathInput), Box::new(ExactMatcher::new("/api")));
+let path_pred = SinglePredicate::new(Box::new(PathInput), Box::new(ExactMatcher::new("/api")));
 
 // Event type matching — SAME ExactMatcher
 let event_pred = SinglePredicate::new(Box::new(EventTypeInput), Box::new(ExactMatcher::new("/api")));
@@ -104,19 +104,19 @@ one implementation, every language.
 
 ```rust
 use rumi::prelude::*;
-use rumi_http::{HttpRequest, SimpleHeaderInput};
+use rumi_http::{HeaderInput, HttpMessageBuilder};
 
 let predicate = Predicate::Single(SinglePredicate::new(
-    Box::new(SimpleHeaderInput::new("x-api-key")),
+    Box::new(HeaderInput::new("x-api-key").unwrap()),
     Box::new(ExactMatcher::new("secret")),
 ));
 
 // Header not present → DataInput returns None → predicate returns false
-let request = HttpRequest::builder().method("GET").path("/").build();
+let request = HttpMessageBuilder::new().method("GET").path("/").build();
 assert!(!predicate.evaluate(&request));
 ```
 
-The matcher never sees an absent value, because there is no `MatchingData` that means absent. Missing data is handled upstream, by the type. This is a security guarantee: missing data never accidentally matches, in the engine and therefore in every binding.
+The matcher never sees an absent value, because there is no `MatchingData` that means absent. Missing data is handled upstream, by the type, so a predicate over a missing value never matches, in the engine and therefore in every binding. What it guarantees is about the predicate, not the rule: `not` turns that `false` into `true`, as it does in Envoy. An input declared `required` makes absence undecided instead, and the evaluation stops without an action or its fallback (D-069).
 
 ## Next
 

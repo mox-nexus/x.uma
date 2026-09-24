@@ -19,20 +19,18 @@ categories = ["config", "web-programming"]
 # project never used its own default. Feature defaults freeze at first publish.
 default = []
 
-# The domain: HttpMessage, its DataInputs, and the query/path helpers. No
-# dependencies at all — it is a HashMap and five Options. Everything else is an
-# adapter onto it, which is what makes the two below siblings rather than a
-# chain.
-message = []
+# The domain itself, HttpMessage and its DataInputs, is not a feature: it has
+# no dependencies, and it is the crate's one context (D-059). Everything below
+# is an adapter onto it, which is what makes them siblings rather than a chain.
 
 # Gateway API config types and compile_route_matches. Config, not transport.
-gateway = ["message", "dep:k8s-gateway-api", "dep:k8s-openapi"]
+gateway = ["dep:k8s-gateway-api", "dep:k8s-openapi"]
 
 # Envoy ext_proc data-plane types, and From<ProcessingRequest> for HttpMessage.
 # Deliberately does NOT imply `gateway`: an ext_proc filter has no use for
 # Kubernetes config types, and making one adapter depend on its sibling is the
 # same conflation this split exists to remove.
-ext-proc = ["message", "dep:envoy-grpc-ext-proc"]
+ext-proc = ["dep:envoy-grpc-ext-proc"]
 
 # Config loading, from the generated proto types and nothing else.
 #
@@ -42,7 +40,7 @@ ext-proc = ["message", "dep:envoy-grpc-ext-proc"]
 # field into `unwrap_or_default()`, so a header deny rule silently stopped
 # firing. There is now one vocabulary and no feature that selects a vocabulary,
 # which is what makes the violation inexpressible rather than merely absent.
-registry = ["message", "rumi-core/registry", "serde", "dep:rumi-proto"]
+registry = ["rumi-core/registry", "serde", "dep:rumi-proto"]
 
 [dependencies]
 rumi-core.workspace = true

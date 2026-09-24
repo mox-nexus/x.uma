@@ -52,7 +52,6 @@ rumi run http routes.yaml --method POST --path /api --header content-type=applic
 | `--method METHOD` | HTTP method (required) |
 | `--path PATH` | Request path (required) |
 | `--header key=value` | Header (repeatable) |
-| `--query key=value` | Query parameter (repeatable) |
 
 **Claude domain:**
 
@@ -151,5 +150,5 @@ The CLI has zero runtime dependencies beyond `rumi`, `rumi-http`, and `rumi-test
 
 Each domain registers its own `Registry<Ctx>`:
 - Test: `rumi_test::register()` -> `Registry<TestContext>`
-- HTTP: `rumi_http::register_simple()` -> `Registry<HttpRequest>`
+- HTTP: `rumi_http::register()` -> `Registry<HttpMessage>`
 - Claude: `rumi::claude::register()` -> `Registry<HookContext>`

@@ -81,7 +81,7 @@ onNoMatch:
 **Rust:**
 ```rust,ignore
 use rumi::prelude::*;
-use rumi_http::{HttpRequest, register_simple};
+use rumi_http::{register, HttpMessageBuilder};
 use rumi_proto::{any_resolver::AnyResolverBuilder, convert::convert_matcher, protojson::parse_matcher};
 
 let resolver = AnyResolverBuilder::new()
@@ -90,13 +90,13 @@ let resolver = AnyResolverBuilder::new()
     .register::<rumi_proto::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
     .build();
 
-let registry = register_simple(RegistryBuilder::new()).build();
+let registry = register(RegistryBuilder::new()).build();
 let doc: serde_json::Value = serde_yaml::from_str(&yaml).unwrap();
 let proto = parse_matcher(&resolver, doc).unwrap();
 let config = convert_matcher(&proto, &resolver).unwrap();
 let matcher = registry.load_typed_matcher(config, &actions).unwrap();
 
-let req = HttpRequest::builder().method("GET").path("/api/users").build();
+let req = HttpMessageBuilder::new().method("GET").path("/api/users").build();
 assert_eq!(matcher.evaluate(&req), Some("api_read".to_string()));
 ```
 

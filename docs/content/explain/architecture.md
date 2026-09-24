@@ -20,7 +20,7 @@ InputMatcher.matches()   ← doesn't know your type, doesn't need to
 bool
 ```
 
-The split happens at `MatchingData`. Above it, domain-specific code that knows about `HttpRequest` or `HookContext`. Below it, domain-agnostic matchers that work with primitives. This is the seam.
+The split happens at `MatchingData`. Above it, domain-specific code that knows about `HttpMessage` or `HookContext`. Below it, domain-agnostic matchers that work with primitives. This is the seam.
 
 ## Why This Works
 
@@ -92,7 +92,7 @@ Core does not own domain knowledge. It does not know what an HTTP request is, wh
 
 Each domain provides:
 
-- **Context type** — `HttpRequest`, `HookContext`, your type
+- **Context type** — `HttpMessage`, `HookContext`, your type
 - **DataInput implementations** — extractors for each matchable field
 - **Compiler** — transforms domain-specific config into matcher trees
 - **Registry function** — registers domain inputs with the type registry

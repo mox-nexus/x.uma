@@ -1,66 +1,34 @@
-//! rumi-http: HTTP domain for request matching
+//! rumi-http: the HTTP matching domain.
 //!
-//! This crate provides two layers:
-//!
-//! 1. **Simple API**: `HttpRequest` for testing and lightweight bindings
-//! 2. **Data Plane API**: `HttpMessage` (indexed from `ProcessingRequest`) for production `ext_proc`
-//!
-//! The simple API is always available. The data plane API requires the `ext-proc` feature
-//! (enabled by default).
-//!
-//! # Architecture
+//! One context, [`HttpMessage`]: a request as it arrives on the wire, with the
+//! query string inside `:path` and `:authority` / `:scheme` as pseudo-headers.
+//! Three adapters build or target it, each behind its own feature:
 //!
 //! ```text
-//! Gateway API HttpRouteMatch (config)        [ext-proc feature]
-//!         ↓ compile()
-//! rumi Matcher<HttpMessage, A>               [ext-proc feature]
-//!         ↓ evaluate()
-//! HttpMessage (indexed from ext_proc ProcessingRequest)
-//!
-//! JSON MatcherIr (config)                [registry feature]
-//!         ↓ register_simple() + load_matcher()
-//! rumi Matcher<HttpRequest, A>               [always available]
-//!         ↓ evaluate()
-//! HttpRequest (simple builder pattern)
+//! protojson config  --registry-->  register() + load_matcher()  --+
+//! Gateway API       --gateway--->  compile_route_matches()     ---+--> Matcher<HttpMessage, A>
+//! ext_proc          --ext-proc-->  From<ProcessingRequest> for HttpMessage
 //! ```
+//!
+//! There was a second context, `HttpRequest`, with its own registry over the
+//! same `xuma.http.v1.*` type URLs; that pair once gave `PathInput` two meanings
+//! depending on the caller. One context removes the class (D-059).
 
-// Modules always available
-mod simple;
-
-// Three pure string functions and nothing else. They are ungated because both
-// HTTP contexts must split a path the same way, and `simple` is ungated while
-// `message` is not — a copy in each would be two answers to one question, which
-// is the defect this shares them to remove.
+// Path and query string parsing, used by the one context.
 mod context;
-
-// The Gateway API compiler, the indexed context and its inputs. These need
-// Gateway API *config types*, not a data plane — `HttpMessage` is six plain
-// fields, and only its `From<ProcessingRequest>` conversions ever touched
-// ext_proc. Conflating the two is what put tonic on the default path.
-#[cfg(feature = "gateway")]
-mod compiler;
-#[cfg(feature = "message")]
 mod inputs;
-#[cfg(feature = "message")]
 mod message;
 
-// Simple types (always available)
-pub use simple::{
-    HttpRequest, HttpRequestBuilder, SimpleAuthorityInput, SimpleHeaderInput, SimpleMethodInput,
-    SimplePathInput, SimpleQueryParamInput, SimpleSchemeInput,
-};
+// The Gateway API compiler. Needs Gateway API *config types*, not a data
+// plane: only `From<ProcessingRequest>` ever touched ext_proc.
+#[cfg(feature = "gateway")]
+mod compiler;
 
-// Registry for simple HttpRequest context (always available with registry)
-#[cfg(feature = "registry")]
-pub use simple::register_simple;
+pub use inputs::*;
+pub use message::{HttpMessage, HttpMessageBuilder};
 
-// Compiler, inputs and the indexed context — available with `gateway` alone.
 #[cfg(feature = "gateway")]
 pub use compiler::*;
-#[cfg(feature = "message")]
-pub use inputs::*;
-#[cfg(feature = "message")]
-pub use message::{HttpMessage, HttpMessageBuilder};
 
 // Gateway API config types.
 #[cfg(feature = "gateway")]
@@ -76,20 +44,7 @@ pub use envoy_grpc_ext_proc::envoy::service::ext_proc::v3::{
 
 /// Prelude for convenient imports.
 pub mod prelude {
-    pub use super::{
-        // Simple context + inputs (always available)
-        HttpRequest,
-        HttpRequestBuilder,
-        SimpleAuthorityInput,
-        SimpleHeaderInput,
-        SimpleMethodInput,
-        SimplePathInput,
-        SimpleQueryParamInput,
-        SimpleSchemeInput,
-    };
-
-    // The domain: indexed context and its DataInputs.
-    #[cfg(feature = "message")]
+    // The domain: the context and its DataInputs.
     pub use super::{
         AuthorityInput, HeaderInput, HttpMessage, HttpMessageBuilder, MethodInput, PathInput,
         QueryParamInput, SchemeInput,
@@ -117,7 +72,7 @@ pub mod prelude {
 /// - `xuma.http.v1.QueryParamInput` → [`QueryParamInput`]
 /// - `xuma.http.v1.SchemeInput` → [`SchemeInput`]
 /// - `xuma.http.v1.AuthorityInput` → [`AuthorityInput`]
-#[cfg(all(feature = "message", feature = "registry"))]
+#[cfg(feature = "registry")]
 #[must_use]
 pub fn register(builder: rumi::RegistryBuilder<HttpMessage>) -> rumi::RegistryBuilder<HttpMessage> {
     rumi::register_core_matchers(builder)

@@ -75,15 +75,13 @@ fn build_matcher(
 
 /// Build the HTTP-domain matcher a fixture describes.
 ///
-/// `register_simple`, not `register`: the fixture's `http_request` describes a
-/// plain request, and `HttpRequest` is the context that reads one. Both bind
-/// the same `xuma.http.v1.*` type URLs, and a fixture here is what holds them
-/// to meaning the same thing.
+/// Build the HTTP-domain matcher a fixture describes, over the one HTTP
+/// context (D-059).
 fn build_http_matcher(
     fixture: &ProtoFixture,
-) -> Result<rumi::Matcher<rumi_http::HttpRequest, String>, rumi::MatcherError> {
+) -> Result<rumi::Matcher<rumi_http::HttpMessage, String>, rumi::MatcherError> {
     let resolver = resolver();
-    let registry = rumi_http::register_simple(rumi::RegistryBuilder::new()).build();
+    let registry = rumi_http::register(rumi::RegistryBuilder::new()).build();
     let proto = parse_matcher(&resolver, fixture.proto_matcher.clone())?;
     load_proto_matcher(&registry, &actions(), &resolver, &proto)
 }
@@ -161,14 +159,9 @@ fn run(fixture: &ProtoFixture) {
                         fixture.name, case.name
                     )
                 });
-                let req = spec.headers.iter().fold(
-                    rumi_http::HttpRequest::builder()
-                        .method(&spec.method)
-                        .path(&spec.path),
-                    |b, (k, v)| b.header(k, v),
-                );
+                let req = spec.message();
                 assert_eq!(
-                    observed(matcher.outcome(&req.build()), |a| a),
+                    observed(matcher.outcome(&req), |a| a),
                     case.expected(),
                     "fixture '{}' case '{}'",
                     fixture.name,

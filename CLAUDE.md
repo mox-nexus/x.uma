@@ -366,7 +366,7 @@ rumi-http = "0.0.2"
 ```rust
 use rumi::prelude::*;
 use rumi::claude::{HookContext, HookMatchExt};
-use rumi_http::{HttpRequest, HeaderInput};
+use rumi_http::{HeaderInput, HttpMessage};
 ```
 
 ## Craft Judgment

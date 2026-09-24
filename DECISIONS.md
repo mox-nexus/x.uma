@@ -384,6 +384,14 @@ removing the second removes the class of defect. Docs promised
 **What it entails.** `git grep -cw register_simple rumi/` = 0. `05_http/`'s
 ledger lists `rust` and widens to the bindings when they expose the compiler.
 
+**Done, 2026-09-24.** `simple.rs` is deleted; `HttpMessage` is the one context,
+and the domain is no longer behind a feature (`message` is gone). The bindings
+and the CLI take the query string in the path, as it arrives on the wire: their
+separate `queryParams` / `query_params` / `--query` channel could disagree with
+the path, and the explicit value won, which is the same two-answers class in
+miniature. Exposing `compile_route_matches` from the bindings is additive and
+waits for a user who needs it; it would bring `k8s-openapi` into both.
+
 **Revisit if.** Streaming (Envoy's three-valued `MatchResult` with
 `InsufficientData`) needs a context that is not flat. That is the shape an
 ext_proc adapter would need, and it is not a conformance-surface change.

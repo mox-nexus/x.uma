@@ -1,11 +1,5 @@
-//! Path and query string parsing.
-//!
-//! Shared by both HTTP contexts — `HttpMessage`, which parses the `:path`
-//! pseudo-header at construction, and `HttpRequest`, which parses whatever the
-//! builder was handed. They must agree on where a path ends and a query string
-//! begins, because both answer to the same `xuma.http.v1.PathInput` type URL.
-//! They did not, and one copy of these three functions is what fixes that
-//! rather than restating it.
+//! Path and query string parsing for `HttpMessage`, which splits `:path` at
+//! the first `?`. No percent-decoding: a value is matched as it was sent.
 
 /// Parse query string from path.
 ///

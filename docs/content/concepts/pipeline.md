@@ -39,16 +39,16 @@ use rumi::prelude::*;
 use rumi_http::*;
 
 let predicate = Predicate::Single(SinglePredicate::new(
-    Box::new(SimplePathInput),         // domain-specific
+    Box::new(PathInput),               // domain-specific
     Box::new(PrefixMatcher::new("/api")), // domain-agnostic
 ));
 
-let matcher: Matcher<HttpRequest, &str> = Matcher::list(
+let matcher: Matcher<HttpMessage, &str> = Matcher::list(
     vec![FieldMatcher::new(predicate, OnMatch::Action("api_backend"))],
     None,
 );
 
-let request = HttpRequest::builder().method("GET").path("/api/users").build();
+let request = HttpMessageBuilder::new().method("GET").path("/api/users").build();
 assert_eq!(matcher.evaluate(&request), Some("api_backend"));
 ```
 
@@ -99,14 +99,14 @@ assert_eq!(matcher.evaluate(&event), Some("handle_event"));
 ```
 
 `PrefixMatcher` operates on `MatchingData` (the erased string), not on
-`CloudEvent` or `HttpRequest`. Domain adapters (`SimplePathInput`,
+`CloudEvent` or `HttpMessage`. Domain adapters (`PathInput`,
 `EventTypeInput`) are context-specific. Matchers are universal.
 
 ## Pipeline Stages
 
 | Stage | Role | Generic? | Examples |
 |-------|------|----------|----------|
-| **Context** | Your domain data | Yes (`Ctx`) | `HttpRequest`, `HookContext`, your type |
+| **Context** | Your domain data | Yes (`Ctx`) | `HttpMessage`, `HookContext`, your type |
 | **DataInput** | Extract a value | Yes (`Ctx`) | `PathInput`, `ToolNameInput`, your input |
 | **MatchingData** | Type-erased value | No | `string`, `int`, `bool`, `bytes`; absent is `None` |
 | **InputMatcher** | Match the value | No | `ExactMatcher`, `PrefixMatcher`, `RegexMatcher` |

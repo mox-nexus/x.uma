@@ -18,7 +18,7 @@ use std::fmt::Debug;
 ///
 /// # Type Parameters
 ///
-/// - `Ctx`: The context type this input operates on (e.g., `HttpRequest`, `HookContext`)
+/// - `Ctx`: The context type this input operates on (e.g., `HttpMessage`, `HookContext`)
 ///
 /// # Thread Safety
 ///
@@ -33,8 +33,8 @@ use std::fmt::Debug;
 /// #[derive(Debug)]
 /// struct HeaderInput { name: String }
 ///
-/// impl DataInput<HttpRequest> for HeaderInput {
-///     fn get(&self, ctx: &HttpRequest) -> Option<MatchingData> {
+/// impl DataInput<HttpMessage> for HeaderInput {
+///     fn get(&self, ctx: &HttpMessage) -> Option<MatchingData> {
 ///         ctx.headers.get(&self.name).map(|v| MatchingData::String(v.clone()))
 ///     }
 /// }
@@ -43,7 +43,7 @@ use std::fmt::Debug;
     message = "`{Self}` does not implement `DataInput<{Ctx}>`",
     label = "this type cannot extract data from `{Ctx}`",
     note = "DataInput<Ctx> extracts data from a specific context type",
-    note = "ensure your input type implements DataInput for the correct context (e.g., DataInput<HttpRequest>, DataInput<HookContext>)"
+    note = "ensure your input type implements DataInput for the correct context (e.g., DataInput<HttpMessage>, DataInput<HookContext>)"
 )]
 pub trait DataInput<Ctx>: Send + Sync + Debug {
     /// Extract data from the given context.

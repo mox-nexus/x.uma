@@ -70,7 +70,7 @@ pub struct ProtoFixture {
 
     /// Which domain's context this fixture evaluates against.
     ///
-    /// `kv` (the default) reads a string map; `http` builds an `HttpRequest`.
+    /// `kv` (the default) reads a string map; `http` builds an `HttpMessage`.
     /// The matcher config itself is domain-agnostic — only the context and the
     /// registry differ.
     #[serde(default)]
@@ -150,6 +150,26 @@ pub struct HttpRequestSpec {
     /// Request headers.
     #[serde(default)]
     pub headers: HashMap<String, String>,
+}
+
+#[cfg(feature = "registry")]
+impl HttpRequestSpec {
+    /// The request as the one HTTP context reads it (D-059). A method or path
+    /// left empty is absent, not the empty string.
+    #[must_use]
+    pub fn message(&self) -> rumi_http::HttpMessage {
+        let mut builder = rumi_http::HttpMessageBuilder::new();
+        if !self.method.is_empty() {
+            builder = builder.method(&self.method);
+        }
+        if !self.path.is_empty() {
+            builder = builder.path(&self.path);
+        }
+        self.headers
+            .iter()
+            .fold(builder, |b, (k, v)| b.header(k, v))
+            .build()
+    }
 }
 
 impl ProtoFixture {

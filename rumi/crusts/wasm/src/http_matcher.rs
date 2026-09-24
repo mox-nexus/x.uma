@@ -6,7 +6,7 @@
 use std::sync::OnceLock;
 
 use rumi::prelude::*;
-use rumi_http::HttpRequest;
+use rumi_http::{HttpMessage, HttpMessageBuilder};
 use wasm_bindgen::prelude::*;
 
 use rumi_proto::index::ActionIndex;
@@ -19,7 +19,7 @@ use crate::matcher::Actions;
 /// Evaluates HTTP requests against compiled matcher trees.
 #[wasm_bindgen]
 pub struct HttpMatcher {
-    inner: Matcher<HttpRequest, ActionIndex>,
+    inner: Matcher<HttpMessage, ActionIndex>,
     actions: Actions,
 }
 
@@ -54,9 +54,11 @@ impl HttpMatcher {
     ///   method: "GET",
     ///   path: "/api/users",
     ///   headers: { "content-type": "application/json" },
-    ///   queryParams: { "page": "1" },
     /// })
     /// ```
+    ///
+    /// The query string rides in `path`, as it does on the wire, and
+    /// pseudo-headers such as `:authority` in `headers` (D-059).
     ///
     /// Returns the action string if the request matched, or `undefined`.
     #[wasm_bindgen(unchecked_return_type = "string | undefined")]
@@ -93,13 +95,13 @@ impl HttpMatcher {
 
 /// The registry every `HttpMatcher` loads through. Built on first use; every
 /// call after that returns the same instance.
-pub(crate) fn registry() -> &'static rumi::Registry<HttpRequest> {
-    static REGISTRY: OnceLock<rumi::Registry<HttpRequest>> = OnceLock::new();
-    REGISTRY.get_or_init(|| rumi_http::register_simple(rumi::RegistryBuilder::new()).build())
+pub(crate) fn registry() -> &'static rumi::Registry<HttpMessage> {
+    static REGISTRY: OnceLock<rumi::Registry<HttpMessage>> = OnceLock::new();
+    REGISTRY.get_or_init(|| rumi_http::register(rumi::RegistryBuilder::new()).build())
 }
 
-/// Build an `HttpRequest` from a JS plain object.
-fn build_request_from_js(val: &JsValue) -> Result<HttpRequest, JsValue> {
+/// Build an `HttpMessage` from a JS plain object.
+fn build_request_from_js(val: &JsValue) -> Result<HttpMessage, JsValue> {
     let get =
         |key| js_sys::Reflect::get(val, &JsValue::from_str(key)).unwrap_or(JsValue::UNDEFINED);
 
@@ -111,7 +113,7 @@ fn build_request_from_js(val: &JsValue) -> Result<HttpRequest, JsValue> {
         .as_string()
         .ok_or_else(|| JsValue::from_str("path is required and must be a string"))?;
 
-    let mut builder = HttpRequest::builder().method(method).path(path);
+    let mut builder = HttpMessageBuilder::new().method(method).path(path);
 
     // Headers (optional, Record<string, string>)
     let headers_val = get("headers");
@@ -128,24 +130,6 @@ fn build_request_from_js(val: &JsValue) -> Result<HttpRequest, JsValue> {
                 .as_string()
                 .ok_or_else(|| JsValue::from_str("header value must be a string"))?;
             builder = builder.header(key, value);
-        }
-    }
-
-    // Query params (optional, Record<string, string>)
-    let params_val = get("queryParams");
-    if !params_val.is_undefined() && !params_val.is_null() {
-        let entries = js_sys::Object::entries(&js_sys::Object::from(params_val));
-        for entry in entries.iter() {
-            let pair = js_sys::Array::from(&entry);
-            let key = pair
-                .get(0)
-                .as_string()
-                .ok_or_else(|| JsValue::from_str("query param key must be a string"))?;
-            let value = pair
-                .get(1)
-                .as_string()
-                .ok_or_else(|| JsValue::from_str("query param value must be a string"))?;
-            builder = builder.query_param(key, value);
         }
     }
 

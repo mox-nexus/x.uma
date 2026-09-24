@@ -33,7 +33,7 @@ fn build(fixture: &ProtoFixture) -> Result<Loaded<KvContext>, rumi::MatcherError
 /// The HTTP-domain matcher a fixture describes.
 fn build_http(
     fixture: &ProtoFixture,
-) -> Result<Loaded<rumi_http::HttpRequest>, rumi::MatcherError> {
+) -> Result<Loaded<rumi_http::HttpMessage>, rumi::MatcherError> {
     let resolver = crate::protojson::resolver();
     let proto = parse_matcher(resolver, fixture.proto_matcher.clone())?;
     let ir = convert_matcher(&proto, resolver)?;
@@ -83,19 +83,10 @@ fn run_cases(fixture: &ProtoFixture, results: &mut Vec<FixtureResult>) {
         },
         Domain::Http => match build_http(fixture) {
             Ok(m) => evaluate!(m, |case: &rumi_test::proto_fixture::ProtoTestCase| {
-                let spec = case
-                    .http_request
+                case.http_request
                     .as_ref()
-                    .expect("http fixture case has no http_request");
-                spec.headers
-                    .iter()
-                    .fold(
-                        rumi_http::HttpRequest::builder()
-                            .method(&spec.method)
-                            .path(&spec.path),
-                        |b, (k, v)| b.header(k, v),
-                    )
-                    .build()
+                    .expect("http fixture case has no http_request")
+                    .message()
             }),
             Err(e) => results.push((
                 fixture.name.clone(),

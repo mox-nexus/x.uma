@@ -15,14 +15,14 @@ registry = ["rumi-core/registry", "rumi-kv/registry", "serde", "dep:rumi-proto",
 # `05_http` goes through the Gateway API compiler, which is rumi-http's
 # `gateway` feature — a different door from the `registry` config path the
 # protojson fixtures use.
-http = ["dep:rumi-http", "rumi-http/gateway", "rumi-http/message", "serde"]
+http = ["dep:rumi-http", "rumi-http/gateway", "serde"]
 
 [dependencies]
 rumi-core.workspace = true
 rumi-kv = { path = "../kv", version = "0.0.2" }
 # The protojson fixtures cover the HTTP domain through the config path; the
 # `05_http` dialect covers it through the compiler.
-rumi-http = { path = "../http", version = "0.0.2", default-features = false, features = ["registry", "message"], optional = true }
+rumi-http = { path = "../http", version = "0.0.2", default-features = false, features = ["registry"], optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde_yaml = { workspace = true, optional = true }

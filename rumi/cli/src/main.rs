@@ -15,7 +15,7 @@ use std::process;
 
 use rumi::claude::HookContext;
 use rumi::{MatcherIr, MatcherKindIr, TreeTypeIr, TypedExtensionConfig};
-use rumi_http::HttpRequest;
+use rumi_http::{HttpMessage, HttpMessageBuilder};
 use rumi_kv::KvContext;
 use rumi_proto::any_resolver::{AnyResolver, AnyResolverBuilder};
 use rumi_proto::convert::convert_matcher;
@@ -493,9 +493,8 @@ fn build_test_registry() -> rumi::Registry<KvContext> {
     rumi_kv::register(builder).build()
 }
 
-fn build_http_registry() -> rumi::Registry<HttpRequest> {
-    let builder = rumi::RegistryBuilder::new();
-    rumi_http::register_simple(builder).build()
+fn build_http_registry() -> rumi::Registry<HttpMessage> {
+    rumi_http::register(rumi::RegistryBuilder::new()).build()
 }
 
 fn build_claude_registry() -> rumi::Registry<HookContext> {
@@ -515,15 +514,16 @@ fn build_test_context(pairs: &HashMap<String, String>) -> KvContext {
     ctx
 }
 
-fn build_http_context(args: &HttpArgs) -> HttpRequest {
-    let mut builder = HttpRequest::builder().method(&args.method).path(&args.path);
-    for (k, v) in &args.headers {
-        builder = builder.header(k, v);
-    }
-    for (k, v) in &args.query_params {
-        builder = builder.query_param(k, v);
-    }
-    builder.build()
+fn build_http_context(args: &HttpArgs) -> HttpMessage {
+    args.headers
+        .iter()
+        .fold(
+            HttpMessageBuilder::new()
+                .method(&args.method)
+                .path(&args.path),
+            |b, (k, v)| b.header(k, v),
+        )
+        .build()
 }
 
 fn build_claude_context(args: &ClaudeArgs) -> Result<HookContext, String> {
@@ -662,7 +662,6 @@ struct HttpArgs {
     method: String,
     path: String,
     headers: Vec<(String, String)>,
-    query_params: Vec<(String, String)>,
 }
 
 /// Parsed Claude arguments.
@@ -697,13 +696,6 @@ fn parse_http_args(args: &[String]) -> Result<HttpArgs, String> {
                 let pair = next_value(args, i, "--header")?;
                 let (k, v) = split_kv(&pair, "--header")?;
                 result.headers.push((k, v));
-                i += 1;
-            }
-            "--query" => {
-                i += 1;
-                let pair = next_value(args, i, "--query")?;
-                let (k, v) = split_kv(&pair, "--query")?;
-                result.query_params.push((k, v));
                 i += 1;
             }
             other => return Err(format!("unexpected argument \"{other}\"")),
@@ -839,9 +831,8 @@ Flags (test domain, default):
 
 Flags (http domain):
   --method METHOD                       HTTP method (required)
-  --path PATH                           Request path (required)
-  --header key=value                    Header (repeatable)
-  --query key=value                     Query parameter (repeatable)
+  --path PATH                           Request target, query string included (required)
+  --header key=value                    Header, or pseudo-header such as :authority (repeatable)
 
 Flags (claude domain):
   --event EVENT                         Hook event name (required)
@@ -936,7 +927,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_http_args_with_headers_and_query() {
+    fn parse_http_args_with_headers() {
         let args: Vec<String> = vec![
             "--method".into(),
             "POST".into(),
@@ -946,8 +937,6 @@ mod tests {
             "content-type=application/json".into(),
             "--header".into(),
             "authorization=Bearer token".into(),
-            "--query".into(),
-            "page=1".into(),
         ];
         let result = parse_http_args(&args).unwrap();
         assert_eq!(result.method, "POST");
@@ -956,8 +945,6 @@ mod tests {
             result.headers[0],
             ("content-type".into(), "application/json".into())
         );
-        assert_eq!(result.query_params.len(), 1);
-        assert_eq!(result.query_params[0], ("page".into(), "1".into()));
     }
 
     #[test]
@@ -1062,13 +1049,12 @@ mod tests {
     fn build_http_context_from_args() {
         let args = HttpArgs {
             method: "GET".into(),
-            path: "/api/users".into(),
+            path: "/api/users?page=1".into(),
             headers: vec![("content-type".into(), "application/json".into())],
-            query_params: vec![("page".into(), "1".into())],
         };
         let ctx = build_http_context(&args);
-        assert_eq!(ctx.method(), "GET");
-        assert_eq!(ctx.path(), "/api/users");
+        assert_eq!(ctx.method(), Some("GET"));
+        assert_eq!(ctx.path(), Some("/api/users"));
         assert_eq!(ctx.header("content-type"), Some("application/json"));
         assert_eq!(ctx.query_param("page"), Some("1"));
     }
