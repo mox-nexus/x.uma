@@ -1,31 +1,25 @@
 ---
 name: validate
-description: "Run full validation suite for x.uma"
+description: "Run x.uma's check suite, covering what CI runs, and report the result"
 ---
 
 # /validate
 
-Run the complete validation suite for x.uma.
+From the repository root, run:
 
-## Execution
+```bash
+set -o pipefail; just ci 2>&1 | tail -60
+set -o pipefail; just crust-check 2>&1 | tail -40
+just gen && git diff --exit-code -- rumi/proto/src/gen
+```
 
-Run these validations in sequence:
+- **`just ci`** covers most of CI.
+- **`just crust-check`** runs the binding test suites, which CI runs as separate jobs.
+- **The last line** is CI's codegen drift check: regenerating must change nothing.
 
-1. **Proto validation:**
-   ```bash
-   cd ~/mox/x.uma && buf lint proto/ && buf breaking proto/ --against .git#branch=main
-   ```
+`pipefail` matters. Without it, the pipe's exit status is `tail`'s, and a failing suite reports
+success.
 
-2. **Rust validation:**
-   ```bash
-   cd ~/mox/x.uma && cargo fmt --manifest-path rumi/Cargo.toml --all -- --check
-   cd ~/mox/x.uma && cargo clippy --manifest-path rumi/Cargo.toml --workspace -- -W clippy::pedantic -D warnings
-   cd ~/mox/x.uma && cargo test --manifest-path rumi/Cargo.toml --workspace
-   ```
-
-3. **Constraint check:**
-   ```bash
-   cd ~/mox/x.uma && .claude/plugins/x.uma-maintainer/scripts/check-constraints.sh
-   ```
-
-Report results to the user with pass/fail for each step.
+Report pass or fail for each line. On failure, name the first failing recipe and quote its
+error. Do not summarise a failure as a pass with warnings. If a tool is missing, run
+`just doctor` and report what it says.

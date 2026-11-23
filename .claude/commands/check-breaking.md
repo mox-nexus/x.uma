@@ -1,27 +1,24 @@
 ---
 name: check-breaking
-description: "Check for breaking changes in proto and Rust APIs"
+description: "Check the current branch for breaking changes to x.uma's schema and public surfaces"
 ---
 
 # /check-breaking
 
-Check for breaking changes against the main branch.
+Nothing is published yet, so a breaking change is allowed. But every one must be deliberate and
+recorded in `DECISIONS.md`, because each will freeze at first publish.
 
-## Execution
+1. **Schema:** run `just breaking` (`buf breaking` against `main`). Report each finding.
+2. **Rust public API:** if `cargo semver-checks` or `cargo public-api` is installed, run it on
+   the five published crates (`rumi-core`, `rumi-proto`, `rumi-kv`, `rumi-http`, `rumi-cli`).
+   If neither is installed, say so. Then review the diff for changed or removed `pub` items,
+   trait signatures, enum variants and error types.
+3. **Binding surfaces:** review the diff in `rumi/crusts/python/` and `rumi/crusts/wasm/` for
+   changed classes, methods, result fields or exception types.
+4. **CLI:** review the diff in `rumi/cli/` for changed subcommands, flags, output or exit
+   codes.
+5. **Type URLs and config:** review the diff in `proto/xuma/` for renamed messages or changed
+   field meanings.
 
-1. **Proto breaking changes:**
-   ```bash
-   cd ~/mox/x.uma && buf breaking proto/ --against .git#branch=main
-   ```
-
-2. **Rust API changes:**
-   - Use `cargo semver-checks` if available
-   - Otherwise, review public API surface manually:
-     - Check `pub` items in rumi/core/src/lib.rs
-     - Check trait definitions
-     - Check struct fields
-
-3. **Report findings:**
-   - List any breaking changes detected
-   - Classify as: Addition, Removal, Modification
-   - Recommend versioning action (major/minor/patch)
+For each change found, classify it (addition, removal, modification) and say whether a D-entry
+covers it. A breaking change with no D-entry is the main thing to report.

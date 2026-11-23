@@ -153,7 +153,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-full test-protojson test-http-conformance test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links docs-samples readme-agreement docs-check docs-test docs-build audit
+ci: fmt-check lint-strict test test-full test-protojson test-http-conformance test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands harness docs-links docs-samples readme-agreement docs-check docs-test docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -197,6 +197,11 @@ docs-preview:
 # Four how-to pages taught subcommands that never existed; prose cannot fail a build.
 docs-commands:
     node scripts/check-doc-commands.mjs
+
+# The harness (.claude/, CLAUDE.md) names recipes, paths and engines that must exist.
+harness:
+    node scripts/check-harness.mjs --self-test
+    node scripts/check-harness.mjs
 
 # Assert every internal Markdown link resolves to a page the site serves.
 # Every one of them was dead until 2026-08-17; the build reported one, as a 404.

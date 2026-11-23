@@ -266,8 +266,9 @@ already states plainly: that this project commits generated code, and that
 | # | Skill | Why |
 |---|---|---|
 | 1 | `ci-scaffolds:crafting` | Compound value, pit of success, complete the work, fidelity levels. The standard this plan is written to. |
-| 2 | `maintainer` | The project's own skill. Architecture, conventions, where things live. |
-| 3 | `rust-mastery` | x.uma-specific Rust judgment. **Read its §6 ladder** (enum → consume `self` → runtime check) before designing any invariant. |
+| 2 | `maintainer` | The project's own skill: where things live, the order work happens in, the commands, the conventions. |
+| 3 | `rust-mastery` | x.uma-specific Rust judgment, above all at the binding boundary. Read "Make illegal states unrepresentable" (enum → consume `self` → runtime check) before designing any invariant. |
+| 4 | `design-mastery` | Before changing anything that freezes at publish: schema, type URLs, binding surface, CLI, errors, result object. |
 
 **When the work touches these areas, load before starting, not partway through:**
 

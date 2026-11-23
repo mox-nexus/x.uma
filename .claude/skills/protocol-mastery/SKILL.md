@@ -1,341 +1,251 @@
 ---
 name: protocol-mastery
 description: >
-  Activates when working with protobuf schemas, buf codegen, xDS protocol family,
-  TypedExtensionConfig patterns, Any resolution, control plane integration, ECDS,
-  or wire format decisions in the x.uma project.
-triggers:
-  - proto files (.proto)
-  - buf.yaml or buf.gen.yaml
-  - xDS types (Matcher, TypedExtensionConfig, Any)
-  - codegen directory structure
-  - type URL resolution
-  - ECDS or control plane integration
-  - wire format decisions (binary proto, ProtoJSON, TypedStruct)
-version: 1.0.0
+  The wire side of x.uma: protobuf schemas under proto/xuma/, buf codegen, the xDS Unified
+  Matcher API and Envoy's semantics for it, TypedExtensionConfig and google.protobuf.Any, type
+  URLs, and canonical protojson. Load it when adding or changing a .proto message or field,
+  touching buf.yaml or the buf.gen templates, regenerating code, changing how configs load,
+  resolving an Any, or deciding what an xDS field means for rumi. design-mastery covers whether
+  a schema change should happen; rust-mastery covers the Rust around it.
 ---
 
-# Protocol Mastery
-
-Knowledge for working with protobuf, buf, xDS, and wire protocols in x.uma.
+# Protocol mastery for x.uma
 
-## buf Codegen Layout
-
-x.uma generates **Rust only**, into `rumi/proto/src/gen/`.
+x.uma implements the xDS Unified Matcher API. Its config is an xDS `Matcher` message; every
+input and every action in it is a `TypedExtensionConfig`, a name plus a
+`google.protobuf.Any`. The proto schema is the contract users write against. The Rust code is
+one implementation of it.
 
-There is one generated tree because there is one engine (D-051). The bindings
-read protojson through it; neither Python nor TypeScript carries generated
-types, and D-038 records why a lenient generator would have been worse than
-none: neither betterproto's `from_dict` nor ts-proto's `fromJSON` rejects an
-unknown field.
-
-```
-rumi/proto/src/gen/    # Rust generated code (tracked; CI asserts no drift)
-```
-
-**Pattern A** (monorepo top-level `gen/`) is also valid but x.uma doesn't use it.
+That ordering is the first principle, and everything else follows from it.
 
-### buf.gen.yaml Structure
-
-```yaml
-version: v2
-clean: true  # Delete old generated code before regenerating
-managed:
-  enabled: true  # Apply defaults (optimize_for: SPEED, etc.)
-  override:
-    go_package_prefix: ...  # Only if generating Go
-plugins:
-  - remote: buf.build/neoeinstein/prost
-    out: src/gen
-  - remote: buf.build/neoeinstein/prost-serde
-    out: src/gen
-```
+---
 
-**Key points:**
-- `managed: enabled: true` covers most defaults — language overrides only needed for specific targets
-- `clean: true` prevents stale generated files (buf.gen.yaml v2 only)
-- x.uma **commits generated code** for convenience (like cncf/xds, go-control-plane)
-- Alternative: gitignore generated code (like Envoy with Bazel)
-
-## Proto Plugin Choices
+## 1. The schema is the contract
 
-| Language | Plugin | Why |
-|----------|--------|-----|
-| **Rust** | neoeinstein-prost + prost-serde | `prost::Message` + `serde::Deserialize` on same types |
-| **Python** | betterproto | Dataclass-based, clean Python idioms, built-in JSON |
-| **TypeScript** | ts-proto (current) → protobuf-es (future) | ts-proto v2 works but protobuf-es is only JS lib passing full conformance + Connect-ES native |
-
-### TypeScript Migration Path
+### The proto decides what a config means
 
-**Current:** ts-proto v2.x (internally depends on @bufbuild/protobuf anyway)
+**Principle.** When the proto and the code disagree, the code is wrong. A field's meaning is
+written in the `.proto` comment above it, and the code implements that comment.
 
-**Future:** protobuf-es + Connect-ES 2.0
-- protobuf-es: Buf's first-party TS library, full conformance
-- Connect-ES 2.0: unified codegen (message + service in single protoc-gen-es plugin)
-- Migration when needed for RPC services
+**Why.** Users, control planes and other implementations read the schema, not rumi's source.
+Behaviour that lives only in code is a second, undocumented contract. And the schema, the type
+URLs and the config format all freeze at first publish.
 
-## xDS Protocol Family
+**What it helps you catch.**
+- A behaviour added in Rust with no comment in the proto.
+- A comment that says one thing while the converter does another.
+- A field that exists in the proto but is silently ignored. That is why the loader refuses
+  `keep_matching: true` rather than accepting it: rumi does not implement it, and accepting it
+  would let a config read one way and behave another.
 
-| Service | Purpose | x.uma Relevance |
-|---------|---------|-----------------|
-| LDS | Listener Discovery | Future: deliver matcher configs |
-| RDS | Route Discovery | Future: HTTP route matching |
-| CDS | Cluster Discovery | N/A |
-| EDS | Endpoint Discovery | N/A |
-| SDS | Secret Discovery | N/A |
-| **ECDS** | Extension Config Discovery | **Primary delivery for matcher configs** |
+**Why it helps.** The maintainer can review a schema change by reading the proto diff alone.
 
-### ECDS for x.uma
+### Every message and field says what it does, including when it is absent
 
-**Extension Config Discovery Service** delivers configs independently from listener updates.
+**Principle.** Each message has a comment. Each field's comment says what it means, what an
+empty or default value does, and what happens when the value is missing at match time.
 
-```protobuf
-// Delivered via ECDS
-message TypedExtensionConfig {
-  string name = 1;                       // Label only
-  google.protobuf.Any typed_config = 2;  // Type resolution via type_url
-}
-```
-
-**Why ECDS matters:**
-- Matcher configs change more frequently than listeners
-- Avoids listener reloads for matcher updates
-- The Unified Matcher API (xds.type.matcher.v3) is cross-cutting — delivered via any xDS service
+**Why.** In proto3 a missing scalar is indistinguishable from its default. So "absent" has to be
+defined in words. In x.uma it decides whether a gate can fail open: an input that reads nothing
+makes its predicate false, and an input marked `required` that reads nothing leaves the match
+undecided.
 
-**Industry default:** Delta xDS (Istio 1.22+) sends only changed configs, not full state.
+**What it helps you catch.** A new input message whose comment does not say what absence does.
 
-## Any Resolution Pattern
+**Why it helps.** Fail-open questions get answered in review, from the schema, before any code
+runs.
 
-`google.protobuf.Any` = type erasure at wire level:
+### Additive changes only, checked by `buf breaking`
 
-```protobuf
-message Any {
-  string type_url = 1;  // "type.googleapis.com/xuma.http.v1.HeaderInput"
-  bytes value = 2;      // Serialized message
-}
-```
-
-### Resolution Flow
-
-1. Extract `type_url`
-2. Lookup factory in type registry
-3. Decode `value` bytes into concrete config
-4. Return typed object
-
-### Implementation by Language
+**Principle.** Add fields and messages. Never renumber, retype or reuse a field number. When
+removing a field, reserve its number and name.
 
-| Language | Pattern |
-|----------|---------|
-| **Envoy (C++)** | `Config::Utility::getFactory<DataInputFactory<T>>(config)` + `translateAnyToFactoryConfig()` |
-| **rumi (Rust)** | `AnyResolver::register::<T>(url)` — monomorphization at registration, `Box<dyn Fn>` erasure |
-| **prost** | `Any::from_msg()`/`to_msg()` with `Name` trait |
-| **betterproto** | `to_json()`/`from_json()` on dataclass messages |
-| **protobuf-es** | Built-in `pack()`/`unpack()` with schema objects |
+**Why.** A config written today must still load tomorrow. Proto's wire compatibility rests
+entirely on field numbers keeping their meaning. `buf breaking` checks the schema against
+`main` at file level (`just breaking`). CI does not run it, nor `buf lint`, so run both
+yourself before a schema change merges, until a CI step does.
 
-### x.uma Type Registry
-
-```rust
-// rumi/proto/src/any_resolver.rs
-let mut resolver = AnyResolver::new();
-resolver.register::<HeaderInput>("type.googleapis.com/xuma.http.v1.HeaderInput");
-
-// Later, resolve Any bytes:
-let input: Box<dyn DataInput<HttpMessage>> = resolver.resolve(&any_config)?;
-```
-
-**Constraint:** Registry immutable after initialization (Arch-Guild: Vector, Lamport).
-
-## x.uma vs Envoy Comparison
-
-### What x.uma Matches
-
-| Pattern | Envoy | x.uma |
-|---------|-------|-------|
-| Type erasure | `MatchingDataType` enum | `MatchingData` (Rust), `MatchingValue` union (Python) |
-| DataInput | `DataInput<DataType>` | `DataInput<Ctx>` |
-| InputMatcher | Non-generic | Non-generic |
-| Predicate composition | AND/OR/NOT | AND/OR/NOT |
-| OnMatch exclusivity | Action XOR matcher (proto `oneof`) | Rust `enum OnMatch<Ctx, A>` — stricter |
+**What it helps you catch.**
+- A "harmless" rename.
+- A field number reused after a removal.
+- A `string` turned into a message.
 
-### What Envoy Has (Not Yet in x.uma)
+**Why it helps.** The compatibility promise becomes a tool's result, not a reviewer's memory,
+and once it runs in CI, it holds without anyone remembering.
 
-| Feature | Envoy | x.uma Status |
-|---------|-------|--------------|
-| Data availability | 3-state: NotAvailable, MoreDataMightBeAvailable, AllDataAvailable | Deferred |
-| keep_matching | Records action, returns no-match, continues | Deferred |
-| CommonProtocolInput | Protocol-agnostic inputs | Deferred |
-| CustomMatcherFactory | IP, domain, CEL matchers | Deferred |
+---
 
-**Current focus:** Core matching semantics, HTTP domain, cross-language conformance.
+## 2. Codegen
 
-## Wire Format Decisions
+### One generated tree, for the one engine
 
-| Format | Size | CPU | Readability | Use When |
-|--------|------|-----|-------------|----------|
-| **Binary proto** | Smallest | Fastest | None | Wire transport, ECDS delivery |
-| **ProtoJSON** | ~3x larger | Slower | Human-readable | Config files, debugging |
-| **TypedStruct** | Largest | Slowest | Human-readable | Control planes without proto schema |
+**Principle.** buf generates Rust only, into `rumi/proto/src/gen/`, and the generated code is
+committed. Python and TypeScript have no generated types: the bindings hand protojson text to
+the engine, which reads it through this one tree.
 
-### x.uma Choices
+**Why.** Generated types in each language were tried and measured. Neither the TypeScript nor
+the Python generator rejected an unknown field: a misspelt key became an empty value without
+an error. A config with a typo then quietly means something else, which for a security matcher
+is the worst failure. One strict reader in the engine is better than three lenient ones.
 
-- **Config files:** ProtoJSON (prost-serde, betterproto, protobuf-es all support)
-- **Wire transport (future):** Binary proto
-- **TypedStruct:** Not planned — x.uma control planes will have schema
+**What it helps you catch.** A proposal to add protobuf codegen to a binding "for type safety".
+Ask whether its reader rejects unknown fields before anything else.
 
-### TypedStruct vs TypedExtensionConfig
+**Why it helps.** Strictness lives in one place, so it is tested in one place.
 
-```protobuf
-// Standard (has schema)
-message TypedExtensionConfig {
-  string name = 1;
-  google.protobuf.Any typed_config = 2;  // type_url → schema
-}
+### Two buf passes, pinned plugins, and `clean` only on the first
 
-// For JSON-only control planes (no schema)
-message TypedStruct {
-  string type_url = 1;
-  google.protobuf.Struct value = 2;  // Opaque JSON
-}
-```
+**Principle.** `just gen` runs `buf.gen.yaml` first and then `buf.gen.rust.yaml`.
+- The first pass has `clean: true` and wipes the tree.
+- The second pass generates the xDS dependency types that no local proto imports, and appends
+  them to the tree.
+- Plugin versions are pinned in both files, and the two files must agree.
 
-**x.uma stance:** TypedExtensionConfig only — simpler, safer, better tooling.
+CI fails if the committed tree differs from a fresh generation.
 
-## Codegen Directory Convention
+**Why.**
+- **`clean` in both passes** would delete what the first pass wrote.
+- **Floating plugin versions** have already broken the build once. A newer prost plugin derived
+  `Eq` and `Hash` on messages that hold an `Any`, which does not implement them, so xDS's
+  `TypedExtensionConfig` stopped compiling.
+- **The pinned plugin** matches the `prost` runtime version in `rumi/proto`.
 
-```
-<impl>/proto/
-├── buf.yaml           # buf workspace config
-├── buf.gen.yaml       # codegen config
-└── src/
-    ├── gen/           # Generated code (committed)
-    │   ├── xds/
-    │   └── xuma/
-    ├── convert.{rs,py,ts}       # proto Matcher → native MatcherIr
-    └── any_resolver.{rs,py,ts}  # Any bytes → native config objects
-```
+**What it helps you catch.**
+- Adding `clean` to the second template.
+- Bumping one plugin without the other, or without the runtime crate.
+- Committing a hand edit inside `gen/`.
 
-**Pattern:**
-- `gen/` = machine-written (buf codegen)
-- Sibling modules = human-written (conversion, resolution)
+**Why it helps.** Regeneration stays a boring, reproducible step, and a drift in it is caught
+by CI, not discovered by a user.
 
-## Package Namespace Convention
+---
 
-Following established patterns:
+## 3. `Any`, type URLs and protojson
 
-| Project | Pattern | Example |
-|---------|---------|---------|
-| Google | `google.<area>.<version>` | `google.protobuf` |
-| xDS | `xds.<area>.<version>` | `xds.type.matcher.v3` |
-| Envoy | `envoy.<area>.<version>` | `envoy.config.core.v3` |
-| **x.uma** | `xuma.<area>.<version>` | `xuma.http.v1` |
+### Type URLs: one spelling written, one name compared
 
-### x.uma Namespaces
+**Principle.** Documents write type URLs as `type.googleapis.com/<package>.<Message>`. Strip
+the prefix at one boundary and look up by the fully qualified message name.
 
-```
-xuma.core.v1      # Base types, registry
-xuma.http.v1      # HTTP matching
-xuma.claude.v1    # Claude Code hooks
-xuma.grpc.v1      # gRPC matching (future)
-```
+Today that holds on the config-loading path: the `Any` resolver strips the
+`type.googleapis.com/` prefix. The core `Registry` stores and looks up type URLs as raw strings,
+so a `TypedExtensionConfig` built by hand in Rust with the full URL does not resolve. Know
+which path you are on.
 
-### Type URLs
+**Why.** Valid type URLs come in more than one spelling, and protobuf libraries disagree on
+which they emit. Comparing raw strings makes two correct configs disagree.
 
-```
-type.googleapis.com/xuma.http.v1.HeaderInput
-type.googleapis.com/xuma.http.v1.QueryParameterInput
-type.googleapis.com/xuma.core.v1.MapInput
-```
+**What it helps you catch.** A new lookup that compares the URL as given.
 
-**Convention:** Always `type.googleapis.com/` prefix (de facto standard).
+**Why it helps.** "Works from a file, fails from a control plane" never becomes a bug report.
 
-## Proto Style Guide (x.uma)
+### Canonical protojson writes `Any` expanded; rumi reads it through binary
 
-```protobuf
-syntax = "proto3";
+**Principle.**
+- **Canonical protojson writes an `Any` expanded:** the payload's own fields inline, beside an
+  `@type` key.
+- **The serde code generated for x.uma's protos writes it packed:** a `typeUrl` beside base64
+  of the binary encoding.
+- **rumi converts expanded documents to packed form** through the same registry that decodes
+  `Any` payloads. Every config, from a file or from a control plane, then meets at one proto
+  `Matcher` value and goes through one conversion walk.
 
-package xuma.http.v1;
+**Why.** Expanding an `Any` needs the payload's schema at serialisation time, which static
+codegen does not have. So the generated code cannot read canonical documents unaided.
 
-import "xds/type/matcher/v3/matcher.proto";
-import "google/protobuf/wrappers.proto";
+Routing through binary costs a round trip once per config load, never per match. It buys one
+conversion, not two. Two readers of the same semantics have already disagreed once in this
+repository.
 
-// GOOD: Clear field names, field numbers reserved blocks
-message HeaderInput {
-  // Name of the header to extract (case-insensitive)
-  string name = 1;
-}
+The registry that decodes is the registry that encodes, so the set of readable types and the
+set of writable types are one set by construction.
 
-// GOOD: Explicit about behavior
-message QueryParameterInput {
-  // Parameter name (case-sensitive)
-  string name = 1;
+**What it helps you catch.** A second loader that reads JSON straight into config types: faster
+to write, and free to disagree with the binary path.
 
-  // If false, evaluates to None when parameter absent
-  // If true, evaluates to empty string when parameter absent
-  bool treat_missing_as_empty = 2;
-}
-```
+**Why it helps.** The control-plane path and the file path cannot drift, because they are the
+same path.
 
-### Field Numbering
+### Unknown fields are rejected
 
-- 1-15: Single-byte encoding (most common fields)
-- 16-2047: Two-byte encoding
-- Reserve blocks when deprecating fields
+**Principle.** The loader rejects any field the schema does not define. A conformance fixture
+requires it of the engine and both bindings.
 
-### Documentation
+**Why.** A typo in a matcher config must fail loudly. Accepting it means the typo's intended
+meaning silently disappears, and the config protects less than its author thinks. Variation the
+design anticipates (new extension types) arrives through type URLs, not through unknown
+fields.
 
-- Every message has a comment
-- Every field has a comment
-- Explain **behavior**, not just "what" — the "when" and "why"
+**What it helps you catch.** Any lenient deserialisation path: `#[serde(default)]` on a config
+type, an ignore-unknown-fields option, a hand-written reader.
 
-## Common Pitfalls
+**Why it helps.** "My rule never fires" turns into a load error with the field's name.
 
-| Mistake | Why It's Wrong | Fix |
-|---------|----------------|-----|
-| `name` in TypedExtensionConfig for type resolution | `name` is a label only | Use `type_url` inside `Any.typed_config` |
-| Recursive codegen (proto imports itself) | buf errors on cycles | Extract shared types to separate package |
-| Missing `managed: enabled` | Manual field numbering, package paths | Add `managed: enabled: true` |
-| Regenerating without `clean: true` | Stale files from renamed/deleted messages | Add `clean: true` in buf.gen.yaml v2 |
-| Hard-coding type URLs as strings | Brittle, error-prone | Use proto `Name` trait / descriptor access |
+### `TypedExtensionConfig`: the name is a label
 
-## Source Material
+**Principle.** In `TypedExtensionConfig`, `typed_config`'s type URL decides what is loaded.
+`name` is a label for humans and traces, and nothing resolves by it.
 
-This skill synthesizes from:
-- buf.build documentation (codegen patterns, managed mode)
-- xDS protocol specification (ECDS, TypedExtensionConfig)
-- Envoy source code (`~/oss/reference/envoy/source/common/matcher/`)
-- x.uma project conventions (CLAUDE.md, MEMORY.md)
-- Connect-ES codegen patterns (protobuf-es + Connect-ES 2.0)
+**Why.** That is the xDS contract. Envoy resolves extensions by type URL, so resolving by name
+would make a config mean different things in Envoy and in rumi.
 
-## Quick Reference: buf Commands
+**What it helps you catch.** Code that dispatches on `name`, or a docs example implying it
+matters.
 
-```bash
-# Generate code for all languages
-buf generate
+**Why it helps.** Configs stay portable between rumi and Envoy.
 
-# Generate for specific proto files only
-buf generate --path proto/xuma
+---
 
-# Lint proto files
-buf lint
+## 4. Envoy's matcher semantics, as rumi implements them
 
-# Format proto files
-buf format -w
+The reference is Envoy: the protos under `~/oss/reference/cncf-xds/xds/type/matcher/v3/`, and
+the implementation under `~/oss/reference/envoy/source/common/matcher/` and
+`~/oss/reference/envoy/envoy/matcher/`. When a behaviour is unclear, read Envoy's code before
+deciding. When rumi departs from it, the departure is a decision with a D-entry.
 
-# Check breaking changes
-buf breaking --against .git#branch=main
+| Concept | xDS / Envoy | rumi |
+|---|---|---|
+| `OnMatch` | `oneof { matcher; action }`, never both | `enum OnMatch { Action(A), Matcher(Box<…>) }` |
+| Nested matcher misses | the parent's `OnMatch` fails, and evaluation continues with the next field matcher | same |
+| `on_no_match` | on `Matcher` only, not per `OnMatch` | `Matcher.on_no_match`; a tree has no fallback field of its own |
+| List vs tree | `oneof matcher_type` | `MatcherKind::List` or `MatcherKind::Tree`, exclusive |
+| First match wins | yes; `keep_matching` records an action and continues | first match wins; `keep_matching: true` is refused at load because it is not implemented |
+| Prefix tree | on a nested miss under the longest prefix, retry the next shorter (Envoy 1.35) | every matching prefix is tried, longest first, and the trace records each attempt |
+| Missing data | three states: not available, more might arrive, all available | an absent value makes a predicate false; for a `required` input it leaves the match undecided. That is the "required value absent" case of Envoy's richer model; streaming ("more might arrive") is not implemented |
+| Regex | RE2 | Rust's `regex` crate: linear time, close to RE2 but not identical |
 
-# Update dependencies
-buf mod update
+**What the table helps you catch.** A "fix" that makes rumi friendlier but different from
+Envoy, such as a fallback per `OnMatch`, or continuing after a match.
 
-# Push to BSR (Buf Schema Registry)
-buf push
-```
+**Why it helps.** Users who know Envoy can trust rumi to mean the same thing, and the
+maintainer can settle a semantic question by pointing at Envoy's code.
 
-## When to Update This Skill
+---
 
-- New xDS service integration (RDS, LDS)
-- Control plane implementation starts
-- Wire format requirements change (binary proto, streaming)
-- Migration to protobuf-es / Connect-ES
-- New language binding (e.g., Go, Java)
-- Type registry patterns evolve
+## 5. Namespaces and layout
+
+- **Packages:** extensions live under `xuma.<area>.v1`: `xuma.core.v1` (shared inputs, matchers,
+  actions), `xuma.http.v1`, `xuma.claude.v1`. New domains follow the pattern of Google
+  (`google.protobuf`), xDS (`xds.type.matcher.v3`) and Envoy (`envoy.config.core.v3`).
+- **Schemas:** `proto/xuma/<area>/v1/*.proto`. Upstream xDS and protoc-gen-validate arrive as
+  buf dependencies (`buf.yaml`); never vendor them.
+- **Generated code:** `rumi/proto/src/gen/`, machine-written. Hand-written code beside it
+  converts the proto `Matcher` to rumi's internal form (`convert.rs`), resolves `Any`
+  (`any_resolver.rs`) and handles protojson (`protojson.rs`).
+- **A domain's context:** described by a proto message in its package, such as
+  `xuma.claude.v1.HookContext`. The proto describes what a host can supply; the inputs read
+  from it.
+- **Lint:** `buf lint` with the STANDARD rules, except version-suffix naming (`just lint-proto`).
+
+---
+
+## 6. Wire formats
+
+| Format | When x.uma uses it |
+|---|---|
+| Canonical protojson (YAML or JSON syntax) | config files, docs, fixtures, and what the bindings accept |
+| Binary proto in an `Any` | the internal meeting point of every load path, and the format a control plane would deliver |
+| `TypedStruct` (schema-less JSON) | not used. x.uma's extensions have schemas, so `TypedExtensionConfig` is enough |
+
+Delivering configs from a control plane (for example via Envoy's extension config discovery
+service, ECDS) is not built. Nothing in the engine should assume it either way.
