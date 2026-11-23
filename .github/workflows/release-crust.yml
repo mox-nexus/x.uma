@@ -106,11 +106,9 @@ jobs:
 
   # ── WASM (xuma-crust) → npm ───────────────────────────────────────
   #
-  # This job did not exist until 2026-09-01, while README.md and
-  # getting-started/typescript.md both told readers `bun add xuma-crust`. The
-  # workflow named for the crusts built and published only the PyO3 wheel, so
-  # one of the two artifacts it is named for had no path to a registry at all
-  # (PLAN.md E8).
+  # README.md and getting-started/typescript.md tell readers `bun add
+  # xuma-crust`, so the wasm crust needs its own path to a registry alongside
+  # the PyO3 wheel.
   #
   # OIDC rather than a token, matching the PyPI job above: `xuma-crust` is
   # unclaimed on npm, so there is no migration cost to starting with trusted

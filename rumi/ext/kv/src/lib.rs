@@ -3,19 +3,14 @@
 //! Match on a `String -> String` map. It is the simplest domain rumi has, a
 //! peer of `rumi-http`, and the one the `rumi` CLI uses by default.
 //!
-//! It lived inside `rumi-test` until 2026-08-17, next to the conformance
-//! suite's YAML fixture loader. That crate is `publish = false` — a fixture
-//! loader has no business in a published artifact — which meant `rumi-cli`
-//! could not be published either, despite only ever wanting this half. The
-//! concept was never "test"; the misleading name is what hid the blocker.
+//! It is a crate of its own, not part of `rumi-test`, because that crate is
+//! `publish = false` — a fixture loader has no business in a published
+//! artifact — and `rumi-cli` needs only this half.
 //!
 //! # Type URL
 //!
-//! This crate registers `xuma.core.v1.MapInput`. It used to be
-//! `xuma.test.v1.StringInput`, whose only proto field was named `value` while
-//! the code used it as a lookup key — so the schema and the config disagreed
-//! about what the field meant, and which one you got depended on a feature
-//! flag. The concept was never "test" and it was never a value.
+//! This crate registers `xuma.core.v1.MapInput`: its proto field names the
+//! lookup key, and there is one schema whatever features are enabled.
 //!
 //! # Example
 //!
@@ -376,12 +371,8 @@ mod config_tests {
     }
 }
 
-/// The crate README's Rust blocks, compiled and run as doctests.
-///
-/// A crate README is a published artifact — it is the crates.io front page —
-/// and until 2026-08-18 nothing checked one. `rumi-core`'s showed a config
-/// dialect that had been retired, so the first thing a new reader would have
-/// copied could not load. Nothing failed, because nothing looked.
+/// The crate README's Rust blocks, compiled and run as doctests: the README is the
+/// crates.io front page, so its examples must load.
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
 pub struct ReadmeDoctests;

@@ -3,14 +3,12 @@
  * Assert that every `rumi ...` command appearing in the docs is one the binary
  * actually has.
  *
- * This exists because four how-to pages taught `rumi eval`, `rumi validate` and
- * a `--config` flag, none of which ever existed. Prose cannot fail a build, so
- * nothing caught it. PLAN.md A4 / CI4.
+ * This exists because prose cannot fail a build: a how-to page can teach a
+ * subcommand or flag the binary does not have, and nothing else would catch it.
  *
  * Scope is deliberately narrow: it checks the *shape* of a command — subcommand
- * and flags — against `rumi --help`, which is the `cli` class in PLAN.md §0.9's
- * taxonomy. It does not execute them; a command that needs a config file on
- * disk is not something a docs check should be inventing.
+ * and flags — against `rumi --help`. It does not execute them; a command that
+ * needs a config file on disk is not something a docs check should be inventing.
  *
  * Usage: node scripts/check-doc-commands.mjs [--help-text <file>]
  */

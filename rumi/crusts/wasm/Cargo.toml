@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 
 [features]
 # Off by default, so the published artifact carries no YAML fixture loader.
-# The conformance suite builds with it; consumers never do. PLAN.md E3.
+# The conformance suite builds with it; consumers never do.
 default = []
 # Running the protojson conformance suite.
 fixtures = ["dep:rumi-test"]
@@ -28,21 +28,20 @@ bench = []
 # name on every evaluate(), and those names are compile-time constants, so
 # without this we spent roughly 60% of the per-call boundary budget transcoding
 # six string literals that never change.
-wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
+#
+# Pinned exactly: the wasm-bindgen CLI that wasm-pack runs must be the same
+# version as this library, and a caret lets `cargo update` move one of them.
+wasm-bindgen = { version = "=0.2.127", features = ["enable-interning"] }
 js-sys = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
 serde_json = { workspace = true }
-serde_yaml = { workspace = true }
 rumi-core = { path = "../../core", features = ["registry", "claude"] }
 rumi-http = { path = "../../ext/http", default-features = false, features = ["registry"] }
 # rumi-kv, not rumi-test: a YAML fixture loader has no business inside a
-# shipped wheel/npm package (PLAN.md E3).
+# shipped wheel/npm package.
 rumi-kv = { path = "../../ext/kv", features = ["registry"] }
 rumi-test = { path = "../../ext/test", features = ["registry", "fixtures"], optional = true }
 # Config loading. The config format is protojson (DECISIONS.md D-026), and
 # from_config() uses it whether or not the fixtures feature is on.
 rumi-proto = { path = "../../proto", version = "0.0.2" }
-
-[dev-dependencies]
-wasm-bindgen-test = "0.3"

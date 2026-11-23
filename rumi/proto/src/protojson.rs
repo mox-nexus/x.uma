@@ -49,10 +49,9 @@ const TYPE_KEY: &str = "@type";
 /// `MAX_DEPTH` — which is checked on a constructed matcher — cannot protect it.
 /// The limit belongs to the walker because the walker is what holds the stack.
 ///
-/// 128 is `serde_json`'s own recursion limit. Measured 2026-08-18, `serde_yaml`
-/// carries the same one — it accepts 128 levels of nesting and rejects 129 — so
-/// neither front end can hand this walk a document deep enough to reach the
-/// bound. It is a backstop for a `Value` a caller built some other way, and
+/// 128 is `serde_json`'s own recursion limit, and `serde_yaml` rejects a
+/// document one level deeper, so neither front end can hand this walk a
+/// document deep enough to pass the bound. It is a backstop for a `Value` a caller built some other way, and
 /// deliberately not the only guard.
 const MAX_JSON_DEPTH: usize = 128;
 

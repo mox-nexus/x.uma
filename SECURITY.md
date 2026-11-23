@@ -50,10 +50,12 @@ an 8 MB pattern against an 8 KB limit.
 | `MAX_DOCUMENT_BYTES` | 1 MiB | a config document, before parsing | every reader: the CLI and both bindings |
 | config nesting | 128 | JSON/YAML object depth before a matcher exists | both parsers, and the protojson walk |
 
-The two width limits used to be enforced in the config loader alone, which meant
-a matcher produced by a domain compiler carried neither — including the compiler
-that gates agent tool calls. Both compilers now call `validate()` before
-returning, so every construction route inherits the same guarantees.
+The two width limits are not enforced in the config loader alone:
+`compile_route_matches` and `compile_hook_matches`, the list compilers of both
+domains, call `validate()` before returning. The single-match `compile()`
+methods on `HttpRouteMatchExt` and `HookMatchExt` do not, so a matcher built
+from one of those, or by hand, carries the limits only once the caller runs
+`validate()`.
 
 **Empty identifiers are rejected at construction.** A header name, query
 parameter name, tool argument name or map key says *where* to read a value.
@@ -61,15 +63,14 @@ Empty, it reads nothing, so the predicate is false and a rule keyed on it stops
 firing — a deny rule that never denies. proto3 cannot express "required", so the
 schema cannot carry this; the constructor does.
 
-**Regex is linear-time in every implementation** — Rust's `regex` crate,
-`google-re2` in Python, `re2js` in TypeScript. None can backtrack, so evaluation
-cost is bounded by input length.
+**Regex is linear-time.** The engine uses Rust's `regex` crate, and both
+bindings run that engine. It cannot backtrack, so evaluation cost is bounded by
+input length.
 
 **Compile cost is bounded separately**, because pattern *length* does not bound
-it. Compiled program size grows as the product of nested repetition counts:
-twenty characters of `((a{100}){100}){100}` cost 282 ms and 286 MB before that
-was bounded. Rust and Python get this from their engines; TypeScript needs an
-explicit budget because `re2js` implements neither of RE2's compile-time guards.
+it. Compiled program size grows as the product of nested repetition counts, so
+the twenty characters of `((a{100}){100}){100}` describe a very large program.
+`REGEX_SIZE_LIMIT` refuses it at compile time.
 
 ### Known gaps
 
@@ -78,25 +79,24 @@ a stronger guarantee than it is.
 
 - **Evaluation is recursive**, with `MAX_DEPTH` holding the line rather than an
   explicit stack. What actually prevents config-borne stack exhaustion today is
-  the parsers' own 128-level recursion limit, not `MAX_DEPTH`. Measured
-  2026-08-18: `serde_json` and `serde_yaml` both accept 128 levels and reject
-  129, so neither front end can hand a deeper document to anything downstream.
-- **An empty rule list compiles to a catch-all.** Its polarity depends entirely
-  on how the caller assigns actions.
+  the parsers' own recursion limit, not `MAX_DEPTH`. Measured: `serde_json`
+  rejects a document at 128 levels of nesting and `serde_yaml` at 129, so
+  neither front end can hand a deeper document to anything downstream.
+- **The single-match `compile()` methods return an unvalidated matcher**, as
+  described above.
 
 ## Controls that are load-bearing
 
 Named so they are not removed by someone who does not know what they hold up.
 
-1. `serde`'s 128-level recursion limit — the real defence against config-borne
+1. `serde`'s recursion limit — the real defence against config-borne
    stack exhaustion. Changing deserializer, or calling
    `disable_recursion_limit()`, removes it silently.
 2. `serde_yaml` rejects YAML alias bombs. Whatever replaces it must be re-tested
    for this; the crate is archived upstream and a migration is planned.
-3. Rust `regex`'s 10 MB size limit — the only cap on a single compiled regex.
-4. `google-re2` rejecting nested counted repetition, which is why Python is
-   immune to the compile bomb. Do not swap it for a pure-Python engine.
-5. `AnyResolver` is a closed-world allowlist with decoders monomorphised at
+3. `REGEX_SIZE_LIMIT` and `REGEX_DFA_SIZE_LIMIT`, set on `RegexBuilder` — the
+   only caps on a single compiled regex.
+4. `AnyResolver` is a closed-world allowlist with decoders monomorphised at
    registration. There is no reflective type lookup, so the classic
    polymorphic-deserialization attack is absent by construction.
 6. `#[serde(deny_unknown_fields)]` on `HookMatch` and `ArgumentMatch`. Without

@@ -11,12 +11,9 @@ keywords = ["xds", "matcher", "http", "envoy", "gateway"]
 categories = ["config", "web-programming"]
 
 [features]
-# default = [] deliberately. `ext-proc` used to be on by default and pulled 101
-# crates against 7 — tokio, tonic, axum, hyper, h2, two major versions of http —
-# into a library that never opens a socket. Its heaviest root, envoy-grpc-ext-proc,
-# had 1,121 total downloads and a single third-party maintainer. Every consumer
-# in this repo already passed --no-default-features, which is the tell: the
-# project never used its own default. Feature defaults freeze at first publish.
+# Empty deliberately: `ext-proc` pulls in tokio, tonic and hyper, which a
+# library that never opens a socket should not carry unless asked. Feature
+# defaults freeze at first publish.
 default = []
 
 # The domain itself, HttpMessage and its DataInputs, is not a feature: it has
@@ -32,19 +29,13 @@ gateway = ["dep:k8s-gateway-api", "dep:k8s-openapi"]
 # same conflation this split exists to remove.
 ext-proc = ["dep:envoy-grpc-ext-proc"]
 
-# Config loading, from the generated proto types and nothing else.
-#
-# There used to be a separate `proto` feature that swapped the config types out
-# from under `registry`. It was not additive — enabling it deleted two public
-# config types and replaced six impls, and one replacement turned a required
-# field into `unwrap_or_default()`, so a header deny rule silently stopped
-# firing. There is now one vocabulary and no feature that selects a vocabulary,
-# which is what makes the violation inexpressible rather than merely absent.
-registry = ["rumi-core/registry", "serde", "dep:rumi-proto"]
+# Config loading, from the generated proto types. There is one config
+# vocabulary, so there is deliberately no feature that selects one: such a
+# feature cannot be additive.
+registry = ["rumi-core/registry", "dep:rumi-proto"]
 
 [dependencies]
 rumi-core.workspace = true
-serde = { workspace = true, optional = true }
 rumi-proto = { path = "../../proto", version = "0.0.2", optional = true }
 
 # ext_proc types (ProcessingRequest, ProcessingResponse, etc.)
@@ -57,6 +48,4 @@ k8s-gateway-api = { version = "0.16", optional = true }
 k8s-openapi = { version = "0.20", features = ["v1_28"], optional = true }
 
 [dev-dependencies]
-serde.workspace = true
 serde_json.workspace = true
-serde_yaml.workspace = true

@@ -61,8 +61,6 @@ jobs:
       # This list is the single source of that order. It is not trusted on its
       # own — `scripts/check-publishable.mjs` asserts on every PR that it holds
       # every publishable workspace crate and that the order is topological.
-      # It previously held three of the five, and rumi-cli depends on both of
-      # the missing ones.
       CRATES: rumi/core rumi/proto rumi/ext/kv rumi/ext/http rumi/cli
     steps:
       - uses: actions/checkout@v4

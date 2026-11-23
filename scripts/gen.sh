@@ -19,7 +19,7 @@
 # Both passes generate into a staging tree and swap only once both succeed.
 # buf.gen.yaml carries `clean: true`, so an in-place generate that fails
 # part-way leaves the committed tree destroyed — and the second pass reaches the
-# network, which rate-limits. Observed on 2026-08-17.
+# network, which rate-limits.
 #
 # Nothing here deletes: the outgoing trees are moved into the staging directory
 # and left for the OS to reap, so a bad swap stays recoverable.

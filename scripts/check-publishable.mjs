@@ -12,8 +12,6 @@
  * crates.io, so crate N+1 cannot be dry-run until crate N is actually live.
  * Checking the edges, the metadata and the ordering is what can be done ahead
  * of time; the chain itself is only provable at publish time.
- *
- * PLAN.md E1, E2, E3, F9, F10.
  */
 
 import { execFileSync } from "node:child_process";
@@ -73,12 +71,10 @@ console.log("check-publishable: no unpublishable edges, all metadata present");
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // The set above is derived from Cargo. The workflow is a hand-maintained list.
-// Nothing linked the two, and they had drifted: `release.yml` published
-// rumi-core, rumi-http and rumi-cli, while rumi-proto and rumi-kv — both
-// publishable, both dependencies of rumi-cli — were absent. The workflow would
-// have published two crates, then failed on the third against a crates.io that
-// had never heard of `rumi-kv`, with `rumi-core` and `rumi-http` already
-// uploaded at a version that can never be re-used.
+// The two must agree: a workflow that omits a publishable dependency of
+// rumi-cli would publish some crates, then fail on one that depends on a crate
+// crates.io has not heard of, with the earlier ones already uploaded at a
+// version that can never be re-used.
 //
 // Order matters as much as membership: `cargo publish` runs a verification
 // build resolving from crates.io, so a crate cannot go up before the crates it

@@ -56,30 +56,19 @@ pkg/
 # Generated
 *.generated.*
 
-# buf-generated proto code is COMMITTED, not ignored.
-#
-# It was ignored from e36dd29 ("keeps PRs reviewable") until 2026-08-17. That
-# reason is handled by .gitattributes linguist-generated=true, which collapses
-# these diffs already — while ignoring them meant `just gen` produced no diff by
-# construction, so nothing could detect codegen drift, and rumi-proto went its
-# whole life uncompiled without CI noticing.
+# buf-generated proto code is committed, not ignored: ignoring it would leave
+# `just gen-check` nothing to compare against. .gitattributes collapses its diffs.
 
 # Scratch (working notes, not committed)
 scratch/
 
-# Spike files (temporary exploration)
-spike/
-
-# Type system test files
-test_send_sync
-test_soundness
-test_variance
-docs/book/
+# Generated API docs
 docs/api/
 
-# Playground
-# SvelteKit build artifacts, any app. Scoped rules meant each new app
-# needed someone to remember; these do not.
+# pytest-benchmark's storage directory
+.benchmarks/
+
+# SvelteKit build artifacts, for any app in the tree
 .svelte-kit/
 pagefind/
 

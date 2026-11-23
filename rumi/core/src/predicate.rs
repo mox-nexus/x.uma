@@ -177,10 +177,6 @@ impl<Ctx> Debug for SinglePredicate<Ctx> {
     }
 }
 
-// Note: No unsafe impl needed — compiler derives Send/Sync automatically
-// because Box<dyn DataInput<Ctx>> requires Send + Sync in the trait bound,
-// and Box<dyn InputMatcher> also requires Send + Sync.
-
 /// Composite predicate with boolean logic.
 ///
 /// Predicates can be composed using AND, OR, and NOT operations.
@@ -373,10 +369,6 @@ impl<Ctx> Debug for Predicate<Ctx> {
         }
     }
 }
-
-// Note: No unsafe impl needed — compiler derives Send/Sync automatically
-// because SinglePredicate<Ctx>, Vec<Predicate<Ctx>>, and Box<Predicate<Ctx>>
-// are all Send/Sync when their contents are.
 
 #[cfg(test)]
 mod tests {

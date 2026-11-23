@@ -11,12 +11,8 @@
  * list — but not `LICENSE-MIT` / `LICENSE-APACHE`, because npm's implicit rule
  * matches `LICENSE`, not a suffixed variant. wasm-pack copies both into `pkg/`,
  * so they are present and still absent from what ships: a package declaring
- * `MIT OR Apache-2.0` with neither licence in it. Verified with `npm pack
- * --dry-run` on 2026-09-01: 5 files, no licence.
- *
- * And nothing published this package at all. Two documents told readers to
- * `bun add xuma-crust` while `release-crust.yml` built only the PyO3 wheel
- * (PLAN.md E8).
+ * `MIT OR Apache-2.0` with neither licence in it. `npm pack --dry-run` on the
+ * unpatched package lists 5 files and no licence.
  *
  * # Why it verifies rather than trusting
  *

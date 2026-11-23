@@ -2,9 +2,9 @@
 /**
  * Keep the Claude Code harness (.claude/ and CLAUDE.md) true to the tree it describes.
  *
- * Until 2026-11-23 the project skills described five implementations after two had been
- * deleted, named eight `just` recipes that did not exist, and pinned claims to file:line
- * anchors that had drifted. Prose cannot fail a build, so this does, on four things:
+ * A skill that describes deleted implementations, names a `just` recipe that does not
+ * exist, or pins a claim to a file:line anchor misleads the next reader. Prose cannot fail
+ * a build, so this does, on four things:
  *
  *   1. a retired name (puma, bumi, r-umi) in a skill, agent, command or script;
  *   2. a file:line anchor in a skill, which goes stale with the next edit to that file;

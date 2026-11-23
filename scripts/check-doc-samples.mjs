@@ -6,17 +6,10 @@
  * # Why this exists
  *
  * `rumi-docs-tests` compiles the *Rust* blocks in `docs/content` via
- * `include_str!` + doctest, and has done since PR #26. Nothing ever did the
- * same for Python or TypeScript.
- *
- * The drift tracked that exactly. An audit on 2026-08-19 found that
- * `docs/content/getting-started/python.md` and
- * `rumi/crusts/python/README.md` both documented `load_http_matcher`, and
- * `typescript.md` documented `loadHttpMatcher` — a function that has never
- * existed in either crust. The two documents did not even agree with each
- * other: one passed a file path, the other passed the file's text. Everything
- * documenting the *gated* language was accurate; every defect was in the two
- * ungated ones.
+ * `include_str!` + doctest. Nothing else does the same for Python or
+ * TypeScript, and an ungated language drifts: a document can name a function
+ * that exists in neither crust, or two documents can disagree about whether it
+ * takes a file path or the file's text.
  *
  * # Why only getting-started
  *
@@ -30,7 +23,7 @@
  *
  * # Classes
  *
- * PLAN.md's M1 taxonomy, implemented. A block carries its class in an HTML
+ * A block carries its class in an HTML
  * comment on the line before it; the default is `run`.
  *
  *     <!-- doc-sample: compile -->   type-checks, is not executed
@@ -94,18 +87,15 @@ const PAGES = [
 	"docs/content/getting-started/python.md",
 	"docs/content/getting-started/typescript.md",
 	// The package READMEs are the *first* page a reader sees — npm and PyPI
-	// render them on the landing page, before any doc site is reached. They were
-	// ungated until 2026-08-23, and the first run found an HTTP example with
-	// three defects that survived being read and not being run.
+	// render them on the landing page, before any doc site is reached, and an
+	// example that is read but not run can carry defects that only running finds.
 	"rumi/crusts/python/README.md",
 	"rumi/crusts/wasm/README.md",
-	// Added 2026-08-23, after a `console.assert` repair on `concepts/pipeline.md`
-	// left the block without its `assert` import and nothing noticed. The
-	// original line — gate the getting-started pages only — was drawn to keep
-	// the gate free of fragment noise. The noise turns out to be small and
-	// nameable: seven blocks across these four pages are genuinely illustrative
-	// and now say so in a marker, and everything else is a whole program that
-	// has to run.
+	// Gating only the getting-started pages would let a repair like a
+	// `console.assert` edit drop its `assert` import unnoticed. The fragment
+	// noise on these four pages is small and nameable: the genuinely
+	// illustrative blocks say so in a marker, and everything else is a whole
+	// program that has to run.
 	"docs/content/concepts/pipeline.md",
 	"docs/content/concepts/type-erasure.md",
 	"docs/content/explain/architecture.md",
@@ -211,7 +201,7 @@ function typecheck(owner, name, cwd) {
 			timeout: TIMEOUT_MS,
 		});
 	}
-	// `--types bun`: the samples run under Bun, and TypeScript 7 no longer pulls
+	// `--types bun`: the samples run under Bun, and TypeScript 7 does not pull
 	// every visible @types package in on its own.
 	return spawnSync("bunx", ["tsc", "--noEmit", "--skipLibCheck", "--target", "esnext", "--module", "preserve", "--moduleResolution", "bundler", "--types", "bun", name], {
 		cwd,

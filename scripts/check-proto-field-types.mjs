@@ -25,8 +25,6 @@
  * redone. This check is what makes that day loud instead of silent. If you need
  * one of these types, delete the ban here and write the round-trip fixture that
  * replaces the proof.
- *
- * PLAN.md INV-FIELDTYPES.
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";

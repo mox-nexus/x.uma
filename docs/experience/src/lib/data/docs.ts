@@ -165,7 +165,7 @@ export const DOCS: DocsEntry[] = [
 	},
 	{
 		slug: 'security',
-		file: 'performance/security',
+		file: 'explain/security',
 		title: 'Security model',
 		description: 'ReDoS protection, depth limits, and the resource bounds config load enforces.',
 		kind: 'explanation',
