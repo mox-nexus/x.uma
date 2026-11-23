@@ -6,7 +6,7 @@ plane, a Python service, and a TypeScript worker.
 ## The config is the contract
 
 A matcher config is data. Nothing in it is language-specific. The same file loads
-in every implementation:
+in the CLI and in both bindings, and one engine reads it in all three:
 
 ```yaml
 matcherList:
@@ -16,7 +16,7 @@ matcherList:
           input:
             name: method
             typedConfig:
-              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              "@type": type.googleapis.com/xuma.core.v1.MapInput
               key: method
           valueMatch:
             exact: GET
@@ -34,28 +34,29 @@ onNoMatch:
       name: reject
 ```
 
-```rust
-let matcher = registry.load_matcher(config)?;
-matcher.evaluate(&ctx)
+```bash
+$ rumi run routes.yaml --context method=GET
+read-handler
 ```
 
 <!-- doc-sample: fragment -->
 ```python
-matcher = registry.load_matcher(config)
-matcher.evaluate(ctx)
+matcher = KvMatcher.from_config(json.dumps(yaml.safe_load(text)))
+matcher.evaluate({"method": "GET"})
 ```
 
 <!-- doc-sample: fragment -->
 ```typescript
-const matcher = registry.loadMatcher(config);
-matcher.evaluate(ctx);
+const matcher = KvMatcher.fromConfig(JSON.stringify(yaml.load(text)));
+matcher.evaluate({ method: "GET" });
 ```
 
 ## What makes them agree
 
-Agreement is not a promise in a README. It is a test suite. Every implementation
-runs the same fixtures in `spec/tests/`, and a fixture is a config plus contexts
-plus expected decisions. An implementation that disagrees fails its own build.
+Agreement is not a promise in a README. It is a test suite. The engine and both
+bindings run the same fixtures in `spec/tests/`, and a fixture is a config plus
+contexts plus expected decisions. A binding that disagrees with the engine
+fails its own build.
 
 If you extend the engine, add a fixture first. That is the only way the guarantee
 stays true for your extension.

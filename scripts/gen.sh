@@ -2,9 +2,8 @@
 #
 # Regenerate proto code.
 #
-# Rust only: puma and bumi read protojson directly rather than through generated
-# types, because no available generator for either language rejects unknown
-# fields — see DECISIONS.md D-038.
+# Rust only. The bindings read protojson through the engine, so there is one
+# generated tree — see DECISIONS.md D-038 and D-051.
 #
 # Lives in a script rather than inline in the justfile so CI can run the exact
 # same steps without installing `just` — the setup action could not resolve a

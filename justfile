@@ -19,13 +19,24 @@ crust-py-check:
     # without it, so no YAML fixture loader ships to PyPI (PLAN.md E3).
     cd rumi/crusts/python && maturin develop --uv --features fixtures
     cd rumi/crusts/python && uv run pytest tests/ -q \
-        --ignore=tests/test_bench_config.py --ignore=tests/test_bench_crusty.py
+        --ignore=tests/test_bench_config.py --ignore=tests/test_bench_crusty.py \
+        --ignore=tests/test_bench_floor.py
 
 # Build the wasm-bindgen crust and run its tests. 80 more, same story.
 crust-wasm-check:
     # --features fixtures for the TEST build only; the npm package ships without.
     cd rumi/crusts/wasm && wasm-pack build --target web -- --features fixtures
     cd rumi/crusts/wasm && bun install --frozen-lockfile && bun test
+    # The crust's Rust unit tests, natively: the resolver, registries and
+    # action table are built once per process, and this is where that is
+    # asserted (the python crust cannot link `cargo test`; it shares the file).
+    cargo test --manifest-path rumi/crusts/wasm/Cargo.toml --lib
+
+# Build the wasm crust in its published shape. The docs site runs on it: the
+# playground and every live example evaluate through this package, so a
+# docs build is a build of the engine first.
+crust-wasm-build:
+    cd rumi/crusts/wasm && wasm-pack build --target web
 
 # Both crusts. Not in `just ci`: wasm-pack builds take ~1 minute and the two
 # have separate toolchains, so CI runs them as their own jobs.
@@ -46,8 +57,8 @@ crust-pack:
     node scripts/pack-wasm-crust.mjs
 
 crust-compiles:
-    cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures
-    cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures
+    cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures,bench
+    cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures,bench
 
 # Check every tool this repo needs is installed. First command in CONTRIBUTING.
 doctor:
@@ -79,7 +90,7 @@ publishable:
 proto-field-types:
     node scripts/check-proto-field-types.mjs
 
-# Generate proto code (all three languages) and the xDS dependency types.
+# Generate proto code and the xDS dependency types.
 #
 # Two passes are required. `buf generate` only walks the local module graph, and
 # no xuma proto imports xDS, so the xds.* types convert.rs depends on are absent
@@ -142,7 +153,7 @@ fmt-check:
 check: lint fmt-check test
 
 # Everything CI runs, in the same order. Green here means green there.
-ci: fmt-check lint-strict test test-full test-protojson test-http-conformance test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links docs-samples readme-agreement puma-check bumi-check docs-check docs-test docs-build audit
+ci: fmt-check lint-strict test test-full test-protojson test-http-conformance test-fixture-coverage crust-compiles bench-smoke features publishable proto-field-types docs-commands docs-links docs-samples readme-agreement docs-check docs-test docs-build audit
 
 # Clippy as CI enforces it: all targets, warnings denied
 lint-strict:
@@ -164,12 +175,18 @@ doc:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Run the docs site with hot reload (localhost:6200)
-docs-dev: bumi-build
+docs-dev: docs-install
     cd docs/experience && bun run dev
 
 # Build the docs site (includes Pagefind search index)
-docs-build: bumi-build
+docs-build: docs-install
     cd docs/experience && bun run build
+
+# The engine is a `file:` dependency of the docs app, so the package has to
+# exist before the app installs. bun links it, so a rebuild is picked up
+# without reinstalling.
+docs-install: crust-wasm-build
+    cd docs/experience && bun install --frozen-lockfile
 
 # Preview the production docs build
 docs-preview:
@@ -202,7 +219,7 @@ docs-links:
 docs-samples:
     node scripts/check-doc-samples.mjs --require-all
 
-docs-check:
+docs-check: docs-install
     cd docs/experience && bun run check
 
 # The playground's diagram must describe the config it was given.
@@ -247,82 +264,42 @@ bench-rust:
     cargo bench --manifest-path rumi/Cargo.toml
     cargo bench --manifest-path rumi/Cargo.toml --bench config --features registry
 
-# Run Python benchmarks (pytest-benchmark)
-bench-puma:
-    cd puma && uv run pytest tests/bench/ --benchmark-only --benchmark-disable-gc
-
-# Run TypeScript benchmarks (mitata)
-bench-bumi:
-    cd bumi && bun run bench
-    cd bumi && bun run bench/config.bench.ts
-
-# Run xuma-crust (Python) vs puma comparison benchmarks
+# The PyO3 boundary, under pytest-benchmark.
+#
+# --release is load-bearing, not tidiness. Without it maturin installs a debug
+# extension, and every verdict drawn from a debug crust is inverted. This
+# recipe omitted the flag until 2026-09-05.
 bench-xuma-crust-py:
-    cd rumi/crusts/python && maturin develop && uv run pytest tests/test_bench_crusty.py tests/test_bench_config.py --benchmark-only --benchmark-disable-gc
+    cd rumi/crusts/python && maturin develop --release --features bench && uv run pytest tests/test_bench_crusty.py tests/test_bench_config.py tests/test_bench_floor.py --benchmark-only --benchmark-disable-gc
 
-# Run xuma-crust (WASM) vs bumi comparison benchmarks
+# The WASM boundary, under mitata.
 bench-xuma-crust-wasm:
-    cd rumi/crusts/wasm && wasm-pack build --target web && bun run bench/crusty.bench.ts && bun run bench/config.bench.ts
+    cd rumi/crusts/wasm && wasm-pack build --target web -- --features bench && bun run bench/crusty.bench.ts && bun run bench/config.bench.ts && bun run bench/floor.bench.ts
 
 # Run all benchmarks
-bench-all: bench-rust bench-puma bench-bumi bench-xuma-crust-py bench-xuma-crust-wasm
+bench-all: bench-rust bench-xuma-crust-py bench-xuma-crust-wasm
 
 # Alias for bench-all
 bench: bench-all
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Python (puma)
-# ═══════════════════════════════════════════════════════════════════════════════
+# One cold launch of both crust benchmark suites, as JSON rows in bench/raw/.
+# Builds the bench-feature crusts first unless NO_BUILD=1.
+bench-collect:
+    python3 scripts/bench_collect.py
 
-# Run puma tests
-puma-test:
-    cd puma && uv run pytest
+# The protocol behind every published number (D-066): LAUNCHES cold launches
+# on a clean tree at one commit, median per launch, CV over the medians, gate
+# G = max(1.20, 1 + 3·CV), written to bench/artifacts/<date>-<sha>.json.
+bench-artifact LAUNCHES="10":
+    python3 scripts/bench_artifact.py --launches {{LAUNCHES}}
 
-# Lint puma
-puma-lint:
-    cd puma && uv run ruff check .
+# Render an artifact as bench/RESULTS.md.
+bench-report ARTIFACT:
+    python3 scripts/bench_report.py {{ARTIFACT}} --output bench/RESULTS.md
 
-# Type-check puma
-puma-typecheck:
-    cd puma && uv run mypy src/xuma
-
-# Run all puma checks
-puma-check: puma-lint puma-typecheck puma-test
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# TypeScript (bumi)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Install bumi dependencies
-bumi-install:
-    cd bumi && bun install
-
-# Build bumi to dist/ (published artifact — .js + .d.ts)
-bumi-build:
-    cd bumi && bun run build
-
-# Run bumi tests
-bumi-test:
-    cd bumi && bun test
-
-# Type-check bumi
-bumi-typecheck:
-    cd bumi && bun run typecheck
-
-# Lint bumi
-bumi-lint:
-    cd bumi && bun run lint
-
-# Format bumi
-bumi-fmt:
-    cd bumi && bun run fmt
-
-# Check bumi formatting
-bumi-fmt-check:
-    cd bumi && bun run fmt:check
-
-# Run all bumi checks
-bumi-check: bumi-lint bumi-fmt-check bumi-typecheck bumi-test
+# Two artifacts, benchmark by benchmark: old/new against the larger gate.
+bench-compare OLD NEW:
+    python3 scripts/bench_compare.py {{OLD}} {{NEW}}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Conformance Testing
@@ -337,19 +314,16 @@ test-protojson:
 
 # spec/tests/05_http through rumi's Gateway API compiler.
 #
-# This suite had runners in puma and bumi and none in the reference
-# implementation, so "all implementations pass all fixtures" was true of
-# 07_protojson and merely assumed here — while one of its fixtures was
-# requiring a fail-open of everyone (D-050). PLAN.md CONF1.
+# Until 2026-08-31 this suite had no runner in the reference implementation,
+# while one of its fixtures was requiring a fail-open of everyone (D-050).
 test-http-conformance:
     cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test http_conformance --features rumi-test/http,rumi-test/fixtures
 
 # Does the fixture corpus span the schema?
 #
-# The price of not generating types for puma and bumi: their dependency on
-# proto/xuma is a human's memory rather than an arrow the build can see, so the
-# fixture corpus has to carry it. Messages with no fixture are listed with a
-# reason, and that list is checked for staleness in both directions.
+# The corpus is the contract the bindings are held to, so every config message
+# has to appear in it. Messages with no fixture are listed with a reason, and
+# that list is checked for staleness in both directions.
 test-fixture-coverage:
     cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test fixture_coverage --features rumi-test/registry,rumi-test/fixtures
 

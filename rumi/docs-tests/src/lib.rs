@@ -35,3 +35,7 @@ doc_page!(
     ConceptsTypeErasure,
     "../../../docs/content/concepts/type-erasure.md"
 );
+doc_page!(
+    ExplainArchitecture,
+    "../../../docs/content/explain/architecture.md"
+);

@@ -15,7 +15,7 @@ proto_matcher:
               input:
                 name: MapInput
                 typedConfig:
-                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
                   key: role
               valueMatch:
                 exact: admin
@@ -23,7 +23,7 @@ proto_matcher:
               input:
                 name: MapInput
                 typedConfig:
-                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
                   key: org
               valueMatch:
                 prefix: acme
@@ -72,7 +72,7 @@ proto_matcher:
               input:
                 name: MapInput
                 typedConfig:
-                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
                   key: role
               valueMatch:
                 exact: admin
@@ -80,7 +80,7 @@ proto_matcher:
               input:
                 name: MapInput
                 typedConfig:
-                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
                   key: role
               valueMatch:
                 exact: superadmin
@@ -120,7 +120,7 @@ proto_matcher:
             input:
               name: MapInput
               typedConfig:
-                '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                '@type': type.googleapis.com/xuma.core.v1.MapInput
                 key: env
             valueMatch:
               exact: production

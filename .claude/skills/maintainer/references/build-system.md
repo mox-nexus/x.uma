@@ -133,22 +133,24 @@ just publish-dry-run
 
 ---
 
-## Python Pipeline (puma)
+## Python Pipeline (PyO3 crust)
 
 ### Setup
 
 ```bash
-cd puma
-uv sync              # Create venv, install deps
+cd rumi/crusts/python
+uv sync --all-groups          # venv with pytest, maturin, pyyaml
 ```
 
 ### Development
 
 ```bash
-maturin develop --uv  # Build Rust extension, install in venv
-uv run pytest         # Run tests
-uv run python         # Interactive shell with extension
+uv run maturin develop --uv --features fixtures   # build the extension into the venv
+uv run pytest tests/ -q                            # run tests
 ```
+
+`--features fixtures` is for the test build only; the published wheel ships
+without the YAML fixture loader.
 
 ### Build Wheel
 
@@ -159,7 +161,7 @@ maturin build --release
 
 ---
 
-## WASM Pipeline (bumi)
+## WASM Pipeline (wasm crust)
 
 ### Build
 
@@ -170,13 +172,16 @@ wasm-pack build --target web    # ESM with async init(), works in browser + Bun
 
 **Note:** Always use `--target web`. The `--target nodejs` generates `require('fs')` calls that break browsers. The `web` target uses `fetch()` in browsers and works with Bun's ESM loader.
 
+The docs site links this output as its `xuma-crust` dependency, so `just
+docs-build` runs this build first.
+
 ### Output
 
 ```
 pkg/
-├── rumi.js          # JS wrapper
-├── rumi_bg.wasm     # WASM binary
-├── rumi.d.ts        # TypeScript types
+├── xuma_crust.js          # JS wrapper
+├── xuma_crust_bg.wasm     # WASM binary
+├── xuma_crust.d.ts        # TypeScript types
 └── package.json
 ```
 

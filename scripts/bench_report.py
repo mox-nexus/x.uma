@@ -1,153 +1,93 @@
 #!/usr/bin/env python3
-"""Generate RESULTS.md from DuckDB benchmark corpus.
+"""Render a D-066 artifact as Markdown.
+
+Every number in the output names the artifact it came from, so a sentence
+quoting it can cite `[bench:<artifact>]` and be checked against the file.
 
 Usage:
-    uv run scripts/bench_report.py [--db bench/x_uma_bench.duckdb] [--output bench/RESULTS.md]
-
-Queries the latest benchmark run and generates a narrated comparison report.
+    python3 scripts/bench_report.py bench/artifacts/<date>-<sha>.json [--output bench/RESULTS.md]
 """
 
 from __future__ import annotations
 
-import sys
+import argparse
+import json
 from pathlib import Path
 
-import click
-import duckdb
-
-
-DB_DEFAULT = "bench/x_uma_bench.duckdb"
-OUTPUT_DEFAULT = "bench/RESULTS.md"
+FLOORS = ["floor_u32", "floor_option_string", "floor_flat_map"]
+PATHS = {
+    "python": ["crusty_evaluate_exact_hit", "crusty_evaluate_exact_miss", "crusty_config_evaluate_simple", "crusty_http_config_evaluate"],
+    "typescript": ["crusty_exact_hit", "crusty_exact_miss", "crusty_config_evaluate_simple", "crusty_http_config_evaluate"],
+}
 
 
 def fmt_ns(ns: float) -> str:
-    """Format nanoseconds into human-readable string."""
-    if ns < 1_000:
-        return f"{ns:.0f}ns"
-    if ns < 1_000_000:
-        return f"{ns / 1_000:.1f}us"
-    if ns < 1_000_000_000:
-        return f"{ns / 1_000_000:.1f}ms"
-    return f"{ns / 1_000_000_000:.2f}s"
+    if ns >= 1_000_000:
+        return f"{ns / 1_000_000:.2f} ms"
+    if ns >= 1_000:
+        return f"{ns / 1_000:.2f} µs"
+    return f"{ns:.0f} ns"
 
 
-def fmt_speedup(slow: float, fast: float) -> str:
-    """Format speedup ratio."""
-    if fast <= 0:
-        return "N/A"
-    ratio = slow / fast
-    return f"{ratio:.1f}x"
+def verdict(a: dict, b: dict) -> str:
+    ratio = a["median_ns"] / b["median_ns"] if b["median_ns"] else float("inf")
+    g = max(a["gate"], b["gate"])
+    if 1 / g <= ratio <= g:
+        return f"{ratio:.2f}x, indistinguishable (G={g:.2f})"
+    return f"{ratio:.2f}x (G={g:.2f})"
 
 
-@click.command()
-@click.option("--db", default=DB_DEFAULT, help="DuckDB database path")
-@click.option("--output", default=OUTPUT_DEFAULT, help="Output markdown file")
-def main(db: str, output: str) -> None:
-    """Generate benchmark report from DuckDB."""
-    if not Path(db).exists():
-        click.echo(f"Database {db} not found. Run `just bench-ingest` first.", err=True)
-        sys.exit(1)
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("artifact")
+    ap.add_argument("--output")
+    args = ap.parse_args()
+    path = Path(args.artifact)
+    art = json.loads(path.read_text())
+    by = {(b["runtime"], b["name"]): b for b in art["benchmarks"]}
 
-    con = duckdb.connect(db, read_only=True)
-
-    # Get latest run
-    run = con.execute(
-        "SELECT id, commit_sha, timestamp, machine, notes FROM bench_runs ORDER BY id DESC LIMIT 1"
-    ).fetchone()
-
-    if not run:
-        click.echo("No benchmark runs found.", err=True)
-        sys.exit(1)
-
-    run_id, commit_sha, timestamp, machine, notes = run
-
-    # Get all results for this run
-    results = con.execute(
-        """SELECT variant, scenario, phase, mean_ns, stddev_ns, min_ns, max_ns, iterations
-           FROM bench_results
-           WHERE run_id = ?
-           ORDER BY scenario, phase, mean_ns""",
-        [run_id],
-    ).fetchall()
-
-    if not results:
-        click.echo(f"No results for run #{run_id}.", err=True)
-        sys.exit(1)
-
-    # Build report
-    lines: list[str] = []
-    lines.append("# x.uma Benchmark Results\n")
-    lines.append(f"**Run #{run_id}** | Commit: `{commit_sha}` | {timestamp}")
-    lines.append(f"Machine: {machine}")
-    if notes:
-        lines.append(f"Notes: {notes}")
+    lines = ["# Benchmark results", ""]
+    lines.append(f"Artifact `{path.as_posix()}`, protocol {art['protocol']}, commit `{art['sha'][:8]}`"
+                 f"{' (dirty)' if art['dirty'] else ''}, {art['date']}. {art['launches']} cold launches; "
+                 f"per row the median of per-launch medians, the CV across launches, and the gate "
+                 f"G = max(1.20, 1 + 3·CV). Two numbers whose ratio lies inside [1/G, G] are indistinguishable.")
+    lines.append("")
+    hw = art["hardware"]; tc = art["toolchains"]
+    load = hw.get("load_average_at_start")
+    load_note = "" if load is None else f" Load average at start: {load}."
+    lines.append(f"Hardware: {hw['cpu']}, {hw['cores']} cores, {hw['os']} {hw['arch']}.{load_note} "
+                 f"Toolchains: {tc['rustc']}; {tc['wasm-pack']}; {tc['maturin']}; bun {tc['bun']}; {tc['python']}. "
+                 f"Profile: {art['profile']}.")
+    if art["gates_nothing"]:
+        lines.append("")
+        lines.append(f"**Worst CV {art['worst_cv']:.3f} exceeds the ceiling {art['cv_ceiling']}: "
+                     "this artifact reports its noise and gates nothing (D-066).**")
     lines.append("")
 
-    # Cross-variant comparison table
-    lines.append("## Cross-Variant Comparison\n")
-
-    # Group by scenario + phase
-    scenarios: dict[tuple[str, str], list[tuple]] = {}
-    for row in results:
-        key = (row[1], row[2])  # scenario, phase
-        scenarios.setdefault(key, []).append(row)
-
-    for (scenario, phase), rows in sorted(scenarios.items()):
-        lines.append(f"### {scenario} ({phase})\n")
-        lines.append("| Variant | Mean | Stddev | Min | Max | Iterations |")
-        lines.append("|---------|------|--------|-----|-----|------------|")
-
-        for row in rows:
-            variant, _, _, mean, stddev, min_ns, max_ns, iters = row
-            lines.append(
-                f"| {variant} | {fmt_ns(mean)} | {fmt_ns(stddev or 0)} "
-                f"| {fmt_ns(min_ns or 0)} | {fmt_ns(max_ns or 0)} "
-                f"| {iters or 'N/A'} |"
-            )
+    for runtime in ("python", "typescript"):
+        rows = [b for b in art["benchmarks"] if b["runtime"] == runtime]
+        if not rows:
+            continue
+        lines += [f"## {runtime}", "", "| Benchmark | Median | CV | Gate |", "|---|---|---|---|"]
+        for b in rows:
+            lines.append(f"| `{b['name']}` | {fmt_ns(b['median_ns'])} | {b['cv']:.3f} | {b['gate']:.2f} |")
         lines.append("")
-
-    # FFI overhead analysis
-    lines.append("## FFI Overhead Analysis\n")
-
-    ffi_pairs = [("puma", "xuma-crust-python"), ("bumi", "xuma-crust-wasm")]
-    for pure, crusty in ffi_pairs:
-        ffi_results = con.execute(
-            """SELECT
-                pure.scenario, pure.phase,
-                pure.mean_ns AS pure_ns,
-                crusty.mean_ns AS crusty_ns
-            FROM bench_results pure
-            JOIN bench_results crusty
-              ON pure.scenario = crusty.scenario
-             AND pure.phase = crusty.phase
-             AND pure.run_id = crusty.run_id
-            WHERE pure.variant = ? AND crusty.variant = ?
-              AND pure.run_id = ?
-            ORDER BY pure.scenario, pure.phase""",
-            [pure, crusty, run_id],
-        ).fetchall()
-
-        if ffi_results:
-            lines.append(f"### {pure} vs {crusty}\n")
-            lines.append("| Scenario | Phase | Pure | Crusty | Speedup |")
-            lines.append("|----------|-------|------|--------|---------|")
-            for scenario, phase, pure_ns, crusty_ns in ffi_results:
-                lines.append(
-                    f"| {scenario} | {phase} | {fmt_ns(pure_ns)} "
-                    f"| {fmt_ns(crusty_ns)} | {fmt_speedup(pure_ns, crusty_ns)} |"
-                )
+        floors = [by[(runtime, f)] for f in FLOORS if (runtime, f) in by]
+        paths = [by[(runtime, p)] for p in PATHS[runtime] if (runtime, p) in by]
+        if floors and paths:
+            lines += ["### Against the boundary floor", "",
+                      "| Path | " + " | ".join(f"vs `{f['name']}`" for f in floors) + " |",
+                      "|---|" + "---|" * len(floors)]
+            for p in paths:
+                lines.append(f"| `{p['name']}` | " + " | ".join(verdict(p, f) for f in floors) + " |")
             lines.append("")
 
-    # Footer
-    lines.append("---")
-    lines.append("*Generated by `scripts/bench_report.py` from DuckDB benchmark corpus.*")
-    lines.append("")
-
-    con.close()
-
-    report = "\n".join(lines)
-    Path(output).write_text(report)
-    click.echo(f"Report written to {output} ({len(results)} results)")
+    text = "\n".join(lines)
+    if args.output:
+        Path(args.output).write_text(text + "\n")
+        print(f"bench_report: wrote {args.output}")
+    else:
+        print(text)
 
 
 if __name__ == "__main__":

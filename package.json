@@ -1,7 +1,0 @@
-{
-  "name": "x.uma",
-  "private": true,
-  "workspaces": [
-    "bumi"
-  ]
-}

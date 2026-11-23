@@ -13,7 +13,7 @@ proto_matcher:
           input:
             name: MapInput
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: v
           valueMatch:
             exact: hello
@@ -48,7 +48,7 @@ proto_matcher:
           input:
             name: MapInput
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: v
           valueMatch:
             prefix: /api
@@ -87,7 +87,7 @@ proto_matcher:
           input:
             name: MapInput
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: v
           valueMatch:
             suffix: .rs
@@ -122,7 +122,7 @@ proto_matcher:
           input:
             name: MapInput
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: v
           valueMatch:
             contains: error
@@ -157,7 +157,7 @@ proto_matcher:
           input:
             name: MapInput
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: v
           valueMatch:
             safeRegex:

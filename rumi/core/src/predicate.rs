@@ -3,8 +3,62 @@
 //! Predicates combine [`DataInput`] and [`InputMatcher`] to create boolean
 //! conditions that can be composed with AND/OR/NOT.
 
-use crate::{DataInput, InputMatcher, MatchingData, PredicateTrace};
+use crate::{DataInput, InputMatcher, PredicateTrace};
 use std::fmt::Debug;
+
+/// What a predicate decided: Envoy's `MatchResult`, with its
+/// `InsufficientData` named for the one way it arises here, a required value
+/// that was absent (D-069).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatchResult {
+    /// The predicate holds.
+    Matched,
+    /// The predicate does not hold. An absent value that is not required lands
+    /// here (INV-1).
+    NoMatch,
+    /// A required value was absent. `not` passes this through, and a matcher
+    /// that meets it stops without an action or its fallback.
+    Undecided,
+}
+
+impl MatchResult {
+    /// Negation that leaves `Undecided` undecided, as Envoy's `NotFieldMatcher`.
+    #[must_use]
+    pub fn negate(self) -> Self {
+        match self {
+            Self::Matched => Self::NoMatch,
+            Self::NoMatch => Self::Matched,
+            Self::Undecided => Self::Undecided,
+        }
+    }
+
+    /// `and` over results in order: the first that is not a match, or a
+    /// match, as Envoy's `AllFieldMatcher`.
+    fn all(results: impl IntoIterator<Item = Self>) -> Self {
+        results
+            .into_iter()
+            .find(|r| *r != Self::Matched)
+            .unwrap_or(Self::Matched)
+    }
+
+    /// `or` over results: a match if any, else undecided if any, else no
+    /// match, as Envoy's `AnyFieldMatcher`.
+    fn any(results: impl IntoIterator<Item = Self>) -> Self {
+        let mut undecided = false;
+        for r in results {
+            match r {
+                Self::Matched => return Self::Matched,
+                Self::Undecided => undecided = true,
+                Self::NoMatch => {}
+            }
+        }
+        if undecided {
+            Self::Undecided
+        } else {
+            Self::NoMatch
+        }
+    }
+}
 
 /// A single predicate: combines a [`DataInput`] with an [`InputMatcher`].
 ///
@@ -12,10 +66,11 @@ use std::fmt::Debug;
 /// The `SinglePredicate` extracts data from the context using the input, then
 /// passes it to the matcher for evaluation.
 ///
-/// # INV (Dijkstra): None → false
+/// # INV-1: absent → false
 ///
-/// If the `DataInput` returns [`MatchingData::None`], the predicate evaluates to `false`.
-/// This is a critical invariant that simplifies reasoning about matcher behavior.
+/// If the `DataInput` returns `None`, the predicate evaluates to `false`,
+/// unless the predicate is [required](Self::with_required), when it is
+/// [`MatchResult::Undecided`] (D-069).
 ///
 /// # Example
 ///
@@ -29,13 +84,32 @@ use std::fmt::Debug;
 pub struct SinglePredicate<Ctx> {
     input: Box<dyn DataInput<Ctx>>,
     matcher: Box<dyn InputMatcher>,
+    required: bool,
 }
 
 impl<Ctx> SinglePredicate<Ctx> {
     /// Create a new single predicate from a `DataInput` and `InputMatcher`.
     #[must_use]
     pub fn new(input: Box<dyn DataInput<Ctx>>, matcher: Box<dyn InputMatcher>) -> Self {
-        Self { input, matcher }
+        Self {
+            input,
+            matcher,
+            required: false,
+        }
+    }
+
+    /// Mark the input's value as required: absent, it leaves the predicate
+    /// [undecided](MatchResult::Undecided) rather than false (D-069).
+    #[must_use]
+    pub fn with_required(mut self, required: bool) -> Self {
+        self.required = required;
+        self
+    }
+
+    /// Whether the input's value is required.
+    #[must_use]
+    pub fn is_required(&self) -> bool {
+        self.required
     }
 
     /// Get a reference to the input.
@@ -52,16 +126,28 @@ impl<Ctx> SinglePredicate<Ctx> {
 
     /// Evaluate this predicate against the given context.
     ///
-    /// # Returns
-    ///
-    /// - `true` if the input produces data and the matcher matches
-    /// - `false` if the input returns `None` (INV: None → false)
-    /// - `false` if the matcher doesn't match
+    /// `true` only for [`MatchResult::Matched`]; an undecided predicate is not
+    /// a match.
     pub fn evaluate(&self, ctx: &Ctx) -> bool {
-        let data = self.input.get(ctx);
+        self.match_result(ctx) == MatchResult::Matched
+    }
+
+    /// Evaluate this predicate, keeping an absent required value apart from a
+    /// miss.
+    pub fn match_result(&self, ctx: &Ctx) -> MatchResult {
+        Self::result_of(self.input.get(ctx).as_ref(), &*self.matcher, self.required)
+    }
+
+    fn result_of(
+        data: Option<&crate::MatchingData>,
+        matcher: &dyn InputMatcher,
+        required: bool,
+    ) -> MatchResult {
         match data {
-            MatchingData::None => false, // INV: None → false
-            _ => self.matcher.matches(&data),
+            Some(d) if matcher.matches(d) => MatchResult::Matched,
+            Some(_) => MatchResult::NoMatch,
+            None if required => MatchResult::Undecided,
+            None => MatchResult::NoMatch,
         }
     }
 
@@ -72,14 +158,10 @@ impl<Ctx> SinglePredicate<Ctx> {
     #[must_use]
     pub fn evaluate_with_trace(&self, ctx: &Ctx) -> PredicateTrace {
         let data = self.input.get(ctx);
-        let matched = match &data {
-            MatchingData::None => false,
-            _ => self.matcher.matches(&data),
-        };
         PredicateTrace::Single {
-            matched,
+            result: Self::result_of(data.as_ref(), &*self.matcher, self.required),
             input: format!("{:?}", self.input),
-            data: format!("{data:?}"),
+            data: data.map_or_else(|| "absent".to_string(), |d| format!("{d:?}")),
             matcher: format!("{:?}", self.matcher),
         }
     }
@@ -90,6 +172,7 @@ impl<Ctx> Debug for SinglePredicate<Ctx> {
         f.debug_struct("SinglePredicate")
             .field("input", &self.input)
             .field("matcher", &self.matcher)
+            .field("required", &self.required)
             .finish()
     }
 }
@@ -145,11 +228,18 @@ impl<Ctx> Predicate<Ctx> {
     /// nested predicates. The depth limit (max 32) should be enforced at
     /// config load time, not evaluation time.
     pub fn evaluate(&self, ctx: &Ctx) -> bool {
+        self.match_result(ctx) == MatchResult::Matched
+    }
+
+    /// Evaluate with Envoy's semantics for an undecided child: `and` stops at
+    /// the first child that is not a match, `or` at the first match, and `not`
+    /// leaves undecided undecided (D-069).
+    pub fn match_result(&self, ctx: &Ctx) -> MatchResult {
         match self {
-            Predicate::Single(p) => p.evaluate(ctx),
-            Predicate::And(predicates) => predicates.iter().all(|p| p.evaluate(ctx)),
-            Predicate::Or(predicates) => predicates.iter().any(|p| p.evaluate(ctx)),
-            Predicate::Not(p) => !p.evaluate(ctx),
+            Predicate::Single(p) => p.match_result(ctx),
+            Predicate::And(ps) => MatchResult::all(ps.iter().map(|p| p.match_result(ctx))),
+            Predicate::Or(ps) => MatchResult::any(ps.iter().map(|p| p.match_result(ctx))),
+            Predicate::Not(p) => p.match_result(ctx).negate(),
         }
     }
 
@@ -167,21 +257,21 @@ impl<Ctx> Predicate<Ctx> {
                     .iter()
                     .map(|p| p.evaluate_with_trace(ctx))
                     .collect();
-                let matched = children.iter().all(PredicateTrace::matched);
-                PredicateTrace::And { matched, children }
+                let result = MatchResult::all(children.iter().map(PredicateTrace::result));
+                PredicateTrace::And { result, children }
             }
             Self::Or(predicates) => {
                 let children: Vec<PredicateTrace> = predicates
                     .iter()
                     .map(|p| p.evaluate_with_trace(ctx))
                     .collect();
-                let matched = children.iter().any(PredicateTrace::matched);
-                PredicateTrace::Or { matched, children }
+                let result = MatchResult::any(children.iter().map(PredicateTrace::result));
+                PredicateTrace::Or { result, children }
             }
             Self::Not(p) => {
                 let inner = p.evaluate_with_trace(ctx);
                 PredicateTrace::Not {
-                    matched: !inner.matched(),
+                    result: inner.result().negate(),
                     inner: Box::new(inner),
                 }
             }
@@ -261,34 +351,14 @@ impl<Ctx> Predicate<Ctx> {
         }
     }
 
-    /// Check that no compound in this tree holds more than
-    /// [`MAX_PREDICATES_PER_COMPOUND`](crate::MAX_PREDICATES_PER_COMPOUND)
-    /// children.
-    ///
-    /// Width is a denial-of-service axis that depth does not cover: a single
-    /// `and` with a hundred thousand children is one level deep. The check lives
-    /// here, on the type that holds the children, so every route to a predicate
-    /// inherits it — the registry, both domain compilers, the FFI bindings, and
-    /// hand construction. A limit enforced only where configs are parsed is
-    /// advisory to every other caller.
-    ///
-    /// # Errors
-    ///
-    /// [`MatcherError::TooManyPredicates`](crate::MatcherError::TooManyPredicates)
-    /// naming the offending count.
-    pub fn validate(&self) -> Result<(), crate::MatcherError> {
+    /// The number of single predicates under this one: the per-request cost
+    /// of evaluating it in full.
+    #[must_use]
+    pub fn leaf_count(&self) -> usize {
         match self {
-            Predicate::Single(_) => Ok(()),
-            Predicate::And(ps) | Predicate::Or(ps) => {
-                if ps.len() > crate::MAX_PREDICATES_PER_COMPOUND {
-                    return Err(crate::MatcherError::TooManyPredicates {
-                        count: ps.len(),
-                        max: crate::MAX_PREDICATES_PER_COMPOUND,
-                    });
-                }
-                ps.iter().try_for_each(Predicate::validate)
-            }
-            Predicate::Not(p) => p.validate(),
+            Predicate::Single(_) => 1,
+            Predicate::And(ps) | Predicate::Or(ps) => ps.iter().map(Predicate::leaf_count).sum(),
+            Predicate::Not(p) => p.leaf_count(),
         }
     }
 }
@@ -311,6 +381,7 @@ impl<Ctx> Debug for Predicate<Ctx> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::MatchingData;
     use crate::{ContainsMatcher, ExactMatcher};
 
     #[derive(Debug, Clone)]
@@ -322,8 +393,8 @@ mod tests {
     struct ValueInput;
 
     impl DataInput<TestContext> for ValueInput {
-        fn get(&self, ctx: &TestContext) -> MatchingData {
-            MatchingData::String(ctx.value.clone())
+        fn get(&self, ctx: &TestContext) -> Option<MatchingData> {
+            Some(MatchingData::String(ctx.value.clone()))
         }
     }
 
@@ -331,8 +402,8 @@ mod tests {
     struct NoneInput;
 
     impl DataInput<TestContext> for NoneInput {
-        fn get(&self, _ctx: &TestContext) -> MatchingData {
-            MatchingData::None
+        fn get(&self, _ctx: &TestContext) -> Option<MatchingData> {
+            None
         }
     }
 
@@ -530,13 +601,13 @@ mod tests {
 
         assert!(trace.matched());
         if let PredicateTrace::Single {
-            matched,
+            result,
             input,
             data,
             matcher,
         } = &trace
         {
-            assert!(matched);
+            assert_eq!(*result, MatchResult::Matched);
             assert!(input.contains("ValueInput"));
             assert!(data.contains("hello"));
             assert!(matcher.contains("hello"));
@@ -566,7 +637,7 @@ mod tests {
 
         assert!(!trace.matched());
         if let PredicateTrace::Single { data, .. } = &trace {
-            assert!(data.contains("None"));
+            assert_eq!(data, "absent");
         } else {
             panic!("expected Single trace");
         }

@@ -18,9 +18,17 @@ crate-type = ["cdylib"]
 default = []
 # Running the protojson conformance suite.
 fixtures = ["dep:rumi-test"]
+# No-op crossings that measure the boundary's floor per return shape (D-066).
+# Bench builds only; the published artifact has no such surface.
+bench = []
 
 [dependencies]
-wasm-bindgen = "0.2"
+# enable-interning caches JsValue strings in a thread-local map instead of
+# re-encoding them on every crossing. build_context_from_js probes six fields by
+# name on every evaluate(), and those names are compile-time constants, so
+# without this we spent roughly 60% of the per-call boundary budget transcoding
+# six string literals that never change.
+wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
 js-sys = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6"

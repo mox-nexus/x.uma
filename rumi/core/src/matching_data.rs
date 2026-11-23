@@ -80,7 +80,6 @@ pub trait CustomMatchData: Send + Sync + Debug {
 ///
 /// # Variants
 ///
-/// - `None` — No data available (extractor returned nothing)
 /// - `String` — String data (most common: headers, paths, query params)
 /// - `Int` — Integer data
 /// - `Bool` — Boolean data
@@ -100,15 +99,15 @@ pub trait CustomMatchData: Send + Sync + Debug {
 ///
 /// let data = MatchingData::String("hello".to_string());
 /// assert_eq!(data.as_str(), Some("hello"));
-/// assert!(!data.is_none());
 /// ```
-#[derive(Debug, Clone, Default)]
+///
+/// Absence is not a variant: `DataInput::get` returns `Option<MatchingData>`,
+/// and a matcher is never asked about a value that does not exist (INV-1).
+///
+/// Non-exhaustive so a variant can be added without a major version (D-064).
+#[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum MatchingData {
-    /// No data available (extractor returned nothing).
-    /// When a predicate receives this, it evaluates to `false` (INV: Dijkstra).
-    #[default]
-    None,
-
     /// String data — the most common case for HTTP headers, paths, etc.
     String(String),
 
@@ -139,12 +138,11 @@ pub enum MatchingData {
     Custom(Arc<dyn CustomMatchData>),
 }
 
-// Manual PartialEq implementation because trait objects don't auto-derive it.
-// For Custom variants, we use Arc pointer equality (same allocation = equal).
+// Trait objects cannot derive `PartialEq`; `Custom` compares by allocation,
+// because a custom type defines no other equality the engine can see.
 impl PartialEq for MatchingData {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::None, Self::None) => true,
             (Self::String(a), Self::String(b)) => a == b,
             (Self::Int(a), Self::Int(b)) => a == b,
             (Self::Bool(a), Self::Bool(b)) => a == b,
@@ -156,22 +154,6 @@ impl PartialEq for MatchingData {
 }
 
 impl MatchingData {
-    /// Returns `true` if this is the `None` variant.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rumi::MatchingData;
-    ///
-    /// assert!(MatchingData::None.is_none());
-    /// assert!(!MatchingData::String("x".to_string()).is_none());
-    /// ```
-    #[inline]
-    #[must_use]
-    pub fn is_none(&self) -> bool {
-        matches!(self, Self::None)
-    }
-
     /// Returns `true` if this is the `String` variant.
     #[inline]
     #[must_use]
@@ -303,7 +285,6 @@ impl MatchingData {
     #[must_use]
     pub fn type_name(&self) -> &'static str {
         match self {
-            Self::None => "none",
             Self::String(_) => "string",
             Self::Int(_) => "int",
             Self::Bool(_) => "bool",
@@ -343,23 +324,10 @@ impl From<Vec<u8>> for MatchingData {
     }
 }
 
-impl<T> From<Option<T>> for MatchingData
-where
-    T: Into<MatchingData>,
-{
-    fn from(opt: Option<T>) -> Self {
-        match opt {
-            Some(v) => v.into(),
-            Option::None => Self::None,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // Test custom type for Custom variant tests
     #[derive(Debug)]
     struct TestCustomData {
         value: i32,
@@ -373,13 +341,6 @@ mod tests {
         fn as_any(&self) -> &dyn Any {
             self
         }
-    }
-
-    #[test]
-    fn test_is_none() {
-        assert!(MatchingData::None.is_none());
-        assert!(!MatchingData::String("x".to_string()).is_none());
-        assert!(!MatchingData::Int(42).is_none());
     }
 
     #[test]
@@ -401,17 +362,10 @@ mod tests {
 
         let data: MatchingData = true.into();
         assert!(matches!(data, MatchingData::Bool(true)));
-
-        let data: MatchingData = Option::<String>::None.into();
-        assert!(data.is_none());
-
-        let data: MatchingData = Some("hello".to_string()).into();
-        assert_eq!(data.as_str(), Some("hello"));
     }
 
     #[test]
     fn test_type_name() {
-        assert_eq!(MatchingData::None.type_name(), "none");
         assert_eq!(MatchingData::String("x".into()).type_name(), "string");
         assert_eq!(MatchingData::Int(1).type_name(), "int");
         assert_eq!(MatchingData::Bool(true).type_name(), "bool");
@@ -422,10 +376,8 @@ mod tests {
     fn test_custom_is_custom() {
         let custom = MatchingData::Custom(Arc::new(TestCustomData { value: 42 }));
         assert!(custom.is_custom());
-        assert!(!custom.is_none());
         assert!(!custom.is_string());
 
-        // Primitives are not custom
         assert!(!MatchingData::String("x".into()).is_custom());
         assert!(!MatchingData::Int(1).is_custom());
     }
@@ -437,14 +389,12 @@ mod tests {
         let trait_obj = custom.as_custom().expect("should be Custom");
         assert_eq!(trait_obj.custom_type_name(), "test_custom");
 
-        // Downcast to concrete type
         let concrete = trait_obj
             .as_any()
             .downcast_ref::<TestCustomData>()
             .expect("should downcast");
         assert_eq!(concrete.value, 42);
 
-        // Primitives return None for as_custom
         assert!(MatchingData::String("x".into()).as_custom().is_none());
     }
 
@@ -460,7 +410,6 @@ mod tests {
         let data1 = MatchingData::Custom(Arc::clone(&arc));
         let data2 = data1.clone();
 
-        // Both point to the same allocation
         assert!(Arc::ptr_eq(
             match &data1 {
                 MatchingData::Custom(c) => c,
@@ -482,13 +431,10 @@ mod tests {
         let data1b = MatchingData::Custom(Arc::clone(&arc1)); // Clone of same Arc
         let data2 = MatchingData::Custom(arc2);
 
-        // Same Arc = equal
         assert_eq!(data1a, data1b);
 
-        // Different Arc (even with same value) = not equal
         assert_ne!(data1a, data2);
 
-        // Custom != primitive
         assert_ne!(data1a, MatchingData::Int(42));
     }
 
@@ -506,10 +452,6 @@ mod tests {
             DataInput, FieldMatcher, InputMatcher, Matcher, OnMatch, Predicate, SinglePredicate,
         };
 
-        // ══════════════════════════════════════════════════════════════════════
-        // Step 1: Define a custom domain type (extension point)
-        // ══════════════════════════════════════════════════════════════════════
-
         #[derive(Debug, Clone)]
         struct GeoLocation {
             lat: f64,
@@ -518,7 +460,6 @@ mod tests {
 
         impl GeoLocation {
             fn distance_to(&self, other: &GeoLocation) -> f64 {
-                // Simplified distance (not real haversine, just for testing)
                 ((self.lat - other.lat).powi(2) + (self.lon - other.lon).powi(2)).sqrt()
             }
         }
@@ -533,35 +474,23 @@ mod tests {
             }
         }
 
-        // ══════════════════════════════════════════════════════════════════════
-        // Step 2: Define a custom context (the "Ctx" generic parameter)
-        // ══════════════════════════════════════════════════════════════════════
-
         #[derive(Debug)]
         struct GeoRequest {
             user_location: GeoLocation,
         }
 
-        // ══════════════════════════════════════════════════════════════════════
-        // Step 3: Define a custom DataInput (extracts GeoLocation from context)
-        // ══════════════════════════════════════════════════════════════════════
-
         #[derive(Debug)]
         struct LocationInput;
 
         impl DataInput<GeoRequest> for LocationInput {
-            fn get(&self, ctx: &GeoRequest) -> MatchingData {
-                MatchingData::Custom(Arc::new(ctx.user_location.clone()))
+            fn get(&self, ctx: &GeoRequest) -> Option<MatchingData> {
+                Some(MatchingData::Custom(Arc::new(ctx.user_location.clone())))
             }
 
             fn data_type(&self) -> &'static str {
                 "geo_location"
             }
         }
-
-        // ══════════════════════════════════════════════════════════════════════
-        // Step 4: Define a custom InputMatcher (matches on geo proximity)
-        // ══════════════════════════════════════════════════════════════════════
 
         #[derive(Debug)]
         struct WithinRadiusMatcher {
@@ -577,7 +506,6 @@ mod tests {
 
         impl InputMatcher for WithinRadiusMatcher {
             fn matches(&self, value: &MatchingData) -> bool {
-                // Get custom data, downcast to GeoLocation, check distance
                 value
                     .as_custom()
                     .and_then(|c| c.as_any().downcast_ref::<GeoLocation>())
@@ -589,13 +517,8 @@ mod tests {
             }
         }
 
-        // ══════════════════════════════════════════════════════════════════════
-        // Step 5: Integration test - wire everything together
-        // ══════════════════════════════════════════════════════════════════════
-
         #[test]
         fn test_full_custom_extension_pipeline() {
-            // Define regions as geo-fences
             let sf_center = GeoLocation {
                 lat: 37.7749,
                 lon: -122.4194,
@@ -605,10 +528,8 @@ mod tests {
                 lon: -74.0060,
             };
 
-            // Build matcher: route to different backends based on location
             let matcher: Matcher<GeoRequest, String> = Matcher::list(
                 vec![
-                    // Rule 1: SF area → sf_backend
                     FieldMatcher::new(
                         Predicate::Single(SinglePredicate::new(
                             Box::new(LocationInput),
@@ -616,7 +537,6 @@ mod tests {
                         )),
                         OnMatch::Action("sf_backend".to_string()),
                     ),
-                    // Rule 2: NYC area → nyc_backend
                     FieldMatcher::new(
                         Predicate::Single(SinglePredicate::new(
                             Box::new(LocationInput),
@@ -628,7 +548,6 @@ mod tests {
                 Some(OnMatch::Action("default_backend".to_string())),
             );
 
-            // Test 1: User in SF → sf_backend
             let sf_request = GeoRequest {
                 user_location: GeoLocation {
                     lat: 37.78,
@@ -640,7 +559,6 @@ mod tests {
                 Some("sf_backend".to_string())
             );
 
-            // Test 2: User in NYC → nyc_backend
             let nyc_request = GeoRequest {
                 user_location: GeoLocation {
                     lat: 40.71,
@@ -652,7 +570,6 @@ mod tests {
                 Some("nyc_backend".to_string())
             );
 
-            // Test 3: User in London → default_backend (no match)
             let london_request = GeoRequest {
                 user_location: GeoLocation {
                     lat: 51.5074,

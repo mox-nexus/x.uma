@@ -26,17 +26,24 @@ echo "clean-clone: files from git archive: $(find . -type f | wc -l | tr -d ' ')
 echo "clean-clone: cargo build"
 cargo build --manifest-path rumi/Cargo.toml
 
-echo "clean-clone: bun install --frozen-lockfile"
-bun install --frozen-lockfile
+echo "clean-clone: crusts check"
+cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures
+cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures
 
-echo "clean-clone: bumi type-check"
-(cd bumi && bun run typecheck)
+echo "clean-clone: wasm crust install --frozen-lockfile"
+(cd rumi/crusts/wasm && bun install --frozen-lockfile)
 
-echo "clean-clone: puma sync + tests"
-uv sync --project puma --all-groups >/dev/null
-# Scoped to puma/tests: a bare pytest from the root collects the crust suites,
-# which need a wheel built by maturin and are covered by their own CI job.
-(cd puma && uv run pytest tests -q --no-header)
+# The docs app links the wasm package from rumi/crusts/wasm/pkg, which exists
+# only once wasm-pack has run. Without wasm-pack the docs half is not checkable
+# here, and that is said rather than skipped silently.
+if command -v wasm-pack >/dev/null 2>&1; then
+    echo "clean-clone: wasm crust build"
+    (cd rumi/crusts/wasm && wasm-pack build --target web >/dev/null 2>&1)
+    echo "clean-clone: docs app install --frozen-lockfile"
+    (cd docs/experience && bun install --frozen-lockfile >/dev/null)
+else
+    echo "clean-clone: wasm-pack not installed — docs app install NOT checked"
+fi
 
 echo
 echo "clean-clone: ok — the tracked tree builds and tests on its own"

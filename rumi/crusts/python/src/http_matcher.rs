@@ -1,15 +1,21 @@
 //! Config-driven HTTP matcher exposed to Python.
 //!
 //! Takes a JSON config string, compiles it via Rust registry, and evaluates
-//! against HTTP request contexts. Same `MatcherConfig<String>` format used
+//! against HTTP request contexts. Same `MatcherIr<String>` format used
 //! by all implementations.
+
+use std::sync::OnceLock;
 
 use std::collections::HashMap;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyString;
+use rumi_proto::index::ActionIndex;
+
+use crate::matcher::{Actions, PyDecision};
 use rumi::prelude::*;
-use rumi_http::HttpRequest;
+use rumi_http::{HttpMessage, HttpMessageBuilder};
 
 /// An opaque compiled HTTP matcher.
 ///
@@ -21,7 +27,8 @@ use rumi_http::HttpRequest;
 /// `HttpMatcher` is immutable and safe to share across threads.
 #[pyclass(frozen)]
 pub struct HttpMatcher {
-    inner: Matcher<HttpRequest, String>,
+    inner: Matcher<HttpMessage, ActionIndex>,
+    actions: Actions,
 }
 
 #[pymethods]
@@ -45,19 +52,14 @@ impl HttpMatcher {
     /// - Invalid regex pattern
     /// - Depth/width limits exceeded
     #[staticmethod]
-    fn from_config(json_config: &str) -> PyResult<Self> {
+    fn from_config(py: Python<'_>, json_config: &str) -> PyResult<Self> {
         let config = crate::protojson::load(json_config).map_err(PyValueError::new_err)?;
 
-        let registry = build_http_registry();
-        let matcher = registry
-            .load_typed_matcher(config, &crate::protojson::actions())
+        let loaded = crate::protojson::load_indexed(registry(), config)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let (inner, actions) = Actions::split(py, loaded);
 
-        matcher
-            .validate()
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
-
-        Ok(Self { inner: matcher })
+        Ok(Self { inner, actions })
     }
 
     /// Evaluate an HTTP request against compiled matcher rules.
@@ -65,46 +67,62 @@ impl HttpMatcher {
     /// # Arguments
     ///
     /// * `method` — HTTP method (e.g., "GET", "POST").
-    /// * `path` — Request path (e.g., "/api/users").
-    /// * `headers` — Request headers as key-value pairs (keys are case-insensitive).
-    /// * `query_params` — Query parameters as key-value pairs.
+    /// * `path` — Request target, query string included (e.g., "/api/users?page=1").
+    /// * `headers` — Request headers as key-value pairs (keys are case-insensitive);
+    ///   pseudo-headers such as `:authority` go here too (D-059).
     ///
     /// # Returns
     ///
     /// The action string if the request matched, or `None`.
-    #[pyo3(signature = (method, path, headers = None, query_params = None))]
+    #[pyo3(signature = (method, path, headers = None))]
     fn evaluate(
         &self,
+        py: Python<'_>,
         method: &str,
         path: &str,
         headers: Option<HashMap<String, String>>,
-        query_params: Option<HashMap<String, String>>,
-    ) -> Option<String> {
-        let req = build_request(method, path, headers, query_params);
-        self.inner.evaluate(&req)
+    ) -> Option<Py<PyString>> {
+        let req = build_request(method, path, headers);
+        self.actions.action(py, self.inner.evaluate(&req))
+    }
+
+    /// The decision as an object: `matched`, `action`, `index`, `fallback`, `undecided`.
+    #[pyo3(signature = (method, path, headers = None))]
+    fn decide(
+        &self,
+        py: Python<'_>,
+        method: &str,
+        path: &str,
+        headers: Option<HashMap<String, String>>,
+    ) -> PyDecision {
+        let req = build_request(method, path, headers);
+        self.actions.decide(py, self.inner.outcome(&req))
+    }
+
+    /// Every action this matcher can return, in index order.
+    fn actions(&self) -> Vec<String> {
+        self.actions.names()
+    }
+
+    /// The metadata carried by the action at `index`.
+    fn action_metadata(&self, index: u32) -> PyResult<HashMap<String, String>> {
+        self.actions.metadata(index)
     }
 
     /// Trace evaluation for debugging.
     ///
     /// Returns the same result as `evaluate()` plus a detailed trace.
-    #[pyo3(signature = (method, path, headers = None, query_params = None))]
+    #[pyo3(signature = (method, path, headers = None))]
     fn trace(
         &self,
+        py: Python<'_>,
         method: &str,
         path: &str,
         headers: Option<HashMap<String, String>>,
-        query_params: Option<HashMap<String, String>>,
     ) -> super::matcher::PyTraceResult {
-        let req = build_request(method, path, headers, query_params);
+        let req = build_request(method, path, headers);
         let trace = self.inner.evaluate_with_trace(&req);
-
-        let steps = super::matcher::trace_steps(&trace.steps);
-
-        super::matcher::PyTraceResult {
-            result: trace.result,
-            steps,
-            used_fallback: trace.used_fallback,
-        }
+        self.actions.trace(py, &trace)
     }
 
     #[allow(clippy::unused_self)]
@@ -113,31 +131,25 @@ impl HttpMatcher {
     }
 }
 
-/// Build the HTTP registry for `HttpRequest`.
-fn build_http_registry() -> rumi::Registry<HttpRequest> {
-    rumi_http::register_simple(rumi::RegistryBuilder::new()).build()
+/// The registry every `HttpMatcher` loads through. Built on first use; every
+/// call after that returns the same instance.
+pub(crate) fn registry() -> &'static rumi::Registry<HttpMessage> {
+    static REGISTRY: OnceLock<rumi::Registry<HttpMessage>> = OnceLock::new();
+    REGISTRY.get_or_init(|| rumi_http::register(rumi::RegistryBuilder::new()).build())
 }
 
-/// Build an `HttpRequest` from Python arguments.
+/// Build an `HttpMessage` from Python arguments.
 fn build_request(
     method: &str,
     path: &str,
     headers: Option<HashMap<String, String>>,
-    query_params: Option<HashMap<String, String>>,
-) -> HttpRequest {
-    let mut builder = HttpRequest::builder().method(method).path(path);
-
-    if let Some(hdrs) = headers {
-        for (k, v) in hdrs {
-            builder = builder.header(k, v);
-        }
-    }
-
-    if let Some(params) = query_params {
-        for (k, v) in params {
-            builder = builder.query_param(k, v);
-        }
-    }
-
-    builder.build()
+) -> HttpMessage {
+    headers
+        .into_iter()
+        .flatten()
+        .fold(
+            HttpMessageBuilder::new().method(method).path(path),
+            |b, (k, v)| b.header(k, v),
+        )
+        .build()
 }

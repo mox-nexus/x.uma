@@ -8,7 +8,7 @@ Indexed list of x.uma's protocol obligations. Inspired by rust-analyzer's 26 lab
 
 | # | Invariant | Enforcement |
 |---|-----------|-------------|
-| INV-1 | `DataInput::get() → None` → predicate evaluates to `false` | Conformance tests |
+| INV-1 | `DataInput::get()` returns `None` → predicate evaluates to `false` | Conformance tests |
 | INV-2 | First-match-wins in `Matcher::evaluate()` | Conformance tests |
 | INV-3 | `EvalTrace.result` always equals `evaluate()` result | Unit test assertion |
 | INV-4 | `OnMatch` is exclusive — Action XOR Matcher, never both | Rust enum (type-level) |
@@ -122,7 +122,7 @@ cases:
     expected: { matches: false }
 ```
 
-**Why:** Fail-closed security. Missing data should never match.
+**Why:** Missing data should never match a predicate. It does not make a rule fail closed: `not` inverts the `false`, as in Envoy. `required` inputs make absence undecided instead (D-069).
 
 ### 7. OnMatch is Exclusive
 

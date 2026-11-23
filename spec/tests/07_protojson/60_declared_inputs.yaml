@@ -1,0 +1,419 @@
+name: map_input_typed
+description: >
+  A `MapInput` declares the type it reads (D-069). `bool` and `int` values are parsed
+  from the context's text; one that does not parse is absent, so its predicate is
+  false and a rule keyed on it does not fire.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: admin
+            typedConfig:
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
+              key: admin
+              type: bool
+          customMatch:
+            name: bool
+            typedConfig:
+              '@type': type.googleapis.com/xuma.core.v1.BoolMatcher
+              expected: true
+      onMatch:
+        action:
+          name: allow
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: allow
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+cases:
+- name: a_true_value_reads_as_true
+  context:
+    admin: 'true'
+  expect: allow
+- name: a_false_value_reads_as_false
+  context:
+    admin: 'false'
+  expect: deny
+- name: a_value_that_is_not_a_bool_is_absent
+  context:
+    admin: 'yes'
+  expect: deny
+- name: no_value_is_absent
+  context: {}
+  expect: deny
+
+---
+name: declared_input_type_mismatch
+description: >
+  A declared type the matcher cannot read is refused when the document loads, never
+  discovered as a rule that silently never fires (D-057, D-069).
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: port
+            typedConfig:
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
+              key: port
+              type: int
+          valueMatch:
+            exact: '80'
+      onMatch:
+        action:
+          name: allow
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: allow
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+expect_error: true
+error_contains: input produces "int" data but matcher supports
+
+---
+name: declared_input_unknown_type
+description: >
+  `type` names one of the types an input can produce; anything else is refused at
+  load (D-069).
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: port
+            typedConfig:
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
+              key: port
+              type: float
+          valueMatch:
+            exact: '80'
+      onMatch:
+        action:
+          name: allow
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: allow
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+expect_error: true
+error_contains: type "float"
+
+---
+name: required_input_absent_under_not
+description: >
+  An absent value makes its predicate false, and `not` turns that true: "allow unless
+  the role is guest" allows a request with no role, in Envoy as here. Marked `required`,
+  the absence is Envoy's insufficient data instead: `not` passes it through, the
+  list stops, and the fallback does not fire either (D-069). The evaluation is undecided,
+  and the host applies its own default.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        notMatcher:
+          singlePredicate:
+            input:
+              name: role
+              typedConfig:
+                '@type': type.googleapis.com/xuma.core.v1.MapInput
+                key: role
+                required: true
+            valueMatch:
+              exact: guest
+      onMatch:
+        action:
+          name: allow
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: allow
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+cases:
+- name: a_non_guest_is_allowed
+  context:
+    role: admin
+  expect: allow
+- name: a_guest_falls_to_the_fallback
+  context:
+    role: guest
+  expect: deny
+- name: no_role_is_undecided_not_allowed
+  context: {}
+  expect: null
+  expect_undecided: true
+
+---
+name: optional_input_absent_under_not
+description: >
+  The same rule without `required` keeps xDS semantics: the absent role is false,
+  `not` makes it true, and the rule fires. This is the behaviour `required` exists
+  to opt out of (D-069).
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        notMatcher:
+          singlePredicate:
+            input:
+              name: role
+              typedConfig:
+                '@type': type.googleapis.com/xuma.core.v1.MapInput
+                key: role
+            valueMatch:
+              exact: guest
+      onMatch:
+        action:
+          name: allow
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: allow
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+cases:
+- name: no_role_is_allowed
+  context: {}
+  expect: allow
+
+---
+name: required_input_absent_under_and
+description: >
+  `and` returns the first child that is not a match, in order, as Envoy's AllFieldMatcher
+  does: a tenant that does not match decides the rule before the absent role is
+  reached, and a tenant that does match reaches it (D-069).
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        andMatcher:
+          predicate:
+          - singlePredicate:
+              input:
+                name: tenant
+                typedConfig:
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
+                  key: tenant
+              valueMatch:
+                exact: acme
+          - singlePredicate:
+              input:
+                name: role
+                typedConfig:
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
+                  key: role
+                  required: true
+              valueMatch:
+                exact: admin
+      onMatch:
+        action:
+          name: allow
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: allow
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+cases:
+- name: both_present_and_matching
+  context:
+    tenant: acme
+    role: admin
+  expect: allow
+- name: a_mismatch_before_the_absence_decides
+  context:
+    tenant: other
+  expect: deny
+- name: an_absence_after_a_match_is_undecided
+  context:
+    tenant: acme
+  expect: null
+  expect_undecided: true
+
+---
+name: required_input_absent_under_or
+description: >
+  `or` matches if any child matches and is otherwise undecided if any child was,
+  as Envoy's AnyFieldMatcher does (D-069).
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        orMatcher:
+          predicate:
+          - singlePredicate:
+              input:
+                name: role
+                typedConfig:
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
+                  key: role
+                  required: true
+              valueMatch:
+                exact: admin
+          - singlePredicate:
+              input:
+                name: tenant
+                typedConfig:
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
+                  key: tenant
+              valueMatch:
+                exact: acme
+      onMatch:
+        action:
+          name: allow
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: allow
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+cases:
+- name: another_child_matching_decides
+  context:
+    tenant: acme
+  expect: allow
+- name: no_child_matching_with_one_absent_is_undecided
+  context:
+    tenant: other
+  expect: null
+  expect_undecided: true
+- name: every_child_present_and_none_matching
+  context:
+    tenant: other
+    role: viewer
+  expect: deny
+
+---
+name: required_input_absent_stops_the_list
+description: >
+  A list that meets an undecided rule stops there, as Envoy's ListMatcher does:
+  a later rule that would match does not get the chance (D-069).
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: role
+            typedConfig:
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
+              key: role
+              required: true
+          valueMatch:
+            exact: admin
+      onMatch:
+        action:
+          name: admin
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: admin
+    - predicate:
+        singlePredicate:
+          input:
+            name: tenant
+            typedConfig:
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
+              key: tenant
+          valueMatch:
+            exact: acme
+      onMatch:
+        action:
+          name: tenant
+          typedConfig:
+            '@type': type.googleapis.com/xuma.core.v1.NamedAction
+            name: tenant
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+cases:
+- name: the_first_rule_decides_when_present
+  context:
+    role: viewer
+    tenant: acme
+  expect: tenant
+- name: an_absent_required_value_stops_before_the_second_rule
+  context:
+    tenant: acme
+  expect: null
+  expect_undecided: true
+
+---
+name: required_tree_key_absent
+description: >
+  A tree keyed on a required input that is absent cannot choose an entry, and does
+  not take `on_no_match` in its place (D-069).
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherTree:
+    input:
+      name: role
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.MapInput
+        key: role
+        required: true
+    exactMatchMap:
+      map:
+        admin:
+          action:
+            name: allow
+            typedConfig:
+              '@type': type.googleapis.com/xuma.core.v1.NamedAction
+              name: allow
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        '@type': type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+cases:
+- name: a_known_key
+  context:
+    role: admin
+  expect: allow
+- name: an_unknown_key_falls_to_on_no_match
+  context:
+    role: viewer
+  expect: deny
+- name: an_absent_key_is_undecided
+  context: {}
+  expect: null
+  expect_undecided: true

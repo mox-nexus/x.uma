@@ -1,9 +1,8 @@
 # Config Format
 
 The config format is canonical protojson — protobuf's own JSON mapping of
-`xds.type.matcher.v3.Matcher`. All five implementations (rumi, puma, bumi, and
-both `xuma-crust` bindings) read the same document and agree on the same
-answers; see [`DECISIONS.md` D-026](https://github.com/mox-nexus/x.uma/blob/main/DECISIONS.md)
+`xds.type.matcher.v3.Matcher`. The engine and both `xuma-crust` bindings read
+the same document and agree on the same answers; see [`DECISIONS.md` D-026](https://github.com/mox-nexus/x.uma/blob/main/DECISIONS.md)
 for why this format and not a bespoke one.
 
 **Field names accept `lowerCamelCase` (canonical) or the proto's own
@@ -46,7 +45,7 @@ Dispatches on a key extracted from the context.
 {
   "input": {
     "name": "role",
-    "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "role" }
+    "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": "role" }
   },
   "exactMatchMap": {
     "map": {
@@ -61,7 +60,7 @@ Dispatches on a key extracted from the context.
 |-------|------|----------|-------------|
 | `input` | `TypedExtensionConfig` | Yes | Produces the lookup key. Must be a string input |
 | `exactMatchMap` | `MatchMap` | One of | O(1) exact key lookup |
-| `prefixMatchMap` | `MatchMap` | One of | Longest matching prefix wins |
+| `prefixMatchMap` | `MatchMap` | One of | Longest matching prefix first; a nested miss tries the next shorter prefix |
 | `customMatch` | `TypedExtensionConfig` | One of | **Not supported** — rejected by name at load |
 
 A `MatchMap` is `{"map": {"<key>": OnMatch}}`. Entry values are `OnMatch`, so
@@ -111,7 +110,7 @@ Extract a value and match it:
   "singlePredicate": {
     "input": {
       "name": "method",
-      "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "method" }
+      "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": "method" }
     },
     "valueMatch": { "exact": "GET" }
   }
@@ -196,7 +195,7 @@ Reference to a registered type, carrying an `Any` payload:
 {
   "name": "method",
   "typedConfig": {
-    "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+    "@type": "type.googleapis.com/xuma.core.v1.MapInput",
     "key": "method"
   }
 }
@@ -253,7 +252,7 @@ The domain `rumi run` uses by default:
 
 | Type URL | Config | Extracts |
 |----------|--------|----------|
-| `xuma.kv.v1.MapInput` | `{ "key": "method" }` | Value for key from a string map context |
+| `xuma.core.v1.MapInput` | `{ "key": "port", "type": "int" }` | Value for key from a string map context, read as `type`: `"string"` (default), `"int"` or `"bool"`. A value that does not parse is absent. |
 
 ### HTTP Domain
 
@@ -266,6 +265,8 @@ The domain `rumi run` uses by default:
 | `xuma.http.v1.AuthorityInput` | `{}` | `:authority` pseudo-header (Host in HTTP/1) |
 | `xuma.http.v1.SchemeInput` | `{}` | `:scheme` pseudo-header |
 
+Every HTTP input also takes `required`, described below.
+
 ### Claude Domain
 
 | Type URL | Config | Extracts |
@@ -276,6 +277,15 @@ The domain `rumi run` uses by default:
 | `xuma.claude.v1.SessionIdInput` | `{}` | Session ID |
 | `xuma.claude.v1.CwdInput` | `{}` | Working directory |
 | `xuma.claude.v1.GitBranchInput` | `{}` | Git branch |
+
+### Required inputs
+
+Every input whose value can be missing takes `"required": true`: `MapInput`,
+all six HTTP inputs, `ToolArgInput` and `GitBranchInput`. By default a missing
+value makes its predicate false (and `not` of it true). A required value that
+is missing leaves the whole evaluation **undecided** instead, as Envoy treats
+insufficient data. No later rule fires, `onNoMatch` does not fire, and the
+result reports `undecided: true` so the host can apply its own default.
 
 ## Full Examples
 
@@ -389,7 +399,7 @@ matcherList:
                 input:
                   name: method
                   typedConfig:
-                    "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                    "@type": type.googleapis.com/xuma.core.v1.MapInput
                     key: method
                 valueMatch:
                   exact: GET
@@ -397,7 +407,7 @@ matcherList:
                 input:
                   name: path
                   typedConfig:
-                    "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                    "@type": type.googleapis.com/xuma.core.v1.MapInput
                     key: path
                 valueMatch:
                   prefix: /api
@@ -413,7 +423,7 @@ matcherList:
           input:
             name: path
             typedConfig:
-              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              "@type": type.googleapis.com/xuma.core.v1.MapInput
               key: path
           valueMatch:
             exact: /health
@@ -439,8 +449,10 @@ Configs are validated at load time:
 | Limit | Value | Error |
 |-------|-------|-------|
 | Max nesting depth | 32 levels | `DepthExceeded` |
-| Max field matchers per matcher | 256 | `TooManyFieldMatchers` |
-| Max predicates per AND/OR | 256 | `TooManyPredicates` |
+| Max predicates one evaluation can reach | 256 | `TooManyPredicatesPerEvaluation` |
+| Max entries per tree | 65,536 | `TooManyTreeEntries` |
+| Max predicates per document | 65,536 | `TooManyDocumentPredicates` |
+| Max regexes per document | 64 | `TooManyRegexes` |
 | Max pattern length | 8192 chars | `PatternTooLong` |
 | Max regex pattern length | 4096 chars | `PatternTooLong` |
 | Max document nesting (before a matcher exists) | 128 levels | rejected during `@type` expansion |

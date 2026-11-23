@@ -8,7 +8,7 @@
 use rumi_proto::any_resolver::{AnyResolver, AnyResolverBuilder};
 use rumi_proto::convert::load_proto_matcher;
 use rumi_proto::protojson::parse_matcher;
-use rumi_test::proto_fixture::{Domain, Implementation, ProtoFixture};
+use rumi_test::proto_fixture::{observed, Domain, Implementation, ProtoFixture};
 use rumi_test::KvContext;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -26,7 +26,7 @@ fn fixtures_dir() -> PathBuf {
 
 fn resolver() -> AnyResolver {
     AnyResolverBuilder::new()
-        .register::<rumi_proto::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+        .register::<rumi_proto::xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
         .register::<rumi_proto::xuma::http::v1::HeaderInput>("xuma.http.v1.HeaderInput")
         .register::<rumi_proto::xuma::http::v1::PathInput>("xuma.http.v1.PathInput")
         .register::<rumi_proto::xuma::http::v1::MethodInput>("xuma.http.v1.MethodInput")
@@ -41,7 +41,7 @@ fn resolver() -> AnyResolver {
 /// `NamedAction` → `String`. The action's `name` is the action.
 struct NamedActionFactory;
 
-impl rumi::IntoAction<String> for NamedActionFactory {
+impl rumi::ActionFactory<String> for NamedActionFactory {
     type Config = rumi_proto::xuma::core::v1::NamedAction;
 
     fn from_config(config: Self::Config) -> Result<String, rumi::MatcherError> {
@@ -75,15 +75,13 @@ fn build_matcher(
 
 /// Build the HTTP-domain matcher a fixture describes.
 ///
-/// `register_simple`, not `register`: the fixture's `http_request` describes a
-/// plain request, and `HttpRequest` is the context that reads one. Both bind
-/// the same `xuma.http.v1.*` type URLs, and a fixture here is what holds them
-/// to meaning the same thing.
+/// Build the HTTP-domain matcher a fixture describes, over the one HTTP
+/// context (D-059).
 fn build_http_matcher(
     fixture: &ProtoFixture,
-) -> Result<rumi::Matcher<rumi_http::HttpRequest, String>, rumi::MatcherError> {
+) -> Result<rumi::Matcher<rumi_http::HttpMessage, String>, rumi::MatcherError> {
     let resolver = resolver();
-    let registry = rumi_http::register_simple(rumi::RegistryBuilder::new()).build();
+    let registry = rumi_http::register(rumi::RegistryBuilder::new()).build();
     let proto = parse_matcher(&resolver, fixture.proto_matcher.clone())?;
     load_proto_matcher(&registry, &actions(), &resolver, &proto)
 }
@@ -143,8 +141,8 @@ fn run(fixture: &ProtoFixture) {
                     .iter()
                     .fold(KvContext::new(), |c, (k, v)| c.with(k, v));
                 assert_eq!(
-                    matcher.evaluate(&ctx),
-                    case.expect,
+                    observed(matcher.outcome(&ctx), |a| a),
+                    case.expected(),
                     "fixture '{}' case '{}'",
                     fixture.name,
                     case.name
@@ -161,15 +159,10 @@ fn run(fixture: &ProtoFixture) {
                         fixture.name, case.name
                     )
                 });
-                let req = spec.headers.iter().fold(
-                    rumi_http::HttpRequest::builder()
-                        .method(&spec.method)
-                        .path(&spec.path),
-                    |b, (k, v)| b.header(k, v),
-                );
+                let req = spec.message();
                 assert_eq!(
-                    matcher.evaluate(&req.build()),
-                    case.expect,
+                    observed(matcher.outcome(&req), |a| a),
+                    case.expected(),
                     "fixture '{}' case '{}'",
                     fixture.name,
                     case.name
@@ -226,7 +219,7 @@ matcherList:
           input:
             name: role
             typedConfig:
-              "@type": type.googleapis.com/xuma.kv.v1.MapInput
+              "@type": type.googleapis.com/xuma.core.v1.MapInput
               key: role
           valueMatch:
             exact: admin
@@ -252,7 +245,7 @@ onNoMatch:
               "input": {
                 "name": "role",
                 "typedConfig": {
-                  "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                  "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                   "key": "role"
                 }
               },

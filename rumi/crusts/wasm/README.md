@@ -3,9 +3,9 @@
 WASM-backed bindings for the [x.uma](https://github.com/mox-nexus/x.uma) matcher
 engine, built with `wasm-bindgen` over the Rust core.
 
-Same config format, and the same conformance suite (`spec/tests/07_protojson/`)
-as the pure-TypeScript `xuma` package. Reach for this when evaluation is hot enough to pay for loading a WASM
-module.
+The engine itself, compiled to WebAssembly: the same protojson config the
+`rumi` CLI reads, and the same conformance suite (`spec/tests/07_protojson/`).
+A compiled matcher is an opaque handle; evaluation never leaves the module.
 
 ```bash
 bun add xuma-crust
@@ -55,7 +55,7 @@ matcher.evaluate({ method: "GET", path: "/api/users" }); // "api"
 matcher.evaluate({ method: "GET", path: "/other" });     // undefined
 ```
 
-`HookMatcher` compiles Claude Code hook rules the same way, and `TestMatcher`
+`HookMatcher` compiles Claude Code hook rules the same way, and `KvMatcher`
 runs conformance fixtures.
 
 ## A rule with no conditions is refused

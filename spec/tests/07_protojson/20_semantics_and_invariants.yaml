@@ -13,7 +13,7 @@ proto_matcher:
           input:
             name: missing_key
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: missing_key
           valueMatch:
             exact: any_value
@@ -119,7 +119,7 @@ proto_matcher:
                   input:
                     name: role
                     typedConfig:
-                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      '@type': type.googleapis.com/xuma.core.v1.MapInput
                       key: role
                   valueMatch:
                     exact: admin
@@ -127,7 +127,7 @@ proto_matcher:
                   input:
                     name: role
                     typedConfig:
-                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      '@type': type.googleapis.com/xuma.core.v1.MapInput
                       key: role
                   valueMatch:
                     exact: superuser
@@ -135,7 +135,7 @@ proto_matcher:
               input:
                 name: status
                 typedConfig:
-                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
                   key: status
               valueMatch:
                 exact: active
@@ -193,7 +193,7 @@ proto_matcher:
           input:
             name: path
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: path
           valueMatch:
             prefix: /api/v2/
@@ -208,7 +208,7 @@ proto_matcher:
           input:
             name: path
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: path
           valueMatch:
             prefix: /api/v1/
@@ -223,7 +223,7 @@ proto_matcher:
           input:
             name: path
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: path
           valueMatch:
             prefix: /api/
@@ -240,7 +240,7 @@ proto_matcher:
               input:
                 name: path
                 typedConfig:
-                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
                   key: path
               valueMatch:
                 suffix: .js
@@ -248,7 +248,7 @@ proto_matcher:
               input:
                 name: path
                 typedConfig:
-                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
                   key: path
               valueMatch:
                 suffix: .css
@@ -256,7 +256,7 @@ proto_matcher:
               input:
                 name: path
                 typedConfig:
-                  '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                  '@type': type.googleapis.com/xuma.core.v1.MapInput
                   key: path
               valueMatch:
                 suffix: .png
@@ -271,7 +271,7 @@ proto_matcher:
           input:
             name: path
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: path
           valueMatch:
             exact: /health
@@ -340,7 +340,7 @@ proto_matcher:
           input:
             name: tier
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: tier
           valueMatch:
             exact: premium
@@ -353,7 +353,7 @@ proto_matcher:
                   input:
                     name: feature
                     typedConfig:
-                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      '@type': type.googleapis.com/xuma.core.v1.MapInput
                       key: feature
                   valueMatch:
                     exact: analytics
@@ -368,7 +368,7 @@ proto_matcher:
                   input:
                     name: feature
                     typedConfig:
-                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      '@type': type.googleapis.com/xuma.core.v1.MapInput
                       key: feature
                   valueMatch:
                     exact: export
@@ -389,7 +389,7 @@ proto_matcher:
           input:
             name: tier
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: tier
           valueMatch:
             exact: free
@@ -446,7 +446,7 @@ proto_matcher:
           input:
             name: tier
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: tier
           valueMatch:
             exact: premium
@@ -459,7 +459,7 @@ proto_matcher:
                   input:
                     name: feature
                     typedConfig:
-                      '@type': type.googleapis.com/xuma.kv.v1.MapInput
+                      '@type': type.googleapis.com/xuma.core.v1.MapInput
                       key: feature
                   valueMatch:
                     exact: analytics
@@ -474,7 +474,7 @@ proto_matcher:
           input:
             name: tier
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: tier
           valueMatch:
             exact: premium

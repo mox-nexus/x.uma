@@ -359,7 +359,7 @@ impl StringMatcher {
     ///
     /// Returns `Err` if the regex pattern is invalid.
     pub fn regex(pattern: &str) -> Result<Self, regex::Error> {
-        regex::Regex::new(pattern).map(Self::Regex)
+        bounded_regex(pattern).map(Self::Regex)
     }
 
     /// Create a case-insensitive regex match.
@@ -370,8 +370,17 @@ impl StringMatcher {
     ///
     /// Returns `Err` if the regex pattern is invalid.
     pub fn regex_ignore_case(pattern: &str) -> Result<Self, regex::Error> {
-        regex::Regex::new(&format!("(?i){pattern}")).map(Self::Regex)
+        bounded_regex(&format!("(?i){pattern}")).map(Self::Regex)
     }
+}
+
+/// Compile with the per-regex memory limits, so a document's regex memory is
+/// its regex count times a known constant (D-054).
+fn bounded_regex(pattern: &str) -> Result<regex::Regex, regex::Error> {
+    regex::RegexBuilder::new(pattern)
+        .size_limit(crate::REGEX_SIZE_LIMIT)
+        .dfa_size_limit(crate::REGEX_DFA_SIZE_LIMIT)
+        .build()
 }
 
 impl InputMatcher for StringMatcher {
@@ -422,13 +431,13 @@ impl InputMatcher for StringMatcher {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// IntoInputMatcher impls (feature = "registry")
+// InputMatcherFactory impls (feature = "registry")
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[cfg(feature = "registry")]
 mod into_input_matcher {
     use super::{BoolMatcher, InputMatcher, StringMatcher};
-    use crate::registry::IntoInputMatcher;
+    use crate::registry::InputMatcherFactory;
     use crate::MatcherError;
     use serde::Deserialize;
 
@@ -441,7 +450,7 @@ mod into_input_matcher {
         pub expected: bool,
     }
 
-    impl IntoInputMatcher for BoolMatcher {
+    impl InputMatcherFactory for BoolMatcher {
         type Config = BoolMatcherConfig;
 
         fn from_config(config: Self::Config) -> Result<Box<dyn InputMatcher>, MatcherError> {
@@ -484,7 +493,7 @@ mod into_input_matcher {
         pub ignore_case: bool,
     }
 
-    impl IntoInputMatcher for StringMatcher {
+    impl InputMatcherFactory for StringMatcher {
         type Config = StringMatcherConfig;
 
         fn from_config(config: Self::Config) -> Result<Box<dyn InputMatcher>, MatcherError> {
@@ -520,7 +529,6 @@ mod tests {
         assert!(matcher.matches(&"hello".into()));
         assert!(!matcher.matches(&"Hello".into()));
         assert!(!matcher.matches(&"hello world".into()));
-        assert!(!matcher.matches(&MatchingData::None));
         assert!(!matcher.matches(&MatchingData::Int(42)));
     }
 
@@ -530,7 +538,6 @@ mod tests {
         assert!(matcher.matches(&"/api/users".into()));
         assert!(matcher.matches(&"/api/".into()));
         assert!(!matcher.matches(&"/users".into()));
-        assert!(!matcher.matches(&MatchingData::None));
     }
 
     #[test]
@@ -600,5 +607,11 @@ mod tests {
 
         let m = StringMatcher::regex_ignore_case(r"^user-\d+$").unwrap();
         assert!(m.matches(&"USER-123".into()));
+    }
+
+    #[test]
+    fn a_regex_whose_program_exceeds_the_size_limit_is_refused() {
+        let err = StringMatcher::regex("(?:[a-z]{1000}){1000}").unwrap_err();
+        assert!(err.to_string().contains("size limit"), "{err}");
     }
 }

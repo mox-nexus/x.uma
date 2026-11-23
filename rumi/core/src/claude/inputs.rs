@@ -2,14 +2,19 @@
 
 use super::context::HookContext;
 use crate::prelude::*;
+use std::borrow::Cow;
 
 /// Extracts the hook event type as a string.
 #[derive(Debug, Clone)]
 pub struct EventTypeInput;
 
 impl DataInput<HookContext> for EventTypeInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        MatchingData::String(ctx.event().as_str().to_string())
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
+        Some(MatchingData::String(ctx.event().as_str().to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.claude.v1.EventTypeInput"))
     }
 }
 
@@ -18,8 +23,12 @@ impl DataInput<HookContext> for EventTypeInput {
 pub struct ToolNameInput;
 
 impl DataInput<HookContext> for ToolNameInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        MatchingData::String(ctx.tool_name().to_string())
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
+        Some(MatchingData::String(ctx.tool_name().to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.claude.v1.ToolNameInput"))
     }
 }
 
@@ -50,9 +59,16 @@ impl ToolArgInput {
 }
 
 impl DataInput<HookContext> for ToolArgInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
         ctx.argument(&self.name)
-            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
+            .map(|s| MatchingData::String(s.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Owned(format!(
+            "xuma.claude.v1.ToolArgInput/{}",
+            self.name
+        )))
     }
 }
 
@@ -61,8 +77,12 @@ impl DataInput<HookContext> for ToolArgInput {
 pub struct SessionIdInput;
 
 impl DataInput<HookContext> for SessionIdInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        MatchingData::String(ctx.session_id().to_string())
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
+        Some(MatchingData::String(ctx.session_id().to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.claude.v1.SessionIdInput"))
     }
 }
 
@@ -71,8 +91,12 @@ impl DataInput<HookContext> for SessionIdInput {
 pub struct CwdInput;
 
 impl DataInput<HookContext> for CwdInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
-        MatchingData::String(ctx.cwd().to_string())
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
+        Some(MatchingData::String(ctx.cwd().to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.claude.v1.CwdInput"))
     }
 }
 
@@ -81,9 +105,13 @@ impl DataInput<HookContext> for CwdInput {
 pub struct GitBranchInput;
 
 impl DataInput<HookContext> for GitBranchInput {
-    fn get(&self, ctx: &HookContext) -> MatchingData {
+    fn get(&self, ctx: &HookContext) -> Option<MatchingData> {
         ctx.git_branch()
-            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
+            .map(|s| MatchingData::String(s.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.claude.v1.GitBranchInput"))
     }
 }
 
@@ -100,7 +128,7 @@ pub struct ToolArgInputConfig {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for EventTypeInput {
+impl crate::DataInputFactory<HookContext> for EventTypeInput {
     type Config = crate::UnitConfig;
 
     fn from_config(
@@ -111,7 +139,7 @@ impl crate::IntoDataInput<HookContext> for EventTypeInput {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for ToolNameInput {
+impl crate::DataInputFactory<HookContext> for ToolNameInput {
     type Config = crate::UnitConfig;
 
     fn from_config(
@@ -122,7 +150,7 @@ impl crate::IntoDataInput<HookContext> for ToolNameInput {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for ToolArgInput {
+impl crate::DataInputFactory<HookContext> for ToolArgInput {
     type Config = ToolArgInputConfig;
 
     fn from_config(
@@ -133,7 +161,7 @@ impl crate::IntoDataInput<HookContext> for ToolArgInput {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for SessionIdInput {
+impl crate::DataInputFactory<HookContext> for SessionIdInput {
     type Config = crate::UnitConfig;
 
     fn from_config(
@@ -144,7 +172,7 @@ impl crate::IntoDataInput<HookContext> for SessionIdInput {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for CwdInput {
+impl crate::DataInputFactory<HookContext> for CwdInput {
     type Config = crate::UnitConfig;
 
     fn from_config(
@@ -155,7 +183,7 @@ impl crate::IntoDataInput<HookContext> for CwdInput {
 }
 
 #[cfg(feature = "registry")]
-impl crate::IntoDataInput<HookContext> for GitBranchInput {
+impl crate::DataInputFactory<HookContext> for GitBranchInput {
     type Config = crate::UnitConfig;
 
     fn from_config(
@@ -184,7 +212,7 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash");
         assert_eq!(
             EventTypeInput.get(&ctx),
-            MatchingData::String("PreToolUse".into())
+            Some(MatchingData::String("PreToolUse".into()))
         );
     }
 
@@ -203,7 +231,7 @@ mod tests {
         ] {
             assert_eq!(
                 EventTypeInput.get(&ctx),
-                MatchingData::String(event_name.into()),
+                Some(MatchingData::String(event_name.into())),
                 "EventTypeInput failed for {event_name}"
             );
         }
@@ -214,14 +242,17 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Write");
         assert_eq!(
             ToolNameInput.get(&ctx),
-            MatchingData::String("Write".into())
+            Some(MatchingData::String("Write".into()))
         );
     }
 
     #[test]
     fn tool_name_input_empty_for_non_tool_events() {
         let ctx = HookContext::stop();
-        assert_eq!(ToolNameInput.get(&ctx), MatchingData::String(String::new()));
+        assert_eq!(
+            ToolNameInput.get(&ctx),
+            Some(MatchingData::String(String::new()))
+        );
     }
 
     #[test]
@@ -229,17 +260,14 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "ls");
         assert_eq!(
             ToolArgInput::new("command").unwrap().get(&ctx),
-            MatchingData::String("ls".into())
+            Some(MatchingData::String("ls".into()))
         );
     }
 
     #[test]
     fn argument_input_returns_none_for_missing() {
         let ctx = HookContext::pre_tool_use("Bash");
-        assert_eq!(
-            ToolArgInput::new("command").unwrap().get(&ctx),
-            MatchingData::None
-        );
+        assert_eq!(ToolArgInput::new("command").unwrap().get(&ctx), None);
     }
 
     #[test]
@@ -247,7 +275,7 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash").with_session_id("abc-123");
         assert_eq!(
             SessionIdInput.get(&ctx),
-            MatchingData::String("abc-123".into())
+            Some(MatchingData::String("abc-123".into()))
         );
     }
 
@@ -256,7 +284,7 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash").with_cwd("/home/user/project");
         assert_eq!(
             CwdInput.get(&ctx),
-            MatchingData::String("/home/user/project".into())
+            Some(MatchingData::String("/home/user/project".into()))
         );
     }
 
@@ -265,13 +293,13 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash").with_git_branch("main");
         assert_eq!(
             GitBranchInput.get(&ctx),
-            MatchingData::String("main".into())
+            Some(MatchingData::String("main".into()))
         );
     }
 
     #[test]
     fn git_branch_input_absent() {
         let ctx = HookContext::pre_tool_use("Bash");
-        assert_eq!(GitBranchInput.get(&ctx), MatchingData::None);
+        assert_eq!(GitBranchInput.get(&ctx), None);
     }
 }

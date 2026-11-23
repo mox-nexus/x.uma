@@ -22,7 +22,7 @@ one worth understanding: a missing input is not an error, it is a non-match.
       {
         "predicate": {
           "singlePredicate": {
-            "input": { "name": "tier", "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "tier" } },
+            "input": { "name": "tier", "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": "tier" } },
             "valueMatch": { "exact": "enterprise" }
           }
         },
@@ -31,7 +31,7 @@ one worth understanding: a missing input is not an error, it is a non-match.
       {
         "predicate": {
           "singlePredicate": {
-            "input": { "name": "tier", "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "tier" } },
+            "input": { "name": "tier", "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": "tier" } },
             "valueMatch": { "exact": "pro" }
           }
         },
@@ -67,7 +67,7 @@ expensive option here, and patterns are length-capped at load time.
 
 ## In the HTTP domain
 
-The example above uses the test domain, which reads a flat string map. For real
+The example above uses the key-value domain, which reads a flat string map. For real
 requests, the HTTP domain provides inputs that understand a request:
 
 ```yaml

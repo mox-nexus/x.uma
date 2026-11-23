@@ -23,7 +23,7 @@ proto_matcher:
             input:
               name: role
               typedConfig:
-                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                "@type": type.googleapis.com/xuma.core.v1.MapInput
                 key: role
             valueMatch:
               exact: admin
@@ -68,13 +68,15 @@ for. That happened: a fixture meant to prove a both-set `oneof` is rejected was
 failing on an unregistered type instead, and passing.
 
 Because the string has to match in every implementation, it also holds the
-error *wording* to cross-language agreement. When Rust and puma disagreed, the
-messages were harmonized rather than the assertion weakened.
+error *wording* to cross-language agreement. When two implementations
+disagreed, the messages were harmonized rather than the assertion weakened.
 
-### `implementations:` — the migration ledger
+### `implementations:` — the conformance ledger
 
-Omit it and every implementation must run the fixture. That is the state today,
-and the field can be deleted once nothing needs it.
+Required on every fixture: the implementations expected to run it. There is no
+default, because a default is a coverage claim nobody has to provide — this
+suite's `05_http/` had no ledger and no runner in the reference implementation
+while one of its fixtures required a fail-open of everyone (D-050).
 
 A shorter list is an **expiring exception**, and CI holds it in *both*
 directions: a listed implementation that fails is a failure, and one that is
@@ -91,7 +93,8 @@ disagreement still means something while a migration is in flight.
 Gateway API `HttpRouteMatch` values fed through `compile_route_matches`; the
 plural takes a list and ORs them. **Not a config format** — they are inputs to a
 compiler API, which is why D-026 does not touch them and why they are still
-here. Loaded by `puma/tests/conftest.py` and `bumi/tests/helpers/fixture-loader.ts`.
+here. Loaded by `rumi/ext/test/src/http_fixture.rs`; the bindings do not expose
+the compiler, so these fixtures list `[rust]`.
 
 ## Coverage is checked
 
@@ -100,15 +103,14 @@ here. Loaded by `puma/tests/conftest.py` and `bumi/tests/helpers/fixture-loader.
 fixture are listed there with a reason, and that list is checked for staleness
 in both directions.
 
-This exists because puma and bumi read protojson by hand rather than through
-generated types (D-038), so their dependency on the schema is not an arrow a
-build can see. The fixture corpus carries it instead — without the check, "all
-three implementations agree" would mean only "all three agree about whatever
-somebody remembered to fixture".
+This exists because the corpus is the contract the bindings are held to: a
+config message with no fixture is one the wheel and the npm package have never
+been shown to handle. Without the check, "the engine and its bindings agree"
+would mean only "they agree about whatever somebody remembered to fixture".
 
 ## Adding a fixture
 
 1. Write the fixture first — this project is conformance-driven.
-2. Run it everywhere: `just test-protojson`, `just puma-test`, `just bumi-test`.
-3. A fixture that passes in one implementation and not another is a **finding**,
-   not a fixture bug. Cross-language disagreement is what this suite is for.
+2. Run it everywhere: `just test-protojson`, `just crust-py-check`, `just crust-wasm-check`.
+3. A fixture that passes in the engine and not in a binding is a **finding**,
+   not a fixture bug. Catching a binding that diverges is what this suite is for.

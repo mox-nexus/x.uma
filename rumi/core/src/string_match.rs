@@ -232,8 +232,8 @@ mod tests {
         #[derive(Debug)]
         struct ValInput;
         impl DataInput<Ctx> for ValInput {
-            fn get(&self, ctx: &Ctx) -> MatchingData {
-                MatchingData::String(ctx.val.clone())
+            fn get(&self, ctx: &Ctx) -> Option<MatchingData> {
+                Some(MatchingData::String(ctx.val.clone()))
             }
         }
 

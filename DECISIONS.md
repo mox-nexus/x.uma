@@ -8,6 +8,707 @@ in `scratch/` and gets summarized here.
 
 ---
 
+## 2026-09-24 · Budgets and declared inputs, before publish
+
+### D-069 · D-057 before publish: `MapInput` in core, `required` as Envoy's insufficient data, typed evaluate stays
+
+**Decided.** Narrows D-057 to what publishing freezes, and says what its
+`required` flag does, which D-057 named and did not define.
+
+1. `xuma.kv.v1.MapInput{key}` becomes `xuma.core.v1.MapInput{key, type,
+   required}`; the kv message is deleted. `type` is `"string"` (the default),
+   `"int"` or `"bool"`, the vocabulary `DataInput::data_type` already speaks,
+   so a matcher that cannot read the declared type is refused at load. A value
+   that does not parse as its declared type is absent.
+2. Every input message declares `bool required`. The registry reads it, not
+   the factory, so no input implements absence twice. `required: false`, the
+   default, keeps today's xDS semantics: an absent value makes its predicate
+   false.
+3. An absent **required** value is Envoy's `InsufficientData`
+   (`source/common/matcher/field_matcher.h`, `list_matcher.h`): the predicate
+   is undecided; `not` passes undecided through; `and` returns the first child
+   that is not a match, undecided or no match, in order; `or` matches if any
+   child matches and is otherwise undecided if any child was; a list or tree
+   that meets undecided stops, and neither a later rule nor `on_no_match`
+   fires. The engine's `Matcher::outcome` returns `Outcome::Undecided`
+   (`evaluate` still returns `Option<A>`, `None` here); the bindings' result
+   object gains `undecided: bool` beside `{matched, action, index,
+   fallback}`, because a host that treats "no rule fired" as allow may treat
+   "could not decide" as deny, and the result object freezes at publish; the
+   trace marks the predicate `undecided`.
+4. The typed `evaluate` methods on the bindings stay. The flat map D-057
+   proposed measured at 2.25 µs against 600 to 900 ns for typed arguments in
+   wasm (artifact `2026-09-08-f6c3adb3`); the packed string that beats both is
+   additive and is 0.1.x.
+
+**Why.** An absent value is false for a plain predicate, but `not` turns it
+true: "allow unless role is guest" allows a request with no role (verified by
+execution, 2026-09-24). Envoy does the same for a value that is absent with
+all data available, so the engine is conformant, and the security page's
+"missing data means no match" overstated what the invariant covers. `required`
+is how a rule author says a value's absence is not an answer, and Envoy
+already has the semantics for that: the evaluation cannot decide, so it does
+not, rather than inventing a three-valued logic of our own. The host that
+receives no decision applies its own default, which is where the policy for a
+missing value belongs (the matcher is not a policy engine).
+
+**What it entails.** Fixtures first, in `60_declared_inputs.yaml`:
+`declared_input_type_mismatch` and `declared_input_unknown_type` (load
+errors); `map_input_typed` (a `bool` read, and an unparsable value absent);
+`required_input_absent_under_{not,and,or}`, `required_input_absent_stops_the_list`
+and `required_tree_key_absent` (each asserting `on_no_match` does not fire);
+`optional_input_absent_under_not` pinning the xDS default. D-057's
+`declared_input_unknown_url` already exists as `unknown_input_type_url`. A
+case asserts `expect_undecided`, and every other case now asserts it is
+decided. The `MapInput` type URL changes in every fixture. The registration
+seam and `just ext` follow in their own change.
+
+**Revisit if.** Streaming input (Envoy's `MoreDataMightBeAvailable`) is
+needed. `Undecided` is the state it would reuse; the difference is that the
+host would call again with more data.
+
+### D-068 · Per-request cost is budgeted along the worst path; the per-list and per-compound bounds go
+
+**Decided.** Revises D-054. `MAX_PREDICATES_PER_EVALUATION = 256` bounds the
+predicates one evaluation can reach, computed once the matcher is built: a list
+costs every rule's predicate plus its nested matcher, since a nested miss moves
+on to the next rule; an exact tree costs its dearest entry; a prefix tree costs
+its dearest chain of prefixes, since a miss falls through to the next shorter
+one (D-055); a fallback adds its own cost. `MAX_DOCUMENT_PREDICATES = 65_536`
+bounds the document, counted during load as D-054's leaf budget was, so a
+hostile document is still refused before it is materialised. It is a memory
+bound, the same size as `MAX_TREE_ENTRIES`. `MAX_FIELD_MATCHERS` and
+`MAX_PREDICATES_PER_COMPOUND` are removed, with their errors.
+
+**Why.** D-054's leaf budget summed every leaf in the document, including those
+under tree entries a request never visits. With the value 256 it capped any
+document at 256 rules, so the trees D-054 names as the way to scale could not
+hold more than 256 single-rule entries (verified by execution 2026-09-24: 256
+entries load, 257 are refused, 300 plain-action entries load). It also made the
+per-list bound unreachable, since every rule holds at least one predicate. The
+2026-09-07 reviews bounded the right thing and the budget did not: Dijkstra,
+that lifting the width is a security decision and a dispatcher over a list that
+cannot exist is not an optimisation; Knuth, that per-request cost is linear in
+the rules visited (~21 ns per rule on a miss) and scale comes from dispatch.
+Both are statements about one request. The path budget is that statement, and
+it covers a wide list and a wide compound, which lie on one path. Two bounds on
+one quantity leave a reader to work out which fires; one does not.
+
+**What it entails.** The per-request security posture is unchanged: a list or a
+compound over 256 predicates is still refused, now by the path budget. What
+changes is that a tree's entries no longer add up. Fixtures first:
+`budget_tree_entries_do_not_add_up` and `budget_prefix_siblings_do_not_add_up`
+(entries summing past 256, each a hundred, load and evaluate);
+`budget_prefix_chain_adds_up` (a chain of prefixes summing to 300 is
+refused); `budget_list_rules_add_up`, formerly `budget_aggregate_leaves`,
+keeps its refusal under the new message. The document budget and the regex
+budget are asserted in registry unit tests at exactly budget + 1, on the IR
+path, which has no byte bound; through protojson `MAX_DOCUMENT_BYTES` binds
+first.
+
+**Revisit if.** The N-scaling benchmark (Knuth; Ixian's
+`rule_count_{last_match,miss}`) shows a workload that needs more than 256
+predicates on one path. Raising the number is then the security decision
+Dijkstra named, taken on those measurements.
+
+---
+
+## 2026-09-08 · The freeze line: what is decided before first publish
+
+Sixteen decisions from one deliberation (2026-09-07, focus mode: Burner,
+Karman, Ace, K; Lotfi on two conflicts; Ixian's validation criteria), over a
+proposal for one hyper-efficient core with two thin crusts. Recorded as a batch
+because they share a boundary: everything publishing freezes is decided before
+0.1.0, and everything it does not freeze comes after (D-053). The guild record
+and the proposal are session files under `scratch/`, untracked; whatever an
+entry needs from them is restated in the entry. Numbered in work order.
+
+### D-052 · `puma/` and `bumi/` are deleted, not frozen as oracles
+
+**Decided.** Both trees are deleted (`f3208660`, 2026-09-08). Neither is kept
+as a frozen conformance oracle.
+
+**Why.** An oracle has to be trusted more than the thing it checks. The pure
+engines shared every spec misreading with rumi (D-050's fail-open was live in
+all three; D-051), so agreement with them proved conformity to a shared
+reading, not correctness. A frozen tree also keeps costing: it builds under
+every toolchain bump or it leaves CI, and an oracle outside CI is a file. The
+oracle the engine work needs is the linear list itself: a differential
+property test asserting that any optimised path returns what the plain scan
+returns, over generated matchers, run in the engine's own suite (D-053, step
+6). That is an oracle with the same reader as the code under test and no
+second reading of the spec to agree with.
+
+**What it entails.** The `implementations:` ledger stays and is required
+(`acd87e12`); its members are `rust`, `python`, `typescript`, meaning the
+engine, the PyO3 binding and the wasm binding. Gate: `git grep -w -e puma -e
+bumi` returns nothing outside `DECISIONS.md`, `PLAN.md` and `reference/`,
+which are records and are not rewritten. History before 2026-09-08 is in git.
+
+**Revisit if.** D-051's condition holds: a runtime the binding cannot reach,
+with usage. A second engine would then be written fresh against the fixture
+suite, not recovered from history.
+
+### D-053 · The sequence: retire, decide, rename, shape the boundary, publish 0.1.0, then the engine
+
+**Decided.** The order of work to first publish:
+
+1. retire the duplicate engines (done: D-052);
+2. this batch;
+3. the rename pass (D-060), one commit, before any hot-path change;
+4. boundary shaping: `OnceLock` registries, `ActionIndex` return (D-056),
+   the flat context and declared inputs (D-057), one HTTP context (D-059),
+   the registration seam, `DataInput::get` returning `Option` (D-061);
+5. publish 0.1.0 behind the benchmark gate (D-066) and the crates dry-run;
+6. the engine, as 0.1.x: borrowed extraction, compilers emitting trees,
+   multi-pattern dispatch under the differential oracle, regex limits, the
+   semantic matcher.
+
+**Why.** Publishing freezes the FFI shape, the config schema, the type URLs,
+the public traits and the security posture. It does not freeze the hot path: a
+faster `evaluate` behind the same `from_config` is a patch release. So whatever
+changes a frozen surface lands before 0.1.0, and whatever changes only speed
+lands after it. The proposal's own sequence put the engine work first and the
+retirement last; K's objection, adopted, is that this ties first publish to
+work whose gate is a benchmark with no noise floor yet, and delays a freeze
+that costs nothing while nothing is published. Retiring first is because every
+later gate ("all runtimes agree") is cheaper with three runtimes than five,
+and because a document written before the retirement describes packages that
+no longer exist.
+
+**What it entails.** Nothing in 0.1.x may change the documents `from_config`
+accepts, the type URLs, the result object, a public trait, or the trace steps
+(D-063). This answers D-051's open questions: deletion, not freezing (D-052);
+this order; and `xuma` on npm ships as the thin package over the crust (D-058)
+once step 4 lands, never as the pure engine in the interval.
+
+**Revisit if.** Step 4 turns out to need an engine change that is not additive
+(borrowed extraction changing the `DataInput` port, say). Then that change
+moves before publish, because it changes a public trait.
+
+### D-054 · Rule sets at scale are trees; per-list width stays bounded; aggregate budgets are checked during load
+
+**Revised by D-068** (2026-09-24): the leaf budget summed branches a request
+never visits; per-request cost is now budgeted along the worst path.
+
+**Decided.** `MAX_FIELD_MATCHERS = 256` stays as the per-list bound. Large rule
+sets are compiled into `MatcherTree`s, with lists beneath the leaves; the
+domain compilers will emit first-field dispatch (`event` then `toolName` for
+hooks, method then path for HTTP). Three aggregate budgets are added, checked
+incrementally during load so a hostile document is refused before it is fully
+materialised: total leaf predicates per root matcher; total regex count and
+compiled regex memory (`RegexBuilder::size_limit` and `dfa_size_limit`,
+closing F-03); and bytes accepted by `from_config`.
+
+**Why.** A list's width is a per-request cost, so 256 is a DoS bound (D-045,
+D-049) and lifting it would be a security decision, not tuning. A 10,000-rule
+policy cannot load today, and if it could, both compilers emit one
+`FieldMatcher` holding an `Or` of every rule (`claude/compiler.rs`,
+`ext/http/src/compiler.rs`), so it would scan linearly and allocate once per
+rule per evaluate. The tree already exists, is O(1) for exact keys and O(k) for
+prefixes, holds 65,536 entries, and is reachable only from hand-written config.
+Trees compose across the per-list bound without any limit moving. The per-list
+bound is also not a budget: a hundred lists of two hundred rules are legal
+today, and regexes compile during the walk while the root `validate` runs
+afterwards, so the refusal comes after the cost has been paid.
+
+**What it entails.** Fixtures first, red: `budget_aggregate_leaves` (three
+lists of a hundred, each under 256, must fail to load) and
+`budget_regex_memory` (the counter at refusal is at most budget + 1, proving
+the check is incremental). The budgets change what `from_config` accepts, so
+they land before 0.1.0; compilers emitting trees is engine work and lands
+after. Each budget's value lives on the type that holds the resource (D-029).
+
+**Revisit if.** A workload has a legitimate flat list over 256 rules that
+cannot be keyed on any field. None is known; the hook workload keys on the
+event.
+
+### D-055 · Prefix trees fall through to shorter prefixes, as Envoy does since 1.35
+
+**Decided.** When the longest matching prefix's nested matcher produces no
+action, evaluation tries the next shorter matching prefix, and so on, before
+falling to the enclosing `on_no_match`. The trace follows evaluate (INV-3): it
+records each prefix tried, and no lookup evaluate did not perform.
+
+**Why.** Envoy changed this in 1.35.0, released 2025-07-23
+(`changelogs/1.35.0.yaml`): "prefix_match_map now continues to search for a
+match with a shorter prefix if a longer match does not find an action. This
+brings it in line with the behavior of matcher_list." Verified in
+`source/common/matcher/prefix_map_matcher.h` at checkout `9d47ea91`:
+`findMatchingPrefixes` returns every prefix, the loop walks longest first, and
+on a nested miss continues, behind
+`prefix_map_matcher_resume_after_subtree_miss`, which defaults on. rumi stops
+at the longest (`matcher_tree.rs:129`, `find_longest_prefix_entry`), and a
+nested miss goes straight to `on_no_match`. D-044 and D-046 (2026-08-18)
+matched the pre-1.35 source, which the maintainer had analysed in March 2025;
+neither considered retrying a shorter prefix. The proto is silent ("Longest
+matching prefix wins", nothing about siblings), so this is a choice, and
+Envoy's stated reason is the one to follow: a list continues past a rule whose
+nested matcher misses, and a prefix tree is a list of prefixes ordered by
+length.
+
+**What it entails.** `radix_tree.rs:120` has `find_all_prefixes`, unused by
+`evaluate` today. Fixture `prefix_tree_fallthrough` in `07_protojson/`, red at
+HEAD, ledger all three: the tree `{"/api" → nested matcher that misses, "/" →
+X}` on `/api/users` yields `X`. Exact maps are unaffected: one key, one
+lookup. D-046's rule stands, since every recorded lookup is one evaluate made.
+
+**Revisit if.** Envoy removes the guard in the other direction. Not expected:
+the flag is the migration path away from their legacy behaviour.
+
+### D-056 · The engine returns action indices; the crust holds the table; the user sees a result object
+
+**Decided.** Across the FFI the engine returns `[ActionIndex]`, a slice, today
+of length zero or one, with a scalar convenience beside it. In Rust the result
+is `Option<ActionIndex>`; a sentinel exists only at the encoding, never in a
+type. Indices are assigned at load by an `ActionFactory` for `u32` in the
+shared `rumi-proto` load path, so PyO3 and wasm number identically, by a
+deterministic pre-order walk with tree keys sorted, because `HashMap`
+iteration order is not stable. The crust receives the typed action table once,
+at load. The user never sees a bare integer: the result object is `{matched,
+action, index, fallback}`. `NamedAction.metadata` is carried, not dropped.
+
+**Why.** The boundary cost is not field access. After `d006b241` the hook path
+costs ~780ns and the KV path, which probes no field at all, ~738ns; what
+remains is call glue, the owned `String` return, and context construction. A
+`u32` return removes one allocation, one transcode and one host string per
+call, with certainty. Where the index is assigned was the guild's first
+conflict: Burner wanted it crust-side with nothing new in core; Ace objected
+to any bare integer reaching a user. Lotfi's resolution, adopted: the factory
+sits in `rumi-proto` because both crusts already load through it, which is
+the one place a single numbering can be guaranteed for both, and core learns
+nothing. The slice is so `keep_matching` (deferred, PLAN.md F2/SF2) lands
+additively: a pipeline that wants every applicable policy gets a longer slice,
+not a new API. `metadata` is dropped at nine sites in `convert.rs` today
+(`metadata: Default::default()`); it is how a policy names its processor
+(D-065), so the loader carries it through.
+
+**What it entails.** Fixture `result_slice`. Property: index→action is a
+bijection, identical across two loads of the same document. No-op boundary
+benchmarks `boundary_floor_{u32, option_string, flat_map}` in both crusts
+establish the ABI floor per shape. The Rust API keeps `Matcher<Ctx, A>` with
+`A` generic; `ActionIndex` is what the crusts choose for `A`.
+
+**Revisit if.** A native Rust trace must carry the same index as a wasm trace
+without going through `rumi-proto`; then the walk moves into core. Or the FFI
+result needs the action's typed config per call, in which case the table
+crosses per call and the index is redundant.
+
+### D-057 · Inputs are declared by the domain proto messages, resolved at load, and extracted natively from a flat context
+
+**Narrowed by D-069** (2026-09-24): what lands before publish, and what
+`required` does.
+
+**Decided.** The only way to declare an input is the domain's proto message:
+`xuma.http.v1.HeaderInput{name}`, `xuma.claude.v1.ToolArgInput`, and so on.
+Their factories compile to a slot lookup in a flat context, a `Map<String,
+MatchingData>` or a packed buffer, chosen by measurement, that the host
+marshals once per evaluate. `xuma.kv.v1.MapInput{key}` is promoted to
+`xuma.core.v1.MapInput{key, type}` and the kv copy is deleted. No `FieldInput`
+(a free field path plus a type as authoring surface) is added. Errors: an
+unknown type URL or a type mismatch fails at load, never at evaluate; absence
+at evaluate is governed by a per-declaration `required` flag; the trace shows
+`absent`, not `false`. Matchers remain Rust-only, with a paved path: fixture
+first, `just ext new` scaffolds a template crate, one registration seam that
+both crusts read, `just ext build`.
+
+**Why.** The crusts' context path is an Inner Platform by the boundary test:
+about 33 hand-written per-domain, per-runtime marshallers for 15
+capability-runtime pairs, growing as N×M; a tenth hook event changes three
+files. Of three ways to let an extension author add an input from Python or
+TypeScript, host callbacks fail on arithmetic (one boundary crossing per
+extraction per rule, ~780ns × rules per evaluate) and break `Send + Sync` and
+registry immutability; Rust-only makes the engine team the serialisation
+point; declared data-only inputs pass. Burner's correction, adopted: the
+declaration stays on the proto messages rather than a free field path, or the
+legal field set becomes host convention and the registry's load-time
+rejection of unknown URLs is lost. Karman: no `FieldInput`, since
+`MapInput{key}` already is one, filed under kv by accident of origin. Ace:
+absence at evaluate is a domain fact (an optional header), not an error, so it
+is declared per input and visible in the trace.
+
+**What it entails.** Fixtures `declared_input_unknown_url`,
+`declared_input_type_mismatch`, `required_input_absent`. Registration seam
+control: `just ext new demo && just ext build` passes a fixture in both crusts
+with an empty diff on the crust registry files. The `MapInput` type URL moves
+before publish (D-053). The flat port already exists in shape as `KvContext {
+values: HashMap<String, String> }`.
+
+**Revisit if.** An input that computes rather than extracts (an embedding, a
+parse) is needed from a host language. Rust-only is the escape hatch by
+design; if the paved path becomes the bottleneck, the callback option is
+re-examined with a batch shape, not per extraction.
+
+### D-058 · `xuma` on PyPI and npm is a thin host-language package over `xuma-crust`
+
+**Decided.** `xuma` returns as a package whose runtime is `xuma-crust`,
+exact-pinned. Every domain identifier in it (field names, event names, type
+URLs) is buf-generated; hand-written code is domain-blind glue. A CI check
+asserts that no domain field name appears in the package outside `gen/`.
+`xuma-crust` leaves the getting-started pages once `xuma` exists.
+
+**Why.** The guild's second conflict, resolved by Lotfi at 0.85 for this over
+renaming the crust or putting the DX in Rust. A crust is an ABI, and its
+surface is what wasm-bindgen and PyO3 produce; a host-language layer is where
+types, docstrings and idioms live. Hand-writing domain vocabulary in that
+layer would recreate the drift the retirement removed (D-051); the vocabulary
+check is what makes the layer thin by construction rather than by review.
+
+**What it entails.** `xuma` installs with no build step. It agrees with the
+`rumi` CLI on the README config (`check-readme-agreement.mjs` grows a
+column). `check-publishable.mjs` stops treating `xuma` as unpublishable when
+the package exists. Until then, the docs name `xuma-crust`.
+
+**Revisit if.** The glue becomes so small that the page-one example is
+identical without it: then rename the crust and delete the layer. Or the
+vocabulary check fails twice on one file: then the DX belongs in Rust after
+all.
+
+### D-059 · One HTTP context
+
+**Decided.** The Gateway compiler (`rumi-http`, `compile_route_matches`) is
+retargeted to the flat context of D-057. `register_simple` and the second
+registry it builds are retired. `HttpRequest` and `HttpMessage` become one
+context. Then `compile_route_matches` can be exposed from the bindings, and
+the playground can regain a Gateway-route mode.
+
+**Why.** F14 found `xuma.http.v1.PathInput` bound to two semantics split by
+runtime: the crusts took the registration under which `/admin?x=1` matched
+`{Exact: "/admin"}`, and the native path did not. That is the boundary test's
+degeneration condition, a type URL whose meaning depends on the caller,
+observed in this repo. Two registries over one type URL is the mechanism;
+removing the second removes the class of defect. Docs promised
+`compileRouteMatches` from the deleted engines; the promise left with
+`f3208660` and returns only when it is honest.
+
+**What it entails.** `git grep -cw register_simple rumi/` = 0. `05_http/`'s
+ledger lists `rust` and widens to the bindings when they expose the compiler.
+
+**Done, 2026-09-24.** `simple.rs` is deleted; `HttpMessage` is the one context,
+and the domain is no longer behind a feature (`message` is gone). The bindings
+and the CLI take the query string in the path, as it arrives on the wire: their
+separate `queryParams` / `query_params` / `--query` channel could disagree with
+the path, and the explicit value won, which is the same two-answers class in
+miniature. Exposing `compile_route_matches` from the bindings is additive and
+waits for a user who needs it; it would bring `k8s-openapi` into both.
+
+**Revisit if.** Streaming (Envoy's three-valued `MatchResult` with
+`InsufficientData`) needs a context that is not flat. That is the shape an
+ext_proc adapter would need, and it is not a conformance-surface change.
+
+### D-060 · The rename pass
+
+**Decided.** Karman's table, executed as one commit before any hot-path
+change:
+
+| Today | After |
+|---|---|
+| `config` module | `ir` |
+| `MatcherConfig<A>`, `MatcherKindConfig`, `MatcherTreeConfig`, `TreeTypeConfig`, `FieldMatcherConfig`, `PredicateConfig`, `SinglePredicateConfig`, `ValueMatchConfig`, `OnMatchConfig` | `MatcherIr<A>`, `MatcherKindIr`, `MatcherTreeIr`, `TreeTypeIr`, `FieldMatcherIr`, `PredicateIr`, `SinglePredicateIr`, `ValueMatchIr`, `OnMatchIr` |
+| `TypedConfig` | `TypedExtensionConfig` |
+| `IntoDataInput`, `IntoInputMatcher`, `IntoAction` | `DataInputFactory`, `InputMatcherFactory`, `ActionFactory` |
+| `MatchingData::None` | `MatchingData::Absent` |
+| `TestMatcher` (both crusts) | `KvMatcher` |
+| the frozen `u32` (D-056) | `ActionIndex` |
+| `SinglePredicate`, `OnMatch`, `MatcherKind`, `MatchingData` | unchanged: xDS vocabulary |
+
+**Why.** `MatcherConfig` is not the config. The config is the protojson
+document (D-026); `MatcherConfig` is what `convert.rs` produces from it and
+`load_matcher` consumes, an unbound intermediate whose leaves are
+`TypedConfig { type_url, Value }`, resolved later. An IR named "config"
+invites a reader to serialise it, and one did: the terse dialect (D-042) was
+that mistake. `TypedConfig` is the proto's `TypedExtensionConfig` with a
+shorter name; the payload is a config, the envelope is not. `Into*` implies a
+`self` being consumed; these traits have no `self` and construct from a
+`Config`. `None` on `MatchingData` collides with `Option::None` in every match
+arm and hides that absence is a domain state with its own trace rendering
+(D-057). `TestMatcher` names the conformance domain after its origin, not its
+use; the CLI's default domain is kv (PLAN.md SF8). Renames are free until
+publish and a breaking change after, which is why this is a step of its own
+and why it precedes the engine work whose diffs would otherwise carry it.
+
+**What it entails.** `UnitConfig` stays: it is a config, the payload of an
+input with no fields. Prelude re-exports, rustdoc and docs follow in the same
+commit. The gate is the count-zero grep for each old name (`git grep -w`, exit
+code checked, a planted hit as control).
+
+**Revisit if.** Not `config`→`ir`. The rest are cheap until publish and frozen
+after.
+
+### D-061 · Comments: no *what*; a *why* is one sentence that may cite a decision
+
+**Decided.** Source comments do not describe what code does; the code and the
+rustdoc do that. A comment that gives a reason states it in a sentence that
+stands on its own, and may add a decision id as the pointer to the fuller
+argument. Rustdoc on public items is contract and is kept. History narratives
+in source ("until 2026-08-31 this was...") move to this file. `DataInput::get`
+returns `Option<MatchingData>`, so that None→false (INV-1) is enforced by the
+type rather than restated in a comment at every site; when that lands, the
+`Absent` variant of D-060 goes with it, because two spellings of absence with
+no stated precedence is the defect D-044 removed one level up, and the trace's
+`absent` (D-057) is a field on the step, not a variant of the value.
+
+**Why.** The engine work of 0.1.x touches every hot-path file, and a comment
+describing the old mechanism would then describe the wrong one: drift by
+construction. "No comments" was proposed; Karman's correction, adopted, is that
+it holds for *what* and fails for *why*, since a reader who cannot find the
+reason for a limit or an ordering removes it. D-030 said source comments do not
+cite this file, because a bare "see D-029" is a pointer the reader cannot
+follow if the log is renumbered. That concern is met by requiring the sentence
+to carry its reason; the id is then a convenience, and the log has been
+append-only and never renumbered through fifty-one entries. D-030's rule that
+a comment carries its own reason stands; its rule that a comment never carries
+an id is relaxed to that extent, and no further.
+
+**What it entails.** The rename pass (D-060) applies the rule to every file it
+touches. The `Option<MatchingData>` port change is decided here and lands in
+step 4 of D-053, because it changes the trait extension authors implement and
+so precedes publish.
+
+**Revisit if.** The log is ever renumbered. Then every cited id is a broken
+pointer, and the sentence-first rule is what keeps the comments true.
+
+### D-062 · `DataInput::get` is pure, and inputs have an identity
+
+**Decided.** Purity of `DataInput::get` (same context, same result; no effect
+observable by another call) is a documented precondition of the trait, in its
+rustdoc, as contract. The trait gains `fn identity(&self) -> Option<Cow<'_,
+str>>`, default `None`; an input returning `Some` asserts that two inputs with
+equal identities read the same value from any context.
+
+**Why.** Both are prerequisites for merging predicates that read one input into
+a single multi-pattern probe (aho-corasick over literals, `RegexSet` over
+regexes), which is where sub-linear evaluation inside a tree bucket comes
+from. A merge that reorders or de-duplicates extraction is sound only if
+extraction is pure and "same input" is decidable; today the trait bound admits
+a `Mutex`, and the trait exposes only `data_type()`. Reordering is already
+relied on, silently: `evaluate_with_trace` visits every child where `evaluate`
+short-circuits (INV-7), and the two must agree (INV-3). Dijkstra's finding was
+that nothing states the precondition that makes that agreement sound.
+
+**What it entails.** Inputs returning `None` from `identity` stay on the
+linear path. Declared inputs (D-057) derive an identity from their
+declaration, so every generated input has one. The precondition is a trait doc
+change before publish; the merging is 0.1.x.
+
+**Revisit if.** A legitimately impure input is needed (a counter, a clock). It
+returns `None` from `identity` and is never merged; if it also needs to be
+called exactly once per evaluate, that is a new contract and a new decision.
+
+### D-063 · Trace steps are contract
+
+**Decided.** The steps of `evaluate_with_trace` are public surface: across the
+FFI as `{index, matched, predicate}` (D-046), in Rust as `EvalSteps`. An engine
+that does not walk the linear list must still produce the step list the linear
+list would have produced, up to the first match (INV-2, INV-3).
+
+**Why.** The steps cross the FFI, and `rumi --trace` and the playground render
+them; a consumer that counts them or reads a rule index has a contract whether
+or not one was declared. The alternative, "diagnostic, may change", would let
+a dispatcher that skips rules emit fewer steps, and a trace that disagrees
+with the config is a second source of truth (D-046). Deciding this before a
+dispatcher exists means the dispatcher is built to the contract instead of
+the contract being read off the dispatcher.
+
+**What it entails.** Fixture `trace_steps_linear`: step count equals the
+linear count; control: a dispatcher that skips must fail it. Tree fall-through
+(D-055) adds a step per prefix tried. The differential oracle asserts equal
+steps as well as equal results.
+
+**Revisit if.** Producing the steps costs more than evaluation on a workload
+that traces by default. None does; the cost is paid only by the caller that
+asks.
+
+### D-064 · Core completeness: ranges and lists first; CEL, IP and SNI deferred
+
+**Decided.** The comparators added next are numeric ranges (xDS `Int64Range`,
+`DoubleRange`) and list-of-string (`ListStringMatcher`). Deferred, with
+reasons: CEL (`xds.type.matcher.v3.CelMatcher`) is a language with its own
+runtime and dependency, not a comparator over erased data; IP/CIDR
+(`IPMatcher`) and server name (`ServerNameMatcher`) are network vocabulary
+that no current domain produces, and both are additive when one does.
+
+**Why.** Core is complete when it compares everything the xDS matcher
+vocabulary compares, over data an input produced; producing the data is the
+input's job (the matcher-engine fence, CLAUDE.md, 2026-02-08). Ranges and
+lists are comparisons with no dependency. CEL would add a dependency to a
+crate whose only one is `regex`, and its expressions read the context
+directly, which makes one thing an input and a matcher at once. Deferring is
+not rejecting: each returns with a domain that needs it and a fixture that
+shows it.
+
+**What it entails.** Fixtures in `07_protojson/` for each comparator, ledger
+all three. `MatchingData` is marked `#[non_exhaustive]` before publish, so the
+planned `Vector` variant for semantic matching (0.1.x, with the determinism
+rules for `f32` accumulation across native, wasm and PyO3) is additive.
+
+**Revisit if.** A domain arrives with an IP or SNI input, or a user has a rule
+that needs CEL and cannot be written as predicates over declared inputs. The
+second is the interesting case: it may argue for a declared input, not for
+CEL.
+
+### D-065 · Matcher, action, processor
+
+**Decided.** One mapping, so docs and code use one vocabulary:
+
+- The **matcher** selects. Its output is an action it does not interpret. The
+  generic `A` in `Matcher<Ctx, A>` stays opaque (the arch-guild fence,
+  2026-02-08).
+- The **action** is a policy: user-authored governance config plus a reference
+  to the processor that applies it. Both travel as `TypedExtensionConfig`,
+  resolved by type URL at load; `NamedAction.metadata` carries the processor
+  reference (D-056).
+- The **processor** executes. It is platform-administered (clients, pools,
+  runtime), has its own configuration that never passes through xuma, and
+  registers the policy types it accepts, so "which actions are legal here" is
+  a property of the registry a slot resolves against.
+- **Merging and overrides** are the control plane's; the data plane receives
+  resolved config.
+- A **policy engine** is built on the matcher, never inside it. `rumi run
+  claude` is the first: a hook-event processor whose policy is allow or deny
+  with a reason.
+
+**Why.** This is how Envoy's matcher and `Composite` filter relate: the
+matcher hands an opaque action to `onMatchCallback`, the consumer downcasts and
+acts, factories run at load. It is also the definition the maintainer's own
+archive held unchanged from 2025-01 to 2026-04 (two memex trawls,
+2026-09-07). Recording it stops the drift in which "policy" names the matcher
+in one document, the action in another and the processor in a third.
+`NamedAction.metadata` is otherwise a field with no consumer, and "carry it or
+delete it" was the fork; carrying it is what gives an action a processor.
+
+**What it entails.** Docs say "matcher engine" and describe a policy engine
+as a consumer. The slice return (D-056) is what a pipeline uses to want every
+applicable policy later. No `Policy` type in core.
+
+**Revisit if.** A second integration shows cross-domain policy pain that a
+pipeline of matchers cannot express. That was the arch-guild's own revisit
+condition, and it is unchanged.
+
+### D-066 · The benchmark gate: no published number is false
+
+**Decided.** The performance gate for publishing is not "beats pure
+TypeScript", which no longer exists, but: every quantitative claim in tracked
+markdown cites a benchmark artifact, and the artifact supports it. Protocol:
+ten cold launches of `just bench-collect` at one commit on a clean tree (a
+dirty flag rejects the artifact); per pair, the median per launch and the CV
+over the ten medians; gate `G = max(1.20, 1 + 3·CV)`; any ratio inside
+`[1/G, G]` is reported as indistinguishable; A/B interleaved, paired ratio
+with a 90% bootstrap CI; artifact `bench/artifacts/<date>-<sha>.json` carrying
+sha, dirty flag, hardware, cores, toolchain versions, build profile, and
+`--release` asserted for PyO3. If CV exceeds 0.15 on a commit, publish the CV
+and gate nothing. The maintainer's own Claude hooks configuration is a
+committed workload (`bench/workloads/claude-hooks.json`), run in all three
+runtimes.
+
+**Why.** This release cycle has been about claims outrunning evidence
+(`b68ca25f`: the measurement path could not have produced the claims it
+justified). The 68x and 3.46x in D-051 exist only in prose; `bench/RESULTS.md`
+is a stub; `bench/raw/` is empty. A gate on a comparison with a deleted
+implementation is unmeetable; a gate on citation is checkable. The noise floor
+comes first because a ratio without one is a number, not a measurement.
+
+**What it entails.** `scripts/check-perf-claims.mjs` in `ci`: a sentence
+matching a quantity or faster/slower/beats must carry `[bench:<artifact>]`;
+the artifact exists, its sha resolves, and the number is within G of it.
+Controls in `scripts/fixtures/perf-claims-{bad,good}/`; the bad set (uncited,
+missing artifact, off by more than G) must fail. D-051's numbers are restated
+with an artifact or deleted. Rollback: a post-release sentence failing the
+check is deleted, not amended. `bench/RESULTS.md` returns under this protocol.
+Roadmap phases 9 and 14 become ✅ when a slower pair fails CI against a
+committed artifact, which is what the legend's "regressed" means.
+
+**Revisit if.** CV stays above 0.15 on the CI hardware. Then the artifact is
+produced on dedicated hardware and CI checks citation, not magnitude.
+
+### D-067 · New vocabulary is defined here before it appears anywhere else
+
+**Decided.** "Policy gradient", "planes of policy", "agent cooperative", and
+any treatment of authorization as a matcher graph have no definition in the
+maintainer's archive and none here. They appear in no doc, code or rustdoc
+until an entry in this file defines them: what they name, and what they
+exclude.
+
+**Why.** Two memex trawls on 2026-09-07 found the processor and policy
+vocabulary (D-065) stable for fifteen months and these terms absent. A word
+coined mid-session reads as design once it lands on a page; six months of
+documents inherited the three-engine reality that way (D-051). A term with no
+definition cannot be checked for drift.
+
+**What it entails.** The batch shape `MatcherSet.evaluate(ctx) ->
+Vec<ActionIndex>`, which the proposal motivated as "planes of policy", is
+described by what it does: one context against many matchers.
+
+**Revisit if.** Defining one. That is the point.
+
+---
+
+## 2026-09-06 · One core
+
+### D-051 · The duplicate engines are retired; `xuma` becomes the binding
+
+**Decided.** `rumi` is the engine. Python and TypeScript get a binding plus a DX
+layer over it, not a reimplementation. The pure-Python engine in `puma/` and the
+pure-TypeScript engine in `bumi/` are debt and will be retired.
+
+**Why.** One core with ports and adapters is what `CLAUDE.md`'s architecture
+diagram has always described. The three-engine reality was never decided: on
+`55df2d21` a roadmap table cell changed from "PyO3/maturin bindings" to "Pure
+Python implementation" and the bindings moved to a new `p.uma[crusty]` slot,
+which `c9afb7e0` then built. `a01790f0` renamed `puma`→`xuma` and
+`puma-crusty`→`xuma-crust`, and the shipped names stopped showing any of it.
+Six months of documents inherited the result as though it were the design.
+
+The cost is measured, not theoretical. Three engines do not cross-check a
+misreading of the spec — they triplicate it. D-050's fail-open was live in all
+three compilers simultaneously, and the `#32` width limits reached Rust only.
+Every spec change lands three times, and this repo has spent four PRs finding
+places where it landed twice.
+
+**Why now.** Nothing is published. Checked 2026-09-06: all nine names —
+`rumi-core`, `rumi-proto`, `rumi-kv`, `rumi-http`, `rumi-cli` on crates.io;
+`xuma` and `xuma-crust` on PyPI and npm — return 404. Retiring a package nobody
+has installed costs nothing. After a release it costs a deprecation cycle, and
+`xuma` on both registries is currently the *pure* implementation, so the rename
+would be a breaking change to a published API rather than a bookkeeping one.
+
+**What it entails, stated plainly rather than discovered later.**
+
+The TypeScript binding is presently much slower than the engine it replaces:
+after the `d006b241` boundary fix, pure TS still wins `exact_hit` 68x, and only
+`regex_hit` goes to the binding (3.46x). So this decision makes the boundary
+work **blocking**, not opportunistic — `xuma` on npm cannot ship at 68x slower
+than the code it replaced. The known remaining items are typed `extern`
+accessors with `final` in place of `Reflect::get`, `OnceCell` for the two
+registries `fromConfig` rebuilds per call, and the returned-`String` transcode.
+The floor is nowhere near reached: raw JS→wasm calls were measured at ~4.5ns in
+2018 and we are at 780ns.
+
+Python is not in the same position — the PyO3 binding already wins everywhere
+except `compile_complex`, and by ~10x on regex.
+
+The conformance suite changes in kind, not in value. "Five implementations
+agree" becomes "the engine and its bindings agree", which is still a real check:
+`F14` found `xuma.http.v1.PathInput` bound to two different semantics in Rust,
+where both crusts took the path that made `/admin?x=1` match `{Exact: "/admin"}`
+and the native path did not. Bindings diverge. The `implementations:` ledger
+stays; its membership shrinks.
+
+**What would justify revisiting.** A runtime where the binding cannot go —
+an edge runtime that forbids WASM, or a Python environment that forbids native
+extensions — carrying enough usage to be worth a second engine. That is a
+distribution constraint, and it is the only argument that survives; "it is
+faster today" is an argument for fixing the boundary, which is now the plan.
+
+**Decided since, 2026-09-08.** The three questions this entry left open have
+their answers in the batch above: `bumi/` and `puma/` are deleted, not frozen
+(D-052); the order is retire, decide, rename, shape the boundary, publish,
+then the engine (D-053); and `xuma` on npm ships as a thin host-language
+package over the crust once the boundary work lands, never as the pure engine
+in the interval (D-058).
+
+---
+
 ## 2026-08-31 · The catch-all becomes a ceremony
 
 ### D-050 · A matcher that matches everything must be asked for by name

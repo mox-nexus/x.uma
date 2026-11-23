@@ -1,4 +1,5 @@
 name: "http_config_path_all_inputs"
+implementations: [rust, python, typescript]
 description: >
   Every HTTP input, reached through the config path rather than the Gateway API
   compiler.
@@ -8,9 +9,9 @@ description: >
   shape. This is the same domain through `parseProtojson` -> registry, which is
   what a user writes.
 
-  It also pins the six `xuma.http.v1.*` type URLs to their meanings in all three
-  implementations. `PathInput` in particular: it strips the query string, which
-  puma and bumi always did and Rust's simple context did not until F26.
+  It also pins the six `xuma.http.v1.*` type URLs to their meanings in the
+  engine and both bindings. `PathInput` in particular strips the query string,
+  which Rust's simple context did not until F26.
 
 domain: http
 
@@ -114,6 +115,7 @@ cases:
 
 ---
 name: "http_authority_and_scheme"
+implementations: [rust, python, typescript]
 description: >
   The two pseudo-header inputs, which the main HTTP fixture does not reach.
 
@@ -184,3 +186,115 @@ cases:
       method: GET
       path: /
     expect: "rejected"
+
+---
+name: "http_required_inputs"
+implementations: [rust, python, typescript]
+description: >
+  Every HTTP input declares `required` (D-069). A request that carries every
+  value is decided as usual; one missing a required value is undecided, and
+  `onNoMatch` does not answer for it. The `and` is ordered, as Envoy's is: a
+  value present and not matching decides the rule before a later absence is
+  reached.
+
+domain: http
+
+proto_matcher:
+  matcherList:
+    matchers:
+      - predicate:
+          andMatcher:
+            predicate:
+              - singlePredicate:
+                  input:
+                    name: method
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.http.v1.MethodInput
+                      required: true
+                  valueMatch:
+                    exact: GET
+              - singlePredicate:
+                  input:
+                    name: path
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.http.v1.PathInput
+                      required: true
+                  valueMatch:
+                    prefix: /api
+              - singlePredicate:
+                  input:
+                    name: tenant
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.http.v1.HeaderInput
+                      name: x-tenant
+                      required: true
+                  valueMatch:
+                    exact: acme
+              - singlePredicate:
+                  input:
+                    name: page
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.http.v1.QueryParamInput
+                      name: page
+                      required: true
+                  valueMatch:
+                    exact: "1"
+              - singlePredicate:
+                  input:
+                    name: authority
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.http.v1.AuthorityInput
+                      required: true
+                  valueMatch:
+                    exact: example.com
+              - singlePredicate:
+                  input:
+                    name: scheme
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.http.v1.SchemeInput
+                      required: true
+                  valueMatch:
+                    exact: https
+        onMatch:
+          action:
+            name: allow
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: allow
+
+  onNoMatch:
+    action:
+      name: deny
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: deny
+
+cases:
+  - name: "every_value_present_and_matching"
+    http_request:
+      method: GET
+      path: /api/users?page=1
+      headers: { x-tenant: acme, ":authority": example.com, ":scheme": https }
+    expect: "allow"
+
+  - name: "a_missing_required_header_is_undecided"
+    http_request:
+      method: GET
+      path: /api/users?page=1
+      headers: { ":authority": example.com, ":scheme": https }
+    expect: null
+    expect_undecided: true
+
+  - name: "a_missing_required_pseudo_header_is_undecided"
+    http_request:
+      method: GET
+      path: /api/users?page=1
+      headers: { x-tenant: acme }
+    expect: null
+    expect_undecided: true
+
+  - name: "a_mismatch_before_the_absence_decides"
+    http_request:
+      method: POST
+      path: /api/users
+    expect: "deny"

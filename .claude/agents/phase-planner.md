@@ -24,7 +24,7 @@ You plan and scaffold the next development phase for x.uma based on the roadmap 
 | 3 | StringMatcher | Pending |
 | 4 | MatcherTree | Pending |
 | 5 | HTTP Domain | Pending |
-| 6 | puma (Python) | Pending |
+| 6 | Bindings: PyO3 and wasm | Pending |
 
 ## Planning Process
 

@@ -452,3 +452,25 @@ class TestSessionSemantics:
         assert matcher.evaluate(event="PreToolUse", git_branch="main") == "matched"
         # Absent (not in a git repo)
         assert matcher.evaluate(event="PreToolUse") is None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# The decision object on the compile door (D-056)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestCompiledDecision:
+    def test_action_is_index_zero_and_fallback_index_one(self):
+        matcher = HookMatcher.compile([HookMatch(event="PreToolUse")], "blocked", "allowed")
+        assert matcher.actions() == ["blocked", "allowed"]
+        hit = matcher.decide(event="PreToolUse")
+        assert (hit.matched, hit.action, hit.index, hit.fallback) == (True, "blocked", 0, False)
+        miss = matcher.decide(event="Stop")
+        assert (miss.matched, miss.action, miss.index, miss.fallback) == (True, "allowed", 1, True)
+
+    def test_without_a_fallback_a_miss_is_no_decision(self):
+        matcher = HookMatcher.compile([HookMatch(event="PreToolUse")], "blocked")
+        assert matcher.actions() == ["blocked"]
+        miss = matcher.decide(event="Stop")
+        assert (miss.matched, miss.action, miss.index, miss.fallback) == (False, None, None, False)
+        assert matcher.action_metadata(0) == {}

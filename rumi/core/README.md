@@ -2,7 +2,7 @@
 
 Rust implementation of the xDS Unified Matcher API.
 
-Part of the [x.uma](https://github.com/mox-nexus/x.uma) matcher engine — also available as [xuma](https://pypi.org/project/xuma/) (Python) and [xuma](https://www.npmjs.com/package/xuma) (TypeScript).
+The engine of [x.uma](https://github.com/mox-nexus/x.uma). Python and TypeScript reach it through `xuma-crust`, a PyO3 wheel and a WebAssembly package over this crate.
 
 ## Installation
 
@@ -25,8 +25,8 @@ use rumi::prelude::*;
 struct MethodInput;
 
 impl DataInput<&'static str> for MethodInput {
-    fn get(&self, ctx: &&'static str) -> MatchingData {
-        MatchingData::String((*ctx).to_string())
+    fn get(&self, ctx: &&'static str) -> Option<MatchingData> {
+        Some(MatchingData::String((*ctx).to_string()))
     }
 }
 
@@ -86,9 +86,10 @@ Type erasure at the data level (`MatchingData`) means the same `ExactMatcher` wo
 
 | Crate | Description |
 |-------|-------------|
+| `rumi-kv` | Key-value domain: the CLI's default, and the one the conformance suite runs in |
 | `rumi-http` | HTTP route matching (Gateway API compiler) |
-| `rumi-test` | Conformance test utilities |
 | `rumi-proto` | Protobuf types + xDS Matcher loading |
+| `rumi-test` | Conformance fixture loader; not published |
 
 ## Security
 

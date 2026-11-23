@@ -43,9 +43,7 @@ pub enum Domain {
     Http,
 }
 
-// Both moved to `crate::implementations` so `05_http` can share the ledger.
-// Re-exported here because every existing path expects them here.
-pub use crate::implementations::{all_implementations, Implementation, ALL};
+pub use crate::implementations::{Implementation, ALL};
 
 /// A fixture whose matcher is written in canonical protojson.
 #[derive(Debug, Deserialize)]
@@ -59,12 +57,11 @@ pub struct ProtoFixture {
     /// The matcher, as canonical protojson for `xds.type.matcher.v3.Matcher`.
     pub proto_matcher: serde_json::Value,
 
-    /// Which implementations are expected to run this fixture.
+    /// Which implementations are expected to run this fixture. Required.
     ///
-    /// Absent means all three, which is the end state. A shorter list is an
-    /// **expiring exception**: it says the others have not been migrated yet,
-    /// and CI holds it to that in both directions.
-    #[serde(default = "all_implementations")]
+    /// A shorter list than [`ALL`] is an **expiring exception**: it says the
+    /// others have not been migrated yet, and CI holds it to that in both
+    /// directions.
     pub implementations: Vec<Implementation>,
 
     /// Cases to evaluate. Empty when `expect_error` is set.
@@ -73,7 +70,7 @@ pub struct ProtoFixture {
 
     /// Which domain's context this fixture evaluates against.
     ///
-    /// `kv` (the default) reads a string map; `http` builds an `HttpRequest`.
+    /// `kv` (the default) reads a string map; `http` builds an `HttpMessage`.
     /// The matcher config itself is domain-agnostic — only the context and the
     /// registry differ.
     #[serde(default)]
@@ -108,6 +105,32 @@ pub struct ProtoTestCase {
     pub http_request: Option<HttpRequestSpec>,
     /// The expected action, or `None` for no match.
     pub expect: Option<String>,
+    /// Whether the evaluation is expected to be undecided: a required value
+    /// absent, so no action and no fallback (D-069). Every other case asserts
+    /// the evaluation was decided.
+    #[serde(default)]
+    pub expect_undecided: bool,
+}
+
+impl ProtoTestCase {
+    /// What this case expects, in the shape [`observed`] reports.
+    #[must_use]
+    pub fn expected(&self) -> (Option<String>, bool) {
+        (self.expect.clone(), self.expect_undecided)
+    }
+}
+
+/// An outcome as `(action, undecided)`, the pair a case states.
+#[must_use]
+pub fn observed<A>(
+    outcome: rumi::Outcome<A>,
+    name: impl Fn(A) -> String,
+) -> (Option<String>, bool) {
+    match outcome {
+        rumi::Outcome::Action(a) => (Some(name(a)), false),
+        rumi::Outcome::NoMatch => (None, false),
+        rumi::Outcome::Undecided => (None, true),
+    }
 }
 
 /// One HTTP request a fixture evaluates against.
@@ -127,6 +150,26 @@ pub struct HttpRequestSpec {
     /// Request headers.
     #[serde(default)]
     pub headers: HashMap<String, String>,
+}
+
+#[cfg(feature = "registry")]
+impl HttpRequestSpec {
+    /// The request as the one HTTP context reads it (D-059). A method or path
+    /// left empty is absent, not the empty string.
+    #[must_use]
+    pub fn message(&self) -> rumi_http::HttpMessage {
+        let mut builder = rumi_http::HttpMessageBuilder::new();
+        if !self.method.is_empty() {
+            builder = builder.method(&self.method);
+        }
+        if !self.path.is_empty() {
+            builder = builder.path(&self.path);
+        }
+        self.headers
+            .iter()
+            .fold(builder, |b, (k, v)| b.header(k, v))
+            .build()
+    }
 }
 
 impl ProtoFixture {
@@ -154,5 +197,20 @@ impl ProtoFixture {
     #[must_use]
     pub fn expects(&self, who: Implementation) -> bool {
         self.implementations.contains(&who)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ProtoFixture;
+
+    #[test]
+    fn a_fixture_without_a_ledger_is_rejected() {
+        let keyless = "name: keyless\nproto_matcher: {}\ncases: []\n";
+        let err = ProtoFixture::from_yaml(keyless).expect_err("the ledger key is required");
+        assert!(
+            err.to_string().contains("implementations"),
+            "the error should name the missing key, got: {err}"
+        );
     }
 }

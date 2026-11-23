@@ -151,7 +151,7 @@ Non-negotiable. Every change must preserve these:
 
 | # | Invariant | What Breaks If Violated |
 |---|-----------|------------------------|
-| INV-1 | `DataInput::get() → None` → predicate evaluates to `false` | Fail-open security — missing data could match |
+| INV-1 | `DataInput::get()` returns `None` → predicate evaluates to `false`; `required` → `Undecided`, which `not` passes through and which stops a list or tree without its fallback (D-069) | Fail-open security — missing data could match |
 | INV-2 | First-match-wins in `Matcher::evaluate()` | Semantic change — different action returned |
 | INV-3 | `EvalTrace.result` always equals `evaluate()` result | Debug output lies — trace shows wrong result |
 | INV-4 | `OnMatch` is exclusive — Action XOR Matcher, never both | Ambiguous semantics — which takes precedence? |
@@ -166,7 +166,7 @@ INV-7 is scoped to the predicate tree deliberately. `Matcher::evaluate_with_trac
 | Constraint | Enforcement |
 |------------|-------------|
 | ReDoS Protection | `regex` crate only (linear time). Never `fancy-regex`. |
-| Resource limits (5) | `MAX_DEPTH=32`, `MAX_FIELD_MATCHERS=256`, `MAX_PREDICATES_PER_COMPOUND=256`, `MAX_PATTERN_LENGTH=8192`, `MAX_REGEX_PATTERN_LENGTH=4096` (`lib.rs:183-205`). Only `MAX_DEPTH` is checked in `validate()`; the other four are enforced solely inside `Registry::load_*`, so a hand-built or compiler-built matcher bypasses them. The crusts **re-declare** the two pattern limits locally (`crusts/python/src/convert.rs:12`, `crusts/wasm/src/convert.rs:10`) instead of importing them — three copies with no compile-time link. |
+| Resource limits | Per evaluation (D-068): `MAX_PREDICATES_PER_EVALUATION=256` along the worst path, so a list's rules add up and a tree's entries do not. Per node: `MAX_DEPTH=32`, `MAX_TREE_ENTRIES=65_536`, `MAX_PATTERN_LENGTH=8192`, `MAX_REGEX_PATTERN_LENGTH=4096`. Per document (D-054): `MAX_DOCUMENT_PREDICATES=65_536`, `MAX_REGEXES=64` with `REGEX_SIZE_LIMIT` and `REGEX_DFA_SIZE_LIMIT` of 1 MiB each, `MAX_DOCUMENT_BYTES=1 MiB` in `rumi_proto::protojson`. Depth, tree widths and the path cost are checked by `validate()`; the regex count and the byte budget only on the reader path, so a hand-built matcher is bounded by its author. The crusts still **re-declare** the two pattern limits locally (`crusts/python/src/convert.rs`, `crusts/wasm/src/convert.rs`). |
 | Max 32 Depth | `MatcherError::DepthExceeded` at `validate()` time |
 | Registry Immutable | `&self` methods only after `build()` |
 | Send + Sync + Debug | All public types — FFI requirement (PyO3, WASM) |
@@ -201,7 +201,7 @@ Config (JSON/Python dict/JS object) → Compile in Rust → Evaluate in Rust →
 | `thiserror` or manual? | Manual `Display` + `Error` | ripgrep, rust-analyzer, hyper all hand-write errors |
 | Add a type parameter? | Only if it serves >5% of uses | axum removed `B` (body type) because it infected everything |
 | Optimize evaluation? | Measure first. 33ns is the baseline. | ripgrep: buffer size matters more than algorithm |
-| Change `MatcherConfig` shape? | **Never.** Format is frozen. | rust-analyzer: "by the time you have first users, it is already de-facto stable" |
+| Change the protojson schema? | **Never after publish.** `MatcherIr` is internal and may change; what `from_config` accepts may not (D-053). | rust-analyzer: "by the time you have first users, it is already de-facto stable" |
 | Feature flag behavior? | Strictly additive. | tokio, rustls: features add capabilities, never change semantics |
 | `&self` or `&mut self`? | `&self` for core traits. | hyper: `&self` enables the full wrapper algebra. `&mut self` breaks FFI. |
 | Clone action in hot path? | `action.clone()` is fine at 33ns. | Measure before switching to `Arc<str>`. |

@@ -7,13 +7,15 @@
 //!
 //! - [`HookMatcher`] — Claude Code hook matching (plain JS objects)
 //! - [`HttpMatcher`] — HTTP request matching (JSON config via registry)
-//! - [`TestMatcher`] — Key-value matching for conformance testing (JSON config via registry)
+//! - [`KvMatcher`] — key-value matching over `xuma.core.v1.MapInput`; the conformance domain
 
 mod config;
 mod convert;
 #[cfg(feature = "fixtures")]
 mod fixtures;
+#[cfg(feature = "bench")]
+mod floor;
 mod http_matcher;
+mod kv_matcher;
 pub(crate) mod matcher;
 mod protojson;
-mod test_matcher;

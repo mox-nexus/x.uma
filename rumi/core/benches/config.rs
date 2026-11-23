@@ -6,7 +6,7 @@
 //! These configs are canonical protojson, and the benchmark walks the whole
 //! shipping path: `parse_matcher` (which expands `@type` bodies) then
 //! `load_proto_matcher`. Until 2026-08-18 it instead measured a terser JSON
-//! dialect deserialized straight into `MatcherConfig`, which was always
+//! dialect deserialized straight into `MatcherIr`, which was always
 //! cheaper than what any caller actually ran and, once that dialect was
 //! retired, measured nothing that existed.
 
@@ -32,7 +32,7 @@ const SIMPLE_CONFIG: &str = r#"{
           "input": {
             "name": "role",
             "typedConfig": {
-              "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+              "@type": "type.googleapis.com/xuma.core.v1.MapInput",
               "key": "role"
             }
           },
@@ -72,7 +72,7 @@ const COMPOUND_CONFIG: &str = r#"{
                 "input": {
                   "name": "role",
                   "typedConfig": {
-                    "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                    "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                     "key": "role"
                   }
                 },
@@ -84,7 +84,7 @@ const COMPOUND_CONFIG: &str = r#"{
                 "input": {
                   "name": "org",
                   "typedConfig": {
-                    "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                    "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                     "key": "org"
                   }
                 },
@@ -115,7 +115,7 @@ const NESTED_CONFIG: &str = r#"{
           "input": {
             "name": "tier",
             "typedConfig": {
-              "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+              "@type": "type.googleapis.com/xuma.core.v1.MapInput",
               "key": "tier"
             }
           },
@@ -131,7 +131,7 @@ const NESTED_CONFIG: &str = r#"{
                   "input": {
                     "name": "region",
                     "typedConfig": {
-                      "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                      "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                       "key": "region"
                     }
                   },
@@ -192,7 +192,7 @@ fn build_registry() -> rumi::Registry<KvContext> {
 
 fn resolver() -> AnyResolver {
     AnyResolverBuilder::new()
-        .register::<rumi_proto::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+        .register::<rumi_proto::xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
         .register::<rumi_proto::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
         .build()
 }
@@ -200,7 +200,7 @@ fn resolver() -> AnyResolver {
 /// `NamedAction` -> `String`, mirroring what the conformance runner registers.
 struct NamedActionFactory;
 
-impl rumi::IntoAction<String> for NamedActionFactory {
+impl rumi::ActionFactory<String> for NamedActionFactory {
     type Config = rumi_proto::xuma::core::v1::NamedAction;
 
     fn from_config(config: Self::Config) -> Result<String, rumi::MatcherError> {
@@ -272,7 +272,7 @@ fn compiler_evaluate_simple(bencher: divan::Bencher) {
     let matcher = Matcher::list(
         vec![FieldMatcher::new(
             Predicate::Single(SinglePredicate::new(
-                Box::new(rumi_kv::StringInput::new("role").unwrap()),
+                Box::new(rumi_kv::MapInput::new("role").unwrap()),
                 Box::new(ExactMatcher::new("admin")),
             )),
             OnMatch::Action("matched".to_string()),
@@ -305,7 +305,7 @@ fn compiler_construct_simple(bencher: divan::Bencher) {
         Matcher::<KvContext, String>::list(
             vec![FieldMatcher::new(
                 Predicate::Single(SinglePredicate::new(
-                    Box::new(rumi_kv::StringInput::new("role").unwrap()),
+                    Box::new(rumi_kv::MapInput::new("role").unwrap()),
                     Box::new(ExactMatcher::new("admin")),
                 )),
                 OnMatch::Action("matched".to_string()),

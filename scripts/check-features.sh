@@ -20,11 +20,9 @@ cd "$(dirname "$0")/.."
 # select, so the violation is inexpressible rather than merely fixed.
 COMBOS=(
     ""
-    "message"
     "gateway"
     "ext-proc"
     "registry"
-    "registry,message"
     "registry,gateway"
     "registry,ext-proc"
     "gateway,ext-proc"

@@ -1,68 +1,30 @@
-"""Head-to-head: puma (pure Python) vs xuma-crust (PyO3 Rust bindings).
+"""Boundary cost of the PyO3 binding on the Claude hook path.
 
-Compares identical workloads through both implementations to isolate:
-1. FFI overhead — crusty's boundary crossing cost
-2. Regex engine — Python `re` (backtracking) vs Rust `regex` (linear time)
-3. Compile cost — Python dataclass construction vs Rust struct compilation
+Every call here crosses from Python into Rust and back. What the numbers
+isolate:
+1. Compile cost — HookMatch objects in, a compiled matcher out
+2. Evaluate cost — keyword arguments marshalled into a HookContext, one
+   matcher walk, an owned action string back
+3. Regex — Rust `regex`, linear time, behind the same boundary
+4. Trace — the opt-in debugging path, against plain evaluate
 
 Run:
   cd rumi/crusts/python
-  maturin develop
+  maturin develop --release   # a debug build inverts every verdict drawn from this
   uv run pytest tests/test_bench_crusty.py --benchmark-only
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import pytest
 
 from xuma_crust import HookMatch, HookMatcher, StringMatch
 
-# Also import xuma (pure Python) for comparison
-from xuma import (
-    Action,
-    ContainsMatcher,
-    DataInput,
-    ExactMatcher,
-    FieldMatcher,
-    Matcher,
-    PrefixMatcher,
-    RegexMatcher,
-    SinglePredicate,
-)
-
-
-# ── Pure Python fixtures (mirror the hook matcher domain) ─────────────────────
-
-
-@dataclass(frozen=True, slots=True)
-class HookCtx:
-    event: str
-    tool_name: str | None = None
-    command: str | None = None
-
-
-class EventTypeInput(DataInput["HookCtx"]):
-    def get(self, ctx: HookCtx) -> str | None:
-        return ctx.event
-
-
-class ToolNameInput(DataInput["HookCtx"]):
-    def get(self, ctx: HookCtx) -> str | None:
-        return ctx.tool_name
-
-
-class CommandInput(DataInput["HookCtx"]):
-    def get(self, ctx: HookCtx) -> str | None:
-        return ctx.command
-
-
-# ── Compile benchmarks ────────────────────────────────────────────────────────
+# ── Compile ───────────────────────────────────────────────────────────────────
 
 
 def test_bench_crusty_compile_simple(benchmark):
-    """Crusty: compile a single event match rule."""
+    """Compile a single event match rule."""
 
     def go():
         return HookMatcher.compile([HookMatch(event="PreToolUse")], action="matched")
@@ -70,25 +32,8 @@ def test_bench_crusty_compile_simple(benchmark):
     benchmark(go)
 
 
-def test_bench_puma_compile_simple(benchmark):
-    """Puma: construct equivalent matcher tree."""
-
-    def go():
-        return Matcher(
-            matcher_list=(
-                FieldMatcher(
-                    predicate=SinglePredicate(input=EventTypeInput(), matcher=ExactMatcher("PreToolUse")),
-                    on_match=Action("matched"),
-                ),
-            ),
-            on_no_match=None,
-        )
-
-    benchmark(go)
-
-
 def test_bench_crusty_compile_complex(benchmark):
-    """Crusty: compile a multi-field rule with regex."""
+    """Compile a multi-field rule with a regex."""
 
     def go():
         return HookMatcher.compile(
@@ -106,38 +51,7 @@ def test_bench_crusty_compile_complex(benchmark):
     benchmark(go)
 
 
-def test_bench_puma_compile_complex(benchmark):
-    """Puma: construct equivalent complex matcher tree."""
-
-    def go():
-        from xuma import And
-
-        return Matcher(
-            matcher_list=(
-                FieldMatcher(
-                    predicate=And(
-                        predicates=(
-                            SinglePredicate(input=EventTypeInput(), matcher=ExactMatcher("PreToolUse")),
-                            SinglePredicate(
-                                input=ToolNameInput(),
-                                matcher=RegexMatcher(r"^(Write|Edit|Bash)$"),
-                            ),
-                            SinglePredicate(
-                                input=CommandInput(),
-                                matcher=ContainsMatcher("rm"),
-                            ),
-                        )
-                    ),
-                    on_match=Action("blocked"),
-                ),
-            ),
-            on_no_match=Action("allowed"),
-        )
-
-    benchmark(go)
-
-
-# ── Evaluate benchmarks (exact match) ────────────────────────────────────────
+# ── Evaluate: exact match ─────────────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -145,42 +59,15 @@ def crusty_exact():
     return HookMatcher.compile([HookMatch(event="PreToolUse")], action="matched")
 
 
-@pytest.fixture
-def puma_exact():
-    return Matcher(
-        matcher_list=(
-            FieldMatcher(
-                predicate=SinglePredicate(input=EventTypeInput(), matcher=ExactMatcher("PreToolUse")),
-                on_match=Action("matched"),
-            ),
-        ),
-        on_no_match=None,
-    )
-
-
 def test_bench_crusty_evaluate_exact_hit(benchmark, crusty_exact):
-    """Crusty: evaluate exact match (hit)."""
     benchmark(crusty_exact.evaluate, event="PreToolUse")
 
 
-def test_bench_puma_evaluate_exact_hit(benchmark, puma_exact):
-    """Puma: evaluate exact match (hit)."""
-    ctx = HookCtx(event="PreToolUse")
-    benchmark(puma_exact.evaluate, ctx)
-
-
 def test_bench_crusty_evaluate_exact_miss(benchmark, crusty_exact):
-    """Crusty: evaluate exact match (miss)."""
     benchmark(crusty_exact.evaluate, event="PostToolUse")
 
 
-def test_bench_puma_evaluate_exact_miss(benchmark, puma_exact):
-    """Puma: evaluate exact match (miss)."""
-    ctx = HookCtx(event="PostToolUse")
-    benchmark(puma_exact.evaluate, ctx)
-
-
-# ── Evaluate benchmarks (regex — the key differentiator) ──────────────────────
+# ── Evaluate: regex ───────────────────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -191,45 +78,15 @@ def crusty_regex():
     )
 
 
-@pytest.fixture
-def puma_regex():
-    return Matcher(
-        matcher_list=(
-            FieldMatcher(
-                predicate=SinglePredicate(
-                    input=ToolNameInput(),
-                    matcher=RegexMatcher(r"^mcp__\w+__\w+$"),
-                ),
-                on_match=Action("matched"),
-            ),
-        ),
-        on_no_match=None,
-    )
-
-
 def test_bench_crusty_evaluate_regex_hit(benchmark, crusty_regex):
-    """Crusty: evaluate regex match (hit) — Rust linear-time regex."""
     benchmark(crusty_regex.evaluate, event="PreToolUse", tool_name="mcp__db__query")
 
 
-def test_bench_puma_evaluate_regex_hit(benchmark, puma_regex):
-    """Puma: evaluate regex match (hit) — Python backtracking re."""
-    ctx = HookCtx(event="PreToolUse", tool_name="mcp__db__query")
-    benchmark(puma_regex.evaluate, ctx)
-
-
 def test_bench_crusty_evaluate_regex_miss(benchmark, crusty_regex):
-    """Crusty: evaluate regex match (miss)."""
     benchmark(crusty_regex.evaluate, event="PreToolUse", tool_name="Write")
 
 
-def test_bench_puma_evaluate_regex_miss(benchmark, puma_regex):
-    """Puma: evaluate regex match (miss)."""
-    ctx = HookCtx(event="PreToolUse", tool_name="Write")
-    benchmark(puma_regex.evaluate, ctx)
-
-
-# ── Evaluate benchmarks (complex multi-field) ────────────────────────────────
+# ── Evaluate: complex multi-field ─────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -247,29 +104,7 @@ def crusty_complex():
     )
 
 
-@pytest.fixture
-def puma_complex():
-    from xuma import And
-
-    return Matcher(
-        matcher_list=(
-            FieldMatcher(
-                predicate=And(
-                    predicates=(
-                        SinglePredicate(input=EventTypeInput(), matcher=ExactMatcher("PreToolUse")),
-                        SinglePredicate(input=ToolNameInput(), matcher=PrefixMatcher("mcp__")),
-                        SinglePredicate(input=CommandInput(), matcher=ContainsMatcher("drop")),
-                    )
-                ),
-                on_match=Action("blocked"),
-            ),
-        ),
-        on_no_match=Action("allowed"),
-    )
-
-
 def test_bench_crusty_evaluate_complex_hit(benchmark, crusty_complex):
-    """Crusty: evaluate complex multi-field match (hit)."""
     benchmark(
         crusty_complex.evaluate,
         event="PreToolUse",
@@ -278,14 +113,8 @@ def test_bench_crusty_evaluate_complex_hit(benchmark, crusty_complex):
     )
 
 
-def test_bench_puma_evaluate_complex_hit(benchmark, puma_complex):
-    """Puma: evaluate complex multi-field match (hit)."""
-    ctx = HookCtx(event="PreToolUse", tool_name="mcp__db__exec", command="DROP TABLE users")
-    benchmark(puma_complex.evaluate, ctx)
-
-
 def test_bench_crusty_evaluate_complex_miss(benchmark, crusty_complex):
-    """Crusty: evaluate complex multi-field match (miss — event fails)."""
+    """The event fails, so the AND short-circuits on its first predicate."""
     benchmark(
         crusty_complex.evaluate,
         event="PostToolUse",
@@ -294,17 +123,11 @@ def test_bench_crusty_evaluate_complex_miss(benchmark, crusty_complex):
     )
 
 
-def test_bench_puma_evaluate_complex_miss(benchmark, puma_complex):
-    """Puma: evaluate complex multi-field match (miss — event fails)."""
-    ctx = HookCtx(event="PostToolUse", tool_name="mcp__db__exec", command="DROP TABLE users")
-    benchmark(puma_complex.evaluate, ctx)
-
-
-# ── Trace overhead (crusty only — puma doesn't have trace) ────────────────────
+# ── Trace ─────────────────────────────────────────────────────────────────────
 
 
 def test_bench_crusty_trace(benchmark, crusty_complex):
-    """Crusty: trace evaluation (opt-in debugging)."""
+    """Trace evaluation: the same walk, plus the step list crossing back."""
     benchmark(
         crusty_complex.trace,
         event="PreToolUse",

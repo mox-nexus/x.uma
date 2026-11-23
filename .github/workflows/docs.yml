@@ -34,17 +34,21 @@ jobs:
         with:
           workspaces: rumi
 
-      # bumi is a local file dep and bun copies it at install time, so its
-      # dist/ must exist before the docs app installs.
-      - name: Build bumi
-        working-directory: bumi
-        run: bun install --frozen-lockfile && bun run build
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked --version 0.15.0
+
+      # The site runs on the engine: the playground and every live example
+      # evaluate through the wasm crust, a `file:` dependency that has to exist
+      # before the app installs.
+      - name: Build the wasm crust
+        working-directory: rumi/crusts/wasm
+        run: wasm-pack build --target web
 
       - name: Build docs site
         working-directory: docs/experience
         env:
           BASE_PATH: ${{ github.event_name == 'pull_request' && format('/x.uma/pr-preview/pr-{0}', github.event.number) || '/x.uma' }}
-        run: bun install && bun run build
+        run: bun install --frozen-lockfile && bun run build
 
       # Named crates, not a bare `cargo doc`: that documents `default-members`,
       # which put `rumi_docs_tests` and `rumi_test` — both `publish = false`

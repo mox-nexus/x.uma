@@ -1,0 +1,1187 @@
+name: budget_list_rules_add_up
+description: >
+  A list's rules lie on one path: a nested matcher that misses hands
+  evaluation on to the next rule, so one request can reach the tenant check of
+  every rule and each nested list beneath it. Three rules of one predicate,
+  each over a nested list of a hundred, cost 303 predicates in one evaluation,
+  past the budget of 256 (D-068). Each list on its own is well under it.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: tenant
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.MapInput
+              key: tenant
+          valueMatch:
+            exact: t0
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+              - &leaf
+                predicate:
+                  singlePredicate:
+                    input:
+                      name: role
+                      typedConfig:
+                        "@type": type.googleapis.com/xuma.core.v1.MapInput
+                        key: role
+                    valueMatch:
+                      exact: admin
+                onMatch:
+                  action:
+                    name: allow
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+                      name: allow
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+    - predicate:
+        singlePredicate:
+          input:
+            name: tenant
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.MapInput
+              key: tenant
+          valueMatch:
+            exact: t1
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+    - predicate:
+        singlePredicate:
+          input:
+            name: tenant
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.MapInput
+              key: tenant
+          valueMatch:
+            exact: t2
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+              - *leaf
+expect_error: true
+error_contains: 303 predicates in one evaluation
+
+---
+name: budget_regex_memory
+description: >
+  A compiled regex holds memory the engine bounds per pattern; the count of
+  them is bounded per document (D-054). Two nested lists of a hundred and
+  fifty regex rules hold three hundred regexes, past the budget of 64. The
+  refusal names the regex that crossed the budget, one
+  past it, which is the proof that the check runs during the walk rather
+  than after every pattern has been compiled.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherList:
+    matchers:
+    - predicate:
+        singlePredicate:
+          input:
+            name: tenant
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.MapInput
+              key: tenant
+          valueMatch:
+            exact: t0
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+              - &rx
+                predicate:
+                  singlePredicate:
+                    input:
+                      name: path
+                      typedConfig:
+                        "@type": type.googleapis.com/xuma.core.v1.MapInput
+                        key: path
+                    valueMatch:
+                      safeRegex:
+                        regex: ^/api/v[0-9]+/users/[0-9]+$
+                onMatch:
+                  action:
+                    name: api
+                    typedConfig:
+                      "@type": type.googleapis.com/xuma.core.v1.NamedAction
+                      name: api
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+    - predicate:
+        singlePredicate:
+          input:
+            name: tenant
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.MapInput
+              key: tenant
+          valueMatch:
+            exact: t1
+      onMatch:
+        matcher:
+          matcherList:
+            matchers:
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+              - *rx
+expect_error: true
+error_contains: 65 regexes
+
+---
+name: budget_tree_entries_do_not_add_up
+description: >
+  A tree looks up one entry per request, so the entries' costs do not add up:
+  three entries over a hundred predicates each hold three hundred in the
+  document and cost a hundred in any one evaluation. The document loads
+  (D-068). Under D-054's budget, which summed every leaf in the document, it
+  was refused, which capped every tree at 256 single-rule entries and closed
+  the path D-054 itself named for rule sets at scale.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherTree:
+    input:
+      name: path
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.MapInput
+        key: path
+    exactMatchMap:
+      map:
+        /x:
+          matcher: &hundred
+            matcherList:
+              matchers:
+                - &role
+                  predicate:
+                    singlePredicate:
+                      input:
+                        name: role
+                        typedConfig:
+                          "@type": type.googleapis.com/xuma.core.v1.MapInput
+                          key: role
+                      valueMatch:
+                        exact: admin
+                  onMatch:
+                    action:
+                      name: allow
+                      typedConfig:
+                        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+                        name: allow
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+        /y:
+          matcher: *hundred
+        /z:
+          matcher: *hundred
+  onNoMatch:
+    action:
+      name: fallback
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: fallback
+cases:
+  - name: an_entry_evaluates_its_own_list
+    context: { path: /y, role: admin }
+    expect: allow
+  - name: a_miss_under_the_entry_falls_to_on_no_match
+    context: { path: /y, role: viewer }
+    expect: fallback
+  - name: an_unknown_key_falls_to_on_no_match
+    context: { path: /w, role: admin }
+    expect: fallback
+
+---
+name: budget_prefix_siblings_do_not_add_up
+description: >
+  Prefixes that are not prefixes of one another never fall through to each
+  other (D-055), so like exact entries they are costed one at a time: three
+  sibling prefixes over a hundred predicates each cost a hundred in one
+  evaluation and load (D-068).
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherTree:
+    input:
+      name: path
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.MapInput
+        key: path
+    prefixMatchMap:
+      map:
+        /x:
+          matcher: &hundred
+            matcherList:
+              matchers:
+                - &role
+                  predicate:
+                    singlePredicate:
+                      input:
+                        name: role
+                        typedConfig:
+                          "@type": type.googleapis.com/xuma.core.v1.MapInput
+                          key: role
+                      valueMatch:
+                        exact: admin
+                  onMatch:
+                    action:
+                      name: allow
+                      typedConfig:
+                        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+                        name: allow
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+        /y:
+          matcher: *hundred
+        /z:
+          matcher: *hundred
+  onNoMatch:
+    action:
+      name: fallback
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: fallback
+cases:
+  - name: a_prefix_evaluates_its_own_list
+    context: { path: /z/1, role: admin }
+    expect: allow
+  - name: a_miss_has_no_shorter_prefix_to_fall_to
+    context: { path: /z/1, role: viewer }
+    expect: fallback
+
+---
+name: budget_prefix_chain_adds_up
+description: >
+  A miss under the longest matching prefix falls through to the next shorter
+  one (D-055), so a request for /a/b/c can evaluate the lists under /a/b, /a
+  and / in turn: three hundred predicates in one evaluation, past the budget
+  of 256 (D-068). The chain is the path, and the path is what is costed.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherTree:
+    input:
+      name: path
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.MapInput
+        key: path
+    prefixMatchMap:
+      map:
+        /:
+          matcher: &hundred
+            matcherList:
+              matchers:
+                - &role
+                  predicate:
+                    singlePredicate:
+                      input:
+                        name: role
+                        typedConfig:
+                          "@type": type.googleapis.com/xuma.core.v1.MapInput
+                          key: role
+                      valueMatch:
+                        exact: admin
+                  onMatch:
+                    action:
+                      name: allow
+                      typedConfig:
+                        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+                        name: allow
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+                - *role
+        /a:
+          matcher: *hundred
+        /a/b:
+          matcher: *hundred
+  onNoMatch:
+    action:
+      name: fallback
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: fallback
+expect_error: true
+error_contains: 300 predicates in one evaluation

@@ -5,8 +5,8 @@
 //!
 //! # Architecture (axum `BoxedIntoRoute` pattern)
 //!
-//! Each `DataInput` type registers itself via [`IntoDataInput`]. Each `InputMatcher` type
-//! registers via [`IntoInputMatcher`]. At registration time, the concrete type `T` is
+//! Each `DataInput` type registers itself via [`DataInputFactory`]. Each `InputMatcher` type
+//! registers via [`InputMatcherFactory`]. At registration time, the concrete type `T` is
 //! monomorphized into a closure and erased behind `Box<dyn Fn>`. This is the same pattern
 //! axum uses for route handlers — early type erasure at registration, late invocation at
 //! request time.
@@ -15,9 +15,9 @@
 //!
 //! | Seam | Trait | Registry Method | Envoy Category |
 //! |------|-------|-----------------|----------------|
-//! | Inputs | [`IntoDataInput`] | `builder.input::<T>(url)` | `envoy.matching.common_inputs` |
-//! | Matchers | [`IntoInputMatcher`] | `builder.matcher::<T>(url)` | `envoy.matching.input_matchers` |
-//! | Actions | [`IntoAction`] | `action_builder.action::<T>(url)` | `envoy.matching.action` |
+//! | Inputs | [`DataInputFactory`] | `builder.input::<T>(url)` | `envoy.matching.common_inputs` |
+//! | Matchers | [`InputMatcherFactory`] | `builder.matcher::<T>(url)` | `envoy.matching.input_matchers` |
+//! | Actions | [`ActionFactory`] | `action_builder.action::<T>(url)` | `envoy.matching.action` |
 //!
 //! `Registry<Ctx>` handles inputs + matchers. [`ActionRegistry<A>`] handles actions
 //! separately because `A` is unknown at `Registry` build time — it's introduced at
@@ -31,9 +31,12 @@
 //!     .input::<HeaderInput>("xuma.http.v1.HeaderInput")
 //!     .build();
 //!
-//! let config: MatcherConfig<String> = serde_json::from_str(json)?;
-//! let matcher = registry.load_matcher(config)?;
+//! let proto = rumi_proto::protojson::parse_matcher(&resolver, document)?;
+//! let matcher = rumi_proto::convert::load_proto_matcher(&registry, &actions, &resolver, &proto)?;
 //! ```
+//!
+//! The IR is built by a protojson reader, never parsed from a dialect of its
+//! own (D-042).
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -41,17 +44,10 @@ use std::marker::PhantomData;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    config::{
-        FieldMatcherConfig, MatcherConfig, OnMatchConfig, PredicateConfig, SinglePredicateConfig,
-        ValueMatchConfig,
-    },
-    DataInput, FieldMatcher, InputMatcher, Matcher, MatcherError, OnMatch, Predicate,
-    SinglePredicate, MAX_FIELD_MATCHERS, MAX_PREDICATES_PER_COMPOUND,
+    ir::{FieldMatcherIr, MatcherIr, OnMatchIr, PredicateIr, SinglePredicateIr, ValueMatchIr},
+    DataInput, FieldMatcher, InputMatcher, Matcher, MatcherError, MatcherKind, OnMatch, Predicate,
+    SinglePredicate,
 };
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Traits
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Trait for `DataInput` types that can be constructed from configuration.
 ///
@@ -60,10 +56,10 @@ use crate::{
 ///
 /// # Design (tower double dispatch)
 ///
-/// `DataInput<Ctx>` describes *what* to extract. `IntoDataInput<Ctx>` describes *how* to
+/// `DataInput<Ctx>` describes *what* to extract. `DataInputFactory<Ctx>` describes *how* to
 /// construct from config. The registry composes both: look up the `type_url` -> deserialize
 /// config -> construct input -> pair with matcher.
-pub trait IntoDataInput<Ctx: 'static>: Send + Sync + 'static {
+pub trait DataInputFactory<Ctx: 'static>: Send + Sync + 'static {
     /// The configuration type deserialized from JSON/YAML/proto.
     type Config: DeserializeOwned + Send + Sync;
 
@@ -79,20 +75,20 @@ pub trait IntoDataInput<Ctx: 'static>: Send + Sync + 'static {
 /// Trait for `InputMatcher` types that can be constructed from configuration.
 ///
 /// Maps to Envoy's `envoy.matching.input_matchers` extension category.
-/// Unlike [`IntoDataInput`], this is NOT generic over `Ctx` — `InputMatcher` is
+/// Unlike [`DataInputFactory`], this is NOT generic over `Ctx` — `InputMatcher` is
 /// domain-agnostic by design.
 ///
 /// # Example
 ///
 /// ```ignore
-/// impl IntoInputMatcher for BoolMatcher {
+/// impl InputMatcherFactory for BoolMatcher {
 ///     type Config = BoolMatcherConfig;
 ///     fn from_config(config: Self::Config) -> Result<Box<dyn InputMatcher>, MatcherError> {
 ///         Ok(Box::new(BoolMatcher::new(config.expected)))
 ///     }
 /// }
 /// ```
-pub trait IntoInputMatcher: Send + Sync + 'static {
+pub trait InputMatcherFactory: Send + Sync + 'static {
     /// The configuration type deserialized from JSON/YAML/proto.
     type Config: DeserializeOwned + Send + Sync;
 
@@ -108,7 +104,7 @@ pub trait IntoInputMatcher: Send + Sync + 'static {
 /// Trait for action types that can be constructed from configuration.
 ///
 /// Maps to Envoy's `envoy.matching.action` extension category.
-/// Unlike [`IntoDataInput`] and [`IntoInputMatcher`], this is generic over the
+/// Unlike [`DataInputFactory`] and [`InputMatcherFactory`], this is generic over the
 /// action type `A` — different registries can produce different action types.
 ///
 /// # Example
@@ -117,14 +113,14 @@ pub trait IntoInputMatcher: Send + Sync + 'static {
 /// struct HttpAction { backend: String, timeout_ms: u64 }
 ///
 /// struct HttpActionFactory;
-/// impl IntoAction<HttpAction> for HttpActionFactory {
+/// impl ActionFactory<HttpAction> for HttpActionFactory {
 ///     type Config = HttpActionConfig;
 ///     fn from_config(config: Self::Config) -> Result<HttpAction, MatcherError> {
 ///         Ok(HttpAction { backend: config.backend, timeout_ms: config.timeout_ms })
 ///     }
 /// }
 /// ```
-pub trait IntoAction<A: Clone + Send + Sync + 'static>: Send + Sync + 'static {
+pub trait ActionFactory<A: Clone + Send + Sync + 'static>: Send + Sync + 'static {
     /// The configuration type deserialized from JSON/YAML/proto.
     type Config: DeserializeOwned + Send + Sync;
 
@@ -135,10 +131,6 @@ pub trait IntoAction<A: Clone + Send + Sync + 'static>: Send + Sync + 'static {
     /// Returns [`MatcherError::InvalidConfig`] if the config is semantically invalid.
     fn from_config(config: Self::Config) -> Result<A, MatcherError>;
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Type-erased factories
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Type-erased input factory closure.
 type BoxedInputFactory<Ctx> =
@@ -151,10 +143,6 @@ type BoxedMatcherFactory =
 /// Type-erased action factory closure.
 type BoxedActionFactory<A> =
     Box<dyn Fn(&serde_json::Value) -> Result<A, MatcherError> + Send + Sync>;
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Builder
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Builder for constructing a [`Registry`].
 ///
@@ -188,7 +176,7 @@ impl<Ctx: 'static> RegistryBuilder<Ctx> {
     /// At load time, the registry deserializes config as `T::Config` and calls
     /// `T::from_config()` to produce the `DataInput`.
     #[must_use]
-    pub fn input<T: IntoDataInput<Ctx>>(mut self, type_url: &str) -> Self {
+    pub fn input<T: DataInputFactory<Ctx>>(mut self, type_url: &str) -> Self {
         self.input_factories.insert(
             type_url.to_owned(),
             Box::new(|value: &serde_json::Value| {
@@ -209,7 +197,7 @@ impl<Ctx: 'static> RegistryBuilder<Ctx> {
     /// At load time, the registry deserializes config as `T::Config` and calls
     /// `T::from_config()` to produce the `InputMatcher`.
     #[must_use]
-    pub fn matcher<T: IntoInputMatcher>(mut self, type_url: &str) -> Self {
+    pub fn matcher<T: InputMatcherFactory>(mut self, type_url: &str) -> Self {
         self.matcher_factories.insert(
             type_url.to_owned(),
             Box::new(|value: &serde_json::Value| {
@@ -258,21 +246,11 @@ impl<Ctx: 'static> Default for RegistryBuilder<Ctx> {
 pub fn register_core_matchers<Ctx: 'static>(builder: RegistryBuilder<Ctx>) -> RegistryBuilder<Ctx> {
     use crate::BoolMatcher;
 
-    // `xuma.core.v1.StringMatcher` used to be registered here too. It was a
-    // second way to say what `valueMatch` already says — xDS's own
-    // `StringMatcher`, on the `singlePredicate` — and `customMatch` exists for
-    // comparisons that oneof cannot express, not for duplicating it. It also
-    // had no proto message, so no config could name it: `rumi info` advertised
-    // a type URL that failed to load.
-    //
-    // `BoolMatcher` is the case that justifies the seam. `valueMatch` compares
-    // strings only, so a boolean has nowhere else to go.
+    // `valueMatch` compares strings only, so a boolean has nowhere else to go;
+    // `xuma.core.v1.StringMatcher` is not registered because `valueMatch`
+    // already says it (D-041).
     builder.matcher::<BoolMatcher>("xuma.core.v1.BoolMatcher")
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ActionRegistry
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Builder for constructing an [`ActionRegistry`].
 ///
@@ -293,7 +271,7 @@ impl<A: Clone + Send + Sync + 'static> ActionRegistryBuilder<A> {
 
     /// Register an action type with a type URL.
     #[must_use]
-    pub fn action<T: IntoAction<A>>(mut self, type_url: &str) -> Self {
+    pub fn action<T: ActionFactory<A>>(mut self, type_url: &str) -> Self {
         self.factories.insert(
             type_url.to_owned(),
             Box::new(|value: &serde_json::Value| {
@@ -325,7 +303,7 @@ impl<A: Clone + Send + Sync + 'static> Default for ActionRegistryBuilder<A> {
 
 /// Immutable registry of action factories.
 ///
-/// Resolves `TypedConfig` actions into concrete `A` values via registered factories.
+/// Resolves `TypedExtensionConfig` actions into concrete `A` values via registered factories.
 /// Used with [`Registry::load_typed_matcher()`] for fully-typed config loading.
 pub struct ActionRegistry<A> {
     factories: HashMap<String, BoxedActionFactory<A>>,
@@ -358,7 +336,13 @@ impl<A: Clone + Send + Sync + 'static> ActionRegistry<A> {
         urls
     }
 
-    fn resolve(&self, config: &crate::config::TypedConfig) -> Result<A, MatcherError> {
+    /// Resolve one action's config into an `A` through its registered factory.
+    ///
+    /// # Errors
+    ///
+    /// [`MatcherError::UnknownTypeUrl`] if no factory is registered for the
+    /// config's type URL, or whatever the factory returns.
+    pub fn resolve(&self, config: &crate::ir::TypedExtensionConfig) -> Result<A, MatcherError> {
         let factory =
             self.factories
                 .get(&config.type_url)
@@ -371,9 +355,52 @@ impl<A: Clone + Send + Sync + 'static> ActionRegistry<A> {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Registry
-// ═══════════════════════════════════════════════════════════════════════════════
+/// Whether an input's declaration marks its value `required` (D-069).
+///
+/// Every input message whose value can be absent declares the field, so the
+/// registry reads it once here rather than every factory implementing
+/// absence; a factory whose message lacks the field refuses the key.
+fn declares_required(config: &serde_json::Value) -> bool {
+    config
+        .get("required")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
+}
+
+/// What one load has spent against the document-wide budgets (D-054, D-068).
+///
+/// Counted as the walk goes, so a document is refused at the predicate or
+/// regex that crosses a budget rather than after everything past it has been
+/// built.
+#[derive(Default)]
+struct LoadBudget {
+    predicates: usize,
+    regexes: usize,
+}
+
+impl LoadBudget {
+    fn predicate(&mut self) -> Result<(), MatcherError> {
+        self.predicates += 1;
+        if self.predicates > crate::MAX_DOCUMENT_PREDICATES {
+            return Err(MatcherError::TooManyDocumentPredicates {
+                count: self.predicates,
+                max: crate::MAX_DOCUMENT_PREDICATES,
+            });
+        }
+        Ok(())
+    }
+
+    fn regex(&mut self) -> Result<(), MatcherError> {
+        self.regexes += 1;
+        if self.regexes > crate::MAX_REGEXES {
+            return Err(MatcherError::TooManyRegexes {
+                count: self.regexes,
+                max: crate::MAX_REGEXES,
+            });
+        }
+        Ok(())
+    }
+}
 
 /// Immutable registry of `DataInput` and `InputMatcher` factories.
 ///
@@ -399,43 +426,52 @@ impl<Ctx: 'static> Registry<Ctx> {
     /// - [`MatcherError::InvalidPattern`] — regex pattern is invalid
     /// - [`MatcherError::IncompatibleTypes`] — input data type vs matcher supported types
     /// - [`MatcherError::DepthExceeded`] — matcher nesting exceeds [`MAX_DEPTH`](crate::MAX_DEPTH)
-    pub fn load_matcher<A>(&self, config: MatcherConfig<A>) -> Result<Matcher<Ctx, A>, MatcherError>
+    pub fn load_matcher<A>(&self, config: MatcherIr<A>) -> Result<Matcher<Ctx, A>, MatcherError>
     where
         A: Clone + Send + Sync + 'static,
     {
-        let on_no_match = config
-            .on_no_match
-            .map(|om| self.load_on_match(om))
-            .transpose()?;
-
-        let matcher = match config.kind {
-            crate::config::MatcherKindConfig::List(matchers) => {
-                if matchers.len() > MAX_FIELD_MATCHERS {
-                    return Err(MatcherError::TooManyFieldMatchers {
-                        count: matchers.len(),
-                        max: MAX_FIELD_MATCHERS,
-                    });
-                }
-                let matchers = matchers
-                    .into_iter()
-                    .map(|fm| self.load_field_matcher(fm))
-                    .collect::<Result<Vec<_>, _>>()?;
-                Matcher::list(matchers, on_no_match)
-            }
-            crate::config::MatcherKindConfig::Tree(tree) => {
-                let tree = self.load_tree(tree, |om| self.load_on_match(om))?;
-                Matcher::tree(tree, on_no_match)
-            }
-        };
-
+        let mut budget = LoadBudget::default();
+        let matcher = self.load_matcher_in(config, &mut budget)?;
         matcher.validate()?;
         Ok(matcher)
+    }
+
+    fn load_matcher_in<A>(
+        &self,
+        config: MatcherIr<A>,
+        budget: &mut LoadBudget,
+    ) -> Result<Matcher<Ctx, A>, MatcherError>
+    where
+        A: Clone + Send + Sync + 'static,
+    {
+        let kind = match config.kind {
+            crate::ir::MatcherKindIr::List(matchers) => {
+                let matchers = matchers
+                    .into_iter()
+                    .map(|fm| self.load_field_matcher(fm, budget))
+                    .collect::<Result<Vec<_>, _>>()?;
+                MatcherKind::List(matchers)
+            }
+            crate::ir::MatcherKindIr::Tree(tree) => {
+                MatcherKind::Tree(
+                    self.load_tree(tree, budget, |this, om, b| this.load_on_match(om, b))?,
+                )
+            }
+        };
+        let on_no_match = config
+            .on_no_match
+            .map(|om| self.load_on_match(om, budget))
+            .transpose()?;
+        Ok(match kind {
+            MatcherKind::List(matchers) => Matcher::list(matchers, on_no_match),
+            MatcherKind::Tree(tree) => Matcher::tree(tree, on_no_match),
+        })
     }
 
     /// Load a `Matcher` from configuration with typed action resolution.
     ///
     /// Like [`load_matcher()`](Self::load_matcher), but actions in the config are
-    /// `TypedConfig` values resolved through the [`ActionRegistry`] instead of
+    /// `TypedExtensionConfig` values resolved through the [`ActionRegistry`] instead of
     /// being deserialized directly as `A`.
     ///
     /// # Two loaders
@@ -443,7 +479,7 @@ impl<Ctx: 'static> Registry<Ctx> {
     /// | Loader | Config Action Type | Resolution |
     /// |--------|-------------------|------------|
     /// | `load_matcher()` | `A` (direct) | `serde::Deserialize` |
-    /// | `load_typed_matcher()` | `TypedConfig` | `ActionRegistry<A>` factory |
+    /// | `load_typed_matcher()` | `TypedExtensionConfig` | `ActionRegistry<A>` factory |
     ///
     /// # Errors
     ///
@@ -451,39 +487,49 @@ impl<Ctx: 'static> Registry<Ctx> {
     /// - [`MatcherError::UnknownTypeUrl`] with `registry: "action"` for unregistered action type URLs
     pub fn load_typed_matcher<A>(
         &self,
-        config: MatcherConfig<crate::config::TypedConfig>,
+        config: MatcherIr<crate::ir::TypedExtensionConfig>,
         actions: &ActionRegistry<A>,
     ) -> Result<Matcher<Ctx, A>, MatcherError>
     where
         A: Clone + Send + Sync + 'static,
     {
-        let on_no_match = config
-            .on_no_match
-            .map(|om| self.load_typed_on_match(om, actions))
-            .transpose()?;
-
-        let matcher = match config.kind {
-            crate::config::MatcherKindConfig::List(matchers) => {
-                if matchers.len() > MAX_FIELD_MATCHERS {
-                    return Err(MatcherError::TooManyFieldMatchers {
-                        count: matchers.len(),
-                        max: MAX_FIELD_MATCHERS,
-                    });
-                }
-                let matchers = matchers
-                    .into_iter()
-                    .map(|fm| self.load_typed_field_matcher(fm, actions))
-                    .collect::<Result<Vec<_>, _>>()?;
-                Matcher::list(matchers, on_no_match)
-            }
-            crate::config::MatcherKindConfig::Tree(tree) => {
-                let tree = self.load_tree(tree, |om| self.load_typed_on_match(om, actions))?;
-                Matcher::tree(tree, on_no_match)
-            }
-        };
-
+        let mut budget = LoadBudget::default();
+        let matcher = self.load_typed_matcher_in(config, actions, &mut budget)?;
         matcher.validate()?;
         Ok(matcher)
+    }
+
+    fn load_typed_matcher_in<A>(
+        &self,
+        config: MatcherIr<crate::ir::TypedExtensionConfig>,
+        actions: &ActionRegistry<A>,
+        budget: &mut LoadBudget,
+    ) -> Result<Matcher<Ctx, A>, MatcherError>
+    where
+        A: Clone + Send + Sync + 'static,
+    {
+        let kind = match config.kind {
+            crate::ir::MatcherKindIr::List(matchers) => {
+                let matchers = matchers
+                    .into_iter()
+                    .map(|fm| self.load_typed_field_matcher(fm, actions, budget))
+                    .collect::<Result<Vec<_>, _>>()?;
+                MatcherKind::List(matchers)
+            }
+            crate::ir::MatcherKindIr::Tree(tree) => {
+                MatcherKind::Tree(self.load_tree(tree, budget, |this, om, b| {
+                    this.load_typed_on_match(om, actions, b)
+                })?)
+            }
+        };
+        let on_no_match = config
+            .on_no_match
+            .map(|om| self.load_typed_on_match(om, actions, budget))
+            .transpose()?;
+        Ok(match kind {
+            MatcherKind::List(matchers) => Matcher::list(matchers, on_no_match),
+            MatcherKind::Tree(tree) => Matcher::tree(tree, on_no_match),
+        })
     }
 
     /// Returns the number of registered input types.
@@ -499,14 +545,19 @@ impl<Ctx: 'static> Registry<Ctx> {
     /// only action resolution differs.
     fn load_tree<A, C, F>(
         &self,
-        config: crate::config::MatcherTreeConfig<C>,
-        load_on_match: F,
+        config: crate::ir::MatcherTreeIr<C>,
+        budget: &mut LoadBudget,
+        mut load_on_match: F,
     ) -> Result<crate::MatcherTree<Ctx, A>, MatcherError>
     where
         A: Clone + Send + Sync + 'static,
-        F: Fn(crate::config::OnMatchConfig<C>) -> Result<crate::OnMatch<Ctx, A>, MatcherError>,
+        F: FnMut(
+            &Self,
+            crate::ir::OnMatchIr<C>,
+            &mut LoadBudget,
+        ) -> Result<crate::OnMatch<Ctx, A>, MatcherError>,
     {
-        use crate::config::TreeTypeConfig;
+        use crate::ir::TreeTypeIr;
 
         let input_factory = self
             .input_factories
@@ -517,10 +568,11 @@ impl<Ctx: 'static> Registry<Ctx> {
                 available: self.input_factories.keys().cloned().collect(),
             })?;
         let input = input_factory(&config.input.config)?;
+        let required = declares_required(&config.input.config);
 
         let (entries, is_prefix) = match config.tree {
-            TreeTypeConfig::ExactMatchMap(e) => (e, false),
-            TreeTypeConfig::PrefixMatchMap(e) => (e, true),
+            TreeTypeIr::ExactMatchMap(e) => (e, false),
+            TreeTypeIr::PrefixMatchMap(e) => (e, true),
         };
 
         // Width is checked before building, so a config that would blow memory
@@ -534,14 +586,15 @@ impl<Ctx: 'static> Registry<Ctx> {
 
         let loaded = entries
             .into_iter()
-            .map(|(key, om)| load_on_match(om).map(|om| (key, om)))
+            .map(|(key, om)| load_on_match(self, om, budget).map(|om| (key, om)))
             .collect::<Result<Vec<_>, _>>()?;
 
-        if is_prefix {
+        let tree = if is_prefix {
             crate::MatcherTree::prefix(input, loaded)
         } else {
             crate::MatcherTree::exact(input, loaded)
-        }
+        };
+        tree.map(|t| t.with_required_input(required))
     }
 
     /// Returns the number of registered matcher types.
@@ -586,50 +639,43 @@ impl<Ctx: 'static> Registry<Ctx> {
 
     fn load_field_matcher<A>(
         &self,
-        config: FieldMatcherConfig<A>,
+        config: FieldMatcherIr<A>,
+        budget: &mut LoadBudget,
     ) -> Result<FieldMatcher<Ctx, A>, MatcherError>
     where
         A: Clone + Send + Sync + 'static,
     {
-        let predicate = self.load_predicate(config.predicate)?;
-        let on_match = self.load_on_match(config.on_match)?;
+        let predicate = self.load_predicate(config.predicate, budget)?;
+        let on_match = self.load_on_match(config.on_match, budget)?;
         Ok(FieldMatcher::new(predicate, on_match))
     }
 
-    fn load_predicate(&self, config: PredicateConfig) -> Result<Predicate<Ctx>, MatcherError> {
+    fn load_predicate(
+        &self,
+        config: PredicateIr,
+        budget: &mut LoadBudget,
+    ) -> Result<Predicate<Ctx>, MatcherError> {
         match config {
-            PredicateConfig::Single(single) => {
-                let sp = self.load_single(single)?;
+            PredicateIr::Single(single) => {
+                let sp = self.load_single(single, budget)?;
                 Ok(Predicate::Single(sp))
             }
-            PredicateConfig::And { predicates } => {
-                if predicates.len() > MAX_PREDICATES_PER_COMPOUND {
-                    return Err(MatcherError::TooManyPredicates {
-                        count: predicates.len(),
-                        max: MAX_PREDICATES_PER_COMPOUND,
-                    });
-                }
+            PredicateIr::And { predicates } => {
                 let ps = predicates
                     .into_iter()
-                    .map(|p| self.load_predicate(p))
+                    .map(|p| self.load_predicate(p, budget))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Predicate::And(ps))
             }
-            PredicateConfig::Or { predicates } => {
-                if predicates.len() > MAX_PREDICATES_PER_COMPOUND {
-                    return Err(MatcherError::TooManyPredicates {
-                        count: predicates.len(),
-                        max: MAX_PREDICATES_PER_COMPOUND,
-                    });
-                }
+            PredicateIr::Or { predicates } => {
                 let ps = predicates
                     .into_iter()
-                    .map(|p| self.load_predicate(p))
+                    .map(|p| self.load_predicate(p, budget))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Predicate::Or(ps))
             }
-            PredicateConfig::Not { predicate } => {
-                let inner = self.load_predicate(*predicate)?;
+            PredicateIr::Not { predicate } => {
+                let inner = self.load_predicate(*predicate, budget)?;
                 Ok(Predicate::Not(Box::new(inner)))
             }
         }
@@ -638,9 +684,17 @@ impl<Ctx: 'static> Registry<Ctx> {
     #[allow(clippy::needless_pass_by_value)] // Consistent with other load_ methods
     fn load_single(
         &self,
-        config: SinglePredicateConfig,
+        config: SinglePredicateIr,
+        budget: &mut LoadBudget,
     ) -> Result<SinglePredicate<Ctx>, MatcherError> {
-        // Resolve input via factory
+        budget.predicate()?;
+        if let ValueMatchIr::BuiltIn {
+            spec: crate::StringMatchSpec::Regex(_),
+            ..
+        } = &config.matcher
+        {
+            budget.regex()?;
+        }
         let input_factory = self
             .input_factories
             .get(&config.input.type_url)
@@ -651,18 +705,16 @@ impl<Ctx: 'static> Registry<Ctx> {
             })?;
         let input = input_factory(&config.input.config)?;
 
-        // Resolve matcher: built-in StringMatchSpec or custom via factory
         let matcher = match config.matcher {
-            ValueMatchConfig::BuiltIn {
+            ValueMatchIr::BuiltIn {
                 ref spec,
                 ignore_case,
             } => {
-                // Length limits, and now the case-insensitivity flag, live in
-                // the constructor that owns the resource. The loader inherits
-                // them rather than keeping a second copy that can drift.
+                // The constructor that owns the resource holds the limits and
+                // the flag, so the loader cannot keep a copy that drifts (D-029).
                 spec.to_input_matcher_with_case(ignore_case)?
             }
-            ValueMatchConfig::Custom(tc) => {
+            ValueMatchIr::Custom(tc) => {
                 let matcher_factory =
                     self.matcher_factories.get(&tc.type_url).ok_or_else(|| {
                         MatcherError::UnknownTypeUrl {
@@ -675,7 +727,6 @@ impl<Ctx: 'static> Registry<Ctx> {
             }
         };
 
-        // Validate type compatibility (arch-guild constraint)
         let data_type = input.data_type();
         let supported = matcher.supported_types();
         if !supported.contains(&data_type) {
@@ -685,52 +736,57 @@ impl<Ctx: 'static> Registry<Ctx> {
             });
         }
 
-        Ok(SinglePredicate::new(input, matcher))
+        Ok(SinglePredicate::new(input, matcher)
+            .with_required(declares_required(&config.input.config)))
     }
 
-    fn load_on_match<A>(&self, config: OnMatchConfig<A>) -> Result<OnMatch<Ctx, A>, MatcherError>
-    where
-        A: Clone + Send + Sync + 'static,
-    {
-        match config {
-            OnMatchConfig::Action { action } => Ok(OnMatch::Action(action)),
-            OnMatchConfig::Matcher { matcher } => {
-                let m = self.load_matcher(*matcher)?;
-                Ok(OnMatch::Matcher(Box::new(m)))
-            }
-        }
-    }
-
-    // ── Typed action loaders ─────────────────────────────────────────────────
-
-    fn load_typed_field_matcher<A>(
+    fn load_on_match<A>(
         &self,
-        config: FieldMatcherConfig<crate::config::TypedConfig>,
-        actions: &ActionRegistry<A>,
-    ) -> Result<FieldMatcher<Ctx, A>, MatcherError>
-    where
-        A: Clone + Send + Sync + 'static,
-    {
-        let predicate = self.load_predicate(config.predicate)?;
-        let on_match = self.load_typed_on_match(config.on_match, actions)?;
-        Ok(FieldMatcher::new(predicate, on_match))
-    }
-
-    fn load_typed_on_match<A>(
-        &self,
-        config: OnMatchConfig<crate::config::TypedConfig>,
-        actions: &ActionRegistry<A>,
+        config: OnMatchIr<A>,
+        budget: &mut LoadBudget,
     ) -> Result<OnMatch<Ctx, A>, MatcherError>
     where
         A: Clone + Send + Sync + 'static,
     {
         match config {
-            OnMatchConfig::Action { action } => {
+            OnMatchIr::Action { action } => Ok(OnMatch::Action(action)),
+            OnMatchIr::Matcher { matcher } => {
+                let m = self.load_matcher_in(*matcher, budget)?;
+                Ok(OnMatch::Matcher(Box::new(m)))
+            }
+        }
+    }
+
+    fn load_typed_field_matcher<A>(
+        &self,
+        config: FieldMatcherIr<crate::ir::TypedExtensionConfig>,
+        actions: &ActionRegistry<A>,
+        budget: &mut LoadBudget,
+    ) -> Result<FieldMatcher<Ctx, A>, MatcherError>
+    where
+        A: Clone + Send + Sync + 'static,
+    {
+        let predicate = self.load_predicate(config.predicate, budget)?;
+        let on_match = self.load_typed_on_match(config.on_match, actions, budget)?;
+        Ok(FieldMatcher::new(predicate, on_match))
+    }
+
+    fn load_typed_on_match<A>(
+        &self,
+        config: OnMatchIr<crate::ir::TypedExtensionConfig>,
+        actions: &ActionRegistry<A>,
+        budget: &mut LoadBudget,
+    ) -> Result<OnMatch<Ctx, A>, MatcherError>
+    where
+        A: Clone + Send + Sync + 'static,
+    {
+        match config {
+            OnMatchIr::Action { action } => {
                 let resolved = actions.resolve(&action)?;
                 Ok(OnMatch::Action(resolved))
             }
-            OnMatchConfig::Matcher { matcher } => {
-                let m = self.load_typed_matcher(*matcher, actions)?;
+            OnMatchIr::Matcher { matcher } => {
+                let m = self.load_typed_matcher_in(*matcher, actions, budget)?;
                 Ok(OnMatch::Matcher(Box::new(m)))
             }
         }
@@ -740,7 +796,7 @@ impl<Ctx: 'static> Registry<Ctx> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::TypedConfig;
+    use crate::ir::TypedExtensionConfig;
     use crate::MatchingData;
     use crate::StringMatchSpec;
 
@@ -755,12 +811,8 @@ mod tests {
     }
 
     impl DataInput<TestCtx> for ValueInput {
-        fn get(&self, ctx: &TestCtx) -> MatchingData {
-            if self.key == "value" {
-                MatchingData::String(ctx.value.clone())
-            } else {
-                MatchingData::None
-            }
+        fn get(&self, ctx: &TestCtx) -> Option<MatchingData> {
+            (self.key == "value").then(|| MatchingData::String(ctx.value.clone()))
         }
     }
 
@@ -769,7 +821,7 @@ mod tests {
         key: String,
     }
 
-    impl IntoDataInput<TestCtx> for ValueInput {
+    impl DataInputFactory<TestCtx> for ValueInput {
         type Config = ValueInputConfig;
 
         fn from_config(config: Self::Config) -> Result<Box<dyn DataInput<TestCtx>>, MatcherError> {
@@ -800,22 +852,18 @@ mod tests {
         assert!(!registry.contains_matcher("xuma.core.v1.StringMatcher"));
     }
 
-    // ── config builders ──────────────────────────────────────────────────
-    //
-    // The tree-shape config types do not deserialize (see `config.rs`), so a
-    // `MatcherConfig` is built, never parsed. These are deliberately thin: a
-    // helper that decided anything — a default action, an implied predicate —
-    // would hide what the test below it is actually asserting.
+    // Built, never parsed (D-042). The helpers decide nothing, so each test
+    // asserts only what it states.
 
-    fn typed(type_url: &str, config: serde_json::Value) -> TypedConfig {
-        TypedConfig {
+    fn typed(type_url: &str, config: serde_json::Value) -> TypedExtensionConfig {
+        TypedExtensionConfig {
             type_url: type_url.into(),
             config,
         }
     }
 
     /// The `ValueInput` reading key `value`, which most tests here use.
-    fn value_input() -> TypedConfig {
+    fn value_input() -> TypedExtensionConfig {
         typed("test.ValueInput", serde_json::json!({ "key": "value" }))
     }
 
@@ -824,10 +872,10 @@ mod tests {
     /// `ignore_case: false` because the terse dialect these tests were written
     /// in had no `ignore_case` sibling — it is protojson that carries the flag.
     /// Passing `false` keeps every assertion below testing what it tested.
-    fn built_in(input: TypedConfig, spec: StringMatchSpec) -> PredicateConfig {
-        PredicateConfig::Single(SinglePredicateConfig {
+    fn built_in(input: TypedExtensionConfig, spec: StringMatchSpec) -> PredicateIr {
+        PredicateIr::Single(SinglePredicateIr {
             input,
-            matcher: ValueMatchConfig::BuiltIn {
+            matcher: ValueMatchIr::BuiltIn {
                 spec,
                 ignore_case: false,
             },
@@ -835,36 +883,36 @@ mod tests {
     }
 
     /// A single predicate matching via a registered matcher type URL.
-    fn custom(input: TypedConfig, matcher: TypedConfig) -> PredicateConfig {
-        PredicateConfig::Single(SinglePredicateConfig {
+    fn custom(input: TypedExtensionConfig, matcher: TypedExtensionConfig) -> PredicateIr {
+        PredicateIr::Single(SinglePredicateIr {
             input,
-            matcher: ValueMatchConfig::Custom(matcher),
+            matcher: ValueMatchIr::Custom(matcher),
         })
     }
 
-    fn act(action: &str) -> OnMatchConfig<String> {
-        OnMatchConfig::Action {
+    fn act(action: &str) -> OnMatchIr<String> {
+        OnMatchIr::Action {
             action: action.into(),
         }
     }
 
     /// An action resolved through the `ActionRegistry`, for `load_typed_matcher`.
-    fn act_typed(type_url: &str, config: serde_json::Value) -> OnMatchConfig<TypedConfig> {
-        OnMatchConfig::Action {
+    fn act_typed(type_url: &str, config: serde_json::Value) -> OnMatchIr<TypedExtensionConfig> {
+        OnMatchIr::Action {
             action: typed(type_url, config),
         }
     }
 
-    fn field<A>(predicate: PredicateConfig, on_match: OnMatchConfig<A>) -> FieldMatcherConfig<A> {
-        FieldMatcherConfig {
+    fn field<A>(predicate: PredicateIr, on_match: OnMatchIr<A>) -> FieldMatcherIr<A> {
+        FieldMatcherIr {
             predicate,
             on_match,
         }
     }
 
     /// A matcher of one field matcher and no fallback — the common shape.
-    fn one<A>(predicate: PredicateConfig, on_match: OnMatchConfig<A>) -> MatcherConfig<A> {
-        MatcherConfig::list(vec![field(predicate, on_match)])
+    fn one<A>(predicate: PredicateIr, on_match: OnMatchIr<A>) -> MatcherIr<A> {
+        MatcherIr::list(vec![field(predicate, on_match)])
     }
 
     #[test]
@@ -873,7 +921,7 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let config = MatcherConfig::list(vec![field(
+        let config = MatcherIr::list(vec![field(
             built_in(value_input(), StringMatchSpec::Exact("hello".into())),
             act("matched!"),
         )])
@@ -893,19 +941,18 @@ mod tests {
 
     #[test]
     fn load_custom_match_bool_matcher() {
-        // BoolMatcher needs a bool-returning DataInput
         #[derive(Debug)]
         struct BoolInput;
         impl DataInput<TestCtx> for BoolInput {
-            fn get(&self, ctx: &TestCtx) -> MatchingData {
-                MatchingData::Bool(ctx.value == "yes")
+            fn get(&self, ctx: &TestCtx) -> Option<MatchingData> {
+                Some(MatchingData::Bool(ctx.value == "yes"))
             }
             fn data_type(&self) -> &'static str {
                 "bool"
             }
         }
 
-        impl IntoDataInput<TestCtx> for BoolInput {
+        impl DataInputFactory<TestCtx> for BoolInput {
             type Config = crate::UnitConfig;
             fn from_config(_: Self::Config) -> Result<Box<dyn DataInput<TestCtx>>, MatcherError> {
                 Ok(Box::new(BoolInput))
@@ -939,11 +986,8 @@ mod tests {
 
     #[test]
     fn load_custom_match_string_matcher() {
-        // StringMatcher is registered here rather than by
-        // `register_core_matchers`, which is what a custom domain does: the
-        // shipped registration was removed because `valueMatch` already says
-        // this. The `customMatch` seam itself is what this test covers, and it
-        // still works for anyone who wants it.
+        // Registered by hand, as a custom domain would: the shipped
+        // registration was removed because `valueMatch` already says it (D-041).
         let registry = register_core_matchers(RegistryBuilder::<TestCtx>::new())
             .input::<ValueInput>("test.ValueInput")
             .matcher::<crate::StringMatcher>("xuma.core.v1.StringMatcher")
@@ -1018,7 +1062,6 @@ mod tests {
         match err {
             MatcherError::UnknownTypeUrl { ref available, .. } => {
                 assert_eq!(available, &["test.ValueInput"]);
-                // Verify the display message includes the registered URL
                 let msg = err.to_string();
                 assert!(
                     msg.contains("test.ValueInput"),
@@ -1058,7 +1101,6 @@ mod tests {
 
     #[test]
     fn incompatible_types_error() {
-        // BoolMatcher + string-returning input = IncompatibleTypes
         let registry = register_core_matchers(RegistryBuilder::<TestCtx>::new())
             .input::<ValueInput>("test.ValueInput")
             .build();
@@ -1103,15 +1145,6 @@ mod tests {
         assert!(matches!(err, MatcherError::InvalidConfig { .. }));
     }
 
-    // `value_match_and_custom_match_both_set` and
-    // `neither_value_match_nor_custom_match` stood here. Both asserted on the
-    // terse dialect's deserializer, which no longer exists. Neither
-    // requirement was dropped: `ValueMatchConfig` is an enum, so both-set is
-    // now unrepresentable rather than rejected, and neither-set is rejected by
-    // `rumi-proto`'s converter. Both are fixtured in
-    // `spec/tests/07_protojson/08_invalid_configs.yaml`, so five
-    // implementations assert them instead of one.
-
     #[test]
     fn load_and_predicate() {
         let registry = RegistryBuilder::<TestCtx>::new()
@@ -1119,7 +1152,7 @@ mod tests {
             .build();
 
         let config = one(
-            PredicateConfig::And {
+            PredicateIr::And {
                 predicates: vec![
                     built_in(value_input(), StringMatchSpec::Prefix("hel".into())),
                     built_in(value_input(), StringMatchSpec::Suffix("llo".into())),
@@ -1149,9 +1182,9 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        let config = MatcherConfig::list(vec![field(
+        let config = MatcherIr::list(vec![field(
             built_in(value_input(), StringMatchSpec::Prefix(String::new())),
-            OnMatchConfig::Matcher {
+            OnMatchIr::Matcher {
                 matcher: Box::new(one(
                     built_in(value_input(), StringMatchSpec::Exact("deep".into())),
                     act("nested_hit"),
@@ -1175,9 +1208,6 @@ mod tests {
         );
     }
 
-    // ── Phase 11b: ActionRegistry + load_typed_matcher tests ─────────────
-
-    // Identity action: config string -> String action
     struct StringActionFactory;
 
     #[derive(serde::Deserialize)]
@@ -1185,7 +1215,7 @@ mod tests {
         value: String,
     }
 
-    impl IntoAction<String> for StringActionFactory {
+    impl ActionFactory<String> for StringActionFactory {
         type Config = StringActionConfig;
 
         fn from_config(config: Self::Config) -> Result<String, MatcherError> {
@@ -1214,7 +1244,7 @@ mod tests {
             .action::<StringActionFactory>("test.StringAction")
             .build();
 
-        let config = MatcherConfig::list(vec![field(
+        let config = MatcherIr::list(vec![field(
             built_in(value_input(), StringMatchSpec::Exact("hello".into())),
             act_typed(
                 "test.StringAction",
@@ -1279,7 +1309,7 @@ mod tests {
 
         let config = one(
             built_in(value_input(), StringMatchSpec::Prefix(String::new())),
-            OnMatchConfig::Matcher {
+            OnMatchIr::Matcher {
                 matcher: Box::new(one(
                     built_in(value_input(), StringMatchSpec::Exact("deep".into())),
                     act_typed(
@@ -1300,8 +1330,6 @@ mod tests {
         assert_eq!(matcher.evaluate(&TestCtx { value: "x".into() }), None);
     }
 
-    // ── Phase 13.0: Width limits, introspection, pattern limits ─────────
-
     #[test]
     fn introspection_input_type_urls() {
         let registry = RegistryBuilder::<TestCtx>::new()
@@ -1309,7 +1337,6 @@ mod tests {
             .input::<ValueInput>("a.Input")
             .build();
 
-        // Sorted alphabetically
         assert_eq!(registry.input_type_urls(), vec!["a.Input", "b.Input"]);
     }
 
@@ -1323,64 +1350,112 @@ mod tests {
         assert!(!urls.contains(&"xuma.core.v1.StringMatcher"));
     }
 
-    #[test]
-    fn too_many_field_matchers() {
-        let registry = RegistryBuilder::<TestCtx>::new()
-            .input::<ValueInput>("test.ValueInput")
-            .build();
+    fn exact_x() -> PredicateIr {
+        built_in(value_input(), StringMatchSpec::Exact("x".into()))
+    }
 
-        // Build a config with MAX_FIELD_MATCHERS + 1 field matchers
-        let fm = || {
-            field(
-                built_in(value_input(), StringMatchSpec::Exact("x".into())),
-                act("x"),
-            )
-        };
-        let matchers: Vec<_> = (0..=crate::MAX_FIELD_MATCHERS).map(|_| fm()).collect();
-        let config = MatcherConfig::list(matchers);
-        let err = registry.load_matcher(config).unwrap_err();
+    fn per_evaluation(err: &MatcherError) -> Option<usize> {
         match err {
-            MatcherError::TooManyFieldMatchers { count, max } => {
-                assert_eq!(count, crate::MAX_FIELD_MATCHERS + 1);
-                assert_eq!(max, crate::MAX_FIELD_MATCHERS);
+            MatcherError::TooManyPredicatesPerEvaluation { count, max } => {
+                assert_eq!(*max, crate::MAX_PREDICATES_PER_EVALUATION);
+                Some(*count)
             }
-            _ => panic!("expected TooManyFieldMatchers, got {err:?}"),
+            _ => None,
         }
     }
 
     #[test]
-    fn too_many_predicates_and() {
+    fn a_list_past_the_evaluation_budget_is_refused() {
         let registry = RegistryBuilder::<TestCtx>::new()
             .input::<ValueInput>("test.ValueInput")
             .build();
+        let over = crate::MAX_PREDICATES_PER_EVALUATION + 1;
 
-        let predicates: Vec<_> = (0..=crate::MAX_PREDICATES_PER_COMPOUND)
-            .map(|_| built_in(value_input(), StringMatchSpec::Exact("x".into())))
-            .collect();
+        let matchers = (0..over).map(|_| field(exact_x(), act("x"))).collect();
+        let err = registry
+            .load_matcher(MatcherIr::list(matchers))
+            .unwrap_err();
 
-        let config = one(PredicateConfig::And { predicates }, act("x"));
+        assert_eq!(per_evaluation(&err), Some(over), "got {err:?}");
+    }
+
+    #[test]
+    fn a_compound_past_the_evaluation_budget_is_refused() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+        let over = crate::MAX_PREDICATES_PER_EVALUATION + 1;
+        let predicates = || (0..over).map(|_| exact_x()).collect::<Vec<_>>();
+
+        for compound in [
+            PredicateIr::And {
+                predicates: predicates(),
+            },
+            PredicateIr::Or {
+                predicates: predicates(),
+            },
+        ] {
+            let err = registry.load_matcher(one(compound, act("x"))).unwrap_err();
+            assert_eq!(per_evaluation(&err), Some(over), "got {err:?}");
+        }
+    }
+
+    #[test]
+    fn the_document_budget_refuses_at_the_predicate_that_crosses_it() {
+        let registry = RegistryBuilder::<TestCtx>::new()
+            .input::<ValueInput>("test.ValueInput")
+            .build();
+        let full_path = || OnMatchIr::Matcher {
+            matcher: Box::new(MatcherIr::list(
+                (0..crate::MAX_PREDICATES_PER_EVALUATION)
+                    .map(|_| field(exact_x(), act("x")))
+                    .collect(),
+            )),
+        };
+        let entries = crate::MAX_DOCUMENT_PREDICATES / crate::MAX_PREDICATES_PER_EVALUATION + 1;
+        let config = MatcherIr {
+            kind: crate::ir::MatcherKindIr::Tree(crate::ir::MatcherTreeIr {
+                input: value_input(),
+                tree: crate::ir::TreeTypeIr::ExactMatchMap(
+                    (0..entries)
+                        .map(|i| (format!("k{i}"), full_path()))
+                        .collect(),
+                ),
+            }),
+            on_no_match: None,
+        };
+
         let err = registry.load_matcher(config).unwrap_err();
-        assert!(
-            matches!(err, MatcherError::TooManyPredicates { .. }),
-            "expected TooManyPredicates, got {err:?}"
+
+        assert_eq!(
+            err,
+            MatcherError::TooManyDocumentPredicates {
+                count: crate::MAX_DOCUMENT_PREDICATES + 1,
+                max: crate::MAX_DOCUMENT_PREDICATES,
+            }
         );
     }
 
     #[test]
-    fn too_many_predicates_or() {
+    fn the_regex_budget_refuses_at_the_regex_that_crosses_it() {
         let registry = RegistryBuilder::<TestCtx>::new()
             .input::<ValueInput>("test.ValueInput")
             .build();
-
-        let predicates: Vec<_> = (0..=crate::MAX_PREDICATES_PER_COMPOUND)
-            .map(|_| built_in(value_input(), StringMatchSpec::Exact("x".into())))
+        let regex = || built_in(value_input(), StringMatchSpec::Regex("^x+$".into()));
+        let matchers = (0..=crate::MAX_REGEXES)
+            .map(|_| field(regex(), act("x")))
             .collect();
 
-        let config = one(PredicateConfig::Or { predicates }, act("x"));
-        let err = registry.load_matcher(config).unwrap_err();
-        assert!(
-            matches!(err, MatcherError::TooManyPredicates { .. }),
-            "expected TooManyPredicates, got {err:?}"
+        let err = registry
+            .load_matcher(MatcherIr::list(matchers))
+            .unwrap_err();
+
+        assert_eq!(
+            err,
+            MatcherError::TooManyRegexes {
+                count: crate::MAX_REGEXES + 1,
+                max: crate::MAX_REGEXES,
+            }
         );
     }
 
@@ -1432,7 +1507,6 @@ mod tests {
             .input::<ValueInput>("test.ValueInput")
             .build();
 
-        // Exactly at the limit should succeed
         let pattern = "x".repeat(crate::MAX_PATTERN_LENGTH);
         let config = one(
             built_in(value_input(), StringMatchSpec::Exact(pattern)),
@@ -1442,7 +1516,7 @@ mod tests {
     }
 
     #[test]
-    fn field_matchers_at_limit_succeeds() {
+    fn a_list_at_the_evaluation_budget_loads() {
         let registry = RegistryBuilder::<TestCtx>::new()
             .input::<ValueInput>("test.ValueInput")
             .build();
@@ -1453,9 +1527,10 @@ mod tests {
                 act("x"),
             )
         };
-        // Exactly at the limit
-        let matchers: Vec<_> = (0..crate::MAX_FIELD_MATCHERS).map(|_| fm()).collect();
-        let config = MatcherConfig::list(matchers);
+        let matchers: Vec<_> = (0..crate::MAX_PREDICATES_PER_EVALUATION)
+            .map(|_| fm())
+            .collect();
+        let config = MatcherIr::list(matchers);
         assert!(registry.load_matcher(config).is_ok());
     }
 }

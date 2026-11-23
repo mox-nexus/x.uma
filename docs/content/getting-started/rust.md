@@ -95,6 +95,9 @@ for the full schema.
 ```bash
 $ rumi check http routes.yaml
 Config valid
+  rules:     2
+  inputs:    xuma.http.v1.MethodInput, xuma.http.v1.PathInput
+  fallback:  yes
 ```
 
 Catches unknown type URLs, invalid regex patterns, and depth limit violations at load time.
@@ -119,7 +122,7 @@ The same config file works programmatically via the Registry API:
 ```rust,no_run
 use rumi::prelude::*;
 use rumi::RegistryBuilder;
-use rumi_http::{register_simple, HttpRequest};
+use rumi_http::{register, HttpMessageBuilder};
 use rumi_proto::any_resolver::{AnyResolver, AnyResolverBuilder};
 use rumi_proto::convert::convert_matcher;
 use rumi_proto::protojson::parse_matcher;
@@ -136,7 +139,7 @@ fn resolver() -> AnyResolver {
 
 struct NamedActionFactory;
 
-impl rumi::IntoAction<String> for NamedActionFactory {
+impl rumi::ActionFactory<String> for NamedActionFactory {
     type Config = xuma::core::v1::NamedAction;
 
     fn from_config(config: Self::Config) -> Result<String, rumi::MatcherError> {
@@ -147,7 +150,7 @@ impl rumi::IntoAction<String> for NamedActionFactory {
 fn main() {
     // Build registry with HTTP inputs, and the action registry NamedAction
     // resolves through.
-    let registry = register_simple(RegistryBuilder::new()).build();
+    let registry = register(RegistryBuilder::new()).build();
     let actions = rumi::ActionRegistryBuilder::new()
         .action::<NamedActionFactory>("xuma.core.v1.NamedAction")
         .build();
@@ -161,7 +164,7 @@ fn main() {
     let matcher = registry.load_typed_matcher(config, &actions).unwrap();
 
     // Evaluate
-    let request = HttpRequest::builder()
+    let request = HttpMessageBuilder::new()
         .method("GET")
         .path("/api/users")
         .build();
@@ -196,16 +199,13 @@ let routes = vec![
 // or oversized regex is reported rather than silently dropping the route.
 let matcher = compile_route_matches(&routes, "allowed", Some("denied")).unwrap();
 
-// `matcher` evaluates against `HttpMessage`, the indexed ext_proc context.
-// See the note below on getting one.
+// `matcher` evaluates against `HttpMessage`, the same context as above.
 ```
 
-`compile_route_matches` produces a `Matcher<HttpMessage, _>`, and `HttpMessage`
-is currently only constructible from an ext_proc `ProcessingRequest` — there is
-no public builder. So the Gateway API compiler is usable today from inside an
-ext_proc filter, but not from a scratch program. If you want to experiment
-locally, use the config path above with `HttpRequest`, which does have a
-builder.
+`compile_route_matches` produces a `Matcher<HttpMessage, _>`, the same context
+the config path uses. Build one with `HttpMessageBuilder` from a plain program;
+an ext_proc filter gets one from the `ProcessingRequest` it is handed (feature
+`ext-proc`).
 
 This requires `rumi-http` with the `gateway` feature. Nothing is enabled by
 default — `default = []` — so ask for what you need:

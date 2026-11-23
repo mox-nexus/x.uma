@@ -25,16 +25,17 @@ that is the whole premise, and anything that breaks it is a bug worth reporting.
 |---|---|---|
 | `cargo`, `rustc` | the Rust workspace | [rustup.rs](https://rustup.rs) — the version is pinned in `rust-toolchain.toml` |
 | `just` | task runner | `cargo install just` |
-| `uv` | Python environment and `puma` | [docs.astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/) |
-| `bun` | `bumi` and the docs site | [bun.sh](https://bun.sh/docs/installation) |
+| `uv` | the PyO3 crust's environment | [docs.astral.sh/uv](https://docs.astral.sh/uv/getting-started/installation/) |
+| `bun` | the wasm crust's tests and the docs site | [bun.sh](https://bun.sh/docs/installation) |
 | `node` | the doc and agreement check scripts | [nodejs.org](https://nodejs.org) |
 | `buf` | proto codegen (`just gen`) | [buf.build](https://buf.build/docs/installation) |
 | `maturin` | the PyO3 crust wheel | `uv pip install maturin` |
 | `wasm-pack` | the wasm crust package | `cargo install wasm-pack` |
 | `cargo-audit` | dependency advisories | `cargo install cargo-audit` |
 
-The last three are optional: `just ci` runs without them, but the crust checks
-and `just audit` will not.
+`cargo-audit` is optional until `just audit`; `maturin` and `wasm-pack` are
+needed by `just ci`, which builds the wasm crust for the docs site and runs the
+doc samples against both bindings.
 
 ## The rule that matters most
 
@@ -78,22 +79,22 @@ Other conventions, and the reasoning behind them, are in `CLAUDE.md`:
 
 ## Adding a conformance fixture
 
-1. Read `spec/tests/README.md` first. There are **four** dialects and they are
-   not interchangeable; `config:` is the only one a user can write.
-2. Add the fixture under the right `spec/tests/` subdirectory.
-3. Run it everywhere: `just test-fixtures`, `just puma-test`, `just bumi-test`.
-4. If it passes in one implementation and fails in another, that is a finding,
-   not a fixture bug. Cross-language disagreement is what the suite is for.
+1. Read `spec/tests/README.md` first. `07_protojson/` is the config format;
+   `05_http/` feeds the Gateway API compiler and is not a config format.
+2. Add the fixture under the right `spec/tests/` subdirectory, with its
+   `implementations:` ledger.
+3. Run it everywhere: `just test-protojson`, `just crust-py-check`,
+   `just crust-wasm-check`.
+4. If it passes in the engine and fails in a binding, that is a finding, not a
+   fixture bug. Catching a binding that diverges is what the suite is for.
 
 ## Running one implementation
 
 ```bash
-just test              # Rust
-just puma-check        # Python: lint, type-check, tests
-just bumi-check        # TypeScript: lint, format, type-check, tests
-just crust-py-check    # PyO3 bindings (needs maturin)
-just crust-wasm-check  # wasm bindings (needs wasm-pack)
-just docs-build        # the docs site
+just test              # the engine
+just crust-py-check    # PyO3 binding (needs maturin)
+just crust-wasm-check  # wasm binding (needs wasm-pack)
+just docs-build        # the docs site, on the wasm binding
 ```
 
 ## Before opening a pull request

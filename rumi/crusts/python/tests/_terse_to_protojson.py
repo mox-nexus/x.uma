@@ -1,8 +1,7 @@
 """Translates the retired terse config dialect into canonical protojson.
 
 Test-only, and deliberately so: the *shipped* schema is protojson, full stop —
-`rumi.MatcherConfig`, puma's `xuma._protojson`, bumi's `protojson.ts` know
-nothing else. This module exists because these crust tests were written
+rumi reads nothing else. This module exists because these crust tests were written
 against the terse dialect's compact literal shape, and rewriting a thousand
 lines of nested dict literals by hand is exactly the kind of transcription
 work that introduces the bug it's supposed to avoid — the spec/tests
@@ -23,7 +22,7 @@ from __future__ import annotations
 from typing import Any
 
 PREFIX = "type.googleapis.com/"
-INPUT_TYPE = PREFIX + "xuma.kv.v1.MapInput"
+INPUT_TYPE = PREFIX + "xuma.core.v1.MapInput"
 ACTION_TYPE = PREFIX + "xuma.core.v1.NamedAction"
 
 _VALUE_MATCH = {"Exact": "exact", "Prefix": "prefix", "Suffix": "suffix", "Contains": "contains"}

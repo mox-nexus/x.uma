@@ -70,8 +70,8 @@ jobs:
       # it needs none of that toolchain and takes ~3s.
       - name: Crusts still compile
         run: |
-          cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures
-          cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures
+          cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures,bench
+          cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures,bench
 
       # Not regression detection — no baseline, no threshold, so a benchmark
       # that got 10x slower passes. It catches a benchmark that has stopped
@@ -95,9 +95,9 @@ jobs:
       - name: Conformance fixtures (protojson)
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test proto_conformance --features rumi-test/registry,rumi-test/fixtures
 
-      # spec/tests/05_http through the Gateway API compiler. Had runners in
-      # puma and bumi and none in the reference implementation until 2026-08-31,
-      # while one of its fixtures required a fail-open of everyone. PLAN.md CONF1.
+      # spec/tests/05_http through the Gateway API compiler. Had no runner in
+      # the reference implementation until 2026-08-31, while one of its
+      # fixtures required a fail-open of everyone. PLAN.md CONF1.
       - name: Conformance fixtures (Gateway API compiler)
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test http_conformance --features rumi-test/http,rumi-test/fixtures
 
@@ -119,62 +119,6 @@ jobs:
       - name: Doc links resolve
         run: node scripts/check-doc-links.mjs
 
-  python:
-    name: python (puma)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Sync
-        working-directory: puma
-        run: uv sync --all-groups
-
-      - name: Lint
-        working-directory: puma
-        run: uv run ruff check .
-
-      - name: Type-check
-        working-directory: puma
-        run: uv run mypy src/xuma
-
-      - name: Test
-        working-directory: puma
-        run: uv run pytest -q
-
-  typescript:
-    name: typescript (bumi)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-
-      - name: Install
-        working-directory: bumi
-        run: bun install --frozen-lockfile
-
-      - name: Lint
-        working-directory: bumi
-        run: bun run lint
-
-      - name: Type-check
-        working-directory: bumi
-        run: bun run typecheck
-
-      - name: Test
-        working-directory: bumi
-        run: bun test
-
-      # Guards the published shape: dist/ must emit .js + .d.ts with rewritten
-      # import specifiers, or consumers cannot type-check against the package.
-      - name: Build publishable output
-        working-directory: bumi
-        run: bun run build
-
   docs:
     name: docs site
     runs-on: ubuntu-latest
@@ -182,14 +126,24 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rumi
 
-      - name: Build bumi
-        working-directory: bumi
-        run: bun install --frozen-lockfile && bun run build
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked --version 0.15.0
+
+      # The site runs on the engine: the playground and every live example
+      # evaluate through the wasm crust, a `file:` dependency that has to exist
+      # before the app installs.
+      - name: Build the wasm crust
+        working-directory: rumi/crusts/wasm
+        run: wasm-pack build --target web
 
       - name: Install
         working-directory: docs/experience
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Type-check
         working-directory: docs/experience
@@ -302,6 +256,7 @@ jobs:
           wasm-pack build --target web -- --features fixtures
           bun install --frozen-lockfile
           bun test
+          cargo test --lib
 
       # The npm artifact is assembled by wasm-pack, whose generated `files`
       # array omitted both licence files — so a package declaring
@@ -310,27 +265,6 @@ jobs:
       # version is spent: npm never lets one be re-uploaded.
       - name: The npm tarball is what the package promises
         run: node scripts/pack-wasm-crust.mjs
-
-  agreement:
-    name: runtimes agree with the README
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: astral-sh/setup-uv@v5
-      - uses: oven-sh/setup-bun@v2
-
-      # PLAN.md CI3. The README says "one config, all runtimes" and shows three
-      # code blocks. Nothing checked that they return the same answers — the
-      # conformance suite has its own fixtures, and a reader copying from the
-      # README is not running it.
-      - name: Install deps
-        run: |
-          uv sync --project puma --all-groups
-          bun install --frozen-lockfile
-
-      - name: Evaluate the README config everywhere
-        run: node scripts/check-readme-agreement.mjs
 
   doc-samples:
     name: getting-started and package READMEs run
@@ -345,8 +279,8 @@ jobs:
       # Python and TypeScript ones never were, and the drift tracked that
       # exactly: `load_http_matcher` / `loadHttpMatcher` were documented on both
       # getting-started pages and in the Python crust's README, and neither
-      # function has ever existed. bumi/README.md called `new` on two type-only
-      # interfaces. Reading found none of it; running finds all of it.
+      # function has ever existed. Reading found none of it; running finds all
+      # of it.
       #
       # This needs the whole toolchain because the samples import the shipped
       # packages, not the sources — which is the point. A sample checked against
@@ -366,13 +300,14 @@ jobs:
           uv sync --all-groups
           uv run maturin develop --uv
 
-      - name: Install pure implementations
-        run: |
-          uv sync --project puma --all-groups
-          bun install --frozen-lockfile
-          bun run --cwd bumi build
-
       # --require-all: an environment skip becomes a failure. "Checked somewhere
       # else" is how the crusts broke three times in one day.
       - name: Every sample runs as written
         run: node scripts/check-doc-samples.mjs --require-all
+
+      # PLAN.md CI3. The README says "one config, all runtimes" and shows three
+      # code blocks. Nothing checked that they return the same answers — the
+      # conformance suite has its own fixtures, and a reader copying from the
+      # README is not running it. Runs here because it needs both crusts built.
+      - name: Evaluate the README config everywhere
+        run: node scripts/check-readme-agreement.mjs

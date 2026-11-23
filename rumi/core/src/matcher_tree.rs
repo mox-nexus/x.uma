@@ -26,20 +26,25 @@ use std::fmt::Debug;
 /// # Variants
 ///
 /// - `ExactMatch` — O(1) hash map lookup
-/// - `PrefixMatch` — O(k) radix tree lookup, longest prefix wins
+/// - `PrefixMatch` — O(k) radix tree lookup, longest prefix first; a nested miss
+///   tries the next shorter prefix (D-055)
 pub enum MatcherTree<Ctx, A: Clone + Send + Sync + 'static> {
     /// O(1) exact string lookup.
     ExactMatch {
         /// Extracts the lookup key from context.
         input: Box<dyn DataInput<Ctx>>,
+        /// Whether an absent key leaves the tree undecided (D-069).
+        required: bool,
         /// Map from exact key to outcome.
         map: HashMap<String, OnMatch<Ctx, A>>,
     },
 
-    /// O(k) prefix lookup, longest matching prefix wins.
+    /// O(k) prefix lookup, longest matching prefix first.
     PrefixMatch {
         /// Extracts the lookup key from context.
         input: Box<dyn DataInput<Ctx>>,
+        /// Whether an absent key leaves the tree undecided (D-069).
+        required: bool,
         /// Radix tree mapping prefixes to outcomes.
         tree: RadixTree<OnMatch<Ctx, A>>,
     },
@@ -69,10 +74,14 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
             }
         }
 
-        Ok(Self::ExactMatch { input, map })
+        Ok(Self::ExactMatch {
+            input,
+            required: false,
+            map,
+        })
     }
 
-    /// Create a prefix-match tree. O(k) radix lookup, longest prefix wins.
+    /// Create a prefix-match tree. O(k) radix lookup, longest prefix first.
     ///
     /// # Errors
     ///
@@ -94,7 +103,29 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
             }
         }
 
-        Ok(Self::PrefixMatch { input, tree })
+        Ok(Self::PrefixMatch {
+            input,
+            required: false,
+            tree,
+        })
+    }
+
+    /// Mark the key as required: absent, the tree is undecided and its
+    /// matcher's `on_no_match` does not fire (D-069).
+    #[must_use]
+    pub fn with_required_input(mut self, required: bool) -> Self {
+        match &mut self {
+            Self::ExactMatch { required: r, .. } | Self::PrefixMatch { required: r, .. } => {
+                *r = required;
+            }
+        }
+        self
+    }
+
+    fn input_required(&self) -> bool {
+        match self {
+            Self::ExactMatch { required, .. } | Self::PrefixMatch { required, .. } => *required,
+        }
     }
 
     /// A tree looks its key up as a string, so a non-string input never matches.
@@ -113,32 +144,61 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
         let input = match self {
             Self::ExactMatch { input, .. } | Self::PrefixMatch { input, .. } => input,
         };
-        input.get(ctx).as_str().map(ToOwned::to_owned)
+        input.get(ctx)?.as_str().map(ToOwned::to_owned)
     }
 
-    /// The entry a key selects, and which key won.
+    /// The entries a key selects, in the order they are tried, each with the
+    /// key that won it.
     ///
-    /// Split out from [`evaluate`](Self::evaluate) so the traced path can reuse
-    /// the same decision rather than reimplement it — that is where the two
-    /// would otherwise drift apart.
-    fn lookup<'a>(&'a self, key: &'a str) -> Option<(&'a str, &'a OnMatch<Ctx, A>)> {
+    /// An exact map yields at most one. A prefix tree yields every matching
+    /// prefix, longest first, because a nested matcher that produces nothing
+    /// hands the lookup to the next shorter prefix (D-055). Split out from
+    /// [`evaluate`](Self::evaluate) so the traced path reuses the same
+    /// decision rather than reimplementing it.
+    fn candidates<'a>(&'a self, key: &'a str) -> Vec<(&'a str, &'a OnMatch<Ctx, A>)> {
         match self {
             Self::ExactMatch { map, .. } => map
                 .get_key_value(key)
-                .map(|(k, on_match)| (k.as_str(), on_match)),
-            Self::PrefixMatch { tree, .. } => tree.find_longest_prefix_entry(key),
+                .map(|(k, on_match)| (k.as_str(), on_match))
+                .into_iter()
+                .collect(),
+            Self::PrefixMatch { tree, .. } => tree.find_all_prefix_entries(key),
         }
     }
 
     /// Evaluate the tree against a context.
     ///
-    /// Returns `None` both when no key is available and when the key selects no
-    /// entry. The enclosing [`Matcher`](crate::Matcher) owns the fallback, so
-    /// there is exactly one place a miss can be handled.
+    /// Returns `None` when no key is available, when the key selects no entry,
+    /// and when every selected entry's nested matcher produced nothing. The
+    /// enclosing [`Matcher`](crate::Matcher) owns the fallback, so there is
+    /// exactly one place a miss can be handled.
     pub fn evaluate(&self, ctx: &Ctx) -> Option<A> {
-        let key = self.key(ctx)?;
-        let (_, on_match) = self.lookup(&key)?;
-        on_match.evaluate(ctx)
+        self.outcome(ctx).into_action()
+    }
+
+    /// Evaluate the tree, keeping an absent required key, or an undecided
+    /// entry, apart from a miss (D-069). An undecided entry stops the prefix
+    /// fall-through, as Envoy's does.
+    pub fn outcome(&self, ctx: &Ctx) -> crate::Outcome<A> {
+        let Some(key) = self.key(ctx) else {
+            return self.absent_key();
+        };
+        for (_, on_match) in self.candidates(&key) {
+            match on_match.outcome(ctx) {
+                crate::Outcome::NoMatch => {}
+                decided => return decided,
+            }
+        }
+        crate::Outcome::NoMatch
+    }
+
+    /// What an absent key decides: undecided if required, a miss otherwise.
+    pub(crate) fn absent_key(&self) -> crate::Outcome<A> {
+        if self.input_required() {
+            crate::Outcome::Undecided
+        } else {
+            crate::Outcome::NoMatch
+        }
     }
 
     /// Which rule this tree applies, and what feeds it — for traces.
@@ -153,11 +213,11 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
         self.key(ctx)
     }
 
-    pub(crate) fn trace_lookup<'a>(
+    pub(crate) fn trace_candidates<'a>(
         &'a self,
         key: &'a str,
-    ) -> Option<(&'a str, &'a OnMatch<Ctx, A>)> {
-        self.lookup(key)
+    ) -> Vec<(&'a str, &'a OnMatch<Ctx, A>)> {
+        self.candidates(key)
     }
 
     /// Number of configured entries.
@@ -196,6 +256,16 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
             .unwrap_or(0)
     }
 
+    /// The dearest entry one lookup can evaluate, or for a prefix tree the
+    /// dearest chain of prefixes, since a miss falls through to the next
+    /// shorter one (D-055).
+    pub(crate) fn path_cost(&self) -> usize {
+        match self {
+            Self::ExactMatch { map, .. } => map.values().map(OnMatch::path_cost).max().unwrap_or(0),
+            Self::PrefixMatch { tree, .. } => tree.max_chain_cost(&OnMatch::path_cost),
+        }
+    }
+
     /// Check this tree's width, and recurse into nested matchers.
     pub(crate) fn validate_widths(&self) -> Result<(), MatcherError> {
         if self.len() > crate::MAX_TREE_ENTRIES {
@@ -218,12 +288,12 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
 impl<Ctx, A: Clone + Send + Sync + Debug + 'static> Debug for MatcherTree<Ctx, A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ExactMatch { input, map } => f
+            Self::ExactMatch { input, map, .. } => f
                 .debug_struct("ExactMatch")
                 .field("input", input)
                 .field("entries", &map.len())
                 .finish(),
-            Self::PrefixMatch { input, tree } => f
+            Self::PrefixMatch { input, tree, .. } => f
                 .debug_struct("PrefixMatch")
                 .field("input", input)
                 .field("tree", tree)
@@ -246,8 +316,8 @@ mod tests {
     struct PathInput;
 
     impl DataInput<TestContext> for PathInput {
-        fn get(&self, ctx: &TestContext) -> MatchingData {
-            MatchingData::String(ctx.path.clone())
+        fn get(&self, ctx: &TestContext) -> Option<MatchingData> {
+            Some(MatchingData::String(ctx.path.clone()))
         }
     }
 
@@ -345,8 +415,8 @@ mod tests {
         struct BoolInput;
 
         impl DataInput<TestContext> for BoolInput {
-            fn get(&self, _ctx: &TestContext) -> MatchingData {
-                MatchingData::Bool(true)
+            fn get(&self, _ctx: &TestContext) -> Option<MatchingData> {
+                Some(MatchingData::Bool(true))
             }
             fn data_type(&self) -> &'static str {
                 "bool"
@@ -379,8 +449,8 @@ mod tests {
         struct UndeclaredIntInput;
 
         impl DataInput<TestContext> for UndeclaredIntInput {
-            fn get(&self, _ctx: &TestContext) -> MatchingData {
-                MatchingData::Int(42)
+            fn get(&self, _ctx: &TestContext) -> Option<MatchingData> {
+                Some(MatchingData::Int(42))
             }
         }
 

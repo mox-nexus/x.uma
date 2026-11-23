@@ -55,14 +55,10 @@ const ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 /** A block on a getting-started page has no business taking 30 seconds. */
 const TIMEOUT_MS = 30_000;
 
-/** Which runtime owns a block, decided by what it imports. */
-function ownerOf(lang, code) {
-	if (lang === "python") {
-		return /\bxuma_crust\b/.test(code) ? "crust-py" : "puma";
-	}
-	if (lang === "typescript") {
-		return /["']xuma-crust["']/.test(code) ? "crust-wasm" : "bumi";
-	}
+/** Which runtime owns a block. */
+function ownerOf(lang) {
+	if (lang === "python") return "crust-py";
+	if (lang === "typescript") return "crust-wasm";
 	return null; // rust is covered by rumi-docs-tests; bash/yaml/toml are not code
 }
 
@@ -88,23 +84,19 @@ function blocks(md) {
  * reader's own file would be.
  */
 const SANDBOX = {
-	puma: "puma/.doc-samples",
 	"crust-py": "rumi/crusts/python/.doc-samples",
-	bumi: "bumi/.doc-samples",
 	"crust-wasm": "rumi/crusts/wasm/.doc-samples",
 };
 
 const PAGES = [
+	// The README's three code blocks are the project's front door.
+	"README.md",
 	"docs/content/getting-started/python.md",
 	"docs/content/getting-started/typescript.md",
 	// The package READMEs are the *first* page a reader sees — npm and PyPI
 	// render them on the landing page, before any doc site is reached. They were
-	// ungated until 2026-08-23, and `bumi/README.md`'s HTTP example had three
-	// defects: it called `new` on two type-only interfaces and passed an options
-	// object to `HttpRequest`, whose constructor is positional. None of the three
-	// survive being run; all three survived being read.
-	"bumi/README.md",
-	"puma/README.md",
+	// ungated until 2026-08-23, and the first run found an HTTP example with
+	// three defects that survived being read and not being run.
 	"rumi/crusts/python/README.md",
 	"rumi/crusts/wasm/README.md",
 	// Added 2026-08-23, after a `console.assert` repair on `concepts/pipeline.md`
@@ -139,7 +131,7 @@ for (const page of PAGES) {
 	const yaml = all.find((b) => b.lang === "yaml");
 
 	for (const b of all) {
-		const owner = ownerOf(b.lang, b.code);
+		const owner = ownerOf(b.lang);
 		if (owner === null) continue;
 		if (b.marker === "fragment") {
 			skipped.push(`${page} block ${b.index} (${b.lang}) — declared a fragment`);
@@ -219,7 +211,9 @@ function typecheck(owner, name, cwd) {
 			timeout: TIMEOUT_MS,
 		});
 	}
-	return spawnSync("bunx", ["tsc", "--noEmit", "--skipLibCheck", "--target", "esnext", "--module", "preserve", "--moduleResolution", "bundler", name], {
+	// `--types bun`: the samples run under Bun, and TypeScript 7 no longer pulls
+	// every visible @types package in on its own.
+	return spawnSync("bunx", ["tsc", "--noEmit", "--skipLibCheck", "--target", "esnext", "--module", "preserve", "--moduleResolution", "bundler", "--types", "bun", name], {
 		cwd,
 		encoding: "utf8",
 		timeout: TIMEOUT_MS,

@@ -16,7 +16,7 @@ proto_matcher:
             input:
               name: role
               typedConfig:
-                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                "@type": type.googleapis.com/xuma.core.v1.MapInput
                 key: role
             valueMatch:
               exact: admin
@@ -55,7 +55,7 @@ proto_matcher:
             input:
               name: role
               typedConfig:
-                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                "@type": type.googleapis.com/xuma.core.v1.MapInput
                 key: role
             valueMatch:
               exact: admin
@@ -101,7 +101,7 @@ proto_matcher:
             input:
               name: role
               typedConfig:
-                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                "@type": type.googleapis.com/xuma.core.v1.MapInput
                 kye: role
             valueMatch:
               exact: admin
@@ -130,7 +130,7 @@ proto_matcher:
             input:
               name: role
               typedConfig:
-                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                "@type": type.googleapis.com/xuma.core.v1.MapInput
                 key: role
             valueMatch:
               exact: admin
@@ -165,7 +165,7 @@ proto_matcher:
             input:
               name: role
               typedConfig:
-                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                "@type": type.googleapis.com/xuma.core.v1.MapInput
                 key: role
             valueMatch:
               exact: admin
@@ -194,15 +194,14 @@ description: >
   A `customMatch` pairing a string-producing input with a boolean matcher is a
   load error, in every implementation.
 
-  This is the only fixture that reaches `xuma.core.v1.BoolMatcher`: no shipped
-  input produces a boolean, so there is no positive case to write in the
-  key-value domain. What it pins is the type-compatibility check itself —
-  `data_type` against `supported_types`, validated when the config loads rather
-  than discovered as a rule that silently never fires.
+  What it pins is the type-compatibility check itself — `data_type` against
+  `supported_types`, validated when the config loads rather than discovered as
+  a rule that silently never fires. The positive case, a `MapInput` declared
+  `type: bool`, is `map_input_typed` (D-069).
 
   It could not be written until 2026-08-18: rumi had checked this since the
-  beginning and puma and bumi had not, so the same config was a load error in
-  one implementation and a no-op in the other two.
+  beginning and the other implementations of the time had not, so the same
+  config was a load error in one and a silent no-op elsewhere.
 
 implementations: [rust, python, typescript]
 expect_error: true
@@ -216,7 +215,7 @@ proto_matcher:
             input:
               name: flag
               typedConfig:
-                "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                "@type": type.googleapis.com/xuma.core.v1.MapInput
                 key: flag
             customMatch:
               name: bool

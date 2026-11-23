@@ -19,8 +19,9 @@ use rumi::MAX_PATTERN_LENGTH;
 /// Maximum number of argument matchers per `HookMatch`.
 const MAX_ARGUMENTS: usize = 64;
 
-/// Maximum number of rules per `compile()` call.
-pub const MAX_RULES: usize = 256;
+/// Rules per `compile()` call, refused before conversion: every rule costs at
+/// least one predicate on the one path the compiler emits (D-068).
+pub const MAX_RULES: usize = rumi::MAX_PREDICATES_PER_EVALUATION;
 
 /// Maximum regex pattern length. Re-exported from core — see above.
 use rumi::MAX_REGEX_PATTERN_LENGTH;

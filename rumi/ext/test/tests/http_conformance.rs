@@ -1,9 +1,8 @@
 //! `spec/tests/05_http/` against rumi's Gateway API compiler.
 //!
-//! Added 2026-08-31 (PLAN.md CONF1). This suite had two runners — puma's and
-//! bumi's — and none in the reference implementation, so "all implementations
-//! pass all fixtures in `spec/tests/`" was true of `07_protojson/` and merely
-//! assumed here.
+//! Added 2026-08-31 (PLAN.md CONF1). Until then this suite had no runner in
+//! the reference implementation, so "all implementations pass all fixtures in
+//! `spec/tests/`" was true of `07_protojson/` and merely assumed here.
 //!
 //! It is not a hypothetical gap. `http_empty_routes_matches_all` required an
 //! empty route list to match everything, which made a fail-open a contract the

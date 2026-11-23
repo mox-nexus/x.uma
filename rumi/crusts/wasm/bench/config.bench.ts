@@ -1,14 +1,14 @@
 /**
- * Head-to-head config benchmarks: bumi vs xuma-crust (WASM).
+ * Boundary cost of the WASM binding on the config path.
  *
- * Compares the config loading path across both implementations to isolate:
- * 1. Config parsing overhead — JSON → config types
- * 2. Registry loading — type URL lookup + factory invocation
- * 3. Evaluation parity — config-loaded matcher evaluation speed
+ * What the numbers isolate:
+ * 1. Config load — protojson text in, a compiled matcher out; the parse, the
+ *    registry lookups and the factory calls all run in WASM
+ * 2. Evaluate — a context object read across the boundary, one walk, a
+ *    string back
  *
- * The configs are canonical protojson (DECISIONS.md D-026), fed through
- * `parseProtojson` on the bumi side and `fromConfig` on the crust side —
- * both are the real production entry points, not synthetic ones.
+ * The configs are canonical protojson (DECISIONS.md D-026) fed through
+ * `fromConfig`, the real entry point, not a synthetic one.
  *
  * Run:
  *   cd rumi/crusts/wasm
@@ -18,18 +18,13 @@
 
 import { bench, run, summary } from "mitata";
 
-// xuma-crust (WASM Rust bindings)
-import init, { HttpMatcher, TestMatcher } from "../pkg/xuma_crust.js";
+import init, { HttpMatcher, KvMatcher } from "../pkg/xuma_crust.js";
 await init();
 
-// bumi
-import { parseProtojson, RegistryBuilder } from "../../../../bumi/src/index.ts";
-import { register } from "../../../../bumi/src/testing.ts";
-
-// ── Shared protojson configs ─────────────────────────────────────────────────
+// ── Configs ──────────────────────────────────────────────────────────────────
 
 function mapInput(key: string) {
-	return { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key };
+	return { "@type": "type.googleapis.com/xuma.core.v1.MapInput", key };
 }
 
 function namedAction(name: string) {
@@ -93,61 +88,29 @@ const HTTP_SIMPLE_CONFIG = JSON.stringify({
 	onNoMatch: actionMatch("not_found"),
 });
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function bumiRegistry() {
-	return register(new RegistryBuilder()).build();
-}
-
-// ── Config load: test domain ────────────────────────────────────────────────
+// ── Load: key-value domain ───────────────────────────────────────────────────
 
 summary(() => {
-	const registry = bumiRegistry();
-
-	bench("crusty_config_load_simple", () =>
-		TestMatcher.fromConfig(SIMPLE_CONFIG),
-	);
-
-	bench("bumi_config_load_simple", () => {
-		const config = parseProtojson(JSON.parse(SIMPLE_CONFIG));
-		registry.loadMatcher(config);
-	});
+	bench("crusty_config_load_simple", () => KvMatcher.fromConfig(SIMPLE_CONFIG));
 });
 
 summary(() => {
-	const registry = bumiRegistry();
-
-	bench("crusty_config_load_compound", () =>
-		TestMatcher.fromConfig(COMPOUND_CONFIG),
-	);
-
-	bench("bumi_config_load_compound", () => {
-		const config = parseProtojson(JSON.parse(COMPOUND_CONFIG));
-		registry.loadMatcher(config);
-	});
+	bench("crusty_config_load_compound", () => KvMatcher.fromConfig(COMPOUND_CONFIG));
 });
 
-// ── Config evaluate: test domain ────────────────────────────────────────────
+// ── Evaluate: key-value domain ───────────────────────────────────────────────
 
 summary(() => {
-	const crusty = TestMatcher.fromConfig(SIMPLE_CONFIG);
-	const registry = bumiRegistry();
-	const bumi = registry.loadMatcher(
-		parseProtojson(JSON.parse(SIMPLE_CONFIG)),
-	);
-
+	const crusty = KvMatcher.fromConfig(SIMPLE_CONFIG);
 	const ctx = { role: "admin" };
 
 	bench("crusty_config_evaluate_simple", () => crusty.evaluate(ctx));
-	bench("bumi_config_evaluate_simple", () => bumi.evaluate(ctx));
 });
 
-// ── HTTP domain (crusty only — no pure bumi HTTP registry yet) ──────────────
+// ── HTTP domain ──────────────────────────────────────────────────────────────
 
 summary(() => {
-	bench("crusty_http_config_load", () =>
-		HttpMatcher.fromConfig(HTTP_SIMPLE_CONFIG),
-	);
+	bench("crusty_http_config_load", () => HttpMatcher.fromConfig(HTTP_SIMPLE_CONFIG));
 });
 
 summary(() => {
@@ -157,4 +120,4 @@ summary(() => {
 	bench("crusty_http_config_evaluate", () => httpMatcher.evaluate(ctx));
 });
 
-await run();
+await run(process.env.BENCH_JSON ? { format: "json" } : {});

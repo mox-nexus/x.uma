@@ -11,36 +11,34 @@ Match structured data against rule trees. Write the rules once; evaluate them in
 
 ## Install
 
-> **Not yet on registries.** No release has been cut, so `rumi-core`, `xuma`, and
+> **Not yet on registries.** No release has been cut, so `rumi-core` and
 > `xuma-crust` do not resolve on crates.io, PyPI, or npm yet. Build from source
 > until the first release lands.
 
 ```bash
 git clone https://github.com/mox-nexus/x.uma
 cd x.uma
-just build          # all runtimes
-just test           # conformance suite, every implementation
+just build          # the engine
+just test           # the suites
 just docs-dev       # docs + playground on localhost:6200
 ```
 
 Once released, the runtimes install as:
 
-**Rust** — reference implementation, lowest latency:
+**Rust** — the engine:
 ```bash
 cargo add rumi-core rumi-http
 cargo install rumi-cli   # binary: rumi
 ```
 
-**Python** — no-build or Rust-backed:
+**Python** — the engine, bound through PyO3:
 ```bash
-uv add xuma          # no build step (google-re2 ships wheels)
-uv add xuma-crust    # Rust-backed via PyO3, 10–100x faster evaluation
+uv add xuma-crust
 ```
 
-**TypeScript** — pure TypeScript or WASM-backed:
+**TypeScript** — the engine, compiled to WebAssembly:
 ```bash
-bun add xuma         # pure TypeScript (re2js for regex)
-bun add xuma-crust   # Rust-backed via WASM, 3–10x faster evaluation
+bun add xuma-crust
 ```
 
 ## HTTP route matching — same rules, three languages
@@ -83,7 +81,7 @@ onNoMatch:
 **Rust:**
 ```rust,ignore
 use rumi::prelude::*;
-use rumi_http::{HttpRequest, register_simple};
+use rumi_http::{register, HttpMessageBuilder};
 use rumi_proto::{any_resolver::AnyResolverBuilder, convert::convert_matcher, protojson::parse_matcher};
 
 let resolver = AnyResolverBuilder::new()
@@ -92,42 +90,42 @@ let resolver = AnyResolverBuilder::new()
     .register::<rumi_proto::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
     .build();
 
-let registry = register_simple(RegistryBuilder::new()).build();
+let registry = register(RegistryBuilder::new()).build();
 let doc: serde_json::Value = serde_yaml::from_str(&yaml).unwrap();
 let proto = parse_matcher(&resolver, doc).unwrap();
 let config = convert_matcher(&proto, &resolver).unwrap();
 let matcher = registry.load_typed_matcher(config, &actions).unwrap();
 
-let req = HttpRequest::builder().method("GET").path("/api/users").build();
+let req = HttpMessageBuilder::new().method("GET").path("/api/users").build();
 assert_eq!(matcher.evaluate(&req), Some("api_read".to_string()));
 ```
 
 **Python:**
 ```python
-from xuma.http import HttpRequest, HttpRouteMatch, HttpPathMatch, compile_route_matches
+import json
 
-matcher = compile_route_matches(
-    [HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/api"), method="GET")],
-    action="api_read",
-    on_no_match="not_found",
-)
+import yaml
+from xuma_crust import HttpMatcher
 
-matcher.evaluate(HttpRequest(method="GET", raw_path="/api/users"))   # "api_read"
-matcher.evaluate(HttpRequest(method="DELETE", raw_path="/other"))     # "not_found"
+with open("routes.yaml") as f:
+    matcher = HttpMatcher.from_config(json.dumps(yaml.safe_load(f)))
+
+assert matcher.evaluate("GET", "/api/users") == "api_read"
+assert matcher.evaluate("DELETE", "/other") == "not_found"
 ```
 
 **TypeScript:**
 ```typescript
-import { compileRouteMatches, HttpRequest } from "xuma/http";
+import { strict as assert } from "node:assert";
+import init, { HttpMatcher } from "xuma-crust";
+import yaml from "js-yaml";
 
-const matcher = compileRouteMatches(
-    [{ path: { type: "PathPrefix", value: "/api" }, method: "GET" }],
-    "api_read",
-    "not_found",
-);
+await init();
+const config = yaml.load(await Bun.file("routes.yaml").text());
+const matcher = HttpMatcher.fromConfig(JSON.stringify(config));
 
-matcher.evaluate(new HttpRequest("GET", "/api/users"));   // "api_read"
-matcher.evaluate(new HttpRequest("DELETE", "/other"));     // "not_found"
+assert.equal(matcher.evaluate({ method: "GET", path: "/api/users" }), "api_read");
+assert.equal(matcher.evaluate({ method: "DELETE", path: "/other" }), "not_found");
 ```
 
 ## How it works
@@ -138,7 +136,7 @@ Context → DataInput → MatchingData → InputMatcher → bool
            specific                    agnostic
 ```
 
-`DataInput` extracts a value from your context (an HTTP request, a hook event). `InputMatcher` tests that value. The two halves are separate: an `ExactMatcher` doesn't know whether it's checking an HTTP path or a Claude tool name — it matches data. This is why the same config file works across all five implementations.
+`DataInput` extracts a value from your context (an HTTP request, a hook event). `InputMatcher` tests that value. The two halves are separate: an `ExactMatcher` doesn't know whether it's checking an HTTP path or a Claude tool name — it matches data. This is why the same config file works in every runtime: there is one engine, and the bindings hand it the same document.
 
 ## Domains
 
@@ -160,13 +158,13 @@ allow
 
 | Guarantee | How |
 |-----------|-----|
-| **No ReDoS** | RE2-class engines everywhere: Rust `regex` crate, `google-re2` (Python), `re2js` (TypeScript) |
+| **No ReDoS** | One regex engine everywhere: Rust's `regex` crate, linear time, no backtracking |
 | **Bounded depth** | Max 32 nesting levels, validated at config load — not at evaluation time |
-| **Fail-closed** | Missing data from `DataInput` → predicate returns `false`. Never matches by accident. |
-| **Thread-safe** | `Send + Sync` (Rust) / immutable frozen types (Python, TypeScript) |
+| **Missing is not a match** | A predicate over a missing value is `false`. Under `not` that turns true, as in Envoy; mark the input `required` and a missing value leaves the evaluation undecided instead. |
+| **Thread-safe** | `Send + Sync` in Rust; a compiled matcher is immutable in every binding |
 
-All five implementations run the same 27 conformance fixtures in `spec/tests/`.
-Suites at last run: 274 Rust, 294 Python, 258 TypeScript.
+The engine and both bindings run the same conformance fixtures in `spec/tests/`.
+A binding that disagrees with the engine fails its own build.
 
 ## Docs
 

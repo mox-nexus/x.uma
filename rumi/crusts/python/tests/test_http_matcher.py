@@ -113,12 +113,8 @@ class TestBasicMatching:
             }],
         }))
         matcher = HttpMatcher.from_config(config)
-        assert matcher.evaluate(
-            "GET", "/api", query_params={"format": "json"},
-        ) == "json_response"
-        assert matcher.evaluate(
-            "GET", "/api", query_params={"format": "xml"},
-        ) is None
+        assert matcher.evaluate("GET", "/api?format=json") == "json_response"
+        assert matcher.evaluate("GET", "/api?format=xml") is None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

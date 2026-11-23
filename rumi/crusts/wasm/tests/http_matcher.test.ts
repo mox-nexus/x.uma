@@ -103,16 +103,8 @@ describe("Basic Matching", () => {
       }],
     }));
     const matcher = HttpMatcher.fromConfig(config);
-    expect(matcher.evaluate({
-      method: "GET",
-      path: "/list",
-      queryParams: { page: "1" },
-    })).toBe("first_page");
-    expect(matcher.evaluate({
-      method: "GET",
-      path: "/list",
-      queryParams: { page: "2" },
-    })).toBeUndefined();
+    expect(matcher.evaluate({ method: "GET", path: "/list?page=1" })).toBe("first_page");
+    expect(matcher.evaluate({ method: "GET", path: "/list?page=2" })).toBeUndefined();
   });
 });
 

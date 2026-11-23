@@ -13,26 +13,26 @@ Context (your data)
     ↓
 DataInput.get()          ← knows your type, returns erased data
     ↓
-MatchingData             ← string | int | bool | bytes | null
+Option<MatchingData>     ← string | int | bool | bytes, or absent
     ↓
 InputMatcher.matches()   ← doesn't know your type, doesn't need to
     ↓
 bool
 ```
 
-The split happens at `MatchingData`. Above it, domain-specific code that knows about `HttpRequest` or `HookContext`. Below it, domain-agnostic matchers that work with primitives. This is the seam.
+The split happens at `MatchingData`. Above it, domain-specific code that knows about `HttpMessage` or `HookContext`. Below it, domain-agnostic matchers that work with primitives. This is the seam.
 
 ## Why This Works
 
-The insight comes from Envoy, where it runs at Google scale. Envoy's xDS Unified Matcher API uses the same split — domain-specific inputs feed type-erased data into generic matchers. x.uma implements these semantics in Rust, Python, and TypeScript.
+The insight comes from Envoy, where it runs at Google scale. Envoy's xDS Unified Matcher API uses the same split — domain-specific inputs feed type-erased data into generic matchers. x.uma implements these semantics once, in Rust, and binds that engine to Python and TypeScript.
 
 What the seam buys:
 
 **Write a matcher once, use it everywhere.** `PrefixMatcher("/api")` matches HTTP paths, event source URIs, file paths — anything that produces a string through `MatchingData`. Five string matchers (`Exact`, `Prefix`, `Suffix`, `Contains`, `Regex`) cover most matching needs across all domains.
 
-**Add a domain without touching core.** HTTP matching, Claude Code hooks, and the test domain all plug in by implementing `DataInput` — a single method that extracts a value from the context. The core engine never changes.
+**Add a domain without touching core.** HTTP matching, Claude Code hooks, and the key-value domain all plug in by implementing `DataInput` — a single method that extracts a value from the context. The core engine never changes.
 
-**Share config across languages.** The same JSON/YAML config produces the same matcher tree in Rust, Python, and TypeScript. `MatchingData` is the same name, same semantics, in all three.
+**Share config across languages.** The same protojson document loads in the CLI, the Python binding and the TypeScript binding and produces the same decision, because one engine reads it in all three.
 
 ## The Shape
 
@@ -74,15 +74,15 @@ The architecture follows four properties:
 
 ## What Core Owns
 
-The core engine (`rumi` in Rust, `xuma` in Python/TypeScript) provides:
+The core engine, `rumi`, provides:
 
 - **Matcher** — first-match-wins evaluation over a list of field matchers
 - **Predicate** — Boolean tree (Single, And, Or, Not) with short-circuit evaluation
 - **SinglePredicate** — pairs a `DataInput` with an `InputMatcher`
-- **MatchingData** — the type-erased bridge (`string | int | bool | bytes | null`)
+- **MatchingData** — the type-erased bridge (`string | int | bool | bytes`); absence is `None`, never a value
 - **InputMatcher** — five string matchers plus `BoolMatcher`
 - **OnMatch** — action XOR nested matcher (illegal states unrepresentable)
-- **Depth/width limits** — MAX_DEPTH=32, MAX_FIELD_MATCHERS=256
+- **Depth, width and budget limits** — MAX_DEPTH=32, MAX_PREDICATES_PER_EVALUATION=256 on the worst path, MAX_DOCUMENT_PREDICATES=65,536 and MAX_REGEXES=64 per document
 - **Registry** — immutable type registry for config-driven construction
 - **Trace** — step-by-step evaluation debugging
 
@@ -92,14 +92,14 @@ Core does not own domain knowledge. It does not know what an HTTP request is, wh
 
 Each domain provides:
 
-- **Context type** — `HttpRequest`, `HookContext`, your type
+- **Context type** — `HttpMessage`, `HookContext`, your type
 - **DataInput implementations** — extractors for each matchable field
 - **Compiler** — transforms domain-specific config into matcher trees
 - **Registry function** — registers domain inputs with the type registry
 
 The compiler is the user-facing API. Instead of manually constructing predicate trees, you write:
 
-```rust
+```rust,ignore
 // HTTP: Gateway API config → matcher
 let matcher = compile_route_matches(&routes, "allowed", Some("denied"))?;
 
@@ -125,11 +125,19 @@ Matchers can be built two ways:
 
 **Compiler path** — domain-specific DSL produces matchers directly. Ergonomic, type-safe, no serialization overhead.
 
-```python
-from xuma.http import HttpPathMatch, HttpRouteMatch, compile_route_matches
+```rust
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use rumi_http::{compile_route_matches, HttpPathMatch, HttpRouteMatch};
 
-routes = [HttpRouteMatch(path=HttpPathMatch(type="PathPrefix", value="/api"), method="GET")]
-matcher = compile_route_matches(routes, "api", "not_found")
+let routes = vec![HttpRouteMatch {
+    path: Some(HttpPathMatch::PathPrefix { value: "/api".into() }),
+    method: Some("GET".into()),
+    ..Default::default()
+}];
+let matcher = compile_route_matches(&routes, "api", Some("not_found"))?;
+# let _ = matcher;
+# Ok(())
+# }
 ```
 
 **Config path** — JSON/YAML config loaded through the registry. Portable across languages, storable, versionable.
@@ -140,7 +148,7 @@ matcher = compile_route_matches(routes, "api", "not_found")
     "matchers": [{
       "predicate": {
         "singlePredicate": {
-          "input": { "name": "method", "typedConfig": { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "method" } },
+          "input": { "name": "method", "typedConfig": { "@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": "method" } },
           "valueMatch": { "exact": "GET" }
         }
       },
@@ -157,17 +165,20 @@ matcher = compile_route_matches(routes, "api", "not_found")
 
 Both paths produce the same `Matcher`. The compiler path is for programmatic construction. The config path is for declarative, cross-language use.
 
-## Five Implementations, One Spec
+## One Engine, Two Bindings
 
-| Implementation | Language | Type |
-|----------------|----------|------|
-| **rumi** | Rust | Reference implementation |
-| **xuma** (Python) | Python | No protobuf runtime; `google-re2` ships platform wheels |
-| **xuma** (TypeScript) | TypeScript | Pure TypeScript — `re2js` is a JS port of RE2 |
-| **xuma-crust** | Python | Rust core via PyO3 |
-| **xuma-crust** | TypeScript | Rust core via WASM |
+| Package | Language | What it is |
+|---------|----------|------------|
+| **rumi** | Rust | The engine. Reference implementation. |
+| **xuma-crust** | Python | The engine, bound through PyO3 |
+| **xuma-crust** | TypeScript | The engine, compiled to WebAssembly |
 
-All five pass the same conformance suite for the config format — `spec/tests/07_protojson/`, the document every implementation reads. The three with a Gateway API compiler (rumi, puma, bumi) also pass `spec/tests/05_http/`. Same config, same evaluation semantics, same results. Choose based on your runtime and performance needs.
+All three read the same config document and pass the same conformance suite,
+`spec/tests/07_protojson/`. The bindings do not reimplement anything: a
+binding's job is to hand the document to the engine and hand the decision
+back, and the suite exists to prove that nothing changes on the way through.
+`spec/tests/05_http/`, the Gateway API compiler suite, runs in Rust, which is
+where the compiler lives.
 
 ## Next
 

@@ -2,20 +2,30 @@
 
 ## What is x.uma?
 
-A matcher engine implementing the xDS Unified Matcher API across multiple languages and domains.
+A matcher engine implementing the xDS Unified Matcher API: one Rust engine,
+`rumi`, with bindings for Python and TypeScript, and domains that plug in at
+`TypedExtensionConfig`.
 
-| Package | Language | Notes |
-|---------|----------|-------|
-| **rumi** | Rust | Core engine (reference implementation) |
-| **puma** | Python | Python implementation, no protobuf runtime (dir: `puma/`, **package `xuma`**) |
-| **bumi** | Bun/TypeScript | Pure TypeScript implementation (dir: `bumi/`, **package `xuma`**) |
-| **xuma-crust** | Python | Rust bindings via PyO3 (from `rumi/crusts/python/`) |
-| **xuma-crust** | TypeScript | Rust bindings via wasm-bindgen (from `rumi/crusts/wasm/`) |
+### One engine, two bindings
 
-All five implementations pass `spec/tests/07_protojson/`, the canonical config
-suite. `spec/tests/05_http/` (Gateway API route matches through the domain
-compiler) runs in rumi, puma and bumi — the three that have a compiler; neither
-crust exposes that surface. Both suites carry the `implementations:` ledger, and
+| Package | Language | What it is |
+|---------|----------|------------|
+| **rumi** | Rust | The engine. Reference implementation. |
+| **xuma-crust** | Python | The engine, bound through PyO3 (`rumi/crusts/python/`) |
+| **xuma-crust** | TypeScript | The engine, compiled to WebAssembly (`rumi/crusts/wasm/`) |
+
+Until 2026-09-08 the tree also held a pure-Python and a pure-TypeScript
+engine, each a complete reimplementation. They were retired under D-051: never decided into existence, they triplicated every spec
+change, and with nothing published their removal cost no user anything. The
+reasoning is in `DECISIONS.md`; the history is in `git log` before that date.
+
+**Write engine and domain code in `rumi` only.** A binding hands a config
+document to the engine and a decision back; it interprets neither.
+
+**Conformance.** The engine and both bindings run `spec/tests/07_protojson/`,
+the canonical config suite, through the same reader. `spec/tests/05_http/`
+(Gateway API route matches through the domain compiler) runs in rumi, where the
+compiler lives. Every fixture carries a required `implementations:` ledger, and
 every runner enforces it in **both** directions: a fixture that omits you must
 also fail for you, so a stale exception cannot hide a finished migration.
 
@@ -26,6 +36,9 @@ also fail for you, so a stale exception cannot hide a finished migration.
 x.uma follows ACES principles using hexagonal architecture (ports & adapters) to achieve **sustainable excellence** — no rewrites needed.
 
 ### Architecture
+
+One CORE with ports and adapters around it. The bindings are adapters onto
+this core, not copies of it.
 
 ```
                     ┌─────────────────────────────────┐
@@ -75,14 +88,13 @@ All x.uma extensions use the `xuma` proto package namespace:
 
 ```
 xuma.core.v1      # Base types, registry
-xuma.kv.v1      # Conformance testing
 xuma.http.v1      # HTTP matching
 xuma.claude.v1    # Claude Code hooks
 xuma.grpc.v1      # gRPC matching
 ```
 
 Type URLs:
-- `type.googleapis.com/xuma.kv.v1.MapInput`
+- `type.googleapis.com/xuma.core.v1.MapInput`
 - `type.googleapis.com/xuma.http.v1.HeaderInput`
 - `type.googleapis.com/xuma.claude.v1.HookContext`
 
@@ -96,16 +108,14 @@ x.uma/
 ├── spec/
 │   └── tests/                  # conformance test fixtures (YAML)
 ├── rumi/                       # Rust workspace (core + extensions + crusts + proto)
+│   ├── crusts/python/          # xuma-crust for PyPI (PyO3)
+│   ├── crusts/wasm/            # xuma-crust for npm (wasm-bindgen)
 │   └── proto/src/gen/          # buf-generated Rust types (prost + prost-serde)
-├── puma/                       # Python implementation (package: xuma)
-│   └── proto/src/gen/          # buf-generated Python types (betterproto)
-├── bumi/                       # Pure TypeScript implementation (package: xuma)
-│   └── proto/src/gen/          # buf-generated TypeScript types (ts-proto)
-├── buf.gen.yaml                # Polyglot codegen config (all 3 languages)
+├── buf.gen.yaml                # codegen config (Rust only)
 ├── docs/
 │   ├── content/                # plain Markdown, framework-free
-│   └── experience/             # SvelteKit docs site (adapter-static)
-└── justfile                    # polyglot task orchestration
+│   └── experience/             # SvelteKit docs site, runs on the wasm crust
+└── justfile                    # task orchestration
 ```
 
 ## Roadmap
@@ -118,22 +128,18 @@ x.uma/
 | 2.5 | Extensible MatchingData (`Custom` variant) | ✅ Done |
 | 3 | StringMatcher, MatcherTree, RadixTree | ✅ Done |
 | 4 | HTTP Domain (ext_proc model) | ✅ Done |
-| 5 | puma (Python + HTTP) | ✅ Done |
-| 5.1 | puma arch-guild hardening | ✅ Done |
-| 6 | bumi (Bun/TypeScript + HTTP) | ✅ Done |
-| 6.1 | bumi arch-guild hardening | ✅ Done |
+| 5, 6 | Pure Python and pure TypeScript engines | Retired 2026-09-08 (D-051) |
 | 7 | xuma-crust: PyO3 Python bindings | ✅ Done |
 | 7.5 | Claude domain: trace + HookMatch compiler (a **feature of `rumi-core`**, not a crate) | ✅ Done |
 | 8 | xuma-crust: wasm-bindgen TypeScript bindings | ✅ Done |
-| 9 | Cross-language benchmarks (all 5 variants) | ⚠️ Runs, not guarded |
-| 10 | TypedExtensionConfig Registry (`IntoDataInput`, `RegistryBuilder`) | ✅ Done |
+| 9 | Benchmarks: engine and both bindings | ⚠️ Runs, not guarded |
+| 10 | TypedExtensionConfig Registry (`DataInputFactory`, `RegistryBuilder`) | ✅ Done |
 | 11 | Test audit (removed 18 ineffective tests → 216 total) | ✅ Done |
 | 12 | Proto Alignment: buf codegen, `rumi-proto`, `AnyResolver`, xDS Matcher loading | ✅ Done |
 | 13 | Config/Registry across all implementations | ✅ Done |
-| 14 | Config-path benchmarks (all 5 variants) | ⚠️ Runs, not guarded |
+| 14 | Config-path benchmarks: engine and both bindings | ⚠️ Runs, not guarded |
 | 15 | Crate restructure + publish prep (0.0.2) | ⚠️ Unverified |
 | — | Semantic matching (cosine similarity via `CustomMatchData`) | Planned |
-| — | RE2 migration: `google-re2` for puma, `re2js` for bumi | ✅ Done |
 
 **Status legend.** ✅ Done means **CI executes something that would fail if it
 regressed**. ⚠️ Unverified means the work exists but nothing checks it, so the
@@ -172,10 +178,11 @@ until 2026-08-31, and `release.yml` published the same three — omitting two th
 `cargo metadata` and fails if the workflow disagrees, so the two cannot drift
 again.
 
-Outside Cargo: `xuma` on PyPI and npm, `xuma-crust` on PyPI and npm. Checked
-2026-08-31 — all four are **unclaimed (404)**. The crates.io names could *not* be
-checked: the registry answered 403, which is a rejected request, not an absent
-crate.
+Outside Cargo: `xuma-crust` on PyPI and npm. Checked 2026-08-31 — both are
+**unclaimed (404)**, as is `xuma` on both registries. `xuma` has had no
+publisher since D-051; it returns as the host-language package over the binding.
+The crates.io names could *not* be checked: the registry answered 403, which is
+a rejected request, not an absent crate.
 
 Both release workflows are `workflow_dispatch` and have never been run.
 `release-crust.yml` published only the PyPI wheel until 2026-09-01, while two
@@ -218,11 +225,11 @@ Envoy source: `~/oss/reference/envoy/source/common/matcher/`
 
 ```rust
 // MatchingData — the erased data type (Envoy's MatchingDataType)
-pub enum MatchingData { None, String(String), Int(i64), Bool(bool), Bytes(Vec<u8>) }
+pub enum MatchingData { String(String), Int(i64), Bool(bool), Bytes(Vec<u8>), Custom(..) }
 
 // DataInput — domain-specific, generic over context, returns erased type
 pub trait DataInput<Ctx>: Send + Sync + Debug {
-    fn get(&self, ctx: &Ctx) -> MatchingData;
+    fn get(&self, ctx: &Ctx) -> Option<MatchingData>;
 }
 
 // InputMatcher — domain-agnostic, NON-GENERIC, shareable across contexts!
@@ -253,6 +260,7 @@ From official Envoy xDS proto research:
 | **on_no_match** | At Matcher level only, not per-OnMatch | `Matcher.on_no_match: Option<OnMatch>` |
 | **First-match-wins** | first match wins; `keep_matching` is **deferred, not implemented** | `Matcher::evaluate()` returns the first match. `keep_matching` appears in the proto and is accepted and ignored — see PLAN.md F2 / SF2 |
 | **MatcherList vs MatcherTree** | `oneof matcher_type` — a list XOR a tree | `enum MatcherKind<Ctx, A> { List(Vec<FieldMatcher>), Tree(MatcherTree) }`. `on_no_match` lives on `Matcher` only, as in the proto — `MatcherTree` has no fallback field (D-044) |
+| **Prefix fall-through** | Envoy 1.35 default: a nested miss under the longest prefix retries the next shorter | `MatcherTree::evaluate` tries every matching prefix longest-first; the trace records each attempt (D-055) |
 
 **Key insight**: OnMatch is EXCLUSIVE — action XOR nested matcher, never both. Making illegal states unrepresentable at the type level.
 
@@ -267,7 +275,7 @@ From 13-agent architecture review:
 | **Type Registry Immutability** | Vector, Lamport | Lock after initialization. No runtime registration. |
 | **Send + Sync** | Lamport, Lotfi | All core types must be thread-safe (FFI requirement). |
 | **Iterative Evaluation** | Taleb, Dijkstra | No recursive `evaluate()` — use explicit stack (deferred to v0.2). |
-| **DataInput None → false** | Dijkstra | `None` from `DataInput::get()` → predicate evaluates to `false`. |
+| **DataInput None → false** | Dijkstra | `DataInput::get()` returns `Option`; `None` → predicate evaluates to `false`, enforced by the signature (D-061); for a `required` input, `None` → `MatchResult::Undecided`, which stops the evaluation without its fallback (D-069). |
 | **No unsafe impl** | Wolf | Let compiler derive Send/Sync — don't add restrictive bounds. |
 | **Validate extension points at construction** | Phase 11 review | Extension hooks (e.g., `data_type()`, `supported_types()`) that exist but are never enforced create silent failure modes. Validate compatibility at construction/load time, not evaluation time. |
 
@@ -307,16 +315,6 @@ Types to build (parallel to rumi-http's gateway):
 - `compile_hook_matches()` — transforms `HookMatch` configs into `Matcher<HookContext, A>`
 - `evaluate_with_trace()` — returns the decision AND the path through the matcher tree
 
-### Cross-Language Type Mapping
-
-| Concept | Rust (rumi) | Python (puma) | TypeScript (bumi) |
-|---------|-------------|---------------|-------------------|
-| Erased data | `MatchingData` | `MatchingData` | `MatchingData` |
-| Context type | `Ctx` (generic) | `Ctx` (TypeVar) | `Ctx` (generic) |
-| Action type | `A` (generic) | `A` (TypeVar) | `A` (generic) |
-
-`MatchingData` is the same name across all three implementations. In Rust it's an enum, in Python a type alias (`str | int | bool | bytes | None`), in TypeScript a type alias (`string | number | boolean | Uint8Array | null`). One concept, one name.
-
 ## rumi Crate Structure
 
 Workspace with core + extension crates:
@@ -334,8 +332,8 @@ rumi/
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs              # Module tree for generated types
-│       ├── any_resolver.rs     # google.protobuf.Any → TypedConfig bridge
-│       ├── convert.rs          # Proto Matcher → MatcherConfig conversion
+│       ├── any_resolver.rs     # google.protobuf.Any → TypedExtensionConfig bridge
+│       ├── convert.rs          # Proto Matcher → MatcherIr conversion
 │       └── gen/                # buf-generated prost + prost-serde code
 ├── ext/
 │   ├── kv/             # rumi-kv (string-map matching) ▲
@@ -368,7 +366,7 @@ rumi-http = "0.0.2"
 ```rust
 use rumi::prelude::*;
 use rumi::claude::{HookContext, HookMatchExt};
-use rumi_http::{HttpRequest, HeaderInput};
+use rumi_http::{HeaderInput, HttpMessage};
 ```
 
 ## Craft Judgment
@@ -378,7 +376,7 @@ Principles distilled from 13 elite Rust codebases. Each prevents a form of self-
 | Principle | What You're Fooling Yourself About | Test |
 |-----------|-----------------------------------|------|
 | **Measure Before Optimizing** | "This will be faster" — but you haven't profiled | Is there benchmark evidence? |
-| **Config Format Is Frozen** | "We can iterate" — but 5 implementations consume it | Does this change `MatcherConfig` serialization? |
+| **Config Format Is Frozen** | "We can iterate" — but every user's config and three runtimes consume it | Does this change what `from_config` accepts? |
 | **Foundation Crates Migrate Last** | "It's just a version bump" — but it cascades everywhere | Does this change a dep in `rumi/core/Cargo.toml`? |
 | **Protocol Obligations Over Convenience** | "This shortcut is safe" — but it violates an invariant | Does this skip validate, reorder eval, or bypass None→false? |
 | **Hold Position Until Evidence** | "Let's add this now" — but no second integration demands it | Is there concrete evidence, or is this speculative? |
@@ -390,7 +388,7 @@ Principles distilled from 13 elite Rust codebases. Each prevents a form of self-
 | Don't | Why | Source |
 |-------|-----|--------|
 | Add `thiserror` or utility crate deps | "17K lines replaced by 150" — hand-write what you need | ripgrep, hyper |
-| Expand `MatcherConfig` format after shipping | Format is frozen across 5 implementations | rust-analyzer |
+| Expand the protojson schema after shipping | Schema, type URLs and FFI shape freeze at publish (D-053); `MatcherIr` is internal and does not | rust-analyzer |
 | Optimize without benchmarking | Bottleneck is rarely where you think | ripgrep, all 13 |
 | Add `&mut self` to core traits | Breaks `Arc<T>` wrapper algebra, breaks FFI | hyper, tower |
 | Test at the abstraction level | Mock the boundary (registry, FFI), not the abstraction | aya |
@@ -450,12 +448,13 @@ a *contract the suite enforced* and each implementation was conformant by
 failing open (D-050). When a fixture and a security property disagree, the
 fixture is the thing that is wrong.
 
-Coverage is deliberate rather than accidental: `07_protojson/` runs in all five;
-`05_http/` runs in the three implementations that have a Gateway API compiler.
-Both carry the `implementations:` ledger and every runner enforces it in both
-directions. Until 2026-08-31 `05_http/` had neither a ledger nor a rumi runner,
-which is how the fixture above got to require a fail-open of everyone while the
-reference implementation was not reading the file that said so.
+Coverage is deliberate rather than accidental: `07_protojson/` runs in the
+engine and both bindings; `05_http/` runs in rumi, which has the Gateway API
+compiler. Every fixture carries a required `implementations:` ledger and every
+runner enforces it in both directions. Until 2026-08-31 `05_http/` had neither
+a ledger nor a rumi runner, which is how the fixture above got to require a
+fail-open of everyone while the reference implementation was not reading the
+file that said so.
 
 ### Session Start
 

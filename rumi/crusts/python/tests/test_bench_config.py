@@ -1,17 +1,16 @@
-"""Head-to-head config benchmarks: puma vs xuma-crust (PyO3).
+"""Boundary cost of the PyO3 binding on the config path.
 
-Compares the config loading path across both implementations to isolate:
-1. Config parsing overhead -- JSON -> config types
-2. Registry loading -- type URL lookup + factory invocation
-3. Evaluation parity -- config-loaded matcher evaluation speed
+What the numbers isolate:
+1. Config load — protojson text in, a compiled matcher out; this is the
+   parse, the registry lookups and the factory calls, all in Rust
+2. Evaluate — a dict marshalled into a KvContext, one walk, a string back
 
-The configs are canonical protojson (DECISIONS.md D-026), fed through
-`parse_protojson` on the puma side and `from_config` on the crust side --
-both are the real production entry points, not synthetic ones.
+The configs are canonical protojson (DECISIONS.md D-026) fed through
+`from_config`, the real entry point, not a synthetic one.
 
 Run:
   cd rumi/crusts/python
-  maturin develop
+  maturin develop --release   # a debug build inverts every verdict drawn from this
   uv run pytest tests/test_bench_config.py --benchmark-only
 """
 
@@ -21,18 +20,13 @@ import json
 
 import pytest
 
-from xuma_crust import HttpMatcher, TestMatcher as CrustTestMatcher
+from xuma_crust import HttpMatcher, KvMatcher
 
-# Pure Python for comparison
-from xuma import RegistryBuilder
-from xuma._protojson import parse_protojson
-from xuma.testing import register
-
-# ── Shared protojson configs ─────────────────────────────────────────────────
+# ── Configs ──────────────────────────────────────────────────────────────────
 
 
 def _map_input(key: str) -> dict:
-    return {"@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": key}
+    return {"@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": key}
 
 
 def _named_action(name: str) -> dict:
@@ -109,79 +103,33 @@ HTTP_SIMPLE_CONFIG = json.dumps(
 )
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
-
-def _puma_registry():
-    return register(RegistryBuilder()).build()
-
-
-# ── Config load: test domain ─────────────────────────────────────────────────
+# ── Load: key-value domain ───────────────────────────────────────────────────
 
 
 def test_bench_crusty_config_load_simple(benchmark):
-    """Crusty: TestMatcher.from_config(json)."""
-    benchmark(CrustTestMatcher.from_config, SIMPLE_CONFIG)
-
-
-def test_bench_puma_config_load_simple(benchmark):
-    """Puma: parse_protojson -> registry.load_matcher."""
-    registry = _puma_registry()
-
-    def go():
-        config = parse_protojson(json.loads(SIMPLE_CONFIG))
-        return registry.load_matcher(config)
-
-    benchmark(go)
+    benchmark(KvMatcher.from_config, SIMPLE_CONFIG)
 
 
 def test_bench_crusty_config_load_compound(benchmark):
-    """Crusty: TestMatcher.from_config(compound json)."""
-    benchmark(CrustTestMatcher.from_config, COMPOUND_CONFIG)
+    benchmark(KvMatcher.from_config, COMPOUND_CONFIG)
 
 
-def test_bench_puma_config_load_compound(benchmark):
-    """Puma: compound config via registry."""
-    registry = _puma_registry()
-
-    def go():
-        config = parse_protojson(json.loads(COMPOUND_CONFIG))
-        return registry.load_matcher(config)
-
-    benchmark(go)
-
-
-# ── Config evaluate: test domain ─────────────────────────────────────────────
+# ── Evaluate: key-value domain ───────────────────────────────────────────────
 
 
 @pytest.fixture
 def crusty_config_matcher():
-    return CrustTestMatcher.from_config(SIMPLE_CONFIG)
-
-
-@pytest.fixture
-def puma_config_matcher():
-    registry = _puma_registry()
-    config = parse_protojson(json.loads(SIMPLE_CONFIG))
-    return registry.load_matcher(config)
+    return KvMatcher.from_config(SIMPLE_CONFIG)
 
 
 def test_bench_crusty_config_evaluate_simple(benchmark, crusty_config_matcher):
-    """Crusty: evaluate config-loaded test matcher."""
     benchmark(crusty_config_matcher.evaluate, {"role": "admin"})
 
 
-def test_bench_puma_config_evaluate_simple(benchmark, puma_config_matcher):
-    """Puma: evaluate config-loaded test matcher."""
-    ctx = {"role": "admin"}
-    benchmark(puma_config_matcher.evaluate, ctx)
-
-
-# ── HTTP domain (crusty only) ────────────────────────────────────────────────
+# ── HTTP domain ──────────────────────────────────────────────────────────────
 
 
 def test_bench_crusty_http_config_load(benchmark):
-    """Crusty: HttpMatcher.from_config(json)."""
     benchmark(HttpMatcher.from_config, HTTP_SIMPLE_CONFIG)
 
 
@@ -191,5 +139,4 @@ def crusty_http_matcher():
 
 
 def test_bench_crusty_http_config_evaluate(benchmark, crusty_http_matcher):
-    """Crusty: evaluate config-loaded HTTP matcher."""
     benchmark(crusty_http_matcher.evaluate, "GET", "/api/v1/users")

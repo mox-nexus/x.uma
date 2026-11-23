@@ -1,324 +1,209 @@
 /**
- * Transform matcher config JSON into the renderer-independent graph model.
+ * Transform a protojson matcher config into the renderer-independent graph
+ * model.
  *
- * Two paths:
- * - Config mode: protojson -> MatcherConfig IR -> tree graph
- * - HTTP mode: Route array -> flat route graph
+ * The walk reads the document a user wrote, not an engine's internal form, so
+ * the diagram cannot disagree with the config it stands beside. Field names
+ * are accepted in `lowerCamelCase` (canonical protojson) and `snake_case`, as
+ * the config format itself accepts them.
  *
- * Produces structure only. Position, size and styling are decided downstream by
- * `layout.ts` and `draw.ts`.
+ * Produces structure only. Position, size and styling are decided downstream
+ * by `layout.ts` and `draw.ts`.
  */
-import {
-  parseProtojson,
-  type MatcherConfig,
-  type FieldMatcherConfig,
-  type PredicateConfig,
-  type OnMatchConfig,
-  SinglePredicateConfig,
-  AndPredicateConfig,
-  OrPredicateConfig,
-  NotPredicateConfig,
-  ActionConfig,
-  MatcherOnMatchConfig,
-} from "xuma";
-import type { ModeKind } from "../types.js";
 import type { GraphData, GraphEdge, GraphNode } from "./types.js";
 
 export type { GraphData };
+
+type Json = Record<string, unknown>;
 
 let idCounter = 0;
 function nextId(prefix: string): string {
   return `${prefix}-${idCounter++}`;
 }
 
-/** Convert config JSON string to graph data. */
-export function configToGraph(configJson: string, mode: ModeKind): GraphData {
+/** Convert a protojson config string to graph data. */
+export function configToGraph(configJson: string): GraphData {
   idCounter = 0;
+  const nodes: GraphNode[] = [];
+  const edges: GraphEdge[] = [];
   try {
-    const parsed = JSON.parse(configJson);
-    if (mode === "http") {
-      return httpToGraph(parsed);
-    }
-    const config = parseProtojson(parsed);
-    return matcherConfigToGraph(config);
+    const config = JSON.parse(configJson);
+    if (!isObject(config)) return { nodes: [], edges: [] };
+    walkMatcher(config, nodes, edges, null, false);
   } catch {
     return { nodes: [], edges: [] };
   }
-}
-
-// ---------------------------------------------------------------------------
-// Config mode: MatcherConfig AST → graph
-// ---------------------------------------------------------------------------
-
-function matcherConfigToGraph(config: MatcherConfig<string>): GraphData {
-  const nodes: GraphNode[] = [];
-  const edges: GraphEdge[] = [];
-  walkMatcher(config, nodes, edges, null);
   return { nodes, edges };
 }
 
+function isObject(v: unknown): v is Json {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** The first of `names` present on `o`. */
+function field(o: unknown, ...names: string[]): unknown {
+  if (!isObject(o)) return undefined;
+  for (const n of names) if (n in o) return o[n];
+  return undefined;
+}
+
+function list(v: unknown): unknown[] {
+  return Array.isArray(v) ? v : [];
+}
+
+/**
+ * Everything reachable from an `onNoMatch` is on the fallback path, however
+ * deep. The flag once stopped at the first nested matcher, so a fallback that
+ * nested instead of ending in a bare action was drawn exactly like a match.
+ */
 function walkMatcher(
-  config: MatcherConfig<string>,
+  matcher: Json,
   nodes: GraphNode[],
   edges: GraphEdge[],
   parentId: string | null,
-  // Everything reachable from an `onNoMatch` is on the fallback path, however
-  // deep. Without this the flag stopped at the first nested matcher, so a
-  // fallback that nests instead of ending in a bare action was drawn exactly
-  // like a match — same node type, no `no-match` edge. In a tool whose whole
-  // job is "why did this match?", that is the diagram answering wrongly.
-  isFallback = false,
+  isFallback: boolean,
 ): string {
   const id = nextId("matcher");
-  // A tree has entries, not field matchers. Counting `matchers` for one would
-  // render a populated config as "Matcher (0)" with no rule nodes — a valid
-  // config drawn as an empty diagram.
-  const count = config.tree ? config.tree.entries.length : config.matchers.length;
-  nodes.push({
-    id,
-    type: "matcher",
-    data: { label: config.tree ? `Matcher (${config.tree.rule} tree)` : "Matcher", count },
-  });
+  const tree = field(matcher, "matcherTree", "matcher_tree");
+  const rules = list(field(field(matcher, "matcherList", "matcher_list"), "matchers"));
 
-  if (parentId) {
-    edges.push({
-      id: nextId("e"),
-      source: parentId,
-      target: id,
-      kind: isFallback ? "no-match" : undefined,
+  if (tree !== undefined) {
+    const [rule, entries] = treeEntries(tree);
+    nodes.push({
+      id,
+      type: "matcher",
+      data: { label: `Matcher (${rule} tree)`, count: entries.length },
     });
-  }
-
-  if (config.tree) {
-    // Entries render as their key plus whatever the key dispatches to. There
-    // is no predicate to draw: a tree looks a key up rather than evaluating a
-    // condition, and drawing a predicate that is not in the config would make
-    // the diagram a second, wrong source of truth.
-    for (const [key, om] of config.tree.entries) {
+    link(edges, parentId, id, isFallback);
+    // An entry is a key and what the key dispatches to. There is no predicate
+    // to draw: a tree looks a key up rather than evaluating a condition.
+    for (const [key, onMatch] of entries) {
       const entryId = nextId("entry");
-      nodes.push({
-        id: entryId,
-        type: "predicate",
-        data: { label: `${config.tree.rule}: ${key}` },
-      });
+      nodes.push({ id: entryId, type: "predicate", data: { label: `${rule}: ${key}` } });
       edges.push({ id: nextId("e"), source: id, target: entryId });
-      walkOnMatch(om, nodes, edges, entryId, isFallback);
+      walkOnMatch(onMatch, nodes, edges, entryId, isFallback);
     }
   } else {
-    for (const fm of config.matchers) {
-      walkFieldMatcher(fm, nodes, edges, id, isFallback);
+    nodes.push({ id, type: "matcher", data: { label: "Matcher", count: rules.length } });
+    link(edges, parentId, id, isFallback);
+    for (const rule of rules) {
+      const predId = walkPredicate(field(rule, "predicate"), nodes, edges);
+      edges.push({ id: nextId("e"), source: id, target: predId });
+      walkOnMatch(field(rule, "onMatch", "on_match"), nodes, edges, predId, isFallback);
     }
   }
 
-  if (config.onNoMatch) {
-    walkOnMatch(config.onNoMatch, nodes, edges, id, true);
-  }
+  const onNoMatch = field(matcher, "onNoMatch", "on_no_match");
+  if (onNoMatch !== undefined) walkOnMatch(onNoMatch, nodes, edges, id, true);
 
   return id;
 }
 
-function walkFieldMatcher(
-  fm: FieldMatcherConfig<string>,
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-  matcherId: string,
-  isFallback: boolean,
-): void {
-  const predId = walkPredicate(fm.predicate, nodes, edges);
-
-  edges.push({
-    id: nextId("e"),
-    source: matcherId,
-    target: predId,
-  });
-
-  walkOnMatch(fm.onMatch, nodes, edges, predId, isFallback);
+function link(edges: GraphEdge[], from: string | null, to: string, isFallback: boolean): void {
+  if (from === null) return;
+  edges.push({ id: nextId("e"), source: from, target: to, kind: isFallback ? "no-match" : undefined });
 }
 
-function walkPredicate(
-  pred: PredicateConfig,
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-): string {
-  if (pred instanceof SinglePredicateConfig) {
-    const id = nextId("pred");
-    const key =
-      (pred.input.config as Record<string, string>).key ??
-      (pred.input.config as Record<string, string>).name ??
-      pred.input.typeUrl.split(".").pop() ??
-      "input";
-    const matchLabel = formatValueMatch(pred.matcher);
-    nodes.push({
-      id,
-      type: "predicate",
-      data: { kind: "single", key, match: matchLabel },
-    });
-    return id;
-  }
+/** A tree's dispatch rule and its `[key, onMatch]` entries. */
+function treeEntries(tree: unknown): [string, Array<[string, unknown]>] {
+  const exact = field(tree, "exactMatchMap", "exact_match_map");
+  const prefix = field(tree, "prefixMatchMap", "prefix_match_map");
+  const [rule, map] = exact !== undefined ? ["exact", exact] : prefix !== undefined ? ["prefix", prefix] : ["custom", undefined];
+  const entries = field(map, "map");
+  return [rule, isObject(entries) ? Object.entries(entries) : []];
+}
 
-  if (pred instanceof AndPredicateConfig) {
-    const id = nextId("pred");
-    nodes.push({
-      id,
-      type: "predicate",
-      data: { kind: "AND", count: pred.predicates.length },
-    });
-    for (const child of pred.predicates) {
-      const childId = walkPredicate(child, nodes, edges);
-      edges.push({
-        id: nextId("e"),
-        source: id,
-        target: childId,
-      });
-    }
-    return id;
-  }
-
-  if (pred instanceof OrPredicateConfig) {
-    const id = nextId("pred");
-    nodes.push({
-      id,
-      type: "predicate",
-      data: { kind: "OR", count: pred.predicates.length },
-    });
-    for (const child of pred.predicates) {
-      const childId = walkPredicate(child, nodes, edges);
-      edges.push({
-        id: nextId("e"),
-        source: id,
-        target: childId,
-      });
-    }
-    return id;
-  }
-
-  if (pred instanceof NotPredicateConfig) {
-    const id = nextId("pred");
-    nodes.push({
-      id,
-      type: "predicate",
-      data: { kind: "NOT" },
-    });
-    const childId = walkPredicate(pred.predicate, nodes, edges);
-    edges.push({
-      id: nextId("e"),
-      source: id,
-      target: childId,
-    });
-    return id;
-  }
-
-  // Fallback — shouldn't happen
+function walkPredicate(pred: unknown, nodes: GraphNode[], edges: GraphEdge[]): string {
   const id = nextId("pred");
-  nodes.push({
-    id,
-    type: "predicate",
-    data: { kind: "unknown" },
-  });
+
+  const single = field(pred, "singlePredicate", "single_predicate");
+  if (single !== undefined) {
+    nodes.push({
+      id,
+      type: "predicate",
+      data: { kind: "single", key: inputLabel(field(single, "input")), match: matchLabel(single) },
+    });
+    return id;
+  }
+
+  const not = field(pred, "notMatcher", "not_matcher");
+  if (not !== undefined) {
+    nodes.push({ id, type: "predicate", data: { kind: "NOT" } });
+    edges.push({ id: nextId("e"), source: id, target: walkPredicate(not, nodes, edges) });
+    return id;
+  }
+
+  const and = field(pred, "andMatcher", "and_matcher");
+  const compound = and !== undefined ? and : field(pred, "orMatcher", "or_matcher");
+  if (compound !== undefined) {
+    const children = list(field(compound, "predicate"));
+    nodes.push({
+      id,
+      type: "predicate",
+      data: { kind: and !== undefined ? "AND" : "OR", count: children.length },
+    });
+    for (const child of children) {
+      edges.push({ id: nextId("e"), source: id, target: walkPredicate(child, nodes, edges) });
+    }
+    return id;
+  }
+
+  nodes.push({ id, type: "predicate", data: { kind: "unknown" } });
   return id;
+}
+
+/** What an input reads: the key it was configured with, else the author's name for it. */
+function inputLabel(input: unknown): string {
+  const typed = field(input, "typedConfig", "typed_config");
+  const candidates = [field(typed, "key"), field(typed, "name"), field(input, "name")];
+  for (const c of candidates) if (typeof c === "string" && c !== "") return c;
+  const url = field(typed, "@type");
+  return typeof url === "string" ? (url.split(".").pop() ?? "input") : "input";
+}
+
+function matchLabel(single: unknown): string {
+  const vm = field(single, "valueMatch", "value_match");
+  for (const variant of ["exact", "prefix", "suffix", "contains"]) {
+    const v = field(vm, variant);
+    if (typeof v === "string") return `${variant} "${truncate(v)}"`;
+  }
+  const regex = field(field(vm, "safeRegex", "safe_regex"), "regex");
+  if (typeof regex === "string") return `regex "${truncate(regex)}"`;
+  return "custom";
+}
+
+function truncate(v: string): string {
+  return v.length > 20 ? `${v.slice(0, 17)}...` : v;
 }
 
 function walkOnMatch(
-  onMatch: OnMatchConfig<string>,
+  onMatch: unknown,
   nodes: GraphNode[],
   edges: GraphEdge[],
   sourceId: string,
   isFallback: boolean,
 ): void {
-  if (onMatch instanceof ActionConfig) {
-    const id = nextId("action");
-    nodes.push({
-      id,
-      type: isFallback ? "fallback" : "action",
-      data: { action: onMatch.action },
-    });
-    edges.push({
-      id: nextId("e"),
-      source: sourceId,
-      target: id,
-      kind: isFallback ? "no-match" : undefined,
-    });
+  const nested = field(onMatch, "matcher");
+  if (isObject(nested)) {
+    walkMatcher(nested, nodes, edges, sourceId, isFallback);
     return;
   }
 
-  if (onMatch instanceof MatcherOnMatchConfig) {
-    walkMatcher(onMatch.matcher, nodes, edges, sourceId, isFallback);
-  }
-}
-
-function formatValueMatch(matcher: unknown): string {
-  // BuiltInMatch has .variant and .value
-  const m = matcher as { variant?: string; value?: string };
-  if (m.variant && m.value !== undefined) {
-    const v = m.value.length > 20 ? m.value.slice(0, 17) + "..." : m.value;
-    return `${m.variant} "${v}"`;
-  }
-  return "custom";
-}
-
-// ---------------------------------------------------------------------------
-// HTTP mode: Route array → flat graph
-// ---------------------------------------------------------------------------
-
-interface HttpRouteEntry {
-  match: {
-    method?: string;
-    path?: { type: string; value: string };
-    headers?: Array<{ type: string; name: string; value: string }>;
-  };
-  action: string;
-}
-
-function httpToGraph(data: unknown): GraphData {
-  if (!Array.isArray(data)) return { nodes: [], edges: [] };
-  const entries = data as HttpRouteEntry[];
-
-  const nodes: GraphNode[] = [];
-  const edges: GraphEdge[] = [];
-
-  const rootId = nextId("routes");
+  const action = field(onMatch, "action");
+  if (action === undefined) return;
+  const id = nextId("action");
   nodes.push({
-    id: rootId,
-    type: "matcher",
-    data: { label: "Routes", count: entries.length },
+    id,
+    type: isFallback ? "fallback" : "action",
+    data: { action: actionLabel(action) },
   });
+  link(edges, sourceId, id, isFallback);
+}
 
-  for (const entry of entries) {
-    const predId = nextId("pred");
-    const parts: string[] = [];
-    if (entry.match.method) parts.push(entry.match.method);
-    if (entry.match.path) parts.push(entry.match.path.value);
-    const headerCount = entry.match.headers?.length ?? 0;
-
-    nodes.push({
-      id: predId,
-      type: "predicate",
-      data: {
-        kind: "route",
-        label: parts.join(" ") || "any",
-        headers: headerCount,
-      },
-    });
-
-    edges.push({
-      id: nextId("e"),
-      source: rootId,
-      target: predId,
-    });
-
-    const actionId = nextId("action");
-    nodes.push({
-      id: actionId,
-      type: "action",
-      data: { action: entry.action },
-    });
-
-    edges.push({
-      id: nextId("e"),
-      source: predId,
-      target: actionId,
-    });
-  }
-
-  return { nodes, edges };
+/** A NamedAction's name, else the extension's own name. */
+function actionLabel(action: unknown): string {
+  const named = field(field(action, "typedConfig", "typed_config"), "name");
+  if (typeof named === "string" && named !== "") return named;
+  const name = field(action, "name");
+  return typeof name === "string" ? name : "action";
 }

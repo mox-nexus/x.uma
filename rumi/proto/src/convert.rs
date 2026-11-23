@@ -1,4 +1,4 @@
-//! Converts proto `Matcher` → `MatcherConfig<TypedConfig>`.
+//! Converts proto `Matcher` → `MatcherIr<TypedExtensionConfig>`.
 //!
 //! Walks the xDS proto matcher tree and produces the rumi config types that
 //! can be loaded through [`Registry::load_typed_matcher()`](rumi::Registry::load_typed_matcher).
@@ -7,20 +7,20 @@
 //!
 //! | Proto type | Config type |
 //! |-----------|-------------|
-//! | `Matcher` | `MatcherConfig<TypedConfig>` |
-//! | `MatcherList.FieldMatcher` | `FieldMatcherConfig<TypedConfig>` |
-//! | `Predicate` | `PredicateConfig` |
-//! | `SinglePredicate` | `SinglePredicateConfig` |
-//! | `StringMatcher` | `ValueMatchConfig::BuiltIn(StringMatchSpec)` |
-//! | `TypedExtensionConfig` (matcher) | `ValueMatchConfig::Custom(TypedConfig)` |
-//! | `TypedExtensionConfig` (input) | `TypedConfig` (in `SinglePredicateConfig.input`) |
-//! | `OnMatch::Action` | `OnMatchConfig::Action { action: TypedConfig }` |
-//! | `OnMatch::Matcher` | `OnMatchConfig::Matcher { matcher: Box<...> }` |
+//! | `Matcher` | `MatcherIr<TypedExtensionConfig>` |
+//! | `MatcherList.FieldMatcher` | `FieldMatcherIr<TypedExtensionConfig>` |
+//! | `Predicate` | `PredicateIr` |
+//! | `SinglePredicate` | `SinglePredicateIr` |
+//! | `StringMatcher` | `ValueMatchIr::BuiltIn(StringMatchSpec)` |
+//! | `TypedExtensionConfig` (matcher) | `ValueMatchIr::Custom(TypedExtensionConfig)` |
+//! | `TypedExtensionConfig` (input) | `SinglePredicateIr.input`, the `Any` unpacked to a `Value` |
+//! | `OnMatch::Action` | `OnMatchIr::Action { action: TypedExtensionConfig }` |
+//! | `OnMatch::Matcher` | `OnMatchIr::Matcher { matcher: Box<...> }` |
 
 use rumi::{
-    ActionRegistry, FieldMatcherConfig, Matcher, MatcherConfig, MatcherError, MatcherKindConfig,
-    MatcherTreeConfig, OnMatchConfig, PredicateConfig, Registry, SinglePredicateConfig,
-    StringMatchSpec, TreeTypeConfig, TypedConfig, ValueMatchConfig,
+    ActionRegistry, FieldMatcherIr, Matcher, MatcherError, MatcherIr, MatcherKindIr, MatcherTreeIr,
+    OnMatchIr, PredicateIr, Registry, SinglePredicateIr, StringMatchSpec, TreeTypeIr,
+    TypedExtensionConfig, ValueMatchIr,
 };
 
 use crate::any_resolver::AnyResolver;
@@ -30,7 +30,7 @@ use crate::xds::r#type::matcher::v3 as proto_matcher;
 ///
 /// This is the one-shot convenience function for the full proto → runtime path:
 ///
-/// 1. **Convert** proto `Matcher` → `MatcherConfig<TypedConfig>` (via [`convert_matcher`])
+/// 1. **Convert** proto `Matcher` → `MatcherIr<TypedExtensionConfig>` (via [`convert_matcher`])
 /// 2. **Load** config through the [`Registry`] → runtime `Matcher<Ctx, A>`
 ///
 /// # Example
@@ -59,7 +59,7 @@ where
     registry.load_typed_matcher(config, actions)
 }
 
-/// Convert a proto `Matcher` into a `MatcherConfig<TypedConfig>`.
+/// Convert a proto `Matcher` into a `MatcherIr<TypedExtensionConfig>`.
 ///
 /// The `AnyResolver` decodes `google.protobuf.Any` payloads in
 /// `TypedExtensionConfig` messages into `serde_json::Value` for the registry.
@@ -77,16 +77,16 @@ where
 pub fn convert_matcher(
     matcher: &proto_matcher::Matcher,
     resolver: &AnyResolver,
-) -> Result<MatcherConfig<TypedConfig>, MatcherError> {
+) -> Result<MatcherIr<TypedExtensionConfig>, MatcherError> {
     let kind = match &matcher.matcher_type {
-        Some(proto_matcher::matcher::MatcherType::MatcherList(list)) => MatcherKindConfig::List(
+        Some(proto_matcher::matcher::MatcherType::MatcherList(list)) => MatcherKindIr::List(
             list.matchers
                 .iter()
                 .map(|fm| convert_field_matcher(fm, resolver))
                 .collect::<Result<Vec<_>, _>>()?,
         ),
         Some(proto_matcher::matcher::MatcherType::MatcherTree(tree)) => {
-            MatcherKindConfig::Tree(convert_matcher_tree(tree, resolver)?)
+            MatcherKindIr::Tree(convert_matcher_tree(tree, resolver)?)
         }
         None => {
             return Err(MatcherError::InvalidConfig {
@@ -101,7 +101,7 @@ pub fn convert_matcher(
         .map(|om| convert_on_match(om, resolver))
         .transpose()?;
 
-    Ok(MatcherConfig { kind, on_no_match })
+    Ok(MatcherIr { kind, on_no_match })
 }
 
 /// Convert a proto `MatcherTree`.
@@ -112,7 +112,7 @@ pub fn convert_matcher(
 fn convert_matcher_tree(
     tree: &proto_matcher::matcher::MatcherTree,
     resolver: &AnyResolver,
-) -> Result<MatcherTreeConfig<TypedConfig>, MatcherError> {
+) -> Result<MatcherTreeIr<TypedExtensionConfig>, MatcherError> {
     use proto_matcher::matcher::matcher_tree::TreeType;
 
     let input = tree
@@ -137,8 +137,8 @@ fn convert_matcher_tree(
     };
 
     let tree_type = match &tree.tree_type {
-        Some(TreeType::ExactMatchMap(map)) => TreeTypeConfig::ExactMatchMap(convert_map(map)?),
-        Some(TreeType::PrefixMatchMap(map)) => TreeTypeConfig::PrefixMatchMap(convert_map(map)?),
+        Some(TreeType::ExactMatchMap(map)) => TreeTypeIr::ExactMatchMap(convert_map(map)?),
+        Some(TreeType::PrefixMatchMap(map)) => TreeTypeIr::PrefixMatchMap(convert_map(map)?),
         Some(TreeType::CustomMatch(_)) => {
             // Refused by name rather than falling into the absent-oneof branch
             // below: reporting "no map set" for a config that plainly sets one
@@ -160,7 +160,7 @@ fn convert_matcher_tree(
         }
     };
 
-    Ok(MatcherTreeConfig {
+    Ok(MatcherTreeIr {
         input,
         tree: tree_type,
     })
@@ -169,7 +169,7 @@ fn convert_matcher_tree(
 fn convert_field_matcher(
     fm: &proto_matcher::matcher::matcher_list::FieldMatcher,
     resolver: &AnyResolver,
-) -> Result<FieldMatcherConfig<TypedConfig>, MatcherError> {
+) -> Result<FieldMatcherIr<TypedExtensionConfig>, MatcherError> {
     let predicate = fm
         .predicate
         .as_ref()
@@ -184,7 +184,7 @@ fn convert_field_matcher(
             source: "FieldMatcher has no on_match".into(),
         })?;
 
-    Ok(FieldMatcherConfig {
+    Ok(FieldMatcherIr {
         predicate: convert_predicate(predicate, resolver)?,
         on_match: convert_on_match(on_match, resolver)?,
     })
@@ -193,7 +193,7 @@ fn convert_field_matcher(
 fn convert_predicate(
     pred: &proto_matcher::matcher::matcher_list::Predicate,
     resolver: &AnyResolver,
-) -> Result<PredicateConfig, MatcherError> {
+) -> Result<PredicateIr, MatcherError> {
     use proto_matcher::matcher::matcher_list::predicate::MatchType;
 
     let match_type = pred
@@ -206,7 +206,7 @@ fn convert_predicate(
     match match_type {
         MatchType::SinglePredicate(sp) => {
             let single = convert_single_predicate(sp, resolver)?;
-            Ok(PredicateConfig::Single(single))
+            Ok(PredicateIr::Single(single))
         }
         MatchType::OrMatcher(list) => {
             let predicates = list
@@ -214,7 +214,7 @@ fn convert_predicate(
                 .iter()
                 .map(|p| convert_predicate(p, resolver))
                 .collect::<Result<Vec<_>, _>>()?;
-            Ok(PredicateConfig::Or { predicates })
+            Ok(PredicateIr::Or { predicates })
         }
         MatchType::AndMatcher(list) => {
             let predicates = list
@@ -222,11 +222,11 @@ fn convert_predicate(
                 .iter()
                 .map(|p| convert_predicate(p, resolver))
                 .collect::<Result<Vec<_>, _>>()?;
-            Ok(PredicateConfig::And { predicates })
+            Ok(PredicateIr::And { predicates })
         }
         MatchType::NotMatcher(inner) => {
             let predicate = convert_predicate(inner, resolver)?;
-            Ok(PredicateConfig::Not {
+            Ok(PredicateIr::Not {
                 predicate: Box::new(predicate),
             })
         }
@@ -236,8 +236,7 @@ fn convert_predicate(
 fn convert_single_predicate(
     sp: &proto_matcher::matcher::matcher_list::predicate::SinglePredicate,
     resolver: &AnyResolver,
-) -> Result<SinglePredicateConfig, MatcherError> {
-    // Resolve input TypedExtensionConfig → TypedConfig
+) -> Result<SinglePredicateIr, MatcherError> {
     let input_ext = sp
         .input
         .as_ref()
@@ -246,7 +245,6 @@ fn convert_single_predicate(
         })?;
     let input = resolver.resolve(input_ext)?;
 
-    // Resolve matcher: value_match (StringMatcher) or custom_match (TypedExtensionConfig)
     use proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher as ProtoMatcher;
 
     let matcher_oneof = sp
@@ -254,26 +252,25 @@ fn convert_single_predicate(
         .as_ref()
         .ok_or_else(|| MatcherError::InvalidConfig {
             // Names the fields, so the error says what to write rather than
-            // what is absent — and so it agrees with puma's wording, which is
-            // a conformance property the fixtures pin.
+            // what is absent. The fixtures pin this wording.
             source: "singlePredicate: one of 'valueMatch' or 'customMatch' is required".into(),
         })?;
 
     let matcher = match matcher_oneof {
         ProtoMatcher::ValueMatch(string_matcher) => {
             let spec = convert_string_matcher(string_matcher)?;
-            ValueMatchConfig::BuiltIn {
+            ValueMatchIr::BuiltIn {
                 spec,
                 ignore_case: string_matcher.ignore_case,
             }
         }
         ProtoMatcher::CustomMatch(ext) => {
             let typed = resolver.resolve(ext)?;
-            ValueMatchConfig::Custom(typed)
+            ValueMatchIr::Custom(typed)
         }
     };
 
-    Ok(SinglePredicateConfig { input, matcher })
+    Ok(SinglePredicateIr { input, matcher })
 }
 
 fn convert_string_matcher(
@@ -288,10 +285,8 @@ fn convert_string_matcher(
             source: "StringMatcher has no match_pattern".into(),
         })?;
 
-    // `ignore_case` is not read here: it belongs to the comparison, not the
-    // pattern, so the caller carries it on ValueMatchConfig::BuiltIn. A comment
-    // in this spot used to claim the registry handled it. It did not, and the
-    // flag was dropped — a rule that read case-insensitive and was not.
+    // `ignore_case` belongs to the comparison, not the pattern, so the caller
+    // carries it on `ValueMatchIr::BuiltIn`.
 
     match pattern {
         MatchPattern::Exact(s) => Ok(StringMatchSpec::Exact(s.clone())),
@@ -308,15 +303,11 @@ fn convert_string_matcher(
 fn convert_on_match(
     om: &proto_matcher::matcher::OnMatch,
     resolver: &AnyResolver,
-) -> Result<OnMatchConfig<TypedConfig>, MatcherError> {
+) -> Result<OnMatchIr<TypedExtensionConfig>, MatcherError> {
     use proto_matcher::matcher::on_match::OnMatch as ProtoOnMatch;
 
-    // `keep_matching` is one keystroke from being set and, until 2026-08-18,
-    // did nothing. In xDS it records the action and continues evaluating, which
-    // is a different answer from first-match-wins — so accepting it and
-    // ignoring it means a config that reads one way behaves another. It is
-    // deferred, not implemented (CLAUDE.md), so it is refused rather than
-    // silently reinterpreted. Rejecting is reversible; a wrong answer is not.
+    // `keep_matching` is deferred, not implemented (PLAN.md F2). Accepting and
+    // ignoring it would let a config read one way and behave another.
     if om.keep_matching {
         return Err(MatcherError::InvalidConfig {
             source: "keep_matching is not implemented. In xDS it records the action and \
@@ -337,11 +328,11 @@ fn convert_on_match(
     match on_match {
         ProtoOnMatch::Action(ext) => {
             let typed = resolver.resolve(ext)?;
-            Ok(OnMatchConfig::Action { action: typed })
+            Ok(OnMatchIr::Action { action: typed })
         }
         ProtoOnMatch::Matcher(nested) => {
             let config = convert_matcher(nested, resolver)?;
-            Ok(OnMatchConfig::Matcher {
+            Ok(OnMatchIr::Matcher {
                 matcher: Box::new(config),
             })
         }
@@ -352,10 +343,10 @@ fn convert_on_match(
 mod tests {
     /// The field matchers of a converted config. Panics on a tree — the
     /// callers here all build lists.
-    fn list_of<A>(config: &MatcherConfig<A>) -> &[FieldMatcherConfig<A>] {
+    fn list_of<A>(config: &MatcherIr<A>) -> &[FieldMatcherIr<A>] {
         match &config.kind {
-            MatcherKindConfig::List(l) => l,
-            MatcherKindConfig::Tree(_) => panic!("expected a list matcher"),
+            MatcherKindIr::List(l) => l,
+            MatcherKindIr::Tree(_) => panic!("expected a list matcher"),
         }
     }
 
@@ -380,7 +371,7 @@ mod tests {
 
     fn test_resolver() -> AnyResolver {
         AnyResolverBuilder::new()
-            .register::<crate::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+            .register::<crate::xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
             .register::<crate::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
             .build()
     }
@@ -389,8 +380,10 @@ mod tests {
     fn convert_simple_exact_match() {
         let resolver = test_resolver();
 
-        // Build proto: StringInput → Exact("hello") → NamedAction("hit")
-        let input_config = crate::xuma::kv::v1::MapInput { key: "role".into() };
+        let input_config = crate::xuma::core::v1::MapInput {
+            key: "role".into(),
+            ..Default::default()
+        };
         let action_config = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "allow".into(),
@@ -405,7 +398,7 @@ mod tests {
                             match_type: Some(
                                 proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                                     proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                                        input: Some(make_ext("input", "xuma.kv.v1.MapInput", &input_config)),
+                                        input: Some(make_ext("input", "xuma.core.v1.MapInput", &input_config)),
                                         matcher: Some(
                                             proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                                 proto_matcher::StringMatcher {
@@ -437,18 +430,16 @@ mod tests {
         assert_eq!(list_of(&config).len(), 1);
         assert!(config.on_no_match.is_none());
 
-        // Check the predicate has our input
         match &list_of(&config)[0].predicate {
-            PredicateConfig::Single(sp) => {
-                assert_eq!(sp.input.type_url, "xuma.kv.v1.MapInput");
+            PredicateIr::Single(sp) => {
+                assert_eq!(sp.input.type_url, "xuma.core.v1.MapInput");
                 assert_eq!(sp.input.config["key"], "role");
             }
             other => panic!("expected Single, got {other:?}"),
         }
 
-        // Check the action
         match &list_of(&config)[0].on_match {
-            OnMatchConfig::Action { action } => {
+            OnMatchIr::Action { action } => {
                 assert_eq!(action.type_url, "xuma.core.v1.NamedAction");
                 assert_eq!(action.config["name"], "allow");
             }
@@ -460,7 +451,10 @@ mod tests {
     fn convert_with_on_no_match() {
         let resolver = test_resolver();
 
-        let input_config = crate::xuma::kv::v1::MapInput { key: "key".into() };
+        let input_config = crate::xuma::core::v1::MapInput {
+            key: "key".into(),
+            ..Default::default()
+        };
         let hit_action = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "hit".into(),
@@ -484,7 +478,7 @@ mod tests {
                             match_type: Some(
                                 proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                                     proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                                        input: Some(make_ext("input", "xuma.kv.v1.MapInput", &input_config)),
+                                        input: Some(make_ext("input", "xuma.core.v1.MapInput", &input_config)),
                                         matcher: Some(
                                             proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                                 proto_matcher::StringMatcher {
@@ -513,7 +507,7 @@ mod tests {
         let config = convert_matcher(&proto, &resolver).unwrap();
         assert!(config.on_no_match.is_some());
         match config.on_no_match.unwrap() {
-            OnMatchConfig::Action { action } => {
+            OnMatchIr::Action { action } => {
                 assert_eq!(action.config["name"], "miss");
             }
             other => panic!("expected Action, got {other:?}"),
@@ -524,19 +518,25 @@ mod tests {
     fn convert_and_predicate() {
         let resolver = test_resolver();
 
-        let input1 = crate::xuma::kv::v1::MapInput { key: "role".into() };
-        let input2 = crate::xuma::kv::v1::MapInput { key: "org".into() };
+        let input1 = crate::xuma::core::v1::MapInput {
+            key: "role".into(),
+            ..Default::default()
+        };
+        let input2 = crate::xuma::core::v1::MapInput {
+            key: "org".into(),
+            ..Default::default()
+        };
         let action = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "both".into(),
         };
 
-        let make_single = |input: &crate::xuma::kv::v1::MapInput, pattern: &str| {
+        let make_single = |input: &crate::xuma::core::v1::MapInput, pattern: &str| {
             proto_matcher::matcher::matcher_list::Predicate {
                 match_type: Some(
                     proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                         proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                            input: Some(make_ext("in", "xuma.kv.v1.MapInput", input)),
+                            input: Some(make_ext("in", "xuma.core.v1.MapInput", input)),
                             matcher: Some(
                                 proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                     proto_matcher::StringMatcher {
@@ -583,7 +583,7 @@ mod tests {
 
         let config = convert_matcher(&proto, &resolver).unwrap();
         match &list_of(&config)[0].predicate {
-            PredicateConfig::And { predicates } => assert_eq!(predicates.len(), 2),
+            PredicateIr::And { predicates } => assert_eq!(predicates.len(), 2),
             other => panic!("expected And, got {other:?}"),
         }
     }
@@ -601,14 +601,10 @@ mod tests {
         assert!(matches!(err, MatcherError::InvalidConfig { .. }));
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // End-to-end: proto → convert → load → evaluate
-    // ═══════════════════════════════════════════════════════════════════
-
     /// NamedAction → String: extracts the `name` field as the action value.
     struct NamedActionFactory;
 
-    impl rumi::IntoAction<String> for NamedActionFactory {
+    impl rumi::ActionFactory<String> for NamedActionFactory {
         type Config = crate::xuma::core::v1::NamedAction;
 
         fn from_config(config: Self::Config) -> Result<String, MatcherError> {
@@ -639,7 +635,10 @@ mod tests {
         let resolver = test_resolver();
 
         let build = |ignore_case: bool| {
-            let input_config = crate::xuma::kv::v1::MapInput { key: "role".into() };
+            let input_config = crate::xuma::core::v1::MapInput {
+                key: "role".into(),
+                ..Default::default()
+            };
             let action_config = crate::xuma::core::v1::NamedAction {
                 metadata: Default::default(),
                 name: "allow".into(),
@@ -655,7 +654,7 @@ mod tests {
                                         proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
                                             input: Some(make_ext(
                                                 "input",
-                                                "xuma.kv.v1.MapInput",
+                                                "xuma.core.v1.MapInput",
                                                 &input_config,
                                             )),
                                             matcher: Some(
@@ -708,13 +707,14 @@ mod tests {
 
     #[test]
     fn e2e_proto_to_evaluate_exact_match() {
-        // Setup: registry with test domain, action registry, resolver
         let registry = rumi_kv::register(rumi::RegistryBuilder::new()).build();
         let actions = test_action_registry();
         let resolver = test_resolver();
 
-        // Build proto: StringInput("role") → Exact("admin") → NamedAction("allow")
-        let input_config = crate::xuma::kv::v1::MapInput { key: "role".into() };
+        let input_config = crate::xuma::core::v1::MapInput {
+            key: "role".into(),
+            ..Default::default()
+        };
         let action_config = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "allow".into(),
@@ -729,7 +729,7 @@ mod tests {
                             match_type: Some(
                                 proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                                     proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                                        input: Some(make_ext("input", "xuma.kv.v1.MapInput", &input_config)),
+                                        input: Some(make_ext("input", "xuma.core.v1.MapInput", &input_config)),
                                         matcher: Some(
                                             proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                                 proto_matcher::StringMatcher {
@@ -755,7 +755,6 @@ mod tests {
             )),
         };
 
-        // Full pipeline: proto → convert → load → evaluate
         let matcher = load_proto_matcher(&registry, &actions, &resolver, &proto).unwrap();
 
         let ctx = rumi_kv::KvContext::new().with("role", "admin");
@@ -771,7 +770,10 @@ mod tests {
         let actions = test_action_registry();
         let resolver = test_resolver();
 
-        let input_config = crate::xuma::kv::v1::MapInput { key: "role".into() };
+        let input_config = crate::xuma::core::v1::MapInput {
+            key: "role".into(),
+            ..Default::default()
+        };
         let hit_action = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "allow".into(),
@@ -795,7 +797,7 @@ mod tests {
                             match_type: Some(
                                 proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                                     proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                                        input: Some(make_ext("input", "xuma.kv.v1.MapInput", &input_config)),
+                                        input: Some(make_ext("input", "xuma.core.v1.MapInput", &input_config)),
                                         matcher: Some(
                                             proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                                 proto_matcher::StringMatcher {
@@ -823,11 +825,9 @@ mod tests {
 
         let matcher = load_proto_matcher(&registry, &actions, &resolver, &proto).unwrap();
 
-        // Match: role=admin → "allow"
         let ctx = rumi_kv::KvContext::new().with("role", "admin");
         assert_eq!(matcher.evaluate(&ctx), Some("allow".to_string()));
 
-        // No match: role=viewer → fallback "deny"
         let ctx = rumi_kv::KvContext::new().with("role", "viewer");
         assert_eq!(matcher.evaluate(&ctx), Some("deny".to_string()));
     }
@@ -838,19 +838,25 @@ mod tests {
         let actions = test_action_registry();
         let resolver = test_resolver();
 
-        let input_role = crate::xuma::kv::v1::MapInput { key: "role".into() };
-        let input_org = crate::xuma::kv::v1::MapInput { key: "org".into() };
+        let input_role = crate::xuma::core::v1::MapInput {
+            key: "role".into(),
+            ..Default::default()
+        };
+        let input_org = crate::xuma::core::v1::MapInput {
+            key: "org".into(),
+            ..Default::default()
+        };
         let action = crate::xuma::core::v1::NamedAction {
             metadata: Default::default(),
             name: "admin_acme".into(),
         };
 
-        let make_single = |input: &crate::xuma::kv::v1::MapInput, pattern: &str| {
+        let make_single = |input: &crate::xuma::core::v1::MapInput, pattern: &str| {
             proto_matcher::matcher::matcher_list::Predicate {
                 match_type: Some(
                     proto_matcher::matcher::matcher_list::predicate::MatchType::SinglePredicate(
                         proto_matcher::matcher::matcher_list::predicate::SinglePredicate {
-                            input: Some(make_ext("in", "xuma.kv.v1.MapInput", input)),
+                            input: Some(make_ext("in", "xuma.core.v1.MapInput", input)),
                             matcher: Some(
                                 proto_matcher::matcher::matcher_list::predicate::single_predicate::Matcher::ValueMatch(
                                     proto_matcher::StringMatcher {
@@ -897,19 +903,16 @@ mod tests {
 
         let matcher = load_proto_matcher(&registry, &actions, &resolver, &proto).unwrap();
 
-        // Both match → action
         let ctx = rumi_kv::KvContext::new()
             .with("role", "admin")
             .with("org", "acme");
         assert_eq!(matcher.evaluate(&ctx), Some("admin_acme".to_string()));
 
-        // Only one matches → None
         let ctx = rumi_kv::KvContext::new()
             .with("role", "admin")
             .with("org", "other");
         assert_eq!(matcher.evaluate(&ctx), None);
 
-        // Neither matches → None
         let ctx = rumi_kv::KvContext::new()
             .with("role", "viewer")
             .with("org", "other");
@@ -925,7 +928,7 @@ mod keep_matching_tests {
 
     fn resolver() -> AnyResolver {
         AnyResolverBuilder::new()
-            .register::<crate::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+            .register::<crate::xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
             .register::<crate::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
             .build()
     }
@@ -940,7 +943,7 @@ mod keep_matching_tests {
                       "input": {{
                         "name": "role",
                         "typedConfig": {{
-                          "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                          "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                           "key": "role"
                         }}
                       }},

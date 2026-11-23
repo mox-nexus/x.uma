@@ -5,14 +5,14 @@
 //! inlined beside an `@type` key:
 //!
 //! ```json
-//! { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", "key": "role" }
+//! { "@type": "type.googleapis.com/xuma.core.v1.MapInput", "key": "role" }
 //! ```
 //!
 //! `pbjson-types` writes it **packed** instead — a type URL beside base64 of the
 //! binary encoding:
 //!
 //! ```json
-//! { "typeUrl": "type.googleapis.com/xuma.kv.v1.MapInput", "value": "CgRyb2xl" }
+//! { "typeUrl": "type.googleapis.com/xuma.core.v1.MapInput", "value": "CgRyb2xl" }
 //! ```
 //!
 //! The difference is not stylistic. Expanding an `Any` requires knowing the
@@ -211,15 +211,39 @@ pub fn parse_matcher(
     })
 }
 
+/// Bytes a reader accepts for one config document (D-054).
+///
+/// Checked before parsing, by every reader: the CLI, both bindings, and
+/// [`parse_matcher_str`]. A document is refused by its size before any of
+/// its content is materialised.
+pub const MAX_DOCUMENT_BYTES: usize = 1 << 20;
+
+/// Refuse a document larger than [`MAX_DOCUMENT_BYTES`].
+///
+/// # Errors
+///
+/// [`MatcherError::DocumentTooLarge`] naming the size.
+pub fn check_document_size(document: &str) -> Result<(), MatcherError> {
+    if document.len() > MAX_DOCUMENT_BYTES {
+        return Err(MatcherError::DocumentTooLarge {
+            bytes: document.len(),
+            max: MAX_DOCUMENT_BYTES,
+        });
+    }
+    Ok(())
+}
+
 /// Parse a canonical protojson string into a proto `Matcher`.
 ///
 /// # Errors
 ///
-/// As [`parse_matcher`], plus a JSON syntax error.
+/// As [`parse_matcher`], plus a JSON syntax error, plus
+/// [`MatcherError::DocumentTooLarge`].
 pub fn parse_matcher_str(
     resolver: &AnyResolver,
     document: &str,
 ) -> Result<crate::xds::r#type::matcher::v3::Matcher, MatcherError> {
+    check_document_size(document)?;
     let value: Value = serde_json::from_str(document).map_err(|e| MatcherError::InvalidConfig {
         source: format!("config is not valid JSON: {e}"),
     })?;
@@ -232,9 +256,21 @@ mod tests {
     use crate::any_resolver::AnyResolverBuilder;
     use crate::xds::r#type::matcher::v3 as proto;
 
+    #[test]
+    fn a_document_over_the_byte_budget_is_refused_before_it_is_parsed() {
+        let padding = "x".repeat(MAX_DOCUMENT_BYTES);
+        let document = format!("{{\"matcherList\":{{\"matchers\":[]}},\"pad\":\"{padding}\"}}");
+        let err = parse_matcher_str(&resolver(), &document).unwrap_err();
+        assert!(
+            matches!(err, MatcherError::DocumentTooLarge { bytes, max } if bytes == document.len() && max == MAX_DOCUMENT_BYTES),
+            "{err:?}"
+        );
+        assert!(check_document_size(&"y".repeat(MAX_DOCUMENT_BYTES)).is_ok());
+    }
+
     fn resolver() -> AnyResolver {
         AnyResolverBuilder::new()
-            .register::<crate::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+            .register::<crate::xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
             .register::<crate::xuma::core::v1::NamedAction>("xuma.core.v1.NamedAction")
             .build()
     }
@@ -270,7 +306,7 @@ mod tests {
                       "input": {
                         "name": "role",
                         "typedConfig": {
-                          "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                          "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                           "key": "role"
                         }
                       },
@@ -310,7 +346,7 @@ mod tests {
         let doc = serde_json::json!({
             "name": "role",
             "typedConfig": {
-                "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                 "key": "role"
             }
         });
@@ -319,7 +355,7 @@ mod tests {
             serde_json::from_value(r.pack(doc).unwrap()).unwrap();
         let typed = r.resolve(&tec).unwrap();
 
-        assert_eq!(typed.type_url, "xuma.kv.v1.MapInput");
+        assert_eq!(typed.type_url, "xuma.core.v1.MapInput");
         assert_eq!(typed.config["key"], "role");
     }
 
@@ -341,7 +377,7 @@ mod tests {
     #[test]
     fn unknown_field_inside_a_payload_is_an_error() {
         let doc = serde_json::json!({
-            "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+            "@type": "type.googleapis.com/xuma.core.v1.MapInput",
             "kye": "role"
         });
         let err = resolver().pack(doc).unwrap_err();
@@ -370,7 +406,7 @@ mod tests {
                 "input": {
                     "name": "role",
                     "typedConfig": {
-                        "@type": "type.googleapis.com/xuma.kv.v1.MapInput",
+                        "@type": "type.googleapis.com/xuma.core.v1.MapInput",
                         "key": "role"
                     }
                 },

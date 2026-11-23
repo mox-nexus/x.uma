@@ -6,76 +6,65 @@ Why does the same `ExactMatcher` work for HTTP headers and custom event types? B
 
 If `InputMatcher` were generic over the context type, every domain would need its own matcher implementations:
 
-<!-- doc-sample: fragment -->
-```python
-# If InputMatcher were generic (DON'T DO THIS)
-class InputMatcher[Ctx]:
-    def matches(self, ctx: Ctx) -> bool: ...
+```rust,ignore
+// If InputMatcher were generic (DON'T DO THIS)
+trait InputMatcher<Ctx> {
+    fn matches(&self, ctx: &Ctx) -> bool;
+}
 
-# You'd need separate matchers for each domain
-http_matcher = ExactMatcher[HttpRequest]("/api")
-event_matcher = ExactMatcher[CloudEvent]("com.example")
-# Can't put them in the same registry. No code reuse.
+// You'd need separate matchers for each domain
+let http_matcher = ExactMatcher::<HttpMessage>::new("/api");
+let event_matcher = ExactMatcher::<CloudEvent>::new("com.example");
+// Can't put them in the same registry. No code reuse.
 ```
 
 ## The Solution
 
 Erase the type at the **data level**. Extract the value first, then match the erased value:
 
-<!-- doc-sample: fragment -->
-```python
-# DataInput is generic — knows about the context
-class DataInput[Ctx]:
-    def get(self, ctx: Ctx) -> MatchingData: ...
+```rust,ignore
+// DataInput is generic — knows about the context
+trait DataInput<Ctx> {
+    fn get(&self, ctx: &Ctx) -> Option<MatchingData>;
+}
 
-# InputMatcher is NOT generic — knows only about MatchingData
-class InputMatcher:
-    def matches(self, value: MatchingData) -> bool: ...
+// InputMatcher is NOT generic — knows only about MatchingData
+trait InputMatcher {
+    fn matches(&self, value: &MatchingData) -> bool;
+}
 ```
 
 Now one `ExactMatcher` works everywhere:
 
-<!-- doc-sample: fragment -->
-```python
-# HTTP path matching
-path_pred = SinglePredicate(input=PathInput(), matcher=ExactMatcher("/api"))
+```rust,ignore
+// HTTP path matching
+let path_pred = SinglePredicate::new(Box::new(PathInput), Box::new(ExactMatcher::new("/api")));
 
-# Event type matching — SAME ExactMatcher
-event_pred = SinglePredicate(input=EventTypeInput(), matcher=ExactMatcher("/api"))
+// Event type matching — SAME ExactMatcher
+let event_pred = SinglePredicate::new(Box::new(EventTypeInput), Box::new(ExactMatcher::new("/api")));
 ```
 
 ## MatchingData: The Bridge
 
-`MatchingData` is the boundary between domain-specific and domain-agnostic code. Same name in all three implementations:
+`MatchingData` is the boundary between domain-specific and domain-agnostic code:
 
-**Rust:**
 ```rust,ignore
 // Declaration, shown for shape. `Arc`, not `Box`: the Arc is what makes the
 // `Arc::ptr_eq` identity comparison possible, and `CustomMatchData` carries the
 // `Send + Sync + Debug` bounds the FFI boundary needs.
 pub enum MatchingData {
-    None,
     String(String),
     Int(i64),
     Bool(bool),
     Bytes(Vec<u8>),
     Custom(Arc<dyn CustomMatchData>),
 }
+// Absence is not a variant. `DataInput::get` returns `Option<MatchingData>`.
 ```
 
-**Python:**
-<!-- doc-sample: fragment -->
-```python
-type MatchingData = str | int | bool | bytes | None
-```
-
-**TypeScript:**
-<!-- doc-sample: fragment -->
-```typescript
-type MatchingData = string | number | boolean | Uint8Array | null;
-```
-
-Rust uses an enum. Python and TypeScript use union types. Same concept, idiomatic syntax.
+A `DataInput` produces it; an `InputMatcher` consumes it. Nothing else touches
+it, which is what lets an input and a matcher that have never heard of each
+other be paired by a config file.
 
 ## The Two Ports
 
@@ -100,38 +89,34 @@ Type erasure creates two ports — the seams where domain-specific and domain-ag
 
 **Matching port (`InputMatcher`)** — converts `MatchingData` into `bool`. Domain-agnostic. x.uma ships five: `ExactMatcher`, `PrefixMatcher`, `SuffixMatcher`, `ContainsMatcher`, `RegexMatcher`.
 
-## Cross-Language Comparison
+## What a Binding Sees
 
-The same architecture in all three languages:
-
-| Concept | Rust | Python | TypeScript |
-|---------|------|--------|------------|
-| Erased data | `enum MatchingData` | `type MatchingData` (union) | `type MatchingData` (union) |
-| Extraction port | `trait DataInput<Ctx>` | `Protocol[Ctx]` | `interface DataInput<Ctx>` |
-| Matching port | `trait InputMatcher` | `Protocol` | `interface InputMatcher` |
-| Predicate tree | `enum Predicate<Ctx>` | `type Predicate[Ctx]` (union) | `type Predicate<Ctx>` (union) |
-| Pattern match | `match` expression | `match`/`case` | `instanceof` checks |
-| Immutability | Owned types | `@dataclass(frozen=True)` | `readonly` fields |
+The types above are the engine's. The Python and TypeScript packages expose
+none of them: a binding takes a config document, compiles it in Rust, and
+returns a decision. There is no `DataInput` to implement in Python or
+TypeScript. A new input is a Rust type registered under a type URL, and every
+runtime reaches it the same way, by naming that URL in the config. One port,
+one implementation, every language.
 
 ## The None Convention
 
-When a `DataInput` returns `None`/`null` (data not present), the predicate evaluates to `false` without calling the matcher. This is enforced across all implementations.
+`DataInput::get` returns `Option<MatchingData>`. When it returns `None`, the predicate evaluates to `false` without calling the matcher.
 
-```python
-from xuma import SinglePredicate, ExactMatcher
-from xuma.http import HttpRequest, HeaderInput
+```rust
+use rumi::prelude::*;
+use rumi_http::{HeaderInput, HttpMessageBuilder};
 
-predicate = SinglePredicate(
-    input=HeaderInput("x-api-key"),
-    matcher=ExactMatcher("secret"),
-)
+let predicate = Predicate::Single(SinglePredicate::new(
+    Box::new(HeaderInput::new("x-api-key").unwrap()),
+    Box::new(ExactMatcher::new("secret")),
+));
 
-# Header not present → DataInput returns None → predicate returns False
-request = HttpRequest(headers={})
-assert predicate.evaluate(request) == False
+// Header not present → DataInput returns None → predicate returns false
+let request = HttpMessageBuilder::new().method("GET").path("/").build();
+assert!(!predicate.evaluate(&request));
 ```
 
-The matcher never sees `None`. Missing data is handled upstream. This is a security guarantee: missing data never accidentally matches.
+The matcher never sees an absent value, because there is no `MatchingData` that means absent. Missing data is handled upstream, by the type, so a predicate over a missing value never matches, in the engine and therefore in every binding. What it guarantees is about the predicate, not the rule: `not` turns that `false` into `true`, as it does in Envoy. An input declared `required` makes absence undecided instead, and the evaluation stops without an action or its fallback (D-069).
 
 ## Next
 

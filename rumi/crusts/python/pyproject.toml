@@ -36,5 +36,4 @@ dev = [
     # HttpMatcher.from_config; the doc-sample gate needs the same parser a
     # reader would install. Not a runtime dependency of xuma-crust.
     "pyyaml>=6.0",
-    "xuma @ file:///${PROJECT_ROOT}/../../../puma",
 ]

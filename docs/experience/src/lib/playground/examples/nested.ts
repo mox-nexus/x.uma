@@ -9,7 +9,7 @@ const single = (key: string, valueMatch: Record<string, string>) => ({
   singlePredicate: {
     input: {
       name: key,
-      typedConfig: { "@type": "type.googleapis.com/xuma.kv.v1.MapInput", key },
+      typedConfig: { "@type": "type.googleapis.com/xuma.core.v1.MapInput", key },
     },
     valueMatch,
   },
@@ -18,7 +18,7 @@ const single = (key: string, valueMatch: Record<string, string>) => ({
 export const tieredRouting: Preset = {
   id: "tiered-routing",
   name: "Tiered Routing",
-  mode: "config",
+  mode: "kv",
   description:
     "Nested matcher: premium users route by region, free users get default",
   config: JSON.stringify(

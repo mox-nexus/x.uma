@@ -1,10 +1,9 @@
 //! Reader for `spec/tests/05_http/` — Gateway API route matches through the
 //! domain compiler.
 //!
-//! Added 2026-08-31. Until then this suite was loaded only by
-//! `puma/tests/conftest.py` and `bumi/tests/helpers/fixture-loader.ts`, so the
-//! project's claim that every implementation passes every fixture was true of
-//! `07_protojson/` and not of this directory. That gap is not academic: the
+//! Added 2026-08-31. Until then this suite had no runner in the reference
+//! implementation, so the project's claim that every implementation passes
+//! every fixture was true of `07_protojson/` and not of this directory. That gap is not academic: the
 //! fixture `http_empty_routes_matches_all` required an empty route list to
 //! match everything, which made a fail-open a contract the suite enforced
 //! (D-050) — and rumi, the reference implementation, was not even running it.
@@ -44,11 +43,10 @@ pub struct HttpFixture {
     #[serde(default)]
     pub on_no_match: Option<String>,
 
-    /// Which implementations are expected to run this fixture.
+    /// Which implementations are expected to run this fixture. Required.
     ///
-    /// Absent means all three, which is the end state. A shorter list is an
-    /// expiring exception, held in both directions by the runners.
-    #[serde(default = "crate::implementations::all_implementations")]
+    /// A shorter list than [`crate::implementations::ALL`] is an expiring
+    /// exception, held in both directions by the runners.
     pub implementations: Vec<Implementation>,
 
     /// The compile must fail. `cases` is then ignored.
@@ -144,5 +142,20 @@ impl HttpFixture {
             (None, Some(many)) => many.iter().map(Into::into).collect(),
             _ => Vec::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HttpFixture;
+
+    #[test]
+    fn a_fixture_without_a_ledger_is_rejected() {
+        let keyless = "name: keyless\naction: hit\ncases: []\n";
+        let err = HttpFixture::all_from_yaml(keyless).expect_err("the ledger key is required");
+        assert!(
+            err.to_string().contains("implementations"),
+            "the error should name the missing key, got: {err}"
+        );
     }
 }

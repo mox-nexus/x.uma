@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package xuma.core.v1;
+
+option java_package = "io.xuma.core.v1";
+option java_outer_classname = "InputsProto";
+option java_multiple_files = true;
+
+// Reads one entry of a flat key-value context.
+//
+// Core rather than a domain's because a flat map is the shape any host can
+// hand the engine without a domain crate (D-057, D-069).
+message MapInput {
+  // Which entry to read. Required in practice: an empty key reads nothing, so
+  // the predicate is always false. proto3 cannot express that, so the
+  // constructor rejects it.
+  string key = 1;
+  // The type the value is read as: "string" (the default when empty), "int"
+  // or "bool". A value that does not parse as it is absent.
+  string type = 2;
+  // Absent is undecided, not false: no action and no fallback (D-069).
+  bool required = 3;
+}

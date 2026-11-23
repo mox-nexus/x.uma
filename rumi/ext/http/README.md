@@ -13,32 +13,32 @@ the same matcher directly, so it stays self-contained:
 # #[cfg(feature = "registry")] {
 use rumi::prelude::*;
 use rumi::{
-    FieldMatcherConfig, MatcherConfig, OnMatchConfig, PredicateConfig, RegistryBuilder,
-    SinglePredicateConfig, StringMatchSpec, TypedConfig, ValueMatchConfig,
+    FieldMatcherIr, MatcherIr, OnMatchIr, PredicateIr, RegistryBuilder,
+    SinglePredicateIr, StringMatchSpec, TypedExtensionConfig, ValueMatchIr,
 };
-use rumi_http::{register_simple, HttpRequest};
+use rumi_http::{register, HttpMessageBuilder};
 
-let registry = register_simple(RegistryBuilder::new()).build();
+let registry = register(RegistryBuilder::new()).build();
 
-let config = MatcherConfig::list(vec![FieldMatcherConfig {
-        predicate: PredicateConfig::Single(SinglePredicateConfig {
-            input: TypedConfig {
+let config = MatcherIr::list(vec![FieldMatcherIr {
+        predicate: PredicateIr::Single(SinglePredicateIr {
+            input: TypedExtensionConfig {
                 type_url: "xuma.http.v1.PathInput".into(),
                 config: serde_json::json!({}),
             },
-            matcher: ValueMatchConfig::BuiltIn {
+            matcher: ValueMatchIr::BuiltIn {
                 spec: StringMatchSpec::Prefix("/api".into()),
                 ignore_case: false,
             },
         }),
-        on_match: OnMatchConfig::Action {
+        on_match: OnMatchIr::Action {
             action: "api_read".to_string(),
         },
 }]);
 
 let matcher = registry.load_matcher(config).unwrap();
 
-let req = HttpRequest::builder().method("GET").path("/api/users").build();
+let req = HttpMessageBuilder::new().method("GET").path("/api/users?page=2").build();
 assert_eq!(matcher.evaluate(&req), Some("api_read".to_string()));
 # }
 ```
@@ -49,13 +49,13 @@ assert_eq!(matcher.evaluate(&req), Some("api_read".to_string()));
 
 | Feature | Adds |
 |---|---|
-| `message` | `HttpMessage`, its `DataInput`s, and `HttpMessageBuilder`. No dependencies. |
 | `registry` | config-file loading via `rumi-core`'s registry |
 | `gateway` | Gateway API types and `compile_route_matches` |
 | `ext-proc` | Envoy `ext_proc` data-plane types, and `From<ProcessingRequest>` |
-| `proto` | xDS proto config loading |
 
-`gateway` and `ext-proc` are **siblings** over `message`, not a chain. An
+`HttpMessage`, its `DataInput`s and `HttpMessageBuilder` need no feature: they
+have no dependencies. `gateway` and `ext-proc` are **siblings** over them, not a
+chain. An
 ext_proc filter has no use for Kubernetes config types, and a Gateway API user
 has no use for a data plane.
 
@@ -64,14 +64,11 @@ hyper, h2 — into a library that never makes a network call, and every consumer
 in this repo already opted out of it. If you are writing an ext_proc filter you
 want it; otherwise you do not.
 
-## Two contexts
+## One context
 
-`HttpMessage` is the indexed context the Gateway API compiler targets. Build one
-with `HttpMessageBuilder` — it needs no data plane. `From<ProcessingRequest>` is
-an additional adapter under `ext-proc`.
-
-`HttpRequest` is a simpler struct that existed because `HttpMessage` used to be
-un-constructible without ext_proc. That reason is gone, and the two are not
-interchangeable — they differ in whether a missing method can be `None`, and in
-whether the raw path is available. Collapsing them is a decision owed before
-first publish.
+`HttpMessage` is a request as it arrives: the query string inside `:path`, and
+`:authority` and `:scheme` as pseudo-headers. The registry, the Gateway API
+compiler and the `ext_proc` conversion all target it. A second context,
+`HttpRequest`, had its own registry over the same `xuma.http.v1.*` type URLs,
+and once gave `PathInput` two meanings depending on the caller; it was retired
+before first publish (D-059).

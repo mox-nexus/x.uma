@@ -4,11 +4,12 @@ Linear-time regex, zero-copy evaluation, type-safe config.
 """
 
 from xuma_crust.xuma_crust import (
+    Decision,
     HookMatcher,
     HttpMatcher,
     PyHookMatch as HookMatch,
     PyStringMatch as StringMatch,
-    TestMatcher,
+    KvMatcher,
 )
 
-__all__ = ["HookMatcher", "HookMatch", "HttpMatcher", "StringMatch", "TestMatcher"]
+__all__ = ["Decision", "HookMatcher", "HookMatch", "HttpMatcher", "StringMatch", "KvMatcher"]

@@ -60,7 +60,7 @@ export const DOCS: DocsEntry[] = [
 		slug: 'python',
 		file: 'getting-started/python',
 		title: 'Python',
-		description: 'The same matcher in pure Python, or Rust-backed via PyO3.',
+		description: 'The engine in Python, through the PyO3 binding.',
 		kind: 'tutorial',
 		readMinutes: 6
 	},
@@ -68,7 +68,7 @@ export const DOCS: DocsEntry[] = [
 		slug: 'typescript',
 		file: 'getting-started/typescript',
 		title: 'TypeScript',
-		description: 'The same matcher in pure TypeScript, or WASM-backed.',
+		description: 'The engine in TypeScript, through the WebAssembly binding.',
 		kind: 'tutorial',
 		readMinutes: 6
 	},

@@ -1,4 +1,5 @@
 name: "http_path_and_method"
+implementations: [rust]
 description: "Path and method conditions are ANDed"
 
 http_route_match:
@@ -36,6 +37,7 @@ cases:
 
 ---
 name: "http_all_conditions"
+implementations: [rust]
 description: "All condition types combined (path, method, headers, query params)"
 
 http_route_match:

@@ -20,8 +20,9 @@
 //! 2. **Non-generic `InputMatcher`**: The same `ExactMatcher` works for HTTP, Claude,
 //!    test contexts, etc. Matchers are domain-agnostic.
 //!
-//! 3. **`DataInput` None → false**: When a `DataInput` returns `MatchingData::None`,
-//!    the predicate evaluates to `false`. This is a critical invariant.
+//! 3. **`DataInput` None → false**: When a `DataInput` returns `None`, the
+//!    predicate evaluates to `false` and the matcher is never asked (INV-1).
+//!    The signature enforces it: absence is not a `MatchingData` value.
 //!
 //! # Example
 //!
@@ -37,8 +38,8 @@
 //! struct PathInput;
 //!
 //! impl DataInput<Request> for PathInput {
-//!     fn get(&self, ctx: &Request) -> MatchingData {
-//!         MatchingData::String(ctx.path.clone())
+//!     fn get(&self, ctx: &Request) -> Option<MatchingData> {
+//!         Some(MatchingData::String(ctx.path.clone()))
 //!     }
 //! }
 //!
@@ -69,10 +70,6 @@
 //! - [`rumi-http`](https://docs.rs/rumi-http) — HTTP request matching (separate crate)
 //! - [`rumi-test`](https://docs.rs/rumi-test) — Test domain for conformance (internal)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Modules
-// ═══════════════════════════════════════════════════════════════════════════════
-
 mod data_input;
 mod field_matcher;
 mod input_matcher;
@@ -89,52 +86,40 @@ mod trace;
 pub mod claude;
 
 #[cfg(feature = "registry")]
-mod config;
+mod ir;
 #[cfg(feature = "registry")]
 mod registry;
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Public API
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Core types
 pub use data_input::DataInput;
 pub use field_matcher::FieldMatcher;
 pub use input_matcher::InputMatcher;
-pub use matcher::{Matcher, MatcherKind};
+pub use matcher::{Matcher, MatcherKind, Outcome};
 pub use matcher_tree::MatcherTree;
 pub use matching_data::{CustomMatchData, MatchingData};
 pub use on_match::OnMatch;
-pub use predicate::{Predicate, SinglePredicate};
+pub use predicate::{MatchResult, Predicate, SinglePredicate};
 pub use radix_tree::RadixTree;
 pub use string_match::StringMatchSpec;
 
-// Registry (feature-gated)
 #[cfg(feature = "registry")]
-pub use config::{
-    FieldMatcherConfig, MatcherConfig, MatcherKindConfig, MatcherTreeConfig, OnMatchConfig,
-    PredicateConfig, SinglePredicateConfig, TreeTypeConfig, TypedConfig, UnitConfig,
-    ValueMatchConfig,
+pub use ir::{
+    FieldMatcherIr, MatcherIr, MatcherKindIr, MatcherTreeIr, OnMatchIr, PredicateIr,
+    SinglePredicateIr, TreeTypeIr, TypedExtensionConfig, UnitConfig, ValueMatchIr,
 };
 #[cfg(feature = "registry")]
 pub use registry::{
-    register_core_matchers, ActionRegistry, ActionRegistryBuilder, IntoAction, IntoDataInput,
-    IntoInputMatcher, Registry, RegistryBuilder,
+    register_core_matchers, ActionFactory, ActionRegistry, ActionRegistryBuilder, DataInputFactory,
+    InputMatcherFactory, Registry, RegistryBuilder,
 };
 
-// Trace types
 pub use trace::{
-    EvalStep, EvalSteps, EvalTrace, OnMatchTrace, PredicateTrace, TreeKind, TreeLookupTrace,
+    EvalStep, EvalSteps, EvalTrace, OnMatchTrace, PredicateTrace, TreeAttempt, TreeKind,
+    TreeLookupTrace,
 };
 
-// Concrete matchers
 pub use input_matcher::{
     BoolMatcher, ContainsMatcher, ExactMatcher, PrefixMatcher, StringMatcher, SuffixMatcher,
 };
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Prelude
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Prelude module for convenient imports.
 ///
@@ -143,52 +128,24 @@ pub use input_matcher::{
 /// ```
 pub mod prelude {
     pub use crate::{
-        // Concrete matchers
-        BoolMatcher,
-        ContainsMatcher,
-        // Traits
-        CustomMatchData,
-        DataInput,
-        // Trace types
-        EvalStep,
-        EvalTrace,
-        ExactMatcher,
-        // Core types
-        FieldMatcher,
-        InputMatcher,
-        Matcher,
-        // Errors
-        MatcherError,
-        MatcherTree,
-        MatchingData,
-        OnMatch,
-        OnMatchTrace,
-        Predicate,
-        PredicateTrace,
-        PrefixMatcher,
-        RadixTree,
-        SinglePredicate,
-        // Config types
-        StringMatchSpec,
-        StringMatcher,
-        SuffixMatcher,
+        BoolMatcher, ContainsMatcher, CustomMatchData, DataInput, EvalStep, EvalTrace,
+        ExactMatcher, FieldMatcher, InputMatcher, MatchResult, Matcher, MatcherError, MatcherTree,
+        MatchingData, OnMatch, OnMatchTrace, Outcome, Predicate, PredicateTrace, PrefixMatcher,
+        RadixTree, SinglePredicate, StringMatchSpec, StringMatcher, SuffixMatcher,
     };
 
     /// Registry types, so `use rumi::prelude::*` is enough to load a config.
     ///
-    /// `MatcherConfig` is deliberately absent: the config format is moving to
+    /// `MatcherIr` is deliberately absent: the config format is moving to
     /// protojson and the hand-written type is being retired, so exporting it
     /// here would add a name in one release and remove it in the next. Import
-    /// it directly as `rumi::MatcherConfig` until the replacement lands.
+    /// it directly as `rumi::MatcherIr` until the replacement lands.
     #[cfg(feature = "registry")]
     pub use crate::{
-        IntoDataInput, IntoInputMatcher, Registry, RegistryBuilder, TypedConfig, UnitConfig,
+        DataInputFactory, InputMatcherFactory, Registry, RegistryBuilder, TypedExtensionConfig,
+        UnitConfig,
     };
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Constants
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Maximum allowed depth for nested matchers.
 ///
@@ -196,30 +153,24 @@ pub mod prelude {
 /// Validate at config load time via [`Matcher::validate`].
 pub const MAX_DEPTH: usize = 32;
 
-/// Maximum number of field matchers in a single [`Matcher`].
+/// Predicates one evaluation can reach, along the worst path through the matcher.
 ///
-/// Prevents width-based denial-of-service: a config with millions of field matchers at depth 1
-/// bypasses [`MAX_DEPTH`] but still causes excessive resource consumption.
-pub const MAX_FIELD_MATCHERS: usize = 256;
+/// Width is a denial-of-service axis that depth does not cover, and every
+/// predicate a request can reach is a per-request cost: all of a list's rules,
+/// since a nested miss moves on to the next; one entry of an exact tree; a
+/// chain of prefixes, since a miss falls through to the next shorter one
+/// (D-055). Entries a request never visits do not count, which is what lets a
+/// tree scale where a list cannot (D-068).
+pub const MAX_PREDICATES_PER_EVALUATION: usize = 256;
 
 /// Maximum entries in a single [`MatcherTree`](crate::MatcherTree).
 ///
-/// Deliberately **not** [`MAX_FIELD_MATCHERS`], and for a different reason.
-/// That limit is about evaluation: a list is O(n) per request, so its width is
-/// a per-request cost. A tree is O(1) hash or O(k) in the key's length, so its
-/// entry count costs nothing at evaluation time — and large routing tables are
-/// the entire reason to reach for a tree.
-///
-/// What a tree's width does cost is memory at config load. That is what this
-/// bounds, and why it is far larger than 256. Copying `MAX_FIELD_MATCHERS`
-/// here would have frozen a limit whose stated rationale does not apply.
+/// A tree is O(1) hash or O(k) in the key's length, so its entry count costs
+/// nothing at evaluation time, and large routing tables are the entire reason
+/// to reach for a tree. What its width does cost is memory at config load,
+/// which is what this bounds, and why it is far larger than
+/// [`MAX_PREDICATES_PER_EVALUATION`].
 pub const MAX_TREE_ENTRIES: usize = 65_536;
-
-/// Maximum number of predicates in a single `And` or `Or` compound predicate.
-///
-/// Same width-based denial-of-service protection as [`MAX_FIELD_MATCHERS`], applied to
-/// compound predicate children.
-pub const MAX_PREDICATES_PER_COMPOUND: usize = 256;
 
 /// Maximum length for non-regex string match patterns (exact, prefix, suffix, contains).
 pub const MAX_PATTERN_LENGTH: usize = 8192;
@@ -231,9 +182,30 @@ pub const MAX_PATTERN_LENGTH: usize = 8192;
 /// faster than literal matching.
 pub const MAX_REGEX_PATTERN_LENGTH: usize = 4096;
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Errors
-// ═══════════════════════════════════════════════════════════════════════════════
+/// Predicates in one document, counted across every nested matcher and tree
+/// entry.
+///
+/// A memory bound, not a per-request one: that is
+/// [`MAX_PREDICATES_PER_EVALUATION`]. The registry counts as it loads and
+/// refuses at the predicate that crosses, so a document whose size is not
+/// bounded in bytes (IR deserialised from YAML with aliases, say) is refused
+/// before it is materialised (D-068).
+pub const MAX_DOCUMENT_PREDICATES: usize = 65_536;
+
+/// Compiled regexes in one document.
+///
+/// Each regex holds up to [`REGEX_SIZE_LIMIT`] of program and
+/// [`REGEX_DFA_SIZE_LIMIT`] of lazy DFA cache per thread, so the count is
+/// what bounds the document's regex memory: 64 × 2 MiB. Counted by the
+/// registry during load; the domain compilers are bounded by their own rule
+/// counts (D-054).
+pub const MAX_REGEXES: usize = 64;
+
+/// Compiled program size per regex, in bytes.
+pub const REGEX_SIZE_LIMIT: usize = 1 << 20;
+
+/// Lazy DFA cache per regex per thread, in bytes.
+pub const REGEX_DFA_SIZE_LIMIT: usize = 1 << 20;
 
 /// Errors from matcher construction and validation.
 ///
@@ -276,18 +248,33 @@ pub enum MatcherError {
         /// The data types accepted by the matcher.
         matcher_types: Vec<String>,
     },
-    /// Too many field matchers in a single `Matcher`.
-    TooManyFieldMatchers {
-        /// Actual count of field matchers.
+    /// More predicates on one evaluation's worst path than
+    /// [`MAX_PREDICATES_PER_EVALUATION`].
+    TooManyPredicatesPerEvaluation {
+        /// The worst path's predicate count.
         count: usize,
         /// Maximum allowed.
         max: usize,
     },
-    /// Too many predicates in a compound `And` or `Or`.
-    TooManyPredicates {
-        /// Actual count of predicates.
+    /// More predicates in the document than [`MAX_DOCUMENT_PREDICATES`].
+    TooManyDocumentPredicates {
+        /// The predicate that crossed the budget.
         count: usize,
         /// Maximum allowed.
+        max: usize,
+    },
+    /// More regexes in the document than [`MAX_REGEXES`].
+    TooManyRegexes {
+        /// The regex that crossed the budget.
+        count: usize,
+        /// Maximum allowed.
+        max: usize,
+    },
+    /// A config document larger than a reader accepts.
+    DocumentTooLarge {
+        /// The document's size.
+        bytes: usize,
+        /// Maximum accepted.
         max: usize,
     },
     /// An identifier that names what to look up was empty.
@@ -363,16 +350,29 @@ impl std::fmt::Display for MatcherError {
                     "input produces \"{input_type}\" data but matcher supports {matcher_types:?}"
                 )
             }
-            Self::TooManyFieldMatchers { count, max } => {
+            Self::TooManyPredicatesPerEvaluation { count, max } => {
                 write!(
                     f,
-                    "matcher has {count} field matchers, but maximum allowed is {max}"
+                    "matcher can reach {count} predicates in one evaluation, but maximum \
+                     allowed is {max} — key large rule sets on a field with a matcher tree"
                 )
             }
-            Self::TooManyPredicates { count, max } => {
+            Self::TooManyDocumentPredicates { count, max } => {
                 write!(
                     f,
-                    "compound predicate has {count} children, but maximum allowed is {max}"
+                    "document has {count} predicates, but maximum allowed is {max}"
+                )
+            }
+            Self::TooManyRegexes { count, max } => {
+                write!(
+                    f,
+                    "matcher compiles {count} regexes, but maximum allowed is {max}"
+                )
+            }
+            Self::DocumentTooLarge { bytes, max } => {
+                write!(
+                    f,
+                    "config document is {bytes} bytes, but maximum accepted is {max}"
                 )
             }
             Self::DuplicateTreeKey { key } => {

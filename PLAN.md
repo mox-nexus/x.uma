@@ -1,5 +1,28 @@
 # Release plan — x.uma 0.1.0
 
+> ## ⛔ READ FIRST — 2026-09-08
+>
+> **The architecture changed. `DECISIONS.md` D-051: one ACES engine in `rumi`,
+> with thin crusts for Python and TypeScript as extension / DX layers.** The
+> pure-Python engine in `puma/` and the pure-TypeScript engine in `bumi/` were
+> deleted on 2026-09-08; the docs site and every gate now run on the bindings.
+> Write new engine and domain code in `rumi` only.
+>
+> Most of this file predates that decision and still reads as though five peer
+> implementations are the design. Treat its Phase and F-number entries as
+> accurate about *defects* and stale about *structure*; the packages table in
+> §2 is current.
+>
+> **The sequence to first publish is decided: `DECISIONS.md` D-053** (retire,
+> decisions batch, rename pass, boundary shaping, publish 0.1.0, engine as
+> 0.1.x), with the fifteen decisions around it as D-052 to D-067. Everything
+> publishing freezes is decided there; the engine work is 0.1.x.
+>
+> **Session cursor: `scratch/HANDOFF-2026-09-08.md`** — branch state, which
+> step is in progress, and the traps this repo has already paid for.
+> Untracked, so it is a cursor and not a record; the records are here and in
+> `DECISIONS.md`.
+
 ## Where this stands (2026-08-18)
 
 Read this block first; the rest of the file was written before any of it was done.
@@ -459,9 +482,9 @@ commit the red fixtures first and keep that commit separate, so the diff shows
 the specification preceding the implementation.
 
 **`just ci` must exit 0 before every commit.** It runs fmt, clippy with `-D
-warnings`, all Rust tests, conformance fixtures, puma checks, bumi checks, docs
-type-check and build, and `cargo audit`. Local and CI run the identical
-sequence.
+warnings`, all Rust tests, conformance fixtures, the doc-sample and README
+agreement gates against both bindings, the docs type-check and build on the
+wasm binding, and `cargo audit`. Local and CI run the identical sequence.
 
 **Deletion:** `rm` is aliased to `rip` (a recoverable graveyard) at the user
 level. Use `rip <path>` for untracked files and `git rm` for tracked ones. Never
@@ -499,13 +522,11 @@ the same answer in every implementation.
 | `rumi/ext/test` | Generic key-value domain | `rumi-test`, currently `publish = false` |
 | `rumi/proto` | xDS proto types + conversion | `rumi-proto`, `publish = false`, **has never compiled** |
 | `rumi/cli` | The `rumi` binary | `rumi-cli` |
-| `rumi/crusts/python` | PyO3 bindings | `xuma-crust` on PyPI |
-| `rumi/crusts/wasm` | wasm-bindgen bindings | `xuma-crust` on npm |
-| `puma/` | Pure Python implementation | **package name is `xuma`**, not `puma` |
-| `bumi/` | Pure TypeScript implementation | **package name is `xuma`**, not `bumi` |
+| `rumi/crusts/python` | PyO3 binding | `xuma-crust` on PyPI |
+| `rumi/crusts/wasm` | wasm-bindgen binding | `xuma-crust` on npm; the docs site runs on it |
 | `docs/content` | Plain Markdown, framework-free | — |
 | `docs/experience` | SvelteKit docs site, carries `/playground` | — |
-| `spec/tests` | 27 conformance fixtures shared by all implementations | — |
+| `spec/tests` | Conformance fixtures shared by the engine and both bindings | — |
 
 **Nothing is published to any registry.** crates.io, PyPI and npm are all empty.
 Zero users. Breaking changes are free right now and expensive the day after

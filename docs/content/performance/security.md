@@ -10,13 +10,11 @@ Matcher configs can come from untrusted sources — user-provided routing rules,
 
 **Threat:** Regular expression Denial of Service. A crafted regex pattern causes exponential backtracking, consuming CPU indefinitely.
 
-**Mitigation:** All implementations use RE2-class linear-time regex engines:
+**Mitigation:** The engine uses a linear-time regex engine, and both bindings run the engine:
 
-| Implementation | Regex Engine | Guarantee |
-|----------------|-------------|-----------|
+| Runtime | Regex Engine | Guarantee |
+|---------|-------------|-----------|
 | rumi (Rust) | `regex` crate (DFA) | Linear time, proven |
-| xuma (Python) | `google-re2` (C++ RE2 binding) | Linear time, Google RE2 |
-| xuma (TypeScript) | `re2js` (pure JS RE2 port) | Linear time, RE2 semantics |
 | xuma-crust (Python) | Rust `regex` via PyO3 | Same as rumi |
 | xuma-crust (TypeScript) | Rust `regex` via WASM | Same as rumi |
 
@@ -36,21 +34,38 @@ No implementation uses a backtracking regex engine. Patterns that would cause ca
 
 **Threat:** Resource exhaustion from extremely wide matchers. A config with millions of field matchers at depth 1 bypasses depth limits but still causes excessive memory and CPU usage.
 
-**Mitigation:** Three width limits, all validated at construction time:
+**Mitigation:** A budget on what one evaluation can reach, and budgets per document that nesting cannot add around, all checked before a matcher exists:
 
 | Limit | Value | Protects |
 |-------|-------|----------|
-| `MAX_FIELD_MATCHERS` | 256 per `Matcher` | Memory from wide matcher lists |
-| `MAX_PREDICATES_PER_COMPOUND` | 256 per AND/OR | CPU from wide predicate trees |
+| `MAX_PREDICATES_PER_EVALUATION` | 256 on the worst path | CPU per request: every rule of a list, one tree entry, or one chain of prefixes |
 | `MAX_PATTERN_LENGTH` | 8,192 chars | Memory from large string patterns |
+| `MAX_DOCUMENT_PREDICATES` | 65,536 per document | Memory, counted across nested matchers and tree entries |
+| `MAX_REGEXES` | 64 per document, 1 MiB program and 1 MiB DFA cache each | Regex memory, bounded as count × size |
+| `MAX_DOCUMENT_BYTES` | 1 MiB | A document refused by its size before it is parsed |
+
+The per-document budgets are counted as the document is loaded, so a hostile config is refused at the predicate or regex that crosses the budget rather than after everything past it has been built.
 
 ## None-to-False
 
 **Threat:** Missing data accidentally matching a rule. If a header doesn't exist, it should not match `ExactMatcher("secret")`.
 
-**Mitigation:** When `DataInput.get()` returns `None`/`null`, the predicate evaluates to `false`. The `InputMatcher` is never called. This is enforced in all five implementations.
+**Mitigation:** `DataInput::get` returns `Option<MatchingData>`. When it returns `None`, the predicate evaluates to `false` and the `InputMatcher` is never called. The signature enforces it in the engine, and therefore in every binding.
 
-This is a security invariant, not a convenience feature. It ensures fail-closed behavior: missing data means no match.
+This is a security invariant, not a convenience feature, and it covers exactly one thing: a predicate over a missing value does not match. It does not make every rule fail closed. `not` inverts that `false`, so "allow unless the role is `guest`" allows a request that carries no role at all. Envoy behaves the same way, and xDS configs rely on it.
+
+When a missing value must not be read as an answer, mark the input `required`:
+
+```yaml
+input:
+  name: role
+  typedConfig:
+    "@type": type.googleapis.com/xuma.core.v1.MapInput
+    key: role
+    required: true
+```
+
+A required value that is absent leaves the evaluation **undecided**, the way Envoy treats insufficient data. `not` passes it through unchanged. An `and` stops at the first child that is not a match, and an `or` still matches if another child does. A list or tree that meets it stops: no later rule fires, and neither does `on_no_match`. The result says `undecided: true`, and your host applies its own default. `rumi run claude` blocks, as it does for every other case where it cannot decide.
 
 ## Immutability
 
@@ -59,8 +74,7 @@ This is a security invariant, not a convenience feature. It ensures fail-closed 
 **Mitigation:**
 
 - **Rust:** All core types are `Send + Sync`. Matchers are immutable after construction and safe to share via `Arc<Matcher>`.
-- **Python:** All types use `@dataclass(frozen=True)`. Fields cannot be reassigned after construction.
-- **TypeScript:** All types use `readonly` fields.
+- **Bindings:** A compiled matcher is an opaque handle with no setters. The Python class is `#[pyclass(frozen)]`; the WebAssembly class exposes only `evaluate` and `trace`.
 - **Registry:** Immutable after `.build()`. The builder produces the registry, then the builder is consumed. No runtime registration.
 
 ## Construction-Time Validation

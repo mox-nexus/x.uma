@@ -5,6 +5,7 @@
 
 use crate::message::HttpMessage;
 use rumi::prelude::*;
+use std::borrow::Cow;
 
 /// Extracts the request path (without query string) from `HttpMessage`.
 ///
@@ -13,9 +14,12 @@ use rumi::prelude::*;
 pub struct PathInput;
 
 impl DataInput<HttpMessage> for PathInput {
-    fn get(&self, ctx: &HttpMessage) -> MatchingData {
-        ctx.path()
-            .map_or(MatchingData::None, |p| MatchingData::String(p.to_string()))
+    fn get(&self, ctx: &HttpMessage) -> Option<MatchingData> {
+        ctx.path().map(|p| MatchingData::String(p.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.http.v1.PathInput"))
     }
 }
 
@@ -26,9 +30,12 @@ impl DataInput<HttpMessage> for PathInput {
 pub struct MethodInput;
 
 impl DataInput<HttpMessage> for MethodInput {
-    fn get(&self, ctx: &HttpMessage) -> MatchingData {
-        ctx.method()
-            .map_or(MatchingData::None, |m| MatchingData::String(m.to_string()))
+    fn get(&self, ctx: &HttpMessage) -> Option<MatchingData> {
+        ctx.method().map(|m| MatchingData::String(m.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.http.v1.MethodInput"))
     }
 }
 
@@ -63,9 +70,16 @@ impl HeaderInput {
 }
 
 impl DataInput<HttpMessage> for HeaderInput {
-    fn get(&self, ctx: &HttpMessage) -> MatchingData {
+    fn get(&self, ctx: &HttpMessage) -> Option<MatchingData> {
         ctx.header(&self.name)
-            .map_or(MatchingData::None, |v| MatchingData::String(v.to_string()))
+            .map(|v| MatchingData::String(v.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Owned(format!(
+            "xuma.http.v1.HeaderInput/{}",
+            self.name.to_ascii_lowercase()
+        )))
     }
 }
 
@@ -97,9 +111,16 @@ impl QueryParamInput {
 }
 
 impl DataInput<HttpMessage> for QueryParamInput {
-    fn get(&self, ctx: &HttpMessage) -> MatchingData {
+    fn get(&self, ctx: &HttpMessage) -> Option<MatchingData> {
         ctx.query_param(&self.name)
-            .map_or(MatchingData::None, |v| MatchingData::String(v.to_string()))
+            .map(|v| MatchingData::String(v.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Owned(format!(
+            "xuma.http.v1.QueryParamInput/{}",
+            self.name
+        )))
     }
 }
 
@@ -108,9 +129,12 @@ impl DataInput<HttpMessage> for QueryParamInput {
 pub struct SchemeInput;
 
 impl DataInput<HttpMessage> for SchemeInput {
-    fn get(&self, ctx: &HttpMessage) -> MatchingData {
-        ctx.scheme()
-            .map_or(MatchingData::None, |s| MatchingData::String(s.to_string()))
+    fn get(&self, ctx: &HttpMessage) -> Option<MatchingData> {
+        ctx.scheme().map(|s| MatchingData::String(s.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.http.v1.SchemeInput"))
     }
 }
 
@@ -119,9 +143,12 @@ impl DataInput<HttpMessage> for SchemeInput {
 pub struct AuthorityInput;
 
 impl DataInput<HttpMessage> for AuthorityInput {
-    fn get(&self, ctx: &HttpMessage) -> MatchingData {
-        ctx.authority()
-            .map_or(MatchingData::None, |a| MatchingData::String(a.to_string()))
+    fn get(&self, ctx: &HttpMessage) -> Option<MatchingData> {
+        ctx.authority().map(|a| MatchingData::String(a.to_string()))
+    }
+
+    fn identity(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed("xuma.http.v1.AuthorityInput"))
     }
 }
 
@@ -153,7 +180,7 @@ mod configs {
     /// still need a `Config` type — their proto messages are empty ones.
     macro_rules! unit_input {
         ($input:ty, $config:ty) => {
-            impl rumi::IntoDataInput<HttpMessage> for $input {
+            impl rumi::DataInputFactory<HttpMessage> for $input {
                 type Config = $config;
 
                 fn from_config(
@@ -170,7 +197,7 @@ mod configs {
     unit_input!(SchemeInput, proto::SchemeInput);
     unit_input!(AuthorityInput, proto::AuthorityInput);
 
-    impl rumi::IntoDataInput<HttpMessage> for HeaderInput {
+    impl rumi::DataInputFactory<HttpMessage> for HeaderInput {
         type Config = proto::HeaderInput;
 
         fn from_config(
@@ -180,7 +207,7 @@ mod configs {
         }
     }
 
-    impl rumi::IntoDataInput<HttpMessage> for QueryParamInput {
+    impl rumi::DataInputFactory<HttpMessage> for QueryParamInput {
         type Config = proto::QueryParamInput;
 
         fn from_config(
@@ -207,6 +234,27 @@ mod tests {
             matches!(err, rumi::MatcherError::EmptyIdentifier { .. }),
             "{err:?}"
         );
+    }
+
+    /// Header names are case-insensitive, so two spellings of one header are
+    /// one input; query parameter names are not (D-062).
+    #[test]
+    fn identity_is_equal_exactly_when_the_value_read_is() {
+        let id = |input: &dyn DataInput<HttpMessage>| input.identity().map(|c| c.into_owned());
+
+        assert_eq!(
+            id(&HeaderInput::new("X-Tenant").unwrap()),
+            id(&HeaderInput::new("x-tenant").unwrap())
+        );
+        assert_ne!(
+            id(&QueryParamInput::new("Page").unwrap()),
+            id(&QueryParamInput::new("page").unwrap())
+        );
+        assert_ne!(
+            id(&HeaderInput::new("path").unwrap()),
+            id(&QueryParamInput::new("path").unwrap())
+        );
+        assert_ne!(id(&PathInput), id(&MethodInput));
     }
 
     #[test]
@@ -261,7 +309,10 @@ mod tests {
     fn path_input_extracts_simple_path() {
         let msg = ProcessingRequestBuilder::new().path("/api/users").build();
         let input = PathInput;
-        assert_eq!(input.get(&msg), MatchingData::String("/api/users".into()));
+        assert_eq!(
+            input.get(&msg),
+            Some(MatchingData::String("/api/users".into()))
+        );
     }
 
     #[test]
@@ -270,28 +321,31 @@ mod tests {
             .path("/api/users?page=1&limit=10")
             .build();
         let input = PathInput;
-        assert_eq!(input.get(&msg), MatchingData::String("/api/users".into()));
+        assert_eq!(
+            input.get(&msg),
+            Some(MatchingData::String("/api/users".into()))
+        );
     }
 
     #[test]
     fn path_input_returns_none_when_missing() {
         let msg = ProcessingRequestBuilder::new().method("GET").build();
         let input = PathInput;
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), None);
     }
 
     #[test]
     fn path_input_handles_root_path() {
         let msg = ProcessingRequestBuilder::new().path("/").build();
         let input = PathInput;
-        assert_eq!(input.get(&msg), MatchingData::String("/".into()));
+        assert_eq!(input.get(&msg), Some(MatchingData::String("/".into())));
     }
 
     #[test]
     fn path_input_handles_empty_query_string() {
         let msg = ProcessingRequestBuilder::new().path("/api?").build();
         let input = PathInput;
-        assert_eq!(input.get(&msg), MatchingData::String("/api".into()));
+        assert_eq!(input.get(&msg), Some(MatchingData::String("/api".into())));
     }
 
     // ========== MethodInput Tests ==========
@@ -300,21 +354,21 @@ mod tests {
     fn method_input_extracts_get() {
         let msg = ProcessingRequestBuilder::new().method("GET").build();
         let input = MethodInput;
-        assert_eq!(input.get(&msg), MatchingData::String("GET".into()));
+        assert_eq!(input.get(&msg), Some(MatchingData::String("GET".into())));
     }
 
     #[test]
     fn method_input_extracts_post() {
         let msg = ProcessingRequestBuilder::new().method("POST").build();
         let input = MethodInput;
-        assert_eq!(input.get(&msg), MatchingData::String("POST".into()));
+        assert_eq!(input.get(&msg), Some(MatchingData::String("POST".into())));
     }
 
     #[test]
     fn method_input_returns_none_when_missing() {
         let msg = ProcessingRequestBuilder::new().path("/").build();
         let input = MethodInput;
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), None);
     }
 
     // ========== HeaderInput Tests ==========
@@ -327,7 +381,7 @@ mod tests {
         let input = HeaderInput::new("content-type").unwrap();
         assert_eq!(
             input.get(&msg),
-            MatchingData::String("application/json".into())
+            Some(MatchingData::String("application/json".into()))
         );
     }
 
@@ -338,7 +392,10 @@ mod tests {
             .build();
 
         let input = HeaderInput::new("X-Custom-Header").unwrap();
-        assert_eq!(input.get(&msg), MatchingData::String("value123".into()));
+        assert_eq!(
+            input.get(&msg),
+            Some(MatchingData::String("value123".into()))
+        );
     }
 
     #[test]
@@ -347,7 +404,7 @@ mod tests {
             .header("content-type", "text/plain")
             .build();
         let input = HeaderInput::new("authorization").unwrap();
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), None);
     }
 
     #[test]
@@ -358,7 +415,7 @@ mod tests {
         let input = HeaderInput::new("authorization").unwrap();
         assert_eq!(
             input.get(&msg),
-            MatchingData::String("Bearer token123".into())
+            Some(MatchingData::String("Bearer token123".into()))
         );
     }
 
@@ -370,7 +427,7 @@ mod tests {
             .path("/search?q=rust")
             .build();
         let input = QueryParamInput::new("q").unwrap();
-        assert_eq!(input.get(&msg), MatchingData::String("rust".into()));
+        assert_eq!(input.get(&msg), Some(MatchingData::String("rust".into())));
     }
 
     #[test]
@@ -381,15 +438,15 @@ mod tests {
 
         assert_eq!(
             QueryParamInput::new("page").unwrap().get(&msg),
-            MatchingData::String("1".into())
+            Some(MatchingData::String("1".into()))
         );
         assert_eq!(
             QueryParamInput::new("limit").unwrap().get(&msg),
-            MatchingData::String("10".into())
+            Some(MatchingData::String("10".into()))
         );
         assert_eq!(
             QueryParamInput::new("sort").unwrap().get(&msg),
-            MatchingData::String("name".into())
+            Some(MatchingData::String("name".into()))
         );
     }
 
@@ -397,21 +454,21 @@ mod tests {
     fn query_param_input_returns_none_when_missing() {
         let msg = ProcessingRequestBuilder::new().path("/api?page=1").build();
         let input = QueryParamInput::new("limit").unwrap();
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), None);
     }
 
     #[test]
     fn query_param_input_returns_none_when_no_query_string() {
         let msg = ProcessingRequestBuilder::new().path("/api").build();
         let input = QueryParamInput::new("page").unwrap();
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), None);
     }
 
     #[test]
     fn query_param_input_returns_none_when_no_path() {
         let msg = ProcessingRequestBuilder::new().method("GET").build();
         let input = QueryParamInput::new("page").unwrap();
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), None);
     }
 
     // ========== SchemeInput Tests ==========
@@ -420,21 +477,21 @@ mod tests {
     fn scheme_input_extracts_https() {
         let msg = ProcessingRequestBuilder::new().scheme("https").build();
         let input = SchemeInput;
-        assert_eq!(input.get(&msg), MatchingData::String("https".into()));
+        assert_eq!(input.get(&msg), Some(MatchingData::String("https".into())));
     }
 
     #[test]
     fn scheme_input_extracts_http() {
         let msg = ProcessingRequestBuilder::new().scheme("http").build();
         let input = SchemeInput;
-        assert_eq!(input.get(&msg), MatchingData::String("http".into()));
+        assert_eq!(input.get(&msg), Some(MatchingData::String("http".into())));
     }
 
     #[test]
     fn scheme_input_returns_none_when_missing() {
         let msg = ProcessingRequestBuilder::new().path("/").build();
         let input = SchemeInput;
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), None);
     }
 
     // ========== AuthorityInput Tests ==========
@@ -445,7 +502,10 @@ mod tests {
             .authority("example.com")
             .build();
         let input = AuthorityInput;
-        assert_eq!(input.get(&msg), MatchingData::String("example.com".into()));
+        assert_eq!(
+            input.get(&msg),
+            Some(MatchingData::String("example.com".into()))
+        );
     }
 
     #[test]
@@ -456,7 +516,7 @@ mod tests {
         let input = AuthorityInput;
         assert_eq!(
             input.get(&msg),
-            MatchingData::String("example.com:8080".into())
+            Some(MatchingData::String("example.com:8080".into()))
         );
     }
 
@@ -464,7 +524,7 @@ mod tests {
     fn authority_input_returns_none_when_missing() {
         let msg = ProcessingRequestBuilder::new().path("/").build();
         let input = AuthorityInput;
-        assert_eq!(input.get(&msg), MatchingData::None);
+        assert_eq!(input.get(&msg), None);
     }
 
     // ========== Combined/Integration Tests ==========
@@ -482,29 +542,35 @@ mod tests {
 
         assert_eq!(
             PathInput.get(&msg),
-            MatchingData::String("/api/v1/users".into())
+            Some(MatchingData::String("/api/v1/users".into()))
         );
-        assert_eq!(MethodInput.get(&msg), MatchingData::String("POST".into()));
-        assert_eq!(SchemeInput.get(&msg), MatchingData::String("https".into()));
+        assert_eq!(
+            MethodInput.get(&msg),
+            Some(MatchingData::String("POST".into()))
+        );
+        assert_eq!(
+            SchemeInput.get(&msg),
+            Some(MatchingData::String("https".into()))
+        );
         assert_eq!(
             AuthorityInput.get(&msg),
-            MatchingData::String("api.example.com".into())
+            Some(MatchingData::String("api.example.com".into()))
         );
         assert_eq!(
             QueryParamInput::new("page").unwrap().get(&msg),
-            MatchingData::String("1".into())
+            Some(MatchingData::String("1".into()))
         );
         assert_eq!(
             QueryParamInput::new("limit").unwrap().get(&msg),
-            MatchingData::String("20".into())
+            Some(MatchingData::String("20".into()))
         );
         assert_eq!(
             HeaderInput::new("content-type").unwrap().get(&msg),
-            MatchingData::String("application/json".into())
+            Some(MatchingData::String("application/json".into()))
         );
         assert_eq!(
             HeaderInput::new("authorization").unwrap().get(&msg),
-            MatchingData::String("Bearer abc123".into())
+            Some(MatchingData::String("Bearer abc123".into()))
         );
     }
 
@@ -513,17 +579,11 @@ mod tests {
         // An empty message: no transport needed to assert INV-1.
         let msg = HttpMessageBuilder::new().build();
 
-        assert_eq!(PathInput.get(&msg), MatchingData::None);
-        assert_eq!(MethodInput.get(&msg), MatchingData::None);
-        assert_eq!(SchemeInput.get(&msg), MatchingData::None);
-        assert_eq!(AuthorityInput.get(&msg), MatchingData::None);
-        assert_eq!(
-            HeaderInput::new("any").unwrap().get(&msg),
-            MatchingData::None
-        );
-        assert_eq!(
-            QueryParamInput::new("any").unwrap().get(&msg),
-            MatchingData::None
-        );
+        assert_eq!(PathInput.get(&msg), None);
+        assert_eq!(MethodInput.get(&msg), None);
+        assert_eq!(SchemeInput.get(&msg), None);
+        assert_eq!(AuthorityInput.get(&msg), None);
+        assert_eq!(HeaderInput::new("any").unwrap().get(&msg), None);
+        assert_eq!(QueryParamInput::new("any").unwrap().get(&msg), None);
     }
 }

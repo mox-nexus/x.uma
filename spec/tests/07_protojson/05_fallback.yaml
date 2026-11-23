@@ -13,7 +13,7 @@ proto_matcher:
           input:
             name: MapInput
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: status
           valueMatch:
             exact: active
@@ -57,7 +57,7 @@ proto_matcher:
           input:
             name: MapInput
             typedConfig:
-              '@type': type.googleapis.com/xuma.kv.v1.MapInput
+              '@type': type.googleapis.com/xuma.core.v1.MapInput
               key: status
           valueMatch:
             exact: active

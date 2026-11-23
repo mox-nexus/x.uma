@@ -40,11 +40,14 @@ an 8 MB pattern against an 8 KB limit.
 | Limit | Value | Bounds | Enforced by |
 |---|---|---|---|
 | `MAX_DEPTH` | 32 | nested matcher depth | `Matcher::validate()` |
-| `MAX_FIELD_MATCHERS` | 256 | rules in one matcher | `Matcher::validate()` |
-| `MAX_PREDICATES_PER_COMPOUND` | 256 | children of one `and`/`or` | `Predicate::validate()` |
+| `MAX_PREDICATES_PER_EVALUATION` | 256 | predicates one evaluation can reach: all of a list's rules, one tree entry or one chain of prefixes | `Matcher::validate()` |
+| `MAX_TREE_ENTRIES` | 65,536 | entries in one tree | `Matcher::validate()` |
 | `MAX_PATTERN_LENGTH` | 8192 | a literal match pattern | `StringMatchSpec` constructor |
 | `MAX_REGEX_PATTERN_LENGTH` | 4096 | a regex pattern's source | `StringMatchSpec` constructor |
-| repetition product (TypeScript) | 1000 | nested `{n}` counts, matching RE2's own `kMaxRepeat` | the regex budget |
+| `MAX_DOCUMENT_PREDICATES` | 65,536 | predicates in one document, across nesting and tree entries | the registry as it loads |
+| `MAX_REGEXES` | 64 | compiled regexes in one document | the registry as it loads |
+| `REGEX_SIZE_LIMIT`, `REGEX_DFA_SIZE_LIMIT` | 1 MiB each | one regex's program and its per-thread DFA cache | `RegexBuilder`, so regex memory is count × 2 MiB |
+| `MAX_DOCUMENT_BYTES` | 1 MiB | a config document, before parsing | every reader: the CLI and both bindings |
 | config nesting | 128 | JSON/YAML object depth before a matcher exists | both parsers, and the protojson walk |
 
 The two width limits used to be enforced in the config loader alone, which meant
@@ -73,9 +76,6 @@ explicit budget because `re2js` implements neither of RE2's compile-time guards.
 Stated plainly, because a limit table that omits what it does not cover reads as
 a stronger guarantee than it is.
 
-- **There is no aggregate budget.** Every limit is per-item. 256 field matchers
-  each carrying a legal 13-byte regex is ~3.3 KB of config and about 2.9 s of
-  CPU, with every declared limit respected.
 - **Evaluation is recursive**, with `MAX_DEPTH` holding the line rather than an
   explicit stack. What actually prevents config-borne stack exhaustion today is
   the parsers' own 128-level recursion limit, not `MAX_DEPTH`. Measured

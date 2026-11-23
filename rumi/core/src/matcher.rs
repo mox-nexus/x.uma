@@ -4,8 +4,8 @@
 //! field matchers and evaluates them in order, returning the first match.
 
 use crate::{
-    EvalStep, EvalSteps, EvalTrace, FieldMatcher, MatcherError, MatcherTree, OnMatch, OnMatchTrace,
-    Predicate, TreeLookupTrace, MAX_DEPTH,
+    EvalStep, EvalSteps, EvalTrace, FieldMatcher, MatchResult, MatcherError, MatcherTree, OnMatch,
+    OnMatchTrace, Predicate, TreeAttempt, TreeLookupTrace, MAX_DEPTH,
 };
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -65,6 +65,28 @@ impl<Ctx, A: Clone + Send + Sync + Debug + 'static> Debug for MatcherKind<Ctx, A
         match self {
             Self::List(l) => f.debug_struct("List").field("len", &l.len()).finish(),
             Self::Tree(t) => f.debug_tuple("Tree").field(t).finish(),
+        }
+    }
+}
+
+/// What one evaluation decided (D-069).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Outcome<A> {
+    /// A rule, or the fallback, produced this action.
+    Action(A),
+    /// No rule matched, and there was no fallback or it matched nothing.
+    NoMatch,
+    /// A required value was absent: the evaluation stopped without an action,
+    /// and without its fallback.
+    Undecided,
+}
+
+impl<A> Outcome<A> {
+    /// The action, if one was produced.
+    pub fn into_action(self) -> Option<A> {
+        match self {
+            Self::Action(a) => Some(a),
+            Self::NoMatch | Self::Undecided => None,
         }
     }
 }
@@ -170,45 +192,44 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
     ///
     /// This matches xDS semantics where nested matcher failure propagates up.
     pub fn evaluate(&self, ctx: &Ctx) -> Option<A> {
-        let matched = match &self.kind {
-            MatcherKind::List(list) => {
-                let mut found = None;
-                for field_matcher in list {
-                    if field_matcher.matches(ctx) {
-                        // OnMatch is exclusive: either Action or Matcher.
-                        match &field_matcher.on_match {
-                            OnMatch::Action(action) => {
-                                found = Some(action.clone());
-                                break;
-                            }
-                            OnMatch::Matcher(nested) => {
-                                // xDS: nested matcher failure propagates, so a
-                                // nested `None` means this field matcher did
-                                // not match and evaluation continues.
-                                if let Some(action) = nested.evaluate(ctx) {
-                                    found = Some(action);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                found
-            }
-            // A tree miss and a tree hit whose nested matcher returned `None`
-            // both arrive here as `None`, and both then reach `on_no_match` —
-            // the same rule the list follows when it falls off the end.
-            MatcherKind::Tree(tree) => tree.evaluate(ctx),
+        self.outcome(ctx).into_action()
+    }
+
+    /// Evaluate, keeping "a required value was absent" apart from "nothing
+    /// matched" (D-069).
+    ///
+    /// A list stops at the first rule whose predicate is undecided, and a tree
+    /// at an absent required key, as Envoy's matchers stop on insufficient
+    /// data; neither a later rule nor `on_no_match` fires. A nested matcher
+    /// that is undecided makes its parent undecided.
+    pub fn outcome(&self, ctx: &Ctx) -> Outcome<A> {
+        let decided = match &self.kind {
+            MatcherKind::List(list) => Self::list_outcome(list, ctx),
+            MatcherKind::Tree(tree) => tree.outcome(ctx),
         };
-
-        if matched.is_some() {
-            return matched;
+        match decided {
+            Outcome::NoMatch => self
+                .on_no_match
+                .as_ref()
+                .map_or(Outcome::NoMatch, |om| om.outcome(ctx)),
+            decided => decided,
         }
+    }
 
-        self.on_no_match.as_ref().and_then(|om| match om {
-            OnMatch::Action(a) => Some(a.clone()),
-            OnMatch::Matcher(nested) => nested.evaluate(ctx),
-        })
+    fn list_outcome(list: &[FieldMatcher<Ctx, A>], ctx: &Ctx) -> Outcome<A> {
+        for field_matcher in list {
+            match field_matcher.predicate.match_result(ctx) {
+                MatchResult::NoMatch => {}
+                MatchResult::Undecided => return Outcome::Undecided,
+                // xDS: a nested matcher that matches nothing hands evaluation
+                // on to the next rule.
+                MatchResult::Matched => match field_matcher.on_match.outcome(ctx) {
+                    Outcome::NoMatch => {}
+                    decided => return decided,
+                },
+            }
+        }
+        Outcome::NoMatch
     }
 
     /// Evaluate with full trace for debugging.
@@ -223,7 +244,7 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
     /// would return for the same context.
     #[must_use]
     pub fn evaluate_with_trace(&self, ctx: &Ctx) -> EvalTrace<A> {
-        let (result, steps) = match &self.kind {
+        let (decided, steps) = match &self.kind {
             MatcherKind::List(list) => {
                 let (r, s) = Self::trace_list(list, ctx);
                 (r, EvalSteps::List(s))
@@ -234,76 +255,76 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
             }
         };
 
-        if result.is_some() {
-            return EvalTrace {
-                result,
-                steps,
-                used_fallback: false,
-            };
-        }
-
-        // `used_fallback` records that the fallback was *consulted*, so it can
-        // be true while the result is still None — a fallback holding a nested
-        // matcher may itself fail.
-        let used_fallback = self.on_no_match.is_some();
-        let result = self.on_no_match.as_ref().and_then(|om| match om {
-            OnMatch::Action(a) => Some(a.clone()),
-            OnMatch::Matcher(nested) => nested.evaluate(ctx),
-        });
+        let (decided, used_fallback) = match decided {
+            // `used_fallback` records that the fallback was *consulted*, so it
+            // can be true while the result is still None: a fallback holding a
+            // nested matcher may itself match nothing.
+            Outcome::NoMatch => (
+                self.on_no_match
+                    .as_ref()
+                    .map_or(Outcome::NoMatch, |om| om.outcome(ctx)),
+                self.on_no_match.is_some(),
+            ),
+            decided => (decided, false),
+        };
 
         EvalTrace {
-            result,
+            undecided: matches!(decided, Outcome::Undecided),
+            result: decided.into_action(),
             steps,
             used_fallback,
         }
     }
 
-    fn trace_list(list: &[FieldMatcher<Ctx, A>], ctx: &Ctx) -> (Option<A>, Vec<EvalStep<A>>) {
+    fn trace_list(list: &[FieldMatcher<Ctx, A>], ctx: &Ctx) -> (Outcome<A>, Vec<EvalStep<A>>) {
         let mut steps = Vec::new();
-        let mut result = None;
 
         for (index, field_matcher) in list.iter().enumerate() {
             let predicate_trace = field_matcher.predicate.evaluate_with_trace(ctx);
-            let pred_matched = predicate_trace.matched();
+            let predicate_result = predicate_trace.result();
 
-            if pred_matched {
-                let on_match = match &field_matcher.on_match {
-                    OnMatch::Action(action) => {
-                        result = Some(action.clone());
-                        Some(OnMatchTrace::Action(action.clone()))
-                    }
-                    OnMatch::Matcher(nested) => {
-                        let nested_trace = nested.evaluate_with_trace(ctx);
-                        result.clone_from(&nested_trace.result);
-                        Some(OnMatchTrace::Nested(Box::new(nested_trace)))
-                    }
-                };
-
-                steps.push(EvalStep {
-                    index,
-                    matched: true,
-                    predicate_trace,
-                    on_match,
-                });
-
-                // First-match-wins: INV-2 requires stopping here, and INV-3
-                // requires the trace agree with `evaluate`, so this early
-                // return is load-bearing rather than an optimisation.
-                if result.is_some() {
-                    break;
-                }
-                // Nested returned None -> continue to the next field matcher.
-            } else {
+            if predicate_result != MatchResult::Matched {
                 steps.push(EvalStep {
                     index,
                     matched: false,
                     predicate_trace,
                     on_match: None,
                 });
+                if predicate_result == MatchResult::Undecided {
+                    return (Outcome::Undecided, steps);
+                }
+                continue;
+            }
+
+            let (decided, on_match) = match &field_matcher.on_match {
+                OnMatch::Action(action) => (
+                    Outcome::Action(action.clone()),
+                    OnMatchTrace::Action(action.clone()),
+                ),
+                OnMatch::Matcher(nested) => {
+                    let nested_trace = nested.evaluate_with_trace(ctx);
+                    (
+                        nested_trace.outcome(),
+                        OnMatchTrace::Nested(Box::new(nested_trace)),
+                    )
+                }
+            };
+            steps.push(EvalStep {
+                index,
+                matched: true,
+                predicate_trace,
+                on_match: Some(on_match),
+            });
+
+            // First-match-wins: INV-2 requires stopping here, and INV-3
+            // requires the trace agree with `outcome`, so this early return is
+            // load-bearing rather than an optimisation.
+            if !matches!(decided, Outcome::NoMatch) {
+                return (decided, steps);
             }
         }
 
-        (result, steps)
+        (Outcome::NoMatch, steps)
     }
 
     /// The four outcomes of a tree lookup, recorded.
@@ -318,54 +339,52 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
     /// The last row is where this and `evaluate` would drift if written
     /// independently, so both read the same lookup through
     /// `MatcherTree::lookup`.
-    fn trace_tree(tree: &MatcherTree<Ctx, A>, ctx: &Ctx) -> (Option<A>, TreeLookupTrace<A>) {
+    fn trace_tree(tree: &MatcherTree<Ctx, A>, ctx: &Ctx) -> (Outcome<A>, TreeLookupTrace<A>) {
         let (kind, input) = tree.trace_identity();
         let key = tree.trace_key(ctx);
 
         let Some(key) = key else {
             return (
-                None,
+                tree.absent_key(),
                 TreeLookupTrace {
                     kind,
                     input,
                     key: None,
-                    matched_key: None,
-                    on_match: None,
+                    attempts: Vec::new(),
                 },
             );
         };
 
-        let Some((matched_key, on_match)) = tree.trace_lookup(&key) else {
-            return (
-                None,
-                TreeLookupTrace {
-                    kind,
-                    input,
-                    key: Some(key),
-                    matched_key: None,
-                    on_match: None,
-                },
-            );
-        };
-        let matched_key = matched_key.to_owned();
-
-        let (result, on_match_trace) = match on_match {
-            OnMatch::Action(a) => (Some(a.clone()), OnMatchTrace::Action(a.clone())),
-            OnMatch::Matcher(nested) => {
-                let nested_trace = nested.evaluate_with_trace(ctx);
-                let r = nested_trace.result.clone();
-                (r, OnMatchTrace::Nested(Box::new(nested_trace)))
+        let mut decided = Outcome::NoMatch;
+        let mut attempts = Vec::new();
+        for (matched_key, on_match) in tree.trace_candidates(&key) {
+            let (d, on_match_trace) = match on_match {
+                OnMatch::Action(a) => (Outcome::Action(a.clone()), OnMatchTrace::Action(a.clone())),
+                OnMatch::Matcher(nested) => {
+                    let nested_trace = nested.evaluate_with_trace(ctx);
+                    (
+                        nested_trace.outcome(),
+                        OnMatchTrace::Nested(Box::new(nested_trace)),
+                    )
+                }
+            };
+            attempts.push(TreeAttempt {
+                matched_key: matched_key.to_owned(),
+                on_match: on_match_trace,
+            });
+            if !matches!(d, Outcome::NoMatch) {
+                decided = d;
+                break;
             }
-        };
+        }
 
         (
-            result,
+            decided,
             TreeLookupTrace {
                 kind,
                 input,
                 key: Some(key),
-                matched_key: Some(matched_key),
-                on_match: Some(on_match_trace),
+                attempts,
             },
         )
     }
@@ -427,15 +446,13 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
     /// Checks, over the whole tree including nested matchers and `on_no_match`
     /// chains:
     /// - nesting depth against [`MAX_DEPTH`]
-    /// - rules per matcher against [`MAX_FIELD_MATCHERS`](crate::MAX_FIELD_MATCHERS)
-    /// - children per `and`/`or` against
-    ///   [`MAX_PREDICATES_PER_COMPOUND`](crate::MAX_PREDICATES_PER_COMPOUND)
+    /// - entries per tree against [`MAX_TREE_ENTRIES`](crate::MAX_TREE_ENTRIES)
+    /// - the worst path's cost, [`path_cost`](Self::path_cost), against
+    ///   [`MAX_PREDICATES_PER_EVALUATION`](crate::MAX_PREDICATES_PER_EVALUATION)
     ///
-    /// The width limits used to live in the registry, which meant a matcher
-    /// built by a domain compiler or across the FFI carried none of them. They
-    /// belong here, on the type that holds the rules, so that whatever builds a
-    /// matcher — in any language, through any adapter — inherits the same
-    /// guarantees rather than reimplementing them.
+    /// The limits live here, on the type that holds the rules, so that
+    /// whatever builds a matcher (the registry, a domain compiler, a binding,
+    /// a hand) inherits the same guarantees rather than reimplementing them.
     ///
     /// Pattern-length limits are not here: a compiled pattern is held by
     /// [`StringMatchSpec`](crate::StringMatchSpec), which enforces its own in
@@ -444,8 +461,9 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
     /// # Errors
     ///
     /// - [`MatcherError::DepthExceeded`] if nesting is too deep
-    /// - [`MatcherError::TooManyFieldMatchers`] if one matcher holds too many rules
-    /// - [`MatcherError::TooManyPredicates`] if one compound holds too many children
+    /// - [`MatcherError::TooManyTreeEntries`] if one tree holds too many entries
+    /// - [`MatcherError::TooManyPredicatesPerEvaluation`] if one evaluation can
+    ///   reach too many predicates
     pub fn validate(&self) -> Result<(), MatcherError> {
         let depth = self.depth();
         if depth > MAX_DEPTH {
@@ -454,31 +472,47 @@ impl<Ctx, A: Clone + Send + Sync + 'static> Matcher<Ctx, A> {
                 max: MAX_DEPTH,
             });
         }
-        self.validate_widths()
+        self.validate_widths()?;
+        let cost = self.path_cost();
+        if cost > crate::MAX_PREDICATES_PER_EVALUATION {
+            return Err(MatcherError::TooManyPredicatesPerEvaluation {
+                count: cost,
+                max: crate::MAX_PREDICATES_PER_EVALUATION,
+            });
+        }
+        Ok(())
     }
 
-    /// The width half of [`validate`](Self::validate), recursing through nested
-    /// matchers. Depth is checked once at the root because `depth()` is already
-    /// a whole-tree measure.
+    /// The most predicates one evaluation can reach.
+    ///
+    /// A list costs every rule's predicate and nested matcher, since a nested
+    /// miss moves on to the next rule; a tree costs its dearest entry, or for a
+    /// prefix tree its dearest chain of prefixes (D-055); the fallback adds its
+    /// own. An upper bound: it assumes every predicate can hold.
+    #[must_use]
+    pub fn path_cost(&self) -> usize {
+        let own = match &self.kind {
+            MatcherKind::List(list) => list
+                .iter()
+                .map(|fm| fm.predicate.leaf_count() + fm.on_match.path_cost())
+                .sum(),
+            MatcherKind::Tree(tree) => tree.path_cost(),
+        };
+        own + self.on_no_match.as_ref().map_or(0, OnMatch::path_cost)
+    }
+
+    /// The tree-width half of [`validate`](Self::validate), recursing through
+    /// nested matchers. Depth is checked once at the root because `depth()` is
+    /// already a whole-tree measure.
     pub(crate) fn validate_widths(&self) -> Result<(), MatcherError> {
         match &self.kind {
             MatcherKind::List(list) => {
-                if list.len() > crate::MAX_FIELD_MATCHERS {
-                    return Err(MatcherError::TooManyFieldMatchers {
-                        count: list.len(),
-                        max: crate::MAX_FIELD_MATCHERS,
-                    });
-                }
-
                 for fm in list {
-                    fm.predicate.validate()?;
                     if let OnMatch::Matcher(nested) = &fm.on_match {
                         nested.validate_widths()?;
                     }
                 }
             }
-            // Bounded separately, and for a different reason — see
-            // `MAX_TREE_ENTRIES`.
             MatcherKind::Tree(tree) => tree.validate_widths()?,
         }
 
@@ -499,14 +533,8 @@ impl<Ctx, A: Clone + Send + Sync + Debug + 'static> Debug for Matcher<Ctx, A> {
     }
 }
 
-// A `Clone` impl bounded on `FieldMatcher<Ctx, A>: Clone` stood here. It could
-// never be instantiated: `FieldMatcher` holds a `Predicate`, which holds a
-// `Box<dyn DataInput<Ctx>>`, and a trait object is not `Clone` for any `Ctx`.
-// Nothing in five implementations ever cloned a `Matcher`.
-
-// Note: No unsafe impl needed — compiler derives Send/Sync automatically
-// because all fields (Vec<FieldMatcher>, Option<OnMatch>, PhantomData) are Send/Sync
-// when their type parameters are.
+// `Send` and `Sync` are derived, never `unsafe impl`'d, so the FFI bound is
+// proved by the compiler rather than promised.
 
 #[cfg(test)]
 mod tests {
@@ -528,8 +556,8 @@ mod tests {
     struct ValueInput;
 
     impl DataInput<TestCtx> for ValueInput {
-        fn get(&self, ctx: &TestCtx) -> MatchingData {
-            MatchingData::String(ctx.value.clone())
+        fn get(&self, ctx: &TestCtx) -> Option<MatchingData> {
+            Some(MatchingData::String(ctx.value.clone()))
         }
     }
 
@@ -1051,7 +1079,10 @@ mod tests {
         assert_eq!(lookup.kind, crate::TreeKind::Prefix);
         assert_eq!(lookup.key.as_deref(), Some("/api/v2/users"));
         // The winning prefix, not the lookup key — the non-obvious step.
-        assert_eq!(lookup.matched_key.as_deref(), Some("/api/v2"));
+        assert_eq!(
+            lookup.winner().map(|a| a.matched_key.as_str()),
+            Some("/api/v2")
+        );
     }
 
     #[test]
@@ -1059,8 +1090,8 @@ mod tests {
         #[derive(Debug)]
         struct AbsentInput;
         impl DataInput<TestCtx> for AbsentInput {
-            fn get(&self, _ctx: &TestCtx) -> MatchingData {
-                MatchingData::None
+            fn get(&self, _ctx: &TestCtx) -> Option<MatchingData> {
+                None
             }
         }
 
@@ -1094,10 +1125,121 @@ mod tests {
         match &no_entry.evaluate_with_trace(&ctx).steps {
             EvalSteps::Tree(t) => {
                 assert_eq!(t.key.as_deref(), Some("z"));
-                assert!(t.matched_key.is_none());
+                assert!(t.attempts.is_empty());
             }
             EvalSteps::List(_) => panic!("expected a tree trace"),
         }
+    }
+
+    #[test]
+    fn path_cost_adds_a_lists_rules_and_takes_a_trees_dearest_entry() {
+        let leaf = || {
+            FieldMatcher::new(
+                Predicate::Single(SinglePredicate::new(
+                    Box::new(ValueInput),
+                    Box::new(ExactMatcher::new("x")),
+                )),
+                OnMatch::Action("leaf".to_string()),
+            )
+        };
+        let nested = |n: usize| Matcher::list((0..n).map(|_| leaf()).collect(), None);
+        let under = |n: usize| OnMatch::Matcher(Box::new(nested(n)));
+        let rule = |n: usize| {
+            FieldMatcher::new(
+                Predicate::Single(SinglePredicate::new(
+                    Box::new(ValueInput),
+                    Box::new(ExactMatcher::new("t")),
+                )),
+                under(n),
+            )
+        };
+
+        let list = Matcher::list(vec![rule(100), rule(100), rule(100)], None);
+        assert_eq!(list.path_cost(), 303);
+        assert!(matches!(
+            list.validate(),
+            Err(MatcherError::TooManyPredicatesPerEvaluation { count: 303, max })
+                if max == crate::MAX_PREDICATES_PER_EVALUATION
+        ));
+
+        let exact = Matcher::tree(
+            MatcherTree::exact(
+                Box::new(ValueInput),
+                [("a", under(100)), ("b", under(200)), ("c", under(100))],
+            )
+            .unwrap(),
+            Some(under(50)),
+        );
+        assert_eq!(exact.path_cost(), 250, "dearest entry plus the fallback");
+        assert!(exact.validate().is_ok());
+
+        let siblings = Matcher::tree(
+            MatcherTree::prefix(
+                Box::new(ValueInput),
+                [("/x", under(200)), ("/y", under(200)), ("/z", under(200))],
+            )
+            .unwrap(),
+            None,
+        );
+        assert_eq!(siblings.path_cost(), 200);
+
+        let chain = Matcher::tree(
+            MatcherTree::prefix(
+                Box::new(ValueInput),
+                [
+                    ("/", under(100)),
+                    ("/a", under(100)),
+                    ("/a/b", under(100)),
+                    ("/z", under(200)),
+                ],
+            )
+            .unwrap(),
+            None,
+        );
+        assert_eq!(chain.path_cost(), 300, "/a/b falls through to /a and /");
+    }
+
+    #[test]
+    fn a_prefix_tree_falls_through_to_the_next_shorter_prefix_and_traces_every_attempt() {
+        let nested = Matcher::list(
+            vec![FieldMatcher::new(
+                Predicate::Single(SinglePredicate::new(
+                    Box::new(ValueInput),
+                    Box::new(ExactMatcher::new("never")),
+                )),
+                OnMatch::Action("api_admin".to_string()),
+            )],
+            None,
+        );
+        let tree = crate::MatcherTree::prefix(
+            Box::new(ValueInput),
+            [
+                ("/", OnMatch::Action("root".to_string())),
+                ("/api", OnMatch::Matcher(Box::new(nested))),
+            ],
+        )
+        .expect("valid tree");
+        let matcher = Matcher::tree(tree, Some(OnMatch::Action("fallback".to_string())));
+        let ctx = TestCtx {
+            value: "/api/users".into(),
+        };
+
+        assert_eq!(matcher.evaluate(&ctx), Some("root".to_string()));
+
+        let trace = matcher.evaluate_with_trace(&ctx);
+        assert_eq!(trace.result, matcher.evaluate(&ctx));
+        assert!(!trace.used_fallback);
+        let EvalSteps::Tree(lookup) = &trace.steps else {
+            panic!("expected a tree trace");
+        };
+        let tried: Vec<&str> = lookup
+            .attempts
+            .iter()
+            .map(|a| a.matched_key.as_str())
+            .collect();
+        assert_eq!(tried, ["/api", "/"]);
+        assert!(!lookup.attempts[0].on_match.produced());
+        assert_eq!(lookup.winner().map(|a| a.matched_key.as_str()), Some("/"));
     }
 
     #[test]

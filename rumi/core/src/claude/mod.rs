@@ -103,7 +103,7 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Write");
         assert_eq!(
             ToolNameInput.get(&ctx),
-            MatchingData::String("Write".into())
+            Some(MatchingData::String("Write".into()))
         );
     }
 
@@ -112,7 +112,7 @@ mod tests {
         let ctx = HookContext::post_tool_use("Read");
         assert_eq!(
             EventTypeInput.get(&ctx),
-            MatchingData::String("PostToolUse".into())
+            Some(MatchingData::String("PostToolUse".into()))
         );
     }
 
@@ -121,7 +121,10 @@ mod tests {
         let ctx = HookContext::pre_tool_use("Bash").with_arg("command", "echo hello");
 
         let input = ToolArgInput::new("command").unwrap();
-        assert_eq!(input.get(&ctx), MatchingData::String("echo hello".into()));
+        assert_eq!(
+            input.get(&ctx),
+            Some(MatchingData::String("echo hello".into()))
+        );
     }
 
     #[test]

@@ -6,8 +6,14 @@ impl serde::Serialize for AuthorityInput {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        let len = 0;
-        let struct_ser = serializer.serialize_struct("xuma.http.v1.AuthorityInput", len)?;
+        let mut len = 0;
+        if self.required {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("xuma.http.v1.AuthorityInput", len)?;
+        if self.required {
+            struct_ser.serialize_field("required", &self.required)?;
+        }
         struct_ser.end()
     }
 }
@@ -18,10 +24,12 @@ impl<'de> serde::Deserialize<'de> for AuthorityInput {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
+            "required",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
+            Required,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -42,7 +50,10 @@ impl<'de> serde::Deserialize<'de> for AuthorityInput {
                     where
                         E: serde::de::Error,
                     {
-                            Err(serde::de::Error::unknown_field(value, FIELDS))
+                        match value {
+                            "required" => Ok(GeneratedField::Required),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
                     }
                 }
                 deserializer.deserialize_identifier(GeneratedVisitor)
@@ -60,10 +71,19 @@ impl<'de> serde::Deserialize<'de> for AuthorityInput {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                while map_.next_key::<GeneratedField>()?.is_some() {
-                    let _ = map_.next_value::<serde::de::IgnoredAny>()?;
+                let mut required__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Required => {
+                            if required__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("required"));
+                            }
+                            required__ = Some(map_.next_value()?);
+                        }
+                    }
                 }
                 Ok(AuthorityInput {
+                    required: required__.unwrap_or_default(),
                 })
             }
         }
@@ -81,9 +101,15 @@ impl serde::Serialize for HeaderInput {
         if !self.name.is_empty() {
             len += 1;
         }
+        if self.required {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("xuma.http.v1.HeaderInput", len)?;
         if !self.name.is_empty() {
             struct_ser.serialize_field("name", &self.name)?;
+        }
+        if self.required {
+            struct_ser.serialize_field("required", &self.required)?;
         }
         struct_ser.end()
     }
@@ -96,11 +122,13 @@ impl<'de> serde::Deserialize<'de> for HeaderInput {
     {
         const FIELDS: &[&str] = &[
             "name",
+            "required",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Name,
+            Required,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -123,6 +151,7 @@ impl<'de> serde::Deserialize<'de> for HeaderInput {
                     {
                         match value {
                             "name" => Ok(GeneratedField::Name),
+                            "required" => Ok(GeneratedField::Required),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -143,6 +172,7 @@ impl<'de> serde::Deserialize<'de> for HeaderInput {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut name__ = None;
+                let mut required__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Name => {
@@ -151,10 +181,17 @@ impl<'de> serde::Deserialize<'de> for HeaderInput {
                             }
                             name__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Required => {
+                            if required__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("required"));
+                            }
+                            required__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(HeaderInput {
                     name: name__.unwrap_or_default(),
+                    required: required__.unwrap_or_default(),
                 })
             }
         }
@@ -168,8 +205,14 @@ impl serde::Serialize for MethodInput {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        let len = 0;
-        let struct_ser = serializer.serialize_struct("xuma.http.v1.MethodInput", len)?;
+        let mut len = 0;
+        if self.required {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("xuma.http.v1.MethodInput", len)?;
+        if self.required {
+            struct_ser.serialize_field("required", &self.required)?;
+        }
         struct_ser.end()
     }
 }
@@ -180,10 +223,12 @@ impl<'de> serde::Deserialize<'de> for MethodInput {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
+            "required",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
+            Required,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -204,7 +249,10 @@ impl<'de> serde::Deserialize<'de> for MethodInput {
                     where
                         E: serde::de::Error,
                     {
-                            Err(serde::de::Error::unknown_field(value, FIELDS))
+                        match value {
+                            "required" => Ok(GeneratedField::Required),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
                     }
                 }
                 deserializer.deserialize_identifier(GeneratedVisitor)
@@ -222,10 +270,19 @@ impl<'de> serde::Deserialize<'de> for MethodInput {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                while map_.next_key::<GeneratedField>()?.is_some() {
-                    let _ = map_.next_value::<serde::de::IgnoredAny>()?;
+                let mut required__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Required => {
+                            if required__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("required"));
+                            }
+                            required__ = Some(map_.next_value()?);
+                        }
+                    }
                 }
                 Ok(MethodInput {
+                    required: required__.unwrap_or_default(),
                 })
             }
         }
@@ -239,8 +296,14 @@ impl serde::Serialize for PathInput {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        let len = 0;
-        let struct_ser = serializer.serialize_struct("xuma.http.v1.PathInput", len)?;
+        let mut len = 0;
+        if self.required {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("xuma.http.v1.PathInput", len)?;
+        if self.required {
+            struct_ser.serialize_field("required", &self.required)?;
+        }
         struct_ser.end()
     }
 }
@@ -251,10 +314,12 @@ impl<'de> serde::Deserialize<'de> for PathInput {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
+            "required",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
+            Required,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -275,7 +340,10 @@ impl<'de> serde::Deserialize<'de> for PathInput {
                     where
                         E: serde::de::Error,
                     {
-                            Err(serde::de::Error::unknown_field(value, FIELDS))
+                        match value {
+                            "required" => Ok(GeneratedField::Required),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
                     }
                 }
                 deserializer.deserialize_identifier(GeneratedVisitor)
@@ -293,10 +361,19 @@ impl<'de> serde::Deserialize<'de> for PathInput {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                while map_.next_key::<GeneratedField>()?.is_some() {
-                    let _ = map_.next_value::<serde::de::IgnoredAny>()?;
+                let mut required__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Required => {
+                            if required__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("required"));
+                            }
+                            required__ = Some(map_.next_value()?);
+                        }
+                    }
                 }
                 Ok(PathInput {
+                    required: required__.unwrap_or_default(),
                 })
             }
         }
@@ -314,9 +391,15 @@ impl serde::Serialize for QueryParamInput {
         if !self.name.is_empty() {
             len += 1;
         }
+        if self.required {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("xuma.http.v1.QueryParamInput", len)?;
         if !self.name.is_empty() {
             struct_ser.serialize_field("name", &self.name)?;
+        }
+        if self.required {
+            struct_ser.serialize_field("required", &self.required)?;
         }
         struct_ser.end()
     }
@@ -329,11 +412,13 @@ impl<'de> serde::Deserialize<'de> for QueryParamInput {
     {
         const FIELDS: &[&str] = &[
             "name",
+            "required",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Name,
+            Required,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -356,6 +441,7 @@ impl<'de> serde::Deserialize<'de> for QueryParamInput {
                     {
                         match value {
                             "name" => Ok(GeneratedField::Name),
+                            "required" => Ok(GeneratedField::Required),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -376,6 +462,7 @@ impl<'de> serde::Deserialize<'de> for QueryParamInput {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut name__ = None;
+                let mut required__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Name => {
@@ -384,10 +471,17 @@ impl<'de> serde::Deserialize<'de> for QueryParamInput {
                             }
                             name__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Required => {
+                            if required__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("required"));
+                            }
+                            required__ = Some(map_.next_value()?);
+                        }
                     }
                 }
                 Ok(QueryParamInput {
                     name: name__.unwrap_or_default(),
+                    required: required__.unwrap_or_default(),
                 })
             }
         }
@@ -401,8 +495,14 @@ impl serde::Serialize for SchemeInput {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        let len = 0;
-        let struct_ser = serializer.serialize_struct("xuma.http.v1.SchemeInput", len)?;
+        let mut len = 0;
+        if self.required {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("xuma.http.v1.SchemeInput", len)?;
+        if self.required {
+            struct_ser.serialize_field("required", &self.required)?;
+        }
         struct_ser.end()
     }
 }
@@ -413,10 +513,12 @@ impl<'de> serde::Deserialize<'de> for SchemeInput {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
+            "required",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
+            Required,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -437,7 +539,10 @@ impl<'de> serde::Deserialize<'de> for SchemeInput {
                     where
                         E: serde::de::Error,
                     {
-                            Err(serde::de::Error::unknown_field(value, FIELDS))
+                        match value {
+                            "required" => Ok(GeneratedField::Required),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
                     }
                 }
                 deserializer.deserialize_identifier(GeneratedVisitor)
@@ -455,10 +560,19 @@ impl<'de> serde::Deserialize<'de> for SchemeInput {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                while map_.next_key::<GeneratedField>()?.is_some() {
-                    let _ = map_.next_value::<serde::de::IgnoredAny>()?;
+                let mut required__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Required => {
+                            if required__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("required"));
+                            }
+                            required__ = Some(map_.next_value()?);
+                        }
+                    }
                 }
                 Ok(SchemeInput {
+                    required: required__.unwrap_or_default(),
                 })
             }
         }

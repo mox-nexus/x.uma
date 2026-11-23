@@ -206,8 +206,6 @@ const DOC_ROOTS = [
 	"docs/content/getting-started/python.md",
 	"docs/content/getting-started/typescript.md",
 	"docs/content/getting-started/rust.md",
-	"puma/README.md",
-	"bumi/README.md",
 	"rumi/core/README.md",
 	"rumi/cli/README.md",
 	"rumi/crusts/python/README.md",
@@ -232,13 +230,9 @@ const workflows = [".github/workflows/release.yml", ".github/workflows/release-c
 /** `registry:name` for everything a workflow actually pushes. */
 const published = new Set(order.map((n) => `crates.io:${n}`));
 
-// PyPI: the pure Python package, and the PyO3 wheel matrix.
-if (/packages-dir:\s*puma\/dist/.test(workflows)) published.add("pypi:xuma");
+// PyPI: the PyO3 wheel matrix.
 if (/packages-dir:\s*dist\//.test(workflows)) published.add("pypi:xuma-crust");
-// npm: the pure TypeScript package, and the wasm crust.
-if (/bun publish/.test(workflows) && /working-directory:\s*bumi/.test(workflows)) {
-	published.add("npm:xuma");
-}
+// npm: the wasm crust.
 if (/npm publish/.test(workflows) && /crusts\/wasm\/pkg/.test(workflows)) {
 	published.add("npm:xuma-crust");
 }

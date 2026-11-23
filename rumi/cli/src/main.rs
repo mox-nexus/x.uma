@@ -14,8 +14,8 @@ use std::collections::HashMap;
 use std::process;
 
 use rumi::claude::HookContext;
-use rumi::{MatcherConfig, MatcherKindConfig, TreeTypeConfig, TypedConfig};
-use rumi_http::HttpRequest;
+use rumi::{MatcherIr, MatcherKindIr, TreeTypeIr, TypedExtensionConfig};
+use rumi_http::{HttpMessage, HttpMessageBuilder};
 use rumi_kv::KvContext;
 use rumi_proto::any_resolver::{AnyResolver, AnyResolverBuilder};
 use rumi_proto::convert::convert_matcher;
@@ -104,7 +104,7 @@ fn cmd_check(args: &[String]) -> Result<(), String> {
     // one, which for a gate is the difference that matters.
     let has_fallback = config.on_no_match.is_some();
     let (rule_count, mut inputs): (usize, Vec<String>) = match &config.kind {
-        MatcherKindConfig::List(matchers) => (
+        MatcherKindIr::List(matchers) => (
             matchers.len(),
             matchers
                 .iter()
@@ -115,9 +115,9 @@ fn cmd_check(args: &[String]) -> Result<(), String> {
         // the input list has exactly one member. Reporting zero rules for a
         // tree would read as an empty config, which for a gate is the
         // difference that matters.
-        MatcherKindConfig::Tree(tree) => {
+        MatcherKindIr::Tree(tree) => {
             let entries = match &tree.tree {
-                TreeTypeConfig::ExactMatchMap(e) | TreeTypeConfig::PrefixMatchMap(e) => e.len(),
+                TreeTypeIr::ExactMatchMap(e) | TreeTypeIr::PrefixMatchMap(e) => e.len(),
             };
             (entries, vec![tree.input.type_url.clone()])
         }
@@ -171,8 +171,8 @@ fn cmd_check(args: &[String]) -> Result<(), String> {
 }
 
 /// Collect the input type URLs a predicate tree references, recursively.
-fn collect_input_urls(predicate: &rumi::PredicateConfig) -> Vec<String> {
-    use rumi::PredicateConfig as P;
+fn collect_input_urls(predicate: &rumi::PredicateIr) -> Vec<String> {
+    use rumi::PredicateIr as P;
     match predicate {
         P::Single(single) => vec![single.input.type_url.clone()],
         P::And { predicates } | P::Or { predicates } => {
@@ -300,9 +300,10 @@ fn report<Ctx, A: std::fmt::Display + Clone + Send + Sync + 'static>(
     if trace {
         trace_output::print(&matcher.evaluate_with_trace(ctx));
     } else {
-        match matcher.evaluate(ctx) {
-            Some(action) => println!("{action}"),
-            None => println!("(no match)"),
+        match matcher.outcome(ctx) {
+            rumi::Outcome::Action(action) => println!("{action}"),
+            rumi::Outcome::NoMatch => println!("(no match)"),
+            rumi::Outcome::Undecided => println!("(undecided: a required value is absent)"),
         }
     }
 }
@@ -446,7 +447,13 @@ fn run_claude_hook(args: &[String]) -> ! {
         Err(e) => block("hook payload describes an event rumi does not know", &e),
     };
 
-    let decision = matcher.evaluate(&ctx);
+    let decision = match matcher.outcome(&ctx) {
+        rumi::Outcome::Undecided => block(
+            "a required value is absent from the hook payload",
+            "the matcher could not decide (D-069)",
+        ),
+        outcome => outcome.into_action(),
+    };
     let code = hook::exit_code_for(decision.as_deref(), &deny_actions);
 
     if code == hook::EXIT_BLOCK {
@@ -486,9 +493,8 @@ fn build_test_registry() -> rumi::Registry<KvContext> {
     rumi_kv::register(builder).build()
 }
 
-fn build_http_registry() -> rumi::Registry<HttpRequest> {
-    let builder = rumi::RegistryBuilder::new();
-    rumi_http::register_simple(builder).build()
+fn build_http_registry() -> rumi::Registry<HttpMessage> {
+    rumi_http::register(rumi::RegistryBuilder::new()).build()
 }
 
 fn build_claude_registry() -> rumi::Registry<HookContext> {
@@ -508,15 +514,16 @@ fn build_test_context(pairs: &HashMap<String, String>) -> KvContext {
     ctx
 }
 
-fn build_http_context(args: &HttpArgs) -> HttpRequest {
-    let mut builder = HttpRequest::builder().method(&args.method).path(&args.path);
-    for (k, v) in &args.headers {
-        builder = builder.header(k, v);
-    }
-    for (k, v) in &args.query_params {
-        builder = builder.query_param(k, v);
-    }
-    builder.build()
+fn build_http_context(args: &HttpArgs) -> HttpMessage {
+    args.headers
+        .iter()
+        .fold(
+            HttpMessageBuilder::new()
+                .method(&args.method)
+                .path(&args.path),
+            |b, (k, v)| b.header(k, v),
+        )
+        .build()
 }
 
 fn build_claude_context(args: &ClaudeArgs) -> Result<HookContext, String> {
@@ -567,7 +574,7 @@ fn build_resolver() -> AnyResolver {
     use rumi_proto::xuma;
 
     AnyResolverBuilder::new()
-        .register::<xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+        .register::<xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
         .register::<xuma::http::v1::HeaderInput>("xuma.http.v1.HeaderInput")
         .register::<xuma::http::v1::PathInput>("xuma.http.v1.PathInput")
         .register::<xuma::http::v1::MethodInput>("xuma.http.v1.MethodInput")
@@ -592,7 +599,7 @@ fn build_resolver() -> AnyResolver {
 /// a CLI that gates tool calls the caller then decides polarity by accident.
 struct NamedActionFactory;
 
-impl rumi::IntoAction<String> for NamedActionFactory {
+impl rumi::ActionFactory<String> for NamedActionFactory {
     type Config = rumi_proto::xuma::core::v1::NamedAction;
 
     fn from_config(config: Self::Config) -> Result<String, rumi::MatcherError> {
@@ -616,7 +623,8 @@ fn build_actions() -> rumi::ActionRegistry<String> {
 /// YAML and JSON are both accepted and both parse to the same document before
 /// anything interprets it, so the two syntaxes cannot mean different things.
 #[cfg(test)]
-fn load_config_str(yaml: &str) -> Result<MatcherConfig<TypedConfig>, String> {
+fn load_config_str(yaml: &str) -> Result<MatcherIr<TypedExtensionConfig>, String> {
+    rumi_proto::protojson::check_document_size(yaml).map_err(|e| e.to_string())?;
     let document: serde_json::Value =
         serde_yaml::from_str(yaml).map_err(|e| format!("YAML parse error: {e}"))?;
     let resolver = build_resolver();
@@ -624,9 +632,10 @@ fn load_config_str(yaml: &str) -> Result<MatcherConfig<TypedConfig>, String> {
     convert_matcher(&proto, &resolver).map_err(|e| format!("{e}"))
 }
 
-fn load_config(path: &str) -> Result<MatcherConfig<TypedConfig>, String> {
+fn load_config(path: &str) -> Result<MatcherIr<TypedExtensionConfig>, String> {
     let content =
         std::fs::read_to_string(path).map_err(|e| format!("failed to read \"{path}\": {e}"))?;
+    rumi_proto::protojson::check_document_size(&content).map_err(|e| e.to_string())?;
 
     let is_json = std::path::Path::new(path)
         .extension()
@@ -653,7 +662,6 @@ struct HttpArgs {
     method: String,
     path: String,
     headers: Vec<(String, String)>,
-    query_params: Vec<(String, String)>,
 }
 
 /// Parsed Claude arguments.
@@ -688,13 +696,6 @@ fn parse_http_args(args: &[String]) -> Result<HttpArgs, String> {
                 let pair = next_value(args, i, "--header")?;
                 let (k, v) = split_kv(&pair, "--header")?;
                 result.headers.push((k, v));
-                i += 1;
-            }
-            "--query" => {
-                i += 1;
-                let pair = next_value(args, i, "--query")?;
-                let (k, v) = split_kv(&pair, "--query")?;
-                result.query_params.push((k, v));
                 i += 1;
             }
             other => return Err(format!("unexpected argument \"{other}\"")),
@@ -760,7 +761,7 @@ fn parse_claude_args(args: &[String]) -> Result<ClaudeArgs, String> {
     Ok(result)
 }
 
-/// Parse `--context key=value...` pairs (test domain).
+/// Parse `--context key=value...` pairs (key-value domain).
 fn parse_context_pairs(args: &[String]) -> Result<HashMap<String, String>, String> {
     let mut map = HashMap::new();
     let mut i = 0;
@@ -830,9 +831,8 @@ Flags (test domain, default):
 
 Flags (http domain):
   --method METHOD                       HTTP method (required)
-  --path PATH                           Request path (required)
-  --header key=value                    Header (repeatable)
-  --query key=value                     Query parameter (repeatable)
+  --path PATH                           Request target, query string included (required)
+  --header key=value                    Header, or pseudo-header such as :authority (repeatable)
 
 Flags (claude domain):
   --event EVENT                         Hook event name (required)
@@ -887,7 +887,7 @@ mod tests {
     #[test]
     fn build_test_registry_has_expected_types() {
         let registry = build_test_registry();
-        assert!(registry.contains_input("xuma.kv.v1.MapInput"));
+        assert!(registry.contains_input("xuma.core.v1.MapInput"));
         assert!(registry.contains_matcher("xuma.core.v1.BoolMatcher"));
     }
 
@@ -927,7 +927,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_http_args_with_headers_and_query() {
+    fn parse_http_args_with_headers() {
         let args: Vec<String> = vec![
             "--method".into(),
             "POST".into(),
@@ -937,8 +937,6 @@ mod tests {
             "content-type=application/json".into(),
             "--header".into(),
             "authorization=Bearer token".into(),
-            "--query".into(),
-            "page=1".into(),
         ];
         let result = parse_http_args(&args).unwrap();
         assert_eq!(result.method, "POST");
@@ -947,8 +945,6 @@ mod tests {
             result.headers[0],
             ("content-type".into(), "application/json".into())
         );
-        assert_eq!(result.query_params.len(), 1);
-        assert_eq!(result.query_params[0], ("page".into(), "1".into()));
     }
 
     #[test]
@@ -1053,13 +1049,12 @@ mod tests {
     fn build_http_context_from_args() {
         let args = HttpArgs {
             method: "GET".into(),
-            path: "/api/users".into(),
+            path: "/api/users?page=1".into(),
             headers: vec![("content-type".into(), "application/json".into())],
-            query_params: vec![("page".into(), "1".into())],
         };
         let ctx = build_http_context(&args);
-        assert_eq!(ctx.method(), "GET");
-        assert_eq!(ctx.path(), "/api/users");
+        assert_eq!(ctx.method(), Some("GET"));
+        assert_eq!(ctx.path(), Some("/api/users"));
         assert_eq!(ctx.header("content-type"), Some("application/json"));
         assert_eq!(ctx.query_param("page"), Some("1"));
     }

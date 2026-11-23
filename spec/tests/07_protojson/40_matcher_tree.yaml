@@ -15,7 +15,7 @@ proto_matcher:
     input:
       name: role
       typedConfig:
-        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+        "@type": type.googleapis.com/xuma.core.v1.MapInput
         key: role
     exactMatchMap:
       map:
@@ -67,7 +67,7 @@ proto_matcher:
     input:
       name: path
       typedConfig:
-        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+        "@type": type.googleapis.com/xuma.core.v1.MapInput
         key: path
     prefixMatchMap:
       map:
@@ -121,7 +121,7 @@ proto_matcher:
     input:
       name: role
       typedConfig:
-        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+        "@type": type.googleapis.com/xuma.core.v1.MapInput
         key: role
   onNoMatch:
     action:
@@ -149,7 +149,7 @@ proto_matcher:
     input:
       name: role
       typedConfig:
-        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+        "@type": type.googleapis.com/xuma.core.v1.MapInput
         key: role
     customMatch:
       name: my-tree
@@ -188,7 +188,7 @@ proto_matcher:
     input:
       name: tier
       typedConfig:
-        "@type": type.googleapis.com/xuma.kv.v1.MapInput
+        "@type": type.googleapis.com/xuma.core.v1.MapInput
         key: tier
     exactMatchMap:
       map:
@@ -198,7 +198,7 @@ proto_matcher:
               input:
                 name: region
                 typedConfig:
-                  "@type": type.googleapis.com/xuma.kv.v1.MapInput
+                  "@type": type.googleapis.com/xuma.core.v1.MapInput
                   key: region
               exactMatchMap:
                 map:
@@ -230,3 +230,74 @@ cases:
   - name: outer_misses
     context: { tier: basic }
     expect: standard
+
+---
+name: tree_prefix_falls_through_to_a_shorter_prefix
+description: >
+  When the longest matching prefix's nested matcher produces no action, the
+  next shorter matching prefix is tried, and only when every prefix has
+  missed does the enclosing `onNoMatch` answer. Envoy 1.35 (2025-07-23) made
+  this the default for `prefix_match_map`, "to bring it in line with the
+  behavior of matcher_list": a list continues past a rule whose nested
+  matcher misses, and a prefix tree is a list of prefixes ordered by length.
+  rumi stopped at the longest prefix until D-055.
+
+  The trace must show every prefix tried (D-063), so a reader can see that
+  `/api` was consulted and passed over before `/` answered.
+implementations: [rust, python, typescript]
+proto_matcher:
+  matcherTree:
+    input:
+      name: path
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.MapInput
+        key: path
+    prefixMatchMap:
+      map:
+        /:
+          action:
+            name: root
+            typedConfig:
+              "@type": type.googleapis.com/xuma.core.v1.NamedAction
+              name: root
+        /api:
+          matcher:
+            matcherList:
+              matchers:
+                - predicate:
+                    singlePredicate:
+                      input:
+                        name: role
+                        typedConfig:
+                          "@type": type.googleapis.com/xuma.core.v1.MapInput
+                          key: role
+                      valueMatch:
+                        exact: admin
+                  onMatch:
+                    action:
+                      name: api_admin
+                      typedConfig:
+                        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+                        name: api_admin
+  onNoMatch:
+    action:
+      name: fallback
+      typedConfig:
+        "@type": type.googleapis.com/xuma.core.v1.NamedAction
+        name: fallback
+cases:
+  - name: the_longest_prefix_answers_when_its_nested_matcher_hits
+    context: { path: /api/users, role: admin }
+    expect: api_admin
+  - name: a_nested_miss_falls_through_to_the_next_shorter_prefix
+    context: { path: /api/users, role: viewer }
+    expect: root
+  - name: a_nested_miss_with_no_role_at_all_also_falls_through
+    context: { path: /api/users }
+    expect: root
+  - name: the_shorter_prefix_serves_what_the_longer_never_covered
+    context: { path: /docs }
+    expect: root
+  - name: no_matching_prefix_at_all_falls_to_on_no_match
+    context: { path: health }
+    expect: fallback

@@ -1,7 +1,7 @@
-//! `AnyResolver` — bridges `google.protobuf.Any` to `TypedConfig`.
+//! `AnyResolver` — bridges `google.protobuf.Any` to `TypedExtensionConfig`.
 //!
 //! In xDS, extension configs are carried as `Any` payloads: a `type_url` string
-//! plus serialized proto bytes. Our registry expects `TypedConfig`: a `type_url`
+//! plus serialized proto bytes. Our registry expects `TypedExtensionConfig`: a `type_url`
 //! string plus `serde_json::Value`. The `AnyResolver` decodes `Any` bytes into
 //! the known proto message type, then serializes it to JSON via prost-serde.
 //!
@@ -108,18 +108,18 @@ impl Default for AnyResolverBuilder {
 
 /// Immutable resolver for `google.protobuf.Any` payloads.
 ///
-/// Converts proto binary `Any` into `TypedConfig` (type_url + JSON value)
+/// Converts proto binary `Any` into `TypedExtensionConfig` (type_url + JSON value)
 /// for consumption by the rumi [`Registry`](rumi::Registry).
 pub struct AnyResolver {
     codecs: HashMap<String, Codec>,
 }
 
 impl AnyResolver {
-    /// Resolve a `TypedExtensionConfig` into a [`TypedConfig`](rumi::TypedConfig).
+    /// Resolve a proto `TypedExtensionConfig` into rumi's [`TypedExtensionConfig`](rumi::TypedExtensionConfig).
     ///
     /// Extracts the `type_url` from the `Any` payload (stripping the
     /// `type.googleapis.com/` prefix if present), decodes the bytes using
-    /// the registered decoder, and returns a `TypedConfig`.
+    /// the registered decoder, and returns a `TypedExtensionConfig`.
     ///
     /// # Errors
     ///
@@ -128,7 +128,7 @@ impl AnyResolver {
     pub fn resolve(
         &self,
         config: &crate::xds::core::v3::TypedExtensionConfig,
-    ) -> Result<rumi::TypedConfig, MatcherError> {
+    ) -> Result<rumi::TypedExtensionConfig, MatcherError> {
         let any = config
             .typed_config
             .as_ref()
@@ -140,7 +140,7 @@ impl AnyResolver {
         let type_url = strip_type_prefix(&any.type_url);
 
         let json_value = (self.codec(type_url)?.decode)(&any.value)?;
-        Ok(rumi::TypedConfig {
+        Ok(rumi::TypedExtensionConfig {
             type_url: type_url.to_owned(),
             config: json_value,
         })
@@ -208,6 +208,7 @@ mod tests {
         // Encode a HeaderInput proto to bytes
         let header_input = crate::xuma::http::v1::HeaderInput {
             name: "content-type".into(),
+            ..Default::default()
         };
         let bytes = header_input.encode_to_vec();
 
@@ -228,21 +229,24 @@ mod tests {
     #[test]
     fn resolve_short_type_url() {
         let resolver = AnyResolverBuilder::new()
-            .register::<crate::xuma::kv::v1::MapInput>("xuma.kv.v1.MapInput")
+            .register::<crate::xuma::core::v1::MapInput>("xuma.core.v1.MapInput")
             .build();
 
-        let input = crate::xuma::kv::v1::MapInput { key: "key".into() };
+        let input = crate::xuma::core::v1::MapInput {
+            key: "key".into(),
+            ..Default::default()
+        };
 
         let config = crate::xds::core::v3::TypedExtensionConfig {
             name: "test".into(),
             typed_config: Some(prost_types::Any {
-                type_url: "xuma.kv.v1.MapInput".into(),
+                type_url: "xuma.core.v1.MapInput".into(),
                 value: input.encode_to_vec().into(),
             }),
         };
 
         let typed = resolver.resolve(&config).unwrap();
-        assert_eq!(typed.type_url, "xuma.kv.v1.MapInput");
+        assert_eq!(typed.type_url, "xuma.core.v1.MapInput");
         assert_eq!(typed.config["key"], "key");
     }
 

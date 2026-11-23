@@ -11,11 +11,12 @@
  * PLAN.md CI3.
  *
  * Extracts the first ```yaml block under the HTTP section, writes it to a temp
- * file, evaluates a fixed set of requests in Rust, Python and TypeScript, and
- * fails on any disagreement.
+ * file, evaluates a fixed set of requests through the rumi CLI, the PyO3
+ * binding and the wasm binding, and fails on any disagreement. Both bindings
+ * have to be built first: `just crust-py-check` and `just crust-wasm-build`.
  */
 
-import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -49,32 +50,35 @@ function run(label, cmd, args, opts = {}) {
 	return (res.stdout || "").trim();
 }
 
+const WASM_PKG = join(ROOT, "rumi/crusts/wasm/pkg/xuma_crust.js");
+if (!existsSync(WASM_PKG)) {
+	console.error("check-readme-agreement: rumi/crusts/wasm/pkg is not built — run `just crust-wasm-build`");
+	process.exit(1);
+}
+
 const dir = mkdtempSync(join(tmpdir(), "xuma-readme-"));
 const configPath = join(dir, "routes.yaml");
 writeFileSync(configPath, extractConfig());
 
 const PY = `
-import sys, yaml
-from xuma import RegistryBuilder
-from xuma._protojson import parse_protojson
-from xuma.http import HttpRequest, register
-cfg = parse_protojson(yaml.safe_load(open(sys.argv[1])))
-matcher = register(RegistryBuilder()).build().load_matcher(cfg)
-for method, path in [(a, b) for a, b in (x.split(" ") for x in sys.argv[2:])]:
-    r = matcher.evaluate(HttpRequest(method=method, raw_path=path))
+import json, sys, yaml
+from xuma_crust import HttpMatcher
+with open(sys.argv[1]) as f:
+    matcher = HttpMatcher.from_config(json.dumps(yaml.safe_load(f)))
+for spec in sys.argv[2:]:
+    method, path = spec.split(" ")
+    r = matcher.evaluate(method, path)
     print(r if r is not None else "(none)")
 `;
 
 const TS = `
-import { parse } from "yaml";
-import { readFileSync } from "node:fs";
-import { RegistryBuilder, parseProtojson } from "__ROOT__/bumi/src/index.ts";
-import { HttpRequest, register } from "__ROOT__/bumi/src/http/index.ts";
-const cfg = parseProtojson(parse(readFileSync(process.argv[2], "utf8")));
-const matcher = register(new RegistryBuilder()).build().loadMatcher(cfg);
+import init, { HttpMatcher } from "__WASM_PKG__";
+await init();
+const config = Bun.YAML.parse(await Bun.file(process.argv[2]).text());
+const matcher = HttpMatcher.fromConfig(JSON.stringify(config));
 for (const spec of process.argv.slice(3)) {
   const [method, path] = spec.split(" ");
-  const r = matcher.evaluate(new HttpRequest(method, path));
+  const r = matcher.evaluate({ method, path });
   console.log(r ?? "(none)");
 }
 `;
@@ -94,15 +98,17 @@ const rust = CASES.map((c) => {
 	return out.split("\n").pop().trim() || "(none)";
 });
 
+// Python — the PyO3 binding, from the project that has it installed.
 const pyFile = join(dir, "run.py");
 writeFileSync(pyFile, PY);
-const python = run("python", "uv", ["run", "--project", "puma", "python", pyFile, configPath, ...specs])
+const python = run("python", "uv", ["run", "--project", "rumi/crusts/python", "python", pyFile, configPath, ...specs])
 	.split("\n")
 	.map((s) => s.trim())
 	.filter(Boolean);
 
+// TypeScript — the wasm binding, from its build output.
 const tsFile = join(dir, "run.ts");
-writeFileSync(tsFile, TS.replaceAll("__ROOT__", ROOT));
+writeFileSync(tsFile, TS.replace("__WASM_PKG__", WASM_PKG));
 const typescript = run("typescript", "bun", [tsFile, configPath, ...specs])
 	.split("\n")
 	.map((s) => s.trim())
