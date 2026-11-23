@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["index_actions"],"struct":["ActionIndex","Indexed"]};
