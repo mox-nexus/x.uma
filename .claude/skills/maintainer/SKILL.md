@@ -1,252 +1,208 @@
 ---
 name: maintainer
-description: "x.uma project maintainer. Use when: working on x.uma codebase, implementing matchers, adding domain extensions, running builds/tests, understanding the architecture."
+description: >
+  How to work in the x.uma repository: what is where, where new code goes, the order work
+  happens in (decision, fixture, code, check), the commands that build and verify it, and the
+  conventions for decisions, commits and pull requests. Load it at the start of any x.uma task,
+  before adding a crate, domain, input, action, fixture, doc page or CI check, and before
+  claiming anything is done. design-mastery covers what to expose; rust-mastery covers how to
+  write the Rust; protocol-mastery covers proto and xDS.
 ---
 
-# x.uma Maintainer
+# x.uma maintainer
 
-Cross-platform Unified Matcher API ecosystem implementing the xDS matcher specification.
+x.uma is a matcher engine. It implements the xDS Unified Matcher API in one Rust engine,
+`rumi`, with two bindings published as `xuma-crust`: PyO3 for Python, wasm-bindgen for
+JavaScript. Domains (HTTP, Claude Code hooks, plain key-value maps) plug in at
+`TypedExtensionConfig`.
 
-## Why This Architecture
+It is a matcher engine, not a policy engine. It selects an action; it does not decide what the
+action means. That line is a standing decision, and most scope questions are answered by it.
 
-xDS matchers are **domain-agnostic by design**. The core evaluates predicates; what it matches *on* (inputs) and what it *does* (actions) are pluggable via `TypedExtensionConfig`. We honor this with ACES principles.
+This skill is how to work here without breaking what the project has learned. The project
+records its own state in three places, and you should read them rather than trust a summary,
+including this one:
 
-**ACES** = Adaptable · Composable · Extensible · Software
-
-The goal: sustainable excellence — no rewrites needed. Growth happens at edges, not core.
-
----
-
-## Project Structure
-
-| Package | Language | Role |
-|---------|----------|------|
-| **rumi** | Rust | Core engine (reference implementation) |
-| **xuma-crust** | Python+Rust | PyO3 bindings (rumi/crusts/python/) |
-| **xuma-crust** | TS+WASM | wasm-bindgen bindings (rumi/crusts/wasm/) |
-
-```
-x.uma/
-├── proto/
-│   ├── xds/                    # upstream (buf dep)
-│   └── xuma/                   # our extensions
-│       ├── core/v1/
-│       ├── test/v1/
-│       ├── http/v1/
-│       └── claude/v1/
-├── spec/tests/                 # conformance fixtures (YAML)
-├── rumi/                      # Rust workspace member
-└── justfile                    # task orchestration
-```
+- **`PLAN.md`**: where the work stands and what is open. Read it top to bottom at the start of
+  a session, and confirm your understanding with the maintainer before acting.
+- **`DECISIONS.md`**: every decision of record, as D-entries. Read the relevant ones before
+  revisiting anything they settle.
+- **`CLAUDE.md`**: the architecture and the standing constraints.
 
 ---
 
-## The Extension Seam
+## 1. The map
 
-Every `input` and `action` in xDS matchers is a `TypedExtensionConfig`:
+| Path | What it is |
+|---|---|
+| `proto/xuma/<area>/v1/` | The schema users write configs against. The contract. |
+| `spec/tests/07_protojson/` | The conformance suite. Runs in the engine and both bindings. |
+| `spec/tests/05_http/` | Gateway API route matches through the HTTP domain compiler. Runs in rumi. |
+| `rumi/core/` | The engine: package `rumi-core`, library name `rumi`. The claude domain is its `claude` feature. |
+| `rumi/proto/` | Generated proto types (`src/gen/`, committed) plus config loading: `convert.rs`, `any_resolver.rs`, `protojson.rs`. |
+| `rumi/ext/kv/`, `rumi/ext/http/` | Domain crates. |
+| `rumi/ext/test/` | The conformance harness. Not published. |
+| `rumi/cli/` | The `rumi` binary, including Claude Code hook mode. |
+| `rumi/crusts/python/`, `rumi/crusts/wasm/` | The two bindings. |
+| `rumi/docs-tests/` | Compiles the Rust code blocks in `docs/content/`. |
+| `docs/content/`, `docs/experience/` | The docs as plain Markdown, and the SvelteKit site that renders them, including the playground. |
+| `bench/` | Committed benchmark artifacts and `RESULTS.md`. The benchmarks themselves live with the code they measure: `rumi/core/benches/` and the crusts' test folders. |
+| `scripts/` | The repository's own checks, called from the `justfile`. |
+| `reference/` | Evidence that `PLAN.md` and `DECISIONS.md` cite, such as the security review. Tracked. |
+| `scratch/` | Session notes and working documents. Not tracked. |
 
-```protobuf
-message TypedExtensionConfig {
-  string name = 1;                       // adapter identifier
-  google.protobuf.Any typed_config = 2;  // adapter config
-}
-```
-
-This IS the port. Adapters are concrete types registered at runtime.
-
-### Extension Namespace: `xuma.*`
-
-| Package | Purpose |
-|---------|---------|
-| `xuma.core.v1` | Base types, registry traits |
-| `xuma.http.v1` | HTTP matching (HeaderInput, PathInput) |
-| `xuma.claude.v1` | Claude Code hooks (HookContext, ToolUseInput) |
-
-Type URLs: `type.googleapis.com/xuma.http.v1.HeaderInput`
-
----
-
-## Decision Framework: Where Does Code Go?
-
-| Adding... | Location | Why |
-|-----------|----------|-----|
-| Matcher evaluation logic | `rumi/core/src/` | Core, domain-agnostic |
-| New input/action type | `proto/xuma/<domain>/v1/` | Extension, domain-specific |
-| DataInput impl | `rumi/ext/<domain>.rs` | Adapter behind port |
-| Binding surface (PyO3, wasm) | `rumi/crusts/<runtime>/src/` | The door the host language sees |
-| Conformance test case | `spec/tests/<matcher-type>/` | Source of truth |
-
-**The filter:** Does it know about a specific domain (HTTP, Claude, etc.)? → Adapter (rumi/ext), not core.
+**What will be published** (nothing is yet):
+- **Five crates on crates.io,** in dependency order: `rumi-core`, `rumi-proto`, `rumi-kv`,
+  `rumi-http`, `rumi-cli`. `scripts/check-publishable.mjs` derives the list from `cargo
+  metadata` and fails if the release workflow disagrees.
+- **`xuma-crust`** on PyPI and on npm.
+- **Not published:** the crusts as Cargo crates (`publish = false`) and the test harness.
 
 ---
 
-## Naming Convention (xDS Alignment)
+## 2. Where new code goes
 
-rumi uses xDS naming throughout for ecosystem compatibility:
+| You are adding | It goes in | Because |
+|---|---|---|
+| Evaluation logic, a matcher kind, a limit | `rumi/core/` | Domain-agnostic, shared by everything |
+| A new input or action for an existing domain | that domain's crate, plus its message in `proto/xuma/<area>/v1/` | Domains own their vocabulary |
+| A new domain | a new `proto/xuma/<area>/v1/` package and a domain crate (or a core feature, if it brings no heavy dependency) | New domains must land without touching the engine's interfaces |
+| Config loading or `Any` handling | `rumi/proto/` | One load path for files and control planes |
+| Anything a binding needs to know | the engine, exposed to both bindings | Bindings interpret nothing |
+| A behaviour test | a fixture in `spec/tests/07_protojson/` first | The suite is the source of truth for all three implementations |
+| A rule about the repository | a check in `scripts/`, called from `just ci` | A rule nothing checks is a wish |
 
-| xDS Term | rumi Type | Purpose |
-|----------|------------|---------|
-| DataInput | `trait DataInput<Ctx>` | Extracts data from context |
-| InputMatcher | `trait InputMatcher<V>` | Matches extracted values |
-| Predicate | `enum Predicate<Ctx>` | Boolean combinations |
-| OnMatch | `struct OnMatch<Ctx, A>` | Action + nested matcher |
-| FieldMatcher | `struct FieldMatcher<Ctx, A>` | Predicate + on_match pair |
-| Matcher | `struct Matcher<Ctx, A>` | Top-level container |
-
-Methods follow Envoy's naming (`get()`, `matches()`, `evaluate()`).
-
----
-
-## Tooling
-
-| Concern | Tool | Command |
-|---------|------|---------|
-| Task orchestration | just | `just build-all`, `just test-all` |
-| Proto codegen | buf | `just gen` |
-| Rust build | cargo | `cargo build -p r-umi` |
-| Python env | uv | `uv sync` |
-| Python build | maturin | `maturin develop --uv` |
-| WASM build | wasm-pack | `wasm-pack build` |
-
-### Build Order
-
-```
-rumi (core) → crusts (PyO3, wasm-bindgen)
-```
-
-### Development Workflow
-
-```bash
-# After Rust changes
-just build-rust              # or: cargo build -p r-umi
-
-# After proto changes
-just gen                     # regenerate all bindings
-
-# Python development
-cd rumi/crusts/python && uv run maturin develop --uv --features fixtures
-uv run pytest tests/ -q
-
-# Run all conformance tests
-just test-all
-```
+**The filter for core:** does it know about a specific domain? Then it is not core.
 
 ---
 
-## Reference Implementations
+## 3. The order work happens in
 
-### Envoy (C++) — The Original
+### 1. Decide, in writing
 
-Location: `~/oss/reference/envoy/source/common/matcher/`
+**Principle.** Before changing anything that freezes at publish or that a D-entry covers, write
+or update the D-entry. New vocabulary is defined in `DECISIONS.md` before it appears in code,
+docs or skills.
 
-| File | What to learn |
-|------|---------------|
-| `list_matcher.h` | MatcherList (first-match-wins) |
-| `exact_map_matcher.h` | O(1) hash lookup |
-| `prefix_map_matcher.h` | Radix tree (longest prefix) |
-| `field_matcher.h` | AND/OR/NOT predicate composition |
+**Why.** A decision not written down is not made; it gets re-argued every session. And a term
+that appears in code before it is defined ends up meaning different things in different places.
 
-**Key insight from Envoy:** Three-state data availability (`NotAvailable`, `MoreDataMightBeAvailable`, `AllDataAvailable`) enables streaming matching.
+**What it helps you catch.** A rename, a new result type, a new CLI verb or a new input whose
+meaning lives only in a commit message.
 
-### xDS Protos — The Spec
+**Why it helps.** The maintainer rules on a short written proposal instead of reverse-engineering
+intent from a diff.
 
-Location: `~/oss/reference/cncf-xds/xds/type/matcher/v3/`
+### 2. Write the fixture first
 
-| File | Defines |
-|------|---------|
-| `matcher.proto` | Core Matcher, MatcherList, MatcherTree, OnMatch |
-| `string.proto` | StringMatcher (exact, prefix, suffix, contains, regex) |
-| `regex.proto` | RegexMatcher (RE2 engine) |
-| `ip.proto` | IPMatcher (CIDR trie) |
-| `cel.proto` | CelMatcher (CEL expressions) |
+**Principle.** Behaviour starts as a conformance fixture that fails. Every fixture carries an
+`implementations:` ledger naming who must pass it, and every runner enforces the ledger in
+**both** directions: a fixture that omits an implementation must also fail for it.
 
----
+**Why.** The suite is what keeps the engine and both bindings in agreement. The two-way ledger
+stops a stale exception from hiding a finished migration, and stops a quietly fixed
+implementation from going unnoticed. When a fixture and a security property disagree, the
+fixture is wrong: this suite once required every implementation to treat an empty route list as
+match-everything, so each was conformant by failing open.
 
-## Conformance Testing
+**What it helps you catch.** A feature with no fixture, and a fixture that encodes a fail-open.
 
-**Principle:** The fixture suite is the source of truth. All implementations must produce identical results.
+**Why it helps.** "Does it work in all three?" has one mechanical answer.
 
-### Fixture Format (YAML)
+### 3. Implement, then check
 
-```yaml
-# spec/tests/string_matcher/exact.yaml
-name: "exact string match"
-cases:
-  - description: "matches identical string"
-    matcher:
-      string_matcher:
-        exact: "hello"
-    input: "hello"
-    expected: { matches: true }
-```
+**Principle.** Make the fixture pass in the engine, then in both bindings. Run the checks below,
+and fix what they find. Never skip or weaken a check to get green.
 
-### Test Categories
+**Why.** Every check in this repository exists because its absence once let a false claim ship.
 
-| Category | What it validates |
-|----------|-------------------|
-| Predicate composition | AND/OR/NOT with all result combinations |
-| Data availability | NotAvailable → MoreData → AllData transitions |
-| MatcherList ordering | First-match-wins semantics |
-| PrefixMapMatcher | Longest-match-wins with fallback |
-| Nested matchers | Recursive on_match.matcher |
-| on_no_match | Fallback chain behavior |
+### 4. Claim only what a check proves
 
----
+**Principle.** Something is done when CI runs a check that would fail if it regressed. Until
+then it is unverified, whatever it looks like locally.
 
-## Common Tasks
+**Why.** One phase of this project was marked done for months while one of its crates had never
+compiled, because nothing built it. Another claim ("nothing compiles the docs' code samples")
+was built on a search that had silently errored. A claim that something does not exist is the
+easiest kind to get wrong.
 
-### Adding a New Domain (e.g., `xuma.grpc.v1`)
+**What it helps you catch.**
+- Your own "done" with no CI behind it.
+- A negative claim from a search that had no control.
+- A self-correction that has not been independently re-checked. In this repository a
+  correction goes to an independent skeptic (the `mrwolf` agent), who must verify it by
+  executing something before it reaches the maintainer.
 
-1. Create proto: `proto/xuma/grpc/v1/inputs.proto`
-2. Define input types (e.g., `MethodInput`, `MetadataInput`)
-3. Run `just gen` to generate bindings
-4. Implement adapter in `rumi/src/adapters/grpc.rs`
-5. Register in extension registry
-6. Add conformance tests in `spec/tests/grpc/`
-
-### Adding a New Matcher Type to Core
-
-1. Check if xDS already defines it (probably does)
-2. Implement evaluation logic in `rumi/src/matchers/`
-3. Add conformance tests first (TDD)
-4. Ensure all three implementations pass
-
-### Debugging Matcher Behavior
-
-1. Check Envoy's implementation for canonical behavior
-2. Write a minimal conformance test case
-3. Run against all implementations to find divergence
-4. Fix implementation, not test (unless test is wrong)
+**Why it helps.** What you report becomes the foundation the next session builds on. False
+foundations compound.
 
 ---
 
-## Watch Out For
+## 4. Commands
 
-| Gotcha | Why it matters |
-|--------|----------------|
-| RE2 vs regex crate | Subtle semantic differences; xDS specifies RE2 |
-| Predicate short-circuit | AND fails fast, OR succeeds fast — order matters for side effects |
-| on_no_match recursion | Can trigger another matcher, not just an action |
-| keep_matching flag | Match succeeds but evaluation continues (audit patterns) |
-| TypedExtensionConfig resolution | Name lookup happens at runtime; typos fail late |
+Everything goes through `just`. Run `just --list` for the full set; these are the ones you will
+use.
+
+| Command | What it does |
+|---|---|
+| `just doctor` | Checks every tool the repository needs is installed. Run it first on a new machine. |
+| `just ci` | Most of what CI runs. It does not include the crust test suites (pytest, `bun test`, the crusts' `cargo test --lib`), the codegen drift check or the npm package check, which run as their own CI jobs: run `just crust-check`, `just gen` plus `git diff --exit-code`, and `just crust-pack` for those. Pipe it with `set -o pipefail`, or a failure hides behind the pipe. |
+| `just build`, `just test`, `just lint` | The Rust workspace's default members. These exclude the crusts. |
+| `just lint-strict` | Clippy as CI enforces it: all targets, warnings denied. |
+| `just fmt` | Format. Before committing: `cargo clippy --fix --allow-dirty -- -W clippy::pedantic`, then `cargo fmt`, in that order. |
+| `just crust-check` | Builds and tests both bindings. |
+| `just test-protojson`, `just test-http-conformance` | The two conformance suites. |
+| `just test-fixture-coverage` | Checks that the fixture ledger is current in both directions. |
+| `just gen` | Regenerates the proto code. CI fails if the committed tree differs. |
+| `just lint-proto`, `just breaking` | `buf lint`, and `buf breaking` against `main`. |
+| `just docs-check`, `just docs-samples`, `just docs-commands`, `just docs-links` | The docs: every code block runs or compiles, every CLI command exists, every link resolves. |
+| `just bench-smoke` | Runs the core Rust benchmarks once, so a broken one fails. It does not judge speed, and it does not run the Python or wasm benchmarks. |
+| `just bench-artifact`, `just bench-compare` | The measured protocol under D-066. Every performance number in tracked markdown cites an artifact. |
+| `just publishable`, `just publish-dry` | Publication checks. |
+| `just verify-clean-clone` | Builds from a fresh clone, to catch files that exist only on this machine. |
 
 ---
 
-## References
+## 5. Conventions
 
-For detailed documentation, see:
+- **Comments** say why, never what. A why-comment is one sentence and may cite a D-entry.
+- **Deleting files:** `git rm` for tracked files. For untracked ones, use `rip`, never `rm`.
+- **Branches and pull requests:** work on a branch, merge to `main` through a pull request, and
+  never force-push. Do not push without the maintainer's go-ahead for that session.
+  - Merge with a merge commit when the branch's commits carry D-entry ids, or when benchmark
+    artifacts are named after their hashes. Squashing or rebasing would lose those
+    references.
+- **Commit messages** name the decision they implement, as in `core(D-069): …`, and say why,
+  not just what.
+- **Status claims** in `CLAUDE.md` and `PLAN.md` use the project's legend:
+  - ✅ means a CI check would fail on regression;
+  - ⚠️ means the work exists unchecked;
+  - "runs, not guarded" means CI executes it but cannot see it get worse.
+- **Performance claims:** never write a number from memory. Cite a committed benchmark
+  artifact, or say nothing.
+- **The pre-release state:** nothing is published yet, and package names are chosen, not
+  reserved. README and getting-started pages say so until a release lands.
 
-| Need | Load |
-|------|------|
-| Design principles (from 7 elite codebases) | [design-principles.md](references/design-principles.md) |
-| Arch-guild constraints | [arch-constraints.md](references/arch-constraints.md) |
-| xDS specification details | [xds-semantics.md](references/xds-semantics.md) |
-| Build system workflows | [build-system.md](references/build-system.md) |
+---
 
-## Commands
+## 6. The harness
 
-| Command | Purpose |
-|---------|---------|
-| `/validate` | Run full validation suite |
-| `/check-breaking` | Check for breaking changes |
-| `/audit` | Run constraint auditor agent |
+| Part | Use it for |
+|---|---|
+| `design-mastery` skill | Any change to something that freezes at publish, or that adds an extension point. |
+| `rust-mastery` skill | Writing Rust in the engine, the CLI or the bindings. |
+| `protocol-mastery` skill | Proto, buf, `Any`, protojson, and Envoy's matcher semantics. |
+| `constraint-auditor` agent, `/audit` | Reviewing a change against the protocol obligations before merge. |
+| `/validate` | Running the full check suite and reporting it. |
+| `/check-breaking` | Checking a change for breaking API or schema changes. |
+
+---
+
+## 7. Reference implementations
+
+Envoy is the original, and rumi follows it unless a D-entry says otherwise:
+- the protos: `~/oss/reference/cncf-xds/xds/type/matcher/v3/`;
+- the C++ implementation: `~/oss/reference/envoy/source/common/matcher/` and
+  `~/oss/reference/envoy/envoy/matcher/`.
+
+When a behaviour is unclear, read Envoy's code before deciding.

@@ -119,6 +119,13 @@ jobs:
       - name: Doc links resolve
         run: node scripts/check-doc-links.mjs
 
+      # The harness named recipes, paths and engines that no longer existed; prose cannot fail
+      # a build.
+      - name: Harness matches the tree
+        run: |
+          node scripts/check-harness.mjs --self-test
+          node scripts/check-harness.mjs
+
   docs:
     name: docs site
     runs-on: ubuntu-latest

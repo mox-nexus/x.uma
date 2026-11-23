@@ -258,7 +258,7 @@ From official Envoy xDS proto research:
 | **OnMatch exclusivity** | `oneof { Matcher matcher = 1; Action action = 2; }` | `enum OnMatch<Ctx, A> { Action(A), Matcher(Box<Matcher>) }` |
 | **Nested matcher failure** | If nested matcher returns no-match, parent OnMatch fails | Continue to next field_matcher (no fallback) |
 | **on_no_match** | At Matcher level only, not per-OnMatch | `Matcher.on_no_match: Option<OnMatch>` |
-| **First-match-wins** | first match wins; `keep_matching` is **deferred, not implemented** | `Matcher::evaluate()` returns the first match. `keep_matching` appears in the proto and is accepted and ignored — see PLAN.md F2 / SF2 |
+| **First-match-wins** | first match wins; `keep_matching` is **deferred, not implemented** | `Matcher::evaluate()` returns the first match. `keep_matching: true` is refused at load with `InvalidConfig`, because accepting and ignoring it would let a config read one way and behave another — see PLAN.md F2 / SF2 |
 | **MatcherList vs MatcherTree** | `oneof matcher_type` — a list XOR a tree | `enum MatcherKind<Ctx, A> { List(Vec<FieldMatcher>), Tree(MatcherTree) }`. `on_no_match` lives on `Matcher` only, as in the proto — `MatcherTree` has no fallback field (D-044) |
 | **Prefix fall-through** | Envoy 1.35 default: a nested miss under the longest prefix retries the next shorter | `MatcherTree::evaluate` tries every matching prefix longest-first; the trace records each attempt (D-055) |
 
@@ -477,4 +477,13 @@ On new session, read `PLAN.md` top to bottom and confirm understanding with the 
    cargo clippy --fix --allow-dirty --manifest-path rumi/Cargo.toml -- -W clippy::pedantic
    cargo fmt --manifest-path rumi/Cargo.toml --all
    ```
-3. **Pre-commit auto-fixes** — if the hook fails, it auto-fixes and you re-stage + commit again.
+3. **CI is the gate** — there is no pre-commit hook. Before opening a pull request, run
+   `set -o pipefail; just ci` and `just crust-check`. `just ci` covers most of CI; the crust
+   test suites, the codegen drift check and the npm package check run as separate CI jobs.
+
+### Project skills
+
+Load `maintainer` at the start of any task. Load `design-mastery` before changing anything
+that freezes at publish, `rust-mastery` before writing Rust or touching a binding, and
+`protocol-mastery` before touching proto, buf or config loading. The `constraint-auditor`
+agent (`/audit`) reviews a branch against the engine's obligations before merge.
