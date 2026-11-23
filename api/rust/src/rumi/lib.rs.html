@@ -397,13 +397,9 @@
 <a href=#397 id=397 data-nosnippet>397</a>
 <a href=#398 id=398 data-nosnippet>398</a><span class="kw">impl </span>std::error::Error <span class="kw">for </span>MatcherError {}
 <a href=#399 id=399 data-nosnippet>399</a>
-<a href=#400 id=400 data-nosnippet>400</a><span class="doccomment">/// The crate README's Rust blocks, compiled and run as doctests.
-<a href=#401 id=401 data-nosnippet>401</a>///
-<a href=#402 id=402 data-nosnippet>402</a>/// A crate README is a published artifact — it is the crates.io front page —
-<a href=#403 id=403 data-nosnippet>403</a>/// and until 2026-08-18 nothing checked one. `rumi-core`'s showed a config
-<a href=#404 id=404 data-nosnippet>404</a>/// dialect that had been retired, so the first thing a new reader would have
-<a href=#405 id=405 data-nosnippet>405</a>/// copied could not load. Nothing failed, because nothing looked.
-<a href=#406 id=406 data-nosnippet>406</a></span><span class="attr">#[cfg(doctest)]
-<a href=#407 id=407 data-nosnippet>407</a>#[doc = <span class="macro">include_str!</span>(<span class="string">"../README.md"</span>)]
-<a href=#408 id=408 data-nosnippet>408</a></span><span class="kw">pub struct </span>ReadmeDoctests;
+<a href=#400 id=400 data-nosnippet>400</a><span class="doccomment">/// The crate README's Rust blocks, compiled and run as doctests: the README is the
+<a href=#401 id=401 data-nosnippet>401</a>/// crates.io front page, so its examples must load.
+<a href=#402 id=402 data-nosnippet>402</a></span><span class="attr">#[cfg(doctest)]
+<a href=#403 id=403 data-nosnippet>403</a>#[doc = <span class="macro">include_str!</span>(<span class="string">"../README.md"</span>)]
+<a href=#404 id=404 data-nosnippet>404</a></span><span class="kw">pub struct </span>ReadmeDoctests;
 </code></pre></div></section></main></body></html>

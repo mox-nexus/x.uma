@@ -24,8 +24,6 @@ runtime <a href="trait.InputMatcher.html" title="trait rumi_kv::prelude::InputMa
 the config loader. This is the only path from a spec to a matcher, so
 every caller inherits the guarantee — the registry, both domain
 compilers, and anyone constructing a spec by hand.</p>
-<p>They lived in a private <code>Registry</code> method until 2026-08-17, which meant
-<code>HookMatch::compile</code> accepted an 8 MB pattern against an 8192-byte limit.</p>
 <h5 id="errors"><a class="doc-anchor" href="#errors">§</a>Errors</h5>
 <p>Returns <a href="enum.MatcherError.html#variant.PatternTooLong" title="variant rumi_kv::prelude::MatcherError::PatternTooLong"><code>MatcherError::PatternTooLong</code></a> if the pattern exceeds
 <a href="crate::MAX_PATTERN_LENGTH"><code>MAX_PATTERN_LENGTH</code></a>, or
@@ -35,9 +33,8 @@ regex. Returns <a href="enum.MatcherError.html#variant.InvalidPattern" title="va
     &amp;self,
     ignore_case: <a class="primitive" href="https://doc.rust-lang.org/1.95.0/std/primitive.bool.html">bool</a>,
 ) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.95.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.95.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="trait.InputMatcher.html" title="trait rumi_kv::prelude::InputMatcher">InputMatcher</a>&gt;, <a class="enum" href="enum.MatcherError.html" title="enum rumi_kv::prelude::MatcherError">MatcherError</a>&gt;</h4></section></summary><div class="docblock"><p>Compile this spec, optionally matching case-insensitively.</p>
-<p>This is xDS <code>StringMatcher.ignore_case</code>. The flag was read from the
-proto and thrown away until 2026-08-18, under a comment asserting the
-registry handled it — a rule that read case-insensitive and was not.</p>
+<p>This is xDS <code>StringMatcher.ignore_case</code>; the flag must reach the matcher,
+or a rule that reads case-insensitive is not.</p>
 <h5 id="errors-1"><a class="doc-anchor" href="#errors-1">§</a>Errors</h5>
 <p>As <a href="enum.StringMatchSpec.html#method.to_input_matcher" title="method rumi_kv::prelude::StringMatchSpec::to_input_matcher"><code>to_input_matcher</code></a>, plus
 <a href="enum.MatcherError.html#variant.InvalidPattern" title="variant rumi_kv::prelude::MatcherError::InvalidPattern"><code>MatcherError::InvalidPattern</code></a> when <code>ignore_case</code> is set on a regex
