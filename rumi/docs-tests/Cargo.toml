@@ -13,9 +13,8 @@ authors.workspace = true
 [dev-dependencies]
 rumi-core = { workspace = true, features = ["registry", "claude"] }
 # "gateway", not "ext-proc": the docs use compile_route_matches and the
-# Gateway API types, not the data plane. This crate previously pinned
-# ext-proc, which unified it into every workspace build and masked the fact
-# that a gateway-only build did not compile.
+# Gateway API types, not the data plane. Pinning ext-proc here would unify it
+# into every workspace build and mask a gateway-only build that does not compile.
 rumi-http = { path = "../ext/http", features = ["registry", "gateway"], default-features = false }
 rumi-proto = { path = "../proto" }
 serde_yaml.workspace = true

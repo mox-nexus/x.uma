@@ -146,17 +146,17 @@ use.
 | Command | What it does |
 |---|---|
 | `just doctor` | Checks every tool the repository needs is installed. Run it first on a new machine. |
-| `just ci` | Most of what CI runs. It does not include the crust test suites (pytest, `bun test`, the crusts' `cargo test --lib`), the codegen drift check or the npm package check, which run as their own CI jobs: run `just crust-check`, `just gen` plus `git diff --exit-code`, and `just crust-pack` for those. Pipe it with `set -o pipefail`, or a failure hides behind the pipe. |
+| `just ci` | Everything CI runs, including both bindings' test suites, the codegen drift check and the npm package check. It needs every tool `just doctor` lists. Pipe it with `set -o pipefail`, or a failure hides behind the pipe. |
 | `just build`, `just test`, `just lint` | The Rust workspace's default members. These exclude the crusts. |
 | `just lint-strict` | Clippy as CI enforces it: all targets, warnings denied. |
 | `just fmt` | Format. Before committing: `cargo clippy --fix --allow-dirty -- -W clippy::pedantic`, then `cargo fmt`, in that order. |
-| `just crust-check` | Builds and tests both bindings. |
+| `just crust-check` | Builds and tests both bindings, and runs each binding benchmark once. |
 | `just test-protojson`, `just test-http-conformance` | The two conformance suites. |
 | `just test-fixture-coverage` | Checks that the fixture ledger is current in both directions. |
-| `just gen` | Regenerates the proto code. CI fails if the committed tree differs. |
+| `just gen`, `just gen-check` | Regenerates the proto code; `gen-check` also fails if the committed tree differs, as CI does. |
 | `just lint-proto`, `just breaking` | `buf lint`, and `buf breaking` against `main`. |
 | `just docs-check`, `just docs-samples`, `just docs-commands`, `just docs-links` | The docs: every code block runs or compiles, every CLI command exists, every link resolves. |
-| `just bench-smoke` | Runs the core Rust benchmarks once, so a broken one fails. It does not judge speed, and it does not run the Python or wasm benchmarks. |
+| `just bench-smoke` | Runs the core Rust benchmarks once, so a broken one fails. It does not judge speed. The Python and wasm benchmarks get the same single run in `just crust-check`. |
 | `just bench-artifact`, `just bench-compare` | The measured protocol under D-066. Every performance number in tracked markdown cites an artifact. |
 | `just publishable`, `just publish-dry` | Publication checks. |
 | `just verify-clean-clone` | Builds from a fresh clone, to catch files that exist only on this machine. |

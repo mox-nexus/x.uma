@@ -1,9 +1,8 @@
 //! Loading a config over FFI: canonical protojson, in.
 //!
-//! `from_config` used to accept the terse dialect via `MatcherIr<String>`'s
-//! `Deserialize` impl. That dialect is retired — DECISIONS.md D-026 — so this
-//! is the only door now: protojson in, `Matcher` out, using the same
-//! `AnyResolver` and `convert_matcher` rumi and the CLI use.
+//! The terse dialect is retired — DECISIONS.md D-026 — so this is the only
+//! door: protojson in, `Matcher` out, using the same `AnyResolver` and
+//! `convert_matcher` rumi and the CLI use.
 //!
 //! Byte-identical between `crusts/python` and `crusts/wasm`, deliberately, for
 //! the same reason `fixtures.rs` is: the wheel and the npm package must not

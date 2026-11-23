@@ -14,10 +14,8 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.."
 
-# `proto` is deliberately absent: it no longer exists. It used to select
-# between two config vocabularies, which is what made a `not(feature = "proto")`
-# cfg writable in the first place. With one vocabulary there is nothing to
-# select, so the violation is inexpressible rather than merely fixed.
+# There is no `proto` feature: with one config vocabulary there is nothing to
+# select, so a `not(feature = "proto")` cfg is inexpressible.
 COMBOS=(
     ""
     "gateway"
@@ -45,7 +43,7 @@ for combo in "${COMBOS[@]}"; do
     fi
 done
 
-# --all-features must work too, and is what everything used to rely on.
+# --all-features must work too.
 if cargo test -q -p rumi-http --manifest-path rumi/Cargo.toml --all-features >/dev/null 2>&1; then
     printf '  ok    <all>\n'
 else

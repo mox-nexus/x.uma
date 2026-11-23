@@ -52,9 +52,6 @@ impl StringMatchSpec {
     /// every caller inherits the guarantee — the registry, both domain
     /// compilers, and anyone constructing a spec by hand.
     ///
-    /// They lived in a private `Registry` method until 2026-08-17, which meant
-    /// `HookMatch::compile` accepted an 8 MB pattern against an 8192-byte limit.
-    ///
     /// # Errors
     ///
     /// Returns [`MatcherError::PatternTooLong`] if the pattern exceeds
@@ -67,9 +64,8 @@ impl StringMatchSpec {
 
     /// Compile this spec, optionally matching case-insensitively.
     ///
-    /// This is xDS `StringMatcher.ignore_case`. The flag was read from the
-    /// proto and thrown away until 2026-08-18, under a comment asserting the
-    /// registry handled it — a rule that read case-insensitive and was not.
+    /// This is xDS `StringMatcher.ignore_case`; the flag must reach the matcher,
+    /// or a rule that reads case-insensitive is not.
     ///
     /// # Errors
     ///
@@ -117,8 +113,7 @@ impl StringMatchSpec {
     /// Does this pattern turn case-insensitivity off with an inline flag?
     ///
     /// `ignore_case` is implemented by asking the regex engine for a
-    /// case-insensitive match, and an inline `(?-i)` overrides that — measured
-    /// both ways on 2026-08-18: `(?i)(?-i)admin` and
+    /// case-insensitive match, and an inline `(?-i)` overrides that: `(?i)(?-i)admin` and
     /// `RegexBuilder::case_insensitive(true)` on `(?-i)admin` both fail to
     /// match `ADMIN`. That is correct regex semantics and not something a
     /// different construction can fix, so the combination is rejected instead.
@@ -263,15 +258,15 @@ mod tests {
         );
     }
 
-    // ── Regression: SEC2 / review F-02 ──────────────────────────────────────
+    // ── Regression: pattern limits live in the constructor ─────────────────
     //
-    // Limits used to live in a private Registry method, so every path that did
-    // not go through the JSON/YAML loader was unprotected: both domain
-    // compilers, and anyone building a spec by hand. The review demonstrated
-    // HookMatch::compile accepting an 8 MB pattern against an 8192-byte limit.
+    // A check in a registry method would leave every path that does not go
+    // through the JSON/YAML loader unprotected: both domain compilers, and
+    // anyone building a spec by hand. A compiler accepting an 8 MB pattern
+    // against an 8192-byte limit is the failure.
     //
     // These assert the constructor itself refuses. If someone moves the check
-    // back out to a caller, these fail.
+    // out to a caller, these fail.
 
     #[test]
     fn oversized_literal_is_rejected_by_the_constructor() {
@@ -334,7 +329,7 @@ mod tests {
 /// Does this pattern clear the `i` flag with an inline group?
 ///
 /// `ignore_case` asks the regex engine for a case-insensitive match, and an
-/// inline `(?-i)` overrides that. Measured both ways on 2026-08-18:
+/// inline `(?-i)` overrides that. Measured both ways:
 /// `(?i)(?-i)admin` and `RegexBuilder::case_insensitive(true)` applied to
 /// `(?-i)admin` both fail to match `ADMIN`. That is correct regex semantics, so
 /// no choice of construction fixes it — the combination has to be rejected.

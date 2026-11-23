@@ -1,12 +1,7 @@
 //! `spec/tests/05_http/` against rumi's Gateway API compiler.
 //!
-//! Added 2026-08-31 (PLAN.md CONF1). Until then this suite had no runner in
-//! the reference implementation, so "all implementations pass all fixtures in
-//! `spec/tests/`" was true of `07_protojson/` and merely assumed here.
-//!
-//! It is not a hypothetical gap. `http_empty_routes_matches_all` required an
-//! empty route list to match everything, which made a fail-open a contract the
-//! suite enforced (D-050) — and rumi was not running the file that said so.
+//! rumi runs this suite because it is the reference implementation: what a
+//! fixture requires is only checked where a runner reads it (D-050).
 
 #![cfg(all(feature = "fixtures", feature = "http"))]
 

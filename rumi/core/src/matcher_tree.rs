@@ -6,10 +6,9 @@
 //! # No fallback lives here
 //!
 //! The proto `MatcherTree` has exactly two members, `input` and the `tree_type`
-//! oneof. `on_no_match` belongs to the enclosing `Matcher`. This type carried
-//! its own until 2026-08-18, which was harmless only because nothing could
-//! construct one from config; wiring it up would have put two fallbacks on one
-//! condition with no stated precedence. See `DECISIONS.md` D-044.
+//! oneof. `on_no_match` belongs to the enclosing `Matcher`; a second one here
+//! would put two fallbacks on one condition with no stated precedence. See
+//! `DECISIONS.md` D-044.
 
 use crate::{radix_tree::RadixTree, DataInput, MatcherError, OnMatch};
 use std::collections::HashMap;
@@ -96,8 +95,8 @@ impl<Ctx, A: Clone + Send + Sync + 'static> MatcherTree<Ctx, A> {
         let mut tree = RadixTree::new();
         for (key, on_match) in entries {
             let key = key.into();
-            // `insert` returns the displaced value. Discarding it is how a
-            // second rule for the same prefix used to disappear silently.
+            // `insert` returns the displaced value; discarding it would drop the
+            // first rule for a duplicated prefix silently.
             if tree.insert(&key, on_match).is_some() {
                 return Err(MatcherError::DuplicateTreeKey { key });
             }
@@ -392,8 +391,8 @@ mod tests {
 
     #[test]
     fn a_duplicate_prefix_key_is_rejected() {
-        // `RadixTree::insert` returns the displaced value; discarding it is how
-        // the second rule used to disappear without a word.
+        // `RadixTree::insert` returns the displaced value; discarding it would
+        // drop the first rule for a duplicated prefix without a word.
         let err = MatcherTree::<TestContext, String>::prefix(
             Box::new(PathInput),
             [

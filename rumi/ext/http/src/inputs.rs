@@ -155,17 +155,10 @@ impl DataInput<HttpMessage> for AuthorityInput {
 // ═══════════════════════════════════════════════════════════════════════════════
 // Config loading (feature = "registry")
 //
-// The config types are the generated proto messages, unconditionally. There
-// used to be hand-written `HeaderInputConfig` / `QueryParamInputConfig` here
-// plus six `UnitConfig` impls, all behind
-// `#[cfg(all(feature = "registry", not(feature = "proto")))]`, with proto
-// versions on the other side. Enabling `proto` deleted two public types and
-// replaced six impls — and the replacement made `name` optional where the
-// hand-written one made it required, so `config: {}` went from a load error to
-// a header rule that silently never fired.
-//
-// Features add. They do not replace. With one vocabulary there is nothing left
-// to select between, which is why the `proto` feature no longer exists.
+// The config types are the generated proto messages, unconditionally. Features
+// add; they do not replace. A feature that swapped the config types would change
+// what `config: {}` means (a load error versus a header rule that never fires),
+// so there is one vocabulary and nothing to select between.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[cfg(feature = "registry")]

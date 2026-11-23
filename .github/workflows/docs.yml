@@ -2,8 +2,7 @@ name: Deploy Docs
 
 # One app, one build, one deploy. The docs site is a single SvelteKit app
 # (adapter-static) that carries the playground as its /playground route.
-# mdBook was retired on 2026-08-12; the standalone playground app was folded in
-# the same day (see DECISIONS.md D-024).
+# There is no separate playground app (see DECISIONS.md D-024).
 
 on:
   push:

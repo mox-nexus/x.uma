@@ -1,16 +1,13 @@
 name: CI
 
-# Nothing ran the test suites on push or PR before this workflow existed.
-# Every command below is one that `just` runs locally, so green here means the
-# same thing as green on a laptop.
+# Every check below is one that `just ci` runs locally, so green here means
+# the same thing as green on a laptop.
 
 on:
   push:
     branches: [main]
-  # Not `branches: [main]`. Phases are developed as stacked PRs (PLAN.md §1,
-  # one PR per phase), and a PR based on another phase branch got ZERO checks
-  # under the narrower filter — observed on #24. A stacked PR is exactly where
-  # CI matters most, since its base is itself unreviewed.
+  # Not `branches: [main]`: a stacked PR, based on another branch, would get
+  # no checks under that filter, and its base is itself unreviewed.
   pull_request:
   workflow_dispatch:
 
@@ -53,31 +50,23 @@ jobs:
         run: cargo test --manifest-path rumi/Cargo.toml
 
       # rumi-proto is outside default-members, so the step above never sees it.
-      # It went its whole life uncompiled because nothing ran this (PLAN.md F1).
       - name: Test rumi-proto
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-proto
 
-      # Red for months while `just ci` ran default features instead. What it
-      # reported was real — see PLAN.md F19.
       - name: Test (all features)
         run: cargo test --manifest-path rumi/Cargo.toml --all-features
 
-      # The crusts are outside default-members and need maturin / wasm-pack to
-      # build for real, so they run as their own jobs — which means nothing in
-      # this job or in `just ci` noticed when a core change stopped them
-      # compiling. That happened three times on 2026-08-18 alone, each found
-      # only after pushing. `cargo check` neither links nor builds a cdylib, so
-      # it needs none of that toolchain and takes ~3s.
+      # The crusts build for real in their own jobs. `cargo check` neither links
+      # nor builds a cdylib, so this needs none of their toolchain and fails
+      # within seconds when a core change stops them compiling.
       - name: Crusts still compile
         run: |
           cargo check --manifest-path rumi/crusts/python/Cargo.toml --features fixtures,bench
           cargo check --manifest-path rumi/crusts/wasm/Cargo.toml --features fixtures,bench
 
-      # Not regression detection — no baseline, no threshold, so a benchmark
-      # that got 10x slower passes. It catches a benchmark that has stopped
-      # measuring anything: panics, a vanished API, a config that no longer
-      # parses. `benches/config.rs` spent months timing a config dialect that
-      # had been retired, and nothing noticed.
+      # Not regression detection: there is no baseline, so a slower benchmark
+      # passes. It catches one that panics, calls a vanished API or carries a
+      # config that no longer parses. The crust jobs do the same for theirs.
       - name: Benchmarks still run
         run: cargo bench --manifest-path rumi/Cargo.toml --all-features -- --test
 
@@ -95,9 +84,7 @@ jobs:
       - name: Conformance fixtures (protojson)
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test proto_conformance --features rumi-test/registry,rumi-test/fixtures
 
-      # spec/tests/05_http through the Gateway API compiler. Had no runner in
-      # the reference implementation until 2026-08-31, while one of its
-      # fixtures required a fail-open of everyone. PLAN.md CONF1.
+      # spec/tests/05_http through the Gateway API compiler.
       - name: Conformance fixtures (Gateway API compiler)
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test http_conformance --features rumi-test/http,rumi-test/fixtures
 
@@ -107,9 +94,7 @@ jobs:
         run: cargo test --manifest-path rumi/Cargo.toml -p rumi-test --test fixture_coverage --features rumi-test/registry,rumi-test/fixtures
 
       # The Rust snippets in docs/content are compiled by rumi-docs-tests, which
-      # include!s the Markdown so rustdoc sees them. They were all `rust,ignore`
-      # until 2026-08-17, which is how four how-to pages taught APIs that had
-      # never existed.
+      # include!s the Markdown so rustdoc sees them.
       - name: Doc snippets compile
         run: cargo test --doc --manifest-path rumi/Cargo.toml -p rumi-docs-tests
 
@@ -119,8 +104,8 @@ jobs:
       - name: Doc links resolve
         run: node scripts/check-doc-links.mjs
 
-      # The harness named recipes, paths and engines that no longer existed; prose cannot fail
-      # a build.
+      # Prose cannot fail a build, so the harness's recipe, path and engine
+      # names are checked against the tree.
       - name: Harness matches the tree
         run: |
           node scripts/check-harness.mjs --self-test
@@ -156,10 +141,8 @@ jobs:
         working-directory: docs/experience
         run: bun run check
 
-      # Types are not truth. The playground's diagram drew the fallback branch
-      # identically to the match branch and type-checked perfectly; it is the
-      # one surface a visitor touches, and it had no tests at all until
-      # 2026-09-01.
+      # Type-checking cannot tell whether the playground's diagram describes
+      # the config it was given; these tests can.
       - name: Playground tests
         working-directory: docs/experience
         run: bun test tests/
@@ -181,10 +164,8 @@ jobs:
       # Cargo.lock is committed (D-031), so there is nothing to resolve first.
       #
       # RUSTUP_TOOLCHAIN overrides rust-toolchain.toml for this job only. The
-      # pin is for building x.uma; it should not constrain what version of a
-      # CI tool can be installed. It did: cargo-audit's transitive kstring
-      # requires rustc 1.96 and the pin forced 1.95, so the job failed to
-      # install its own tool.
+      # pin is for building x.uma; it should not constrain which version of a
+      # CI tool can be installed.
       - uses: rustsec/audit-check@v2
         env:
           RUSTUP_TOOLCHAIN: stable
@@ -202,14 +183,14 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      # PLAN.md CI5. Generated code is committed (DECISIONS.md D-028), which is
-      # only honest if regenerating reproduces it exactly. While gen/ was
-      # gitignored this check was vacuous by construction, and rumi-proto spent
-      # its whole life uncompiled without anything noticing.
+      - name: Lint the protos
+        run: buf lint
+
+      # Generated code is committed (DECISIONS.md D-028), which is honest only
+      # if regenerating reproduces it exactly.
       #
-      # scripts/gen.sh rather than `just gen`, so this job needs no `just` in
-      # CI — the setup action could not resolve a release and failed the job
-      # twice. The justfile recipe calls the same script, so there is one source.
+      # scripts/gen.sh rather than `just gen`, so this job needs no `just`. The
+      # justfile recipe calls the same script, so there is one source.
       - name: Regenerate
         run: ./scripts/gen.sh
 
@@ -231,19 +212,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: astral-sh/setup-uv@v5
 
-      # PLAN.md F5 / CI1. Two of five shipped implementations were never built
-      # by CI. The PyO3 crust has 80 tests that had never run here, in a wheel
-      # that goes to PyPI.
       # maturin is a build tool, not a project dependency, so `uv run maturin`
-      # cannot find it — it must be installed into the environment first.
+      # cannot find it until it is installed into the environment.
+      #
+      # `fixtures` and `bench` are for this test build only; the wheel ships
+      # with neither. --benchmark-disable runs each benchmark once as a test.
       - name: Build and test
         working-directory: rumi/crusts/python
         run: |
           uv sync --all-groups
           uv pip install maturin
-          uv run maturin develop --uv --features fixtures
-          uv run pytest tests/ -q \
-            --ignore=tests/test_bench_config.py --ignore=tests/test_bench_crusty.py
+          uv run maturin develop --uv --features fixtures,bench
+          uv run pytest tests/ -q --benchmark-disable
 
   crust-wasm:
     name: crust (wasm)
@@ -256,20 +236,27 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack --locked --version 0.15.0
 
-      # 80 more tests, in the package that goes to npm.
+      # `fixtures` and `bench` are for this test build only; the npm package
+      # ships with neither. The Rust unit tests run natively and cover the code
+      # both crusts share.
       - name: Build and test
         working-directory: rumi/crusts/wasm
         run: |
-          wasm-pack build --target web -- --features fixtures
+          wasm-pack build --target web -- --features fixtures,bench
           bun install --frozen-lockfile
           bun test
           cargo test --lib
 
-      # The npm artifact is assembled by wasm-pack, whose generated `files`
-      # array omitted both licence files — so a package declaring
-      # `MIT OR Apache-2.0` would have shipped with neither. Checked on every
-      # PR rather than at release time, because release time is after the
-      # version is spent: npm never lets one be re-uploaded.
+      - name: Benchmarks still run
+        working-directory: rumi/crusts/wasm
+        run: |
+          bun run bench/floor.bench.ts
+          bun run bench/crusty.bench.ts
+          bun run bench/config.bench.ts
+
+      # wasm-pack assembles the npm artifact and its generated `files` array
+      # omits the licence files. Checked on every PR, not at release time: npm
+      # never lets a version be re-uploaded.
       - name: The npm tarball is what the package promises
         run: node scripts/pack-wasm-crust.mjs
 
@@ -282,16 +269,9 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - uses: oven-sh/setup-bun@v2
 
-      # The Rust blocks in docs/content have been compiled since PR #26. The
-      # Python and TypeScript ones never were, and the drift tracked that
-      # exactly: `load_http_matcher` / `loadHttpMatcher` were documented on both
-      # getting-started pages and in the Python crust's README, and neither
-      # function has ever existed. Reading found none of it; running finds all
-      # of it.
-      #
       # This needs the whole toolchain because the samples import the shipped
-      # packages, not the sources — which is the point. A sample checked against
-      # anything other than the artifact a reader installs proves nothing.
+      # packages, not the sources: a sample checked against anything other than
+      # the artifact a reader installs proves nothing.
       - name: Install wasm-pack
         run: cargo install wasm-pack --locked --version 0.15.0
 
@@ -307,14 +287,12 @@ jobs:
           uv sync --all-groups
           uv run maturin develop --uv
 
-      # --require-all: an environment skip becomes a failure. "Checked somewhere
-      # else" is how the crusts broke three times in one day.
+      # --require-all: an environment skip becomes a failure.
       - name: Every sample runs as written
         run: node scripts/check-doc-samples.mjs --require-all
 
-      # PLAN.md CI3. The README says "one config, all runtimes" and shows three
-      # code blocks. Nothing checked that they return the same answers — the
-      # conformance suite has its own fixtures, and a reader copying from the
-      # README is not running it. Runs here because it needs both crusts built.
+      # The README says "one config, all runtimes" and shows three code blocks;
+      # this checks they return the same answers. Runs here because it needs
+      # both crusts built.
       - name: Evaluate the README config everywhere
         run: node scripts/check-readme-agreement.mjs

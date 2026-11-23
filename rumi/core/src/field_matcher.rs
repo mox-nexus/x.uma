@@ -58,10 +58,6 @@ impl<Ctx, A: Clone + Send + Sync + Debug + 'static> Debug for FieldMatcher<Ctx, 
     }
 }
 
-// Note: No unsafe impl needed — compiler derives Send/Sync automatically
-// because Predicate<Ctx> and OnMatch<Ctx, A> are Send/Sync when their
-// type parameters satisfy the bounds.
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -240,7 +240,7 @@ would silently read one way and behave another.
 
 ### Core (all domains)
 
-Registered by `register_core_matchers()` in all implementations:
+Registered by the CLI and by both bindings:
 
 | Type URL | Type | Config |
 |----------|------|--------|

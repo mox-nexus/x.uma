@@ -9,17 +9,11 @@
  * manifest, and a link whose target is not in the manifest is silently left as
  * a dead `.md` href.
  *
- * Before 2026-08-17 every internal link in the docs was dead: they used a
- * `<category>/<page>` structure the site does not have. The docs build reported
- * exactly one of them, as a prefetch 404, and nothing failed.
+ * The docs build reports at most a prefetch 404 for a dead link, and nothing
+ * fails, so this check does.
  *
- * PLAN.md A4 / CI4.
- *
- * Two link syntaxes, both checked. Only the `.md` one was, until 2026-08-31,
- * while the summary line read "all internal links resolve to routable pages" —
- * an absolute `](/anything)` was not merely unresolved, it was not counted.
- * Proved by injecting `](/reference/nope)` and watching the count stay at 25.
- * A gate that silently declines to look at a whole syntax is worse than no
+ * Two link syntaxes, both checked: the `.md` one and the absolute `](/anything)`
+ * one. A gate that silently declines to look at a whole syntax is worse than no
  * gate, because the summary reads like coverage.
  */
 
@@ -71,8 +65,8 @@ function manifestSlugs() {
  * into the site after the SvelteKit build, so a bare `](/api/rust)` fails
  * prerender — and it would be wrong in production anyway: the site is served
  * under a base path (`/x.uma` on Pages), which a hand-written absolute link
- * ignores. Link the full URL instead. Both failure modes were introduced and
- * caught on 2026-08-31; leaving the root undeclared is what keeps them caught.
+ * ignores. Link the full URL instead. Leaving the root undeclared is
+ * what keeps both failure modes caught.
  */
 const STATIC_ROOTS = new Set(["/", "/docs", "/playground"]);
 

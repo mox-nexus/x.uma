@@ -148,13 +148,11 @@ onNoMatch:
 ```
 
 An empty `matcherList.matchers` list matches **nothing**, and falls through to
-`onNoMatch`. This page said the opposite until 2026-08-31. xDS is explicit —
-*"if no matcher above matched and this field is not populated, the match will
-be considered unsuccessful"* — and the config path has always honoured it; the
-sentence was describing the Gateway API compiler's behaviour, which was a bug
-and is now an error. So a config that fails to load leaves you with your
-fallback, not with open access. `rumi check` prints the fallback, and says so
-explicitly when there are zero rules.
+`onNoMatch`. xDS is explicit — *"if no matcher above matched and this field is
+not populated, the match will be considered unsuccessful"* — and an empty
+Gateway API route list is an error, not a catch-all. So a config with no rules
+leaves you with your fallback, not with open access. `rumi check` reports
+whether a fallback is set, and says so explicitly when there are zero rules.
 
 ## The rule that catches people
 

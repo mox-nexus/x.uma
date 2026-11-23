@@ -62,8 +62,9 @@ removing a field, reserve its number and name.
 
 **Why.** A config written today must still load tomorrow. Proto's wire compatibility rests
 entirely on field numbers keeping their meaning. `buf breaking` checks the schema against
-`main` at file level (`just breaking`). CI does not run it, nor `buf lint`, so run both
-yourself before a schema change merges, until a CI step does.
+`main` at file level (`just breaking`). CI runs `buf lint` but not `buf breaking`: until the
+first release the schema is still being changed on purpose, so run it yourself and read each
+finding as a decision to make. It becomes a CI gate when the schema freezes at publish.
 
 **What it helps you catch.**
 - A "harmless" rename.

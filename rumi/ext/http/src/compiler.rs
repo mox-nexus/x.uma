@@ -11,10 +11,9 @@ use rumi::{MatcherError, StringMatchSpec};
 
 /// Extension trait for compiling `HttpRouteMatch` to rumi Matcher.
 ///
-/// Both methods return `Result`. Until 2026-08-17 they did not: an invalid
-/// regex was silently replaced with an exact match on the *pattern literal*,
-/// so a route the operator believed was live simply never fired. The sibling
-/// Claude compiler already returned `Result`; this removes the asymmetry.
+/// Both methods return `Result`: an invalid regex is an error, not a silent
+/// fallback to an exact match on the *pattern literal*, which would leave a
+/// route the operator believed was live that never fires.
 pub trait HttpRouteMatchExt {
     /// Compile this `HttpRouteMatch` into a rumi Matcher.
     ///
@@ -234,8 +233,9 @@ mod tests {
     use super::*;
     use crate::message::HttpMessageBuilder;
 
-    /// The width limits used to live only in the registry, so this — the path
-    /// CLAUDE.md calls the door handle — accepted a matcher of any width.
+    /// The width limits apply here too, not only in the registry: this is the
+    /// path CLAUDE.md calls the door handle, and it must not accept a matcher of
+    /// any width.
     #[test]
     fn compiler_rejects_more_routes_than_the_limit() {
         let routes: Vec<HttpRouteMatch> = (0..=rumi::MAX_PREDICATES_PER_EVALUATION)
@@ -254,11 +254,10 @@ mod tests {
         );
     }
 
-    // These used to build an ext_proc `ProcessingRequest` to get an
-    // `HttpMessage`, which meant every test of the compiler — a Gateway API
-    // feature — needed the data plane. It also meant the builder these tests
-    // now use, the only construction path a `gateway`-only consumer has, had
-    // no coverage at all.
+    // These build an `HttpMessage` with the builder, not an ext_proc
+    // `ProcessingRequest`: the compiler is a Gateway API feature and its tests
+    // must not need the data plane. The builder is also the only construction
+    // path a `gateway`-only consumer has, so this exercises it.
     struct RequestBuilder {
         inner: HttpMessageBuilder,
     }
@@ -292,10 +291,9 @@ mod tests {
 
     #[test]
     fn empty_route_match_is_rejected() {
-        // Used to assert this compiled to a single catch-all predicate. That
-        // was true, and was the bug. `HttpRouteMatch` is k8s-gateway-api's
-        // type: every field optional, no `deny_unknown_fields`, so a config
-        // saying `pathPrefix:` where it meant `path:` arrives here as
+        // A catch-all predicate here would be the bug. `HttpRouteMatch` is
+        // k8s-gateway-api's type: every field optional, no `deny_unknown_fields`,
+        // so a config saying `pathPrefix:` where it meant `path:` arrives here as
         // `default()` with nothing to signal the typo.
         let err = HttpRouteMatch::default().to_predicate().unwrap_err();
         assert!(matches!(err, MatcherError::InvalidConfig { .. }), "{err:?}");
@@ -303,9 +301,8 @@ mod tests {
 
     #[test]
     fn a_typod_route_cannot_smuggle_in_a_catch_all() {
-        // The falsifying test from the finding, kept as a regression: an
-        // allowlist built from one typo'd rule used to return ALLOW for
-        // `DELETE /etc/passwd`.
+        // Regression: an allowlist built from one typo'd rule must not return
+        // ALLOW for `DELETE /etc/passwd`.
         let routes = [HttpRouteMatch::default()];
         assert!(compile_route_matches(&routes, "ALLOW", Some("DENY")).is_err());
     }
@@ -685,12 +682,11 @@ mod tests {
         assert_eq!(matcher.evaluate(&msg), None);
     }
 
-    // ── Regression: SEC2 / review F-02, and PLAN.md F16 ─────────────────────
+    // ── Regression: declared limits and invalid patterns ────────────────────
     //
-    // This compiler used to construct matchers directly, so it inherited none
-    // of the declared limits — `grep MAX_ rumi/ext/http/src/*.rs` returned
-    // nothing — and an invalid regex was swallowed into an exact match on the
-    // pattern literal, silently deleting the route.
+    // The compiler must inherit the declared limits, and an invalid regex must
+    // be an error, not an exact match on the pattern literal that silently
+    // deletes the route.
 
     #[test]
     fn oversized_regex_is_rejected_not_swallowed() {

@@ -5,10 +5,7 @@
 //!
 //! These configs are canonical protojson, and the benchmark walks the whole
 //! shipping path: `parse_matcher` (which expands `@type` bodies) then
-//! `load_proto_matcher`. Until 2026-08-18 it instead measured a terser JSON
-//! dialect deserialized straight into `MatcherIr`, which was always
-//! cheaper than what any caller actually ran and, once that dialect was
-//! retired, measured nothing that existed.
+//! `load_proto_matcher`, so it measures what a caller actually runs.
 
 use rumi::prelude::*;
 use rumi_kv::KvContext;

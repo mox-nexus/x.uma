@@ -48,13 +48,11 @@ assert_eq!(matcher.evaluate(&ctx), Some("allow".to_string()));
 
 ## Why this is its own crate
 
-It used to live inside `rumi-test` alongside the conformance suite's YAML
-fixture loader. That crate is `publish = false`, because a fixture loader has no
-business in a published artifact — which meant `rumi-cli` could not be published
-either, despite only ever wanting the domain.
+It is not part of `rumi-test`, the conformance suite's YAML fixture loader. That
+crate is `publish = false`, because a fixture loader has no business in a
+published artifact, and `rumi-cli` needs only the domain.
 
-The concept was never "test". It is a general-purpose domain, a peer of
-`rumi-http`, and the misleading name is what hid the release blocker.
+It is a general-purpose domain, a peer of `rumi-http`.
 
 ## Type URLs
 
@@ -62,6 +60,6 @@ The concept was never "test". It is a general-purpose domain, a peer of
 |---|---|
 | `xuma.core.v1.MapInput` | one key from the context map |
 
-The URL still says `test`. Type URLs are part of the config schema and freeze at
-first publish, so renaming them belongs with the schema migration rather than
-with a crate split — see `PLAN.md` SF8.
+The URL is in `xuma.core`, not a `kv` package: the proto message is defined in
+the core schema (D-069). The Rust `MapInput` and the context it reads are
+defined here.

@@ -64,8 +64,8 @@ error_contains: "unknown field"
 
 Without `error_contains` a fixture passes on *any* failure — so one that starts
 failing earlier still looks green while no longer testing what it was written
-for. That happened: a fixture meant to prove a both-set `oneof` is rejected was
-failing on an unregistered type instead, and passing.
+for. A fixture meant to prove a both-set `oneof` is rejected would pass if it
+failed on an unregistered type instead.
 
 Because the string has to match in every implementation, it also holds the
 error *wording* to cross-language agreement. When two implementations

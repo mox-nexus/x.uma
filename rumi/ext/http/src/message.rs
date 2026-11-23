@@ -53,10 +53,10 @@ pub struct HttpMessage {
 
 /// Builds an [`HttpMessage`] from plain header pairs.
 ///
-/// `HttpMessage` was previously constructible only via `From<ProcessingRequest>`,
-/// which made the Gateway API compiler — whose output matches on `HttpMessage` —
-/// unusable from anything that was not an `ext_proc` filter. The type itself is
-/// six plain fields and has nothing to do with `ext_proc`; only the conversion did.
+/// Constructing an `HttpMessage` must not require `ProcessingRequest`, or the
+/// Gateway API compiler — whose output matches on `HttpMessage` — would be
+/// unusable from anything that is not an `ext_proc` filter. The type itself is
+/// six plain fields and has nothing to do with `ext_proc`; only the conversion does.
 #[derive(Debug, Default, Clone)]
 pub struct HttpMessageBuilder {
     headers: Vec<(String, String)>,
@@ -213,11 +213,9 @@ impl From<&ProcessingRequest> for HttpMessage {
 
 /// Decode `ext_proc` headers, then delegate the indexing.
 ///
-/// This *calls* [`HttpMessage::from_header_pairs`] rather than reproducing it.
-/// It used to hand-copy the pseudo-header lift, and a comment claimed the two
-/// paths could not disagree — which was untrue, and worse than no comment,
-/// because it told the next reader not to check. The only thing that belongs
-/// here is the transport-shaped detail: `raw_value` takes precedence over
+/// This *calls* [`HttpMessage::from_header_pairs`] rather than reproducing the
+/// pseudo-header lift, so the two paths cannot disagree. The only thing that
+/// belongs here is the transport-shaped detail: `raw_value` takes precedence over
 /// `value`, and is never stored.
 #[cfg(feature = "ext-proc")]
 fn from_request_headers(request: Option<&Request>) -> HttpMessage {
@@ -400,11 +398,7 @@ mod tests {
     // ── The invariant the doc comment claims ────────────────────────────────
     //
     // `from_request_headers` delegates to `from_header_pairs` rather than
-    // repeating the pseudo-header lift. Before 2026-08-17 it duplicated it, and
-    // a comment asserted the two could not disagree — which was untrue, and
-    // worse than no comment, because it told the reader not to check.
-    //
-    // This is that check.
+    // repeating the pseudo-header lift; this checks that the two agree.
 
     #[cfg(feature = "ext-proc")]
     #[test]

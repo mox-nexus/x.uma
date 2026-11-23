@@ -7,8 +7,7 @@ just doctor
 ```
 
 It lists every tool the repo needs, reports what you have, and exits non-zero if
-something required is missing. Run it before anything else — two defects in one
-week traced to a tool being present on one machine and absent on another.
+something required is missing. Run it before anything else.
 
 Then:
 
@@ -16,7 +15,7 @@ Then:
 just ci
 ```
 
-That runs exactly what CI runs, in the same order. Green here means green there;
+That runs everything CI runs. Green here means green there;
 that is the whole premise, and anything that breaks it is a bug worth reporting.
 
 ## Prerequisites
@@ -33,9 +32,8 @@ that is the whole premise, and anything that breaks it is a bug worth reporting.
 | `wasm-pack` | the wasm crust package | `cargo install wasm-pack` |
 | `cargo-audit` | dependency advisories | `cargo install cargo-audit` |
 
-`cargo-audit` is optional until `just audit`; `maturin` and `wasm-pack` are
-needed by `just ci`, which builds the wasm crust for the docs site and runs the
-doc samples against both bindings.
+`just ci` needs all of them: it builds and tests both bindings, regenerates the
+proto code, builds the docs site on the wasm binding and audits the lockfile.
 
 ## The rule that matters most
 
@@ -105,10 +103,8 @@ just verify-clean-clone  # what a clone actually gets
 ```
 
 The second one matters more than it looks. `just ci` runs against your working
-tree, so it cannot see a file that exists locally but is untracked or ignored.
-That class has bitten this repo three times: seventeen files hidden by a bare
-`lib/` gitignore pattern, a workspace entry pointing at a deleted directory, and
-generated proto code that was ignored while a crate depended on it.
+tree, so it cannot see a file that exists locally but is untracked or ignored,
+such as a source file hidden by a broad gitignore pattern.
 
 ## Decisions
 

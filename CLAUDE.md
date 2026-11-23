@@ -160,7 +160,7 @@ What each ⚠️ needs to become ✅:
 | Phase | Blocked on |
 |---|---|
 | ~~7, 8~~ | ~~CI building both crusts~~ — done 2026-08-17; both are built and their 160 tests run on every PR |
-| 9, 14 | a committed baseline to compare against. They now run in CI (`just bench-smoke`), so a broken benchmark fails — but nothing yet fails on a *slower* one, which is the guarantee the ✅ implies |
+| 9, 14 | a committed baseline to compare against. They run in CI (`just bench-smoke` for the engine, `just crust-check` for the bindings), so a broken benchmark fails — but nothing yet fails on a *slower* one, which is the guarantee the ✅ implies |
 | 15 | `cargo publish --dry-run` passing without path patching — `PLAN.md` Phase E |
 
 ## Current Work
@@ -309,7 +309,7 @@ The compiler is the "door handle" — it makes the matcher engine usable without
 
 ### Claude Domain Compiler (`rumi-core`, feature = "claude")
 
-Types to build (parallel to rumi-http's gateway):
+Its types, parallel to rumi-http's gateway:
 - `HookMatch` — match conditions for Claude Code hook events
 - `HookMatchExt` — extension trait for compile convenience
 - `compile_hook_matches()` — transforms `HookMatch` configs into `Matcher<HookContext, A>`
@@ -387,7 +387,7 @@ Principles distilled from 13 elite Rust codebases. Each prevents a form of self-
 
 | Don't | Why | Source |
 |-------|-----|--------|
-| Add `thiserror` or utility crate deps | "17K lines replaced by 150" — hand-write what you need | ripgrep, hyper |
+| Add utility crate deps to the core | Every core dependency is supply-chain risk and build time that each consumer pays; hand-write what is small | ripgrep, hyper |
 | Expand the protojson schema after shipping | Schema, type URLs and FFI shape freeze at publish (D-053); `MatcherIr` is internal and does not | rust-analyzer |
 | Optimize without benchmarking | Bottleneck is rarely where you think | ripgrep, all 13 |
 | Add `&mut self` to core traits | Breaks `Arc<T>` wrapper algebra, breaks FFI | hyper, tower |
@@ -478,8 +478,7 @@ On new session, read `PLAN.md` top to bottom and confirm understanding with the 
    cargo fmt --manifest-path rumi/Cargo.toml --all
    ```
 3. **CI is the gate** — there is no pre-commit hook. Before opening a pull request, run
-   `set -o pipefail; just ci` and `just crust-check`. `just ci` covers most of CI; the crust
-   test suites, the codegen drift check and the npm package check run as separate CI jobs.
+   `set -o pipefail; just ci`, which runs everything CI runs.
 
 ### Project skills
 

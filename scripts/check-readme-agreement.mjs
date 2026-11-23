@@ -4,11 +4,9 @@
  * they return the same answers.
  *
  * The README says "one config, all runtimes" and then shows three code blocks.
- * That is the project's central correctness claim, and nothing checked it — the
- * conformance suite has its own fixtures, but not this config, and a reader
- * copying from the README is not running the conformance suite.
- *
- * PLAN.md CI3.
+ * That is the project's central correctness claim: the conformance suite has its
+ * own fixtures, not this config, and a reader copying from the README is not
+ * running the conformance suite.
  *
  * Extracts the first ```yaml block under the HTTP section, writes it to a temp
  * file, evaluates a fixed set of requests through the rumi CLI, the PyO3

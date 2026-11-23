@@ -373,8 +373,9 @@ context. Then `compile_route_matches` can be exposed from the bindings, and
 the playground can regain a Gateway-route mode.
 
 **Why.** F14 found `xuma.http.v1.PathInput` bound to two semantics split by
-runtime: the crusts took the registration under which `/admin?x=1` matched
-`{Exact: "/admin"}`, and the native path did not. That is the boundary test's
+registration: under `register` (`HttpMessage`) `/admin?x=1` matched
+`{Exact: "/admin"}`, and under `register_simple` (`HttpRequest`), which both
+crusts and the CLI used, it did not. That is the boundary test's
 degeneration condition, a type URL whose meaning depends on the caller,
 observed in this repo. Two registries over one type URL is the mechanism;
 removing the second removes the class of defect. Docs promised
