@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_DOCUMENT_BYTES"],"fn":["check_document_size","parse_matcher","parse_matcher_str"]};

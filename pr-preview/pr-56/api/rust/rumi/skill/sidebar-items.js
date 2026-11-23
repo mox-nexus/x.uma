@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["AUTHORING_REFERENCE","CONFIG_KEYS","CONFIG_REFERENCE","REFERENCE_NAMES"],"fn":["config_key","describe","description","hint","reference","section","skill"]};

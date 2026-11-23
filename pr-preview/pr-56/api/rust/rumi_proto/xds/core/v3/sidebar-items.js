@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["FILE_DESCRIPTOR_SET"],"mod":["collection_entry","resource_locator"],"struct":["Authority","CidrRange","CollectionEntry","ContextParams","Resource","ResourceLocator","ResourceName","TypedExtensionConfig"]};

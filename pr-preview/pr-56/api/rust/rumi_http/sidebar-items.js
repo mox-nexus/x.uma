@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["register"],"mod":["prelude"],"struct":["AuthorityInput","HeaderInput","HttpMessage","HttpMessageBuilder","MethodInput","PathInput","QueryParamInput","SchemeInput"]};
