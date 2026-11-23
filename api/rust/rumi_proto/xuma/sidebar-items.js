@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["claude","core","http","kv"]};
+window.SIDEBAR_ITEMS = {"mod":["claude","core","http"]};

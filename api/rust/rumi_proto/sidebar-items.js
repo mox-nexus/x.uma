@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["any_resolver","cel","convert","google","protojson","xds","xuma"]};
+window.SIDEBAR_ITEMS = {"mod":["any_resolver","cel","convert","google","index","protojson","xds","xuma"]};

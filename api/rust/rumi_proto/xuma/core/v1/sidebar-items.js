@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["FILE_DESCRIPTOR_SET"],"struct":["BoolMatcher","NamedAction"]};
+window.SIDEBAR_ITEMS = {"constant":["FILE_DESCRIPTOR_SET"],"struct":["BoolMatcher","MapInput","NamedAction"]};

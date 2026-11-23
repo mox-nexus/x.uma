@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["register"],"mod":["prelude"],"struct":["KvContext","StringInput"]};
+window.SIDEBAR_ITEMS = {"enum":["ValueType"],"fn":["register"],"mod":["prelude"],"struct":["KvContext","MapInput"]};

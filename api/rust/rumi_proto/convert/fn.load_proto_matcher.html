@@ -8,7 +8,7 @@
     A: <a class="trait" href="https://doc.rust-lang.org/1.95.0/core/clone/trait.Clone.html" title="trait core::clone::Clone">Clone</a> + <a class="trait" href="https://doc.rust-lang.org/1.95.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + <a class="trait" href="https://doc.rust-lang.org/1.95.0/core/marker/trait.Sync.html" title="trait core::marker::Sync">Sync</a> + 'static,</div></code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Load a proto <code>Matcher</code> into a runtime <code>Matcher&lt;Ctx, A&gt;</code>.</p>
 <p>This is the one-shot convenience function for the full proto → runtime path:</p>
 <ol>
-<li><strong>Convert</strong> proto <code>Matcher</code> → <code>MatcherConfig&lt;TypedConfig&gt;</code> (via <a href="fn.convert_matcher.html" title="fn rumi_proto::convert::convert_matcher"><code>convert_matcher</code></a>)</li>
+<li><strong>Convert</strong> proto <code>Matcher</code> → <code>MatcherIr&lt;TypedExtensionConfig&gt;</code> (via <a href="fn.convert_matcher.html" title="fn rumi_proto::convert::convert_matcher"><code>convert_matcher</code></a>)</li>
 <li><strong>Load</strong> config through the <a href="../../rumi/registry/struct.Registry.html" title="struct rumi::registry::Registry"><code>Registry</code></a> → runtime <code>Matcher&lt;Ctx, A&gt;</code></li>
 </ol>
 <h2 id="example"><a class="doc-anchor" href="#example">§</a>Example</h2>

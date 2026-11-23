@@ -1,9 +1,9 @@
 (function() {
-    const implementors = Object.fromEntries([["rumi_proto",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.95.0/core/cmp/trait.PartialOrd.html\" title=\"trait core::cmp::PartialOrd\">PartialOrd</a> for <a class=\"enum\" href=\"rumi_proto/xds/core/v3/resource_locator/enum.Scheme.html\" title=\"enum rumi_proto::xds::core::v3::resource_locator::Scheme\">Scheme</a>",0]]]]);
+    const implementors = Object.fromEntries([["rumi_proto",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.95.0/core/cmp/trait.PartialOrd.html\" title=\"trait core::cmp::PartialOrd\">PartialOrd</a> for <a class=\"enum\" href=\"rumi_proto/xds/core/v3/resource_locator/enum.Scheme.html\" title=\"enum rumi_proto::xds::core::v3::resource_locator::Scheme\">Scheme</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.95.0/core/cmp/trait.PartialOrd.html\" title=\"trait core::cmp::PartialOrd\">PartialOrd</a> for <a class=\"struct\" href=\"rumi_proto/index/struct.ActionIndex.html\" title=\"struct rumi_proto::index::ActionIndex\">ActionIndex</a>",0]]]]);
     if (window.register_implementors) {
         window.register_implementors(implementors);
     } else {
         window.pending_implementors = implementors;
     }
 })()
-//{"start":59,"fragment_lengths":[338]}
+//{"start":59,"fragment_lengths":[632]}
