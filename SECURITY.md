@@ -50,12 +50,10 @@ an 8 MB pattern against an 8 KB limit.
 | `MAX_DOCUMENT_BYTES` | 1 MiB | a config document, before parsing | every reader: the CLI and both bindings |
 | config nesting | 128 | JSON/YAML object depth before a matcher exists | both parsers, and the protojson walk |
 
-The two width limits are not enforced in the config loader alone:
-`compile_route_matches` and `compile_hook_matches`, the list compilers of both
-domains, call `validate()` before returning. The single-match `compile()`
-methods on `HttpRouteMatchExt` and `HookMatchExt` do not, so a matcher built
-from one of those, or by hand, carries the limits only once the caller runs
-`validate()`.
+The two width limits are not enforced in the config loader alone: every
+compiler in both domains calls `validate()` before returning a matcher. A
+matcher assembled by hand from `Matcher::list` carries the limits only once the
+caller runs `validate()`.
 
 **Empty identifiers are rejected at construction.** A header name, query
 parameter name, tool argument name or map key says *where* to read a value.
@@ -82,8 +80,8 @@ a stronger guarantee than it is.
   the parsers' own recursion limit, not `MAX_DEPTH`. Measured: `serde_json`
   rejects a document at 128 levels of nesting and `serde_yaml` at 129, so
   neither front end can hand a deeper document to anything downstream.
-- **The single-match `compile()` methods return an unvalidated matcher**, as
-  described above.
+- **A hand-assembled matcher is unvalidated** until the caller runs
+  `validate()`, as described above.
 
 ## Controls that are load-bearing
 

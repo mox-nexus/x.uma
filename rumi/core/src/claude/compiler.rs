@@ -46,8 +46,9 @@ impl HookMatchExt for HookMatch {
         &self,
         action: A,
     ) -> Result<Matcher<HookContext, A>, MatcherError> {
-        let predicate = self.to_predicate()?;
-        Ok(Matcher::from_predicate(predicate, action, None))
+        let matcher = Matcher::from_predicate(self.to_predicate()?, action, None);
+        matcher.validate()?;
+        Ok(matcher)
     }
 
     fn to_predicate(&self) -> Result<Predicate<HookContext>, MatcherError> {

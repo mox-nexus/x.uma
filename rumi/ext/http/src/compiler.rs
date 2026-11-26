@@ -42,7 +42,9 @@ impl HttpRouteMatchExt for HttpRouteMatch {
         &self,
         action: A,
     ) -> Result<Matcher<HttpMessage, A>, MatcherError> {
-        Ok(Matcher::from_predicate(self.to_predicate()?, action, None))
+        let matcher = Matcher::from_predicate(self.to_predicate()?, action, None);
+        matcher.validate()?;
+        Ok(matcher)
     }
 
     fn to_predicate(&self) -> Result<Predicate<HttpMessage>, MatcherError> {
@@ -236,6 +238,27 @@ mod tests {
     /// The width limits apply here too, not only in the registry: this is the
     /// path CLAUDE.md calls the door handle, and it must not accept a matcher of
     /// any width.
+    #[test]
+    fn a_single_route_is_held_to_the_limits_too() {
+        let route = HttpRouteMatch {
+            headers: Some(
+                (0..=rumi::MAX_PREDICATES_PER_EVALUATION)
+                    .map(|i| HttpHeaderMatch::Exact {
+                        name: format!("x-h{i}"),
+                        value: "v".into(),
+                    })
+                    .collect(),
+            ),
+            ..Default::default()
+        };
+
+        let err = route.compile("hit").unwrap_err();
+        assert!(
+            matches!(err, MatcherError::TooManyPredicatesPerEvaluation { .. }),
+            "{err:?}"
+        );
+    }
+
     #[test]
     fn compiler_rejects_more_routes_than_the_limit() {
         let routes: Vec<HttpRouteMatch> = (0..=rumi::MAX_PREDICATES_PER_EVALUATION)
