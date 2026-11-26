@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_DENY_ACTIONS","EXIT_ALLOW","EXIT_BLOCK"],"fn":["exit_code_for","parse_payload"],"struct":["HookPayload"]};
